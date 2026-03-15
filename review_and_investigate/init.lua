@@ -76,9 +76,13 @@ local DEFAULT_POLICY = {
 -- ─── Phase 1: Detect ──────────────────────────────────────
 
 --- Scan code and extract issue themes as structured data.
+--- Uses step_back to first abstract the code's design intent, then detect
+--- deviations from that intent as themes. This reduces surface-level false positives.
 --- Returns a list of theme tables: { id, name, category, surface_symptom, locations }
 local function phase_detect(code, context)
-    alc.log("info", "review_and_investigate: Phase 1 — Detect")
+    alc.log("info", "review_and_investigate: Phase 1 — Detect (step_back-enhanced)")
+
+    local step_back = require("step_back")
 
     local context_block = ""
     if context ~= "" then
@@ -88,10 +92,29 @@ local function phase_detect(code, context)
         )
     end
 
+    -- Step 1a: step_back — abstract the code's design intent and principles
+    local abstraction_ctx = step_back.run({
+        task = string.format(
+            "Analyze this code and identify its design intent, architectural principles, "
+                .. "and key invariants.\n\n```\n%s\n```\n%s\n"
+                .. "What are the underlying design principles this code is trying to follow?",
+            code, context_block
+        ),
+        abstraction_levels = 1,
+        domain_hint = "software engineering / code review",
+    })
+
+    local design_principles = abstraction_ctx.result.answer or ""
+    alc.log("info", "review_and_investigate: step_back — design principles extracted")
+
+    -- Step 1b: detect themes as deviations from the abstracted principles
     local raw = alc.llm(
         string.format(
-            "Analyze the following code (or diff) and identify potential issue themes.\n\n"
-                .. "```\n%s\n```\n%s\n"
+            "You have analyzed the following code and identified its design principles.\n\n"
+                .. "Design principles:\n%s\n\n"
+                .. "Code:\n```\n%s\n```\n%s\n"
+                .. "Now identify issue themes — places where the implementation DEVIATES from "
+                .. "or VIOLATES these design principles.\n\n"
                 .. "For each theme, output in the following JSON array format (no other text):\n"
                 .. '[\n'
                 .. '  {\n'
@@ -99,15 +122,16 @@ local function phase_detect(code, context)
                 .. '    "name": "theme-name (e.g. error-handling-design)",\n'
                 .. '    "category": "safety|logic|design|performance|style",\n'
                 .. '    "surface_symptom": "description of the surface symptom",\n'
+                .. '    "principle_violated": "which design principle this violates",\n'
                 .. '    "locations": ["file:line or function name"]\n'
                 .. '  }\n'
                 .. ']\n\n'
                 .. "Do not stop at surface-level observations (e.g. unwrap→expect).\n"
-                .. "Prioritize structural and design issues.",
-            code, context_block
+                .. "Prioritize structural deviations from the identified design principles.",
+            design_principles, code, context_block
         ),
         {
-            system = "You are a senior code analyst. You identify structural issues, "
+            system = "You are a senior code analyst. You detect deviations from design intent, "
                 .. "not just surface-level lint. Output ONLY valid JSON array.",
             max_tokens = 800,
         }
@@ -303,13 +327,15 @@ end
 -- ─── Phase 4: Diagnose ────────────────────────────────────
 
 --- Identify root cause for each theme.
---- 1. reflect: identify root cause, self-critique whether it is intentional design
---- 2. calibrate: confidence gating
---- 3. triad: if low confidence, debate with related data
+--- 1. meta_prompt: dispatch to domain-specific experts based on theme category
+--- 2. reflect: self-critique the expert diagnosis for intentional design
+--- 3. calibrate: confidence gating
+--- 4. triad: if low confidence, debate with related data
 --- Themes diagnosed as intentional design are removed from the pipeline.
 local function phase_diagnose(themes, code, deep_threshold, context)
-    alc.log("info", "review_and_investigate: Phase 4 — Diagnose")
+    alc.log("info", "review_and_investigate: Phase 4 — Diagnose (meta_prompt-enhanced)")
 
+    local meta_prompt = require("meta_prompt")
     local reflect = require("reflect")
     local calibrate = require("calibrate")
     local triad = require("triad")
@@ -326,23 +352,49 @@ local function phase_diagnose(themes, code, deep_threshold, context)
     local reclassified = 0
 
     for i, theme in ipairs(themes) do
-        -- Step 1: reflect — identify root cause and self-critique for intentional design
-        local reflect_ctx = reflect.run({
+        -- Step 1: meta_prompt — dispatch to domain-specific experts
+        local expert_ctx = meta_prompt.run({
             task = string.format(
-                "Identify the root cause of the theme \"%s\".\n\n"
+                "Diagnose the root cause of the following code issue.\n\n"
+                    .. "Theme: %s (category: %s)\n"
                     .. "Surface symptom: %s\n"
                     .. "Related locations (%d occurrences): %s\n\n"
                     .. "Code:\n```\n%s\n```\n%s\n"
-                    .. "Decision procedure:\n"
-                    .. "1. Read the overall design intent of the code\n"
-                    .. "2. Consider whether this implementation is intentional design\n"
-                    .. "   (deliberate trade-off, safe-side fallback, etc.)\n"
-                    .. "3. If intentional design, start your answer with INTENTIONAL_DESIGN: and state the reason\n"
-                    .. "4. If it is a problem, identify the structural cause",
+                    .. "Identify the structural root cause, not just the surface symptom.",
                 theme.name,
+                theme.category or "unknown",
                 theme.surface_symptom or "",
                 theme.total_occurrences or 0,
                 alc.json_encode(theme.related_locations or {}),
+                code,
+                context_block
+            ),
+            max_experts = 3,
+        })
+
+        local expert_diagnosis = expert_ctx.result.answer or ""
+        theme.expert_consultations = expert_ctx.result.experts_consulted
+
+        alc.log("info", string.format(
+            "  [META] %s — %d experts consulted",
+            theme.name, expert_ctx.result.total_experts or 0
+        ))
+
+        -- Step 2: reflect — self-critique the expert diagnosis for intentional design
+        local reflect_ctx = reflect.run({
+            task = string.format(
+                "Review the following expert diagnosis and determine if the issue is "
+                    .. "a genuine problem or intentional design.\n\n"
+                    .. "Theme: \"%s\"\n"
+                    .. "Expert diagnosis:\n%s\n\n"
+                    .. "Code:\n```\n%s\n```\n%s\n"
+                    .. "Decision procedure:\n"
+                    .. "1. Does the expert diagnosis identify a real structural problem?\n"
+                    .. "2. Could this be intentional design (deliberate trade-off, safe-side fallback)?\n"
+                    .. "3. If intentional design, start with INTENTIONAL_DESIGN: and state the reason\n"
+                    .. "4. If a genuine problem, summarize the structural root cause",
+                theme.name,
+                expert_diagnosis,
                 code,
                 context_block
             ),
@@ -504,19 +556,48 @@ local function compare_fixes(theme_name, fix_a, fix_b, policy_text)
 end
 
 --- Enumerate fix candidates, rate by policy, rank pairwise.
+--- Uses contrastive to first identify common fix anti-patterns, then generate
+--- fixes that explicitly avoid those pitfalls.
 local function phase_prescribe(themes, code, policy, max_fixes)
-    alc.log("info", "review_and_investigate: Phase 6 — Prescribe")
+    alc.log("info", "review_and_investigate: Phase 6 — Prescribe (contrastive-enhanced)")
 
+    local contrastive = require("contrastive")
     local policy_text = table.concat(policy.priorities, " > ")
 
     for _, theme in ipairs(themes) do
-        -- Generate fix candidates
+        -- Step 6a: contrastive — identify common fix anti-patterns for this theme
+        local anti_ctx = contrastive.run({
+            task = string.format(
+                "What are common WRONG approaches to fixing the issue \"%s\"?\n\n"
+                    .. "Root cause: %s\n"
+                    .. "Best practice: %s\n"
+                    .. "Gap: %s\n\n"
+                    .. "Identify subtle mistakes developers commonly make when attempting to fix "
+                    .. "this type of issue (e.g. surface-level patches that don't address root cause, "
+                    .. "over-engineering, breaking API compatibility, etc.)",
+                theme.name,
+                theme.root_cause or "",
+                theme.best_practice or "",
+                theme.gap or ""
+            ),
+            n_contrasts = 1,
+        })
+
+        local anti_patterns = anti_ctx.result.answer or ""
+        theme.fix_anti_patterns = anti_ctx.result.contrasts
+
+        alc.log("info", string.format(
+            "  [CONTRASTIVE] %s — anti-patterns identified", theme.name
+        ))
+
+        -- Step 6b: generate fix candidates, informed by anti-patterns
         local raw = alc.llm(
             string.format(
                 "Propose %d fix candidates for the theme \"%s\".\n\n"
                     .. "Root cause: %s\n"
                     .. "BP: %s\n"
                     .. "Gap: %s\n\n"
+                    .. "CRITICAL — Avoid these common fix anti-patterns:\n%s\n\n"
                     .. "Code:\n```\n%s\n```\n\n"
                     .. "Output each fix as a JSON array:\n"
                     .. '[\n'
@@ -525,7 +606,8 @@ local function phase_prescribe(themes, code, policy, max_fixes)
                     .. '    "summary": "fix summary",\n'
                     .. '    "approach": "concrete approach",\n'
                     .. '    "impact": "impact scope",\n'
-                    .. '    "risk": "risk"\n'
+                    .. '    "risk": "risk",\n'
+                    .. '    "avoids": "which anti-pattern this explicitly avoids"\n'
                     .. '  }\n'
                     .. ']\n\n'
                     .. "Policy priorities: %s",
@@ -534,12 +616,14 @@ local function phase_prescribe(themes, code, policy, max_fixes)
                 theme.root_cause or "",
                 theme.best_practice or "",
                 theme.gap or "",
+                anti_patterns,
                 code,
                 policy_text
             ),
             {
                 system = "You are a solution architect. Propose concrete, actionable fixes. "
-                    .. "Each fix must respect the policy priorities. Output ONLY valid JSON array.",
+                    .. "Each fix must respect the policy priorities and EXPLICITLY avoid "
+                    .. "the identified anti-patterns. Output ONLY valid JSON array.",
                 max_tokens = 600,
             }
         )

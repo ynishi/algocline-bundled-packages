@@ -70,7 +70,7 @@ local function verify_steps(task, steps)
             { system = "You are a step-level verifier. Rate ONLY this step's correctness. Just the number.", max_tokens = 10 }
         )
 
-        local score = tonumber(score_str:match("%d+")) or 5
+        local score = alc.parse_score(score_str)
         scores[#scores + 1] = { step = step, score = score }
         total = total + score
     end
@@ -153,7 +153,7 @@ function M.run(ctx)
                 ),
                 { system = "Rate overall correctness. Just the number.", max_tokens = 10 }
             )
-            local score = tonumber(score_str:match("%d+")) or 5
+            local score = alc.parse_score(score_str)
             verification = {
                 step_scores = { { step = path.reasoning, score = score } },
                 total_score = score,

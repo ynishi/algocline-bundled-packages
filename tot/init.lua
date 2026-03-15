@@ -46,7 +46,7 @@ local function evaluate_thought(task, path_so_far, thought)
         { system = "You are a critical evaluator of reasoning quality. Just the number.", max_tokens = 10 }
     )
 
-    return tonumber(score_str:match("%d+")) or 5
+    return alc.parse_score(score_str)
 end
 
 --- Generate candidate thoughts for the next step.

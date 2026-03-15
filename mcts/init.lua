@@ -166,7 +166,7 @@ local function simulate(task, node, max_depth)
         { system = "You are a rigorous evaluator. Just the number.", max_tokens = 10 }
     )
 
-    return tonumber(score_str:match("%d+")) or 5
+    return alc.parse_score(score_str)
 end
 
 --- BACKPROPAGATION: Update scores from leaf to root.

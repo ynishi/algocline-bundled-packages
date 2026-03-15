@@ -64,7 +64,7 @@ function M.run(ctx)
                 ),
                 { system = "You are a critical evaluator. Just the number.", max_tokens = 10 }
             )
-            local score = tonumber(score_str:match("%d+")) or 5
+            local score = alc.parse_score(score_str)
             scores[i].total = scores[i].total + score
             scores[i].n = scores[i].n + 1
             total_pulls = total_pulls + 1
