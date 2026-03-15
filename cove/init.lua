@@ -69,6 +69,7 @@ function M.run(ctx)
                 system = "You are a fact-checker. Answer based on what you know. "
                     .. "If uncertain, say so. Do not fabricate.",
                 max_tokens = 200,
+                grounded = true,
             }
         )
         verifications[i] = { question = questions[i], answer = answer }

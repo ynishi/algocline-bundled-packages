@@ -55,6 +55,28 @@ M.meta = {
     category = "combinator",
 }
 
+--- Extract the code slice for a theme using its span [start, end].
+--- Falls back to full code if span is missing or invalid.
+local function slice_code(code, theme)
+    local span = theme.span
+    if type(span) ~= "table" or #span < 2 then return code end
+    local s, e = tonumber(span[1]), tonumber(span[2])
+    if not s or not e or s < 1 then return code end
+
+    local lines = {}
+    for line in (code .. "\n"):gmatch("(.-)\n") do
+        lines[#lines + 1] = line
+    end
+    e = math.min(e, #lines)
+    if s > e then return code end
+
+    local parts = {}
+    for i = s, e do
+        parts[#parts + 1] = string.format("%4d: %s", i, lines[i])
+    end
+    return table.concat(parts, "\n")
+end
+
 -- ─── Default Policy ────────────────────────────────────────
 
 local DEFAULT_POLICY = {
@@ -123,9 +145,13 @@ local function phase_detect(code, context)
                 .. '    "category": "safety|logic|design|performance|style",\n'
                 .. '    "surface_symptom": "description of the surface symptom",\n'
                 .. '    "principle_violated": "which design principle this violates",\n'
-                .. '    "locations": ["file:line or function name"]\n'
+                .. '    "locations": ["file:line or function name"],\n'
+                .. '    "span": [start_line, end_line]\n'
                 .. '  }\n'
                 .. ']\n\n'
+                .. "IMPORTANT: \"span\" is the line range [start, end] (1-indexed) of the "
+                .. "relevant code region for this theme. Include enough context to understand "
+                .. "the issue but no more.\n\n"
                 .. "Do not stop at surface-level observations (e.g. unwrap→expect).\n"
                 .. "Prioritize structural deviations from the identified design principles.",
             design_principles, code, context_block
@@ -244,6 +270,7 @@ local function phase_verify(themes, code, context)
                     .. "Be strict — if you cannot verify the claim with concrete code evidence, "
                     .. "mark FALSE_POSITIVE.",
                 max_tokens = 200,
+                grounded = true,
             }
         )
     end)
@@ -352,6 +379,8 @@ local function phase_diagnose(themes, code, deep_threshold, context)
     local reclassified = 0
 
     for i, theme in ipairs(themes) do
+        local snippet = slice_code(code, theme)
+
         -- Step 1: meta_prompt — dispatch to domain-specific experts
         local expert_ctx = meta_prompt.run({
             task = string.format(
@@ -366,7 +395,7 @@ local function phase_diagnose(themes, code, deep_threshold, context)
                 theme.surface_symptom or "",
                 theme.total_occurrences or 0,
                 alc.json_encode(theme.related_locations or {}),
-                code,
+                snippet,
                 context_block
             ),
             max_experts = 3,
@@ -395,7 +424,7 @@ local function phase_diagnose(themes, code, deep_threshold, context)
                     .. "4. If a genuine problem, summarize the structural root cause",
                 theme.name,
                 expert_diagnosis,
-                code,
+                snippet,
                 context_block
             ),
             max_rounds = 2,
@@ -450,7 +479,7 @@ local function phase_diagnose(themes, code, deep_threshold, context)
                         theme.surface_symptom or "",
                         theme.total_occurrences or 0,
                         alc.json_encode(theme.related_locations or {}),
-                        code
+                        snippet
                     ),
                     rounds = 2,
                 })
@@ -497,13 +526,14 @@ local function phase_research(themes, code)
                 theme.name,
                 theme.root_cause or "",
                 theme.total_occurrences or 0,
-                code
+                slice_code(code, theme)
             ),
             {
                 system = "You are a best-practice researcher. Cite specific sources: "
                     .. "Effective Rust, Rust API Guidelines, OWASP, relevant RFCs, "
                     .. "seminal papers. Output ONLY valid JSON.",
                 max_tokens = 400,
+                grounded = true,
             }
         )
     end)
@@ -617,7 +647,7 @@ local function phase_prescribe(themes, code, policy, max_fixes)
                 theme.best_practice or "",
                 theme.gap or "",
                 anti_patterns,
-                code,
+                slice_code(code, theme),
                 policy_text
             ),
             {

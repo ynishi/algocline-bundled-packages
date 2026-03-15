@@ -105,6 +105,7 @@ function M.run(ctx)
                     .. "Only mark SUPPORTED if you are confident the claim is accurate. "
                     .. "Mark UNCERTAIN if you lack sufficient knowledge to verify.",
                 max_tokens = verify_tokens,
+                grounded = true,
             }
         )
     end)
