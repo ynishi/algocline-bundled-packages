@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-18
+
+### Added
+
+- **9 reasoning strategy packages**: bisect, blind_spot, cascade, claim_trace, critic, dmad, negation, p_tts, verify_first
+- **robust_qa**: composite pipeline combining p_tts, negation, and critic
+- **3 bundled eval scenarios** (`scenarios/` directory):
+  - **math_basic**: arithmetic and number theory (7 cases, contains + exact_match)
+  - **reasoning_basic**: logical reasoning and common knowledge (5 cases, contains)
+  - **factual_basic**: factual knowledge with verifiable answers (5 cases, contains)
+
 ## [0.2.0] - 2026-03-15
 
 ### Added
