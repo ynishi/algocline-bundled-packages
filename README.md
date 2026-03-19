@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (16)
+## Packages (22)
 
 ### Reasoning
 
@@ -26,6 +26,10 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[maieutic](maieutic/)** | Recursive explanation tree with logical consistency filtering. Generates supporting/opposing arguments recursively and eliminates contradictions | Jung et al. (2022) |
 | **[reflect](reflect/)** | Iterative self-critique loop. Generate, critique, and revise until convergence | Madaan et al., "Self-Refine" (2023) |
 | **[calibrate](calibrate/)** | Confidence-gated adaptive reasoning. Escalates to sc/panel/retry when confidence falls below threshold | CISC (ACL Findings 2025) |
+| **[plan_solve](plan_solve/)** | Plan-and-Solve. Devises an explicit step-by-step plan, then executes each step sequentially. More structured than CoT, lighter than decompose | Wang et al. (2023) |
+| **[faithful](faithful/)** | Faithful CoT. Translates reasoning into formal representation (code/logic) for verification, then answers grounded in verified output | Lyu et al. (2023), Gao et al. "PAL" (2023) |
+| **[rstar](rstar/)** | Mutual reasoning verification. Two independent paths cross-verify each other. MCTS-level accuracy at ~1/3 the cost | Qi et al. (2024) |
+| **[bot](bot/)** | Buffer of Thoughts. Identifies problem type, applies structured thought template, then verifies. Meta-reasoning with reusable patterns | Yang et al. (2024) |
 
 ### Selection
 
@@ -35,6 +39,13 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[ucb](ucb/)** | UCB1 hypothesis exploration. Generates, scores, and refines hypotheses using UCB1 selection | — |
 | **[rank](rank/)** | Best-of-N sampling with tournament selection. Pairwise comparison via LLM-as-Judge | Zheng et al. (2023) |
 | **[triad](triad/)** | Three-role adversarial debate. Proponent, opponent, and judge engage in multi-round argumentation | Du et al. (2023) |
+| **[moa](moa/)** | Mixture of Agents. Layered multi-agent aggregation — each layer's agents see all previous layer outputs for cross-pollination and refinement | Wang et al. (2024) |
+
+### Preprocessing
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[s2a](s2a/)** | System 2 Attention. Strips irrelevant/biasing context before reasoning. Composable as a pre-filter for any other strategy | Weston & Sukhbaatar (2023, Meta) |
 
 ### Generation
 
@@ -185,10 +196,16 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 |---|---|---|
 | pre_mortem | ~19/proposal + ranking | Feasibility-gate proposals, then rank accepted ones |
 | ucb | ~11 | UCB1 hypothesis exploration |
+| moa | ~4-8 | Layered multi-agent aggregation |
 | panel | ~5-8 | Multi-perspective deliberation |
+| rstar | ~4-6 | Mutual reasoning verification (2 paths cross-verify) |
 | cove | ~4-6 | Chain-of-verification |
+| faithful | ~3-4 | Formal verification (code/logic) of reasoning |
+| bot | ~3-4 | Template-based meta-reasoning |
 | reflect | ~3-6 | Self-critique loop |
 | sc | ~5 | Self-consistency (majority vote) |
+| plan_solve | ~2-3 | Plan then execute step by step |
+| s2a | ~2 | Context denoising (composable pre-filter) |
 | calibrate | ~1-2 | Confidence-gated reasoning |
 
 ## License

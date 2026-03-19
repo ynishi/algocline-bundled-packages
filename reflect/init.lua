@@ -11,6 +11,7 @@
 ---   return reflect.run(ctx)
 ---
 --- ctx.task (required): The task to perform
+--- ctx.initial_draft: Pre-generated draft to refine (skips initial LLM generation)
 --- ctx.max_rounds: Maximum critique-revise cycles (default: 3)
 --- ctx.stop_when: Stop condition — "no_major_issues" or "no_issues" (default: "no_major_issues")
 --- ctx.gen_tokens: Max tokens for generation (default: 500)
@@ -48,14 +49,19 @@ function M.run(ctx)
     local gen_tokens = ctx.gen_tokens or 500
     local critique_tokens = ctx.critique_tokens or 300
 
-    -- Initial generation
-    local draft = alc.llm(
-        string.format("Task: %s\n\nProvide a thorough response.", task),
-        {
-            system = "You are an expert. Produce a high-quality, detailed response.",
-            max_tokens = gen_tokens,
-        }
-    )
+    -- Initial generation (skip if caller provides a draft)
+    local draft
+    if ctx.initial_draft then
+        draft = ctx.initial_draft
+    else
+        draft = alc.llm(
+            string.format("Task: %s\n\nProvide a thorough response.", task),
+            {
+                system = "You are an expert. Produce a high-quality, detailed response.",
+                max_tokens = gen_tokens,
+            }
+        )
+    end
 
     local rounds = {}
 
