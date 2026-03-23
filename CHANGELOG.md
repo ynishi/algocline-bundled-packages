@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-24
+
+### Added
+
+- **5 orchestration packages**:
+  - **[orch_fixpipe](orch_fixpipe/)**: Deterministic fixed pipeline with gate/retry (Lobster/OpenClaw pattern)
+  - **[orch_gatephase](orch_gatephase/)**: Phase orchestration with pre/post hooks and skip rules (Thin Agent/Fat Platform, Praetorian)
+  - **[orch_adaptive](orch_adaptive/)**: Adaptive depth orchestration based on task difficulty (DAAO, arXiv:2509.11079)
+  - **[orch_nver](orch_nver/)**: N-version programming with score/vote selection (Agentic SE Roadmap, arXiv:2509.06216)
+  - **[orch_escalate](orch_escalate/)**: Cascade escalation from light to heavy strategies (Microsoft + DAAO cost optimization)
+- **3 router packages**:
+  - **[router_daao](router_daao/)**: Difficulty-aware routing with injectable confidence profiles (DAAO, arXiv:2509.11079)
+  - **[router_semantic](router_semantic/)**: Keyword matching with LLM fallback, 0-1 LLM calls (Microsoft Multi-Agent Reference Architecture)
+  - **[router_capability](router_capability/)**: Jaccard similarity agent registry matching (Dynamic Agent Registry pattern)
+- **[optimize](optimize/)**: Modular parameter optimization orchestrator (v0.2.0)
+  - 4-component architecture: search, eval, stop, orchestrator
+  - **Search strategies**: UCB1 (Auer et al. 2002), random, OPRO (Yang et al. 2023), EA/GA (Guo et al. 2024), epsilon-greedy
+  - **Evaluators**: evalframe integration, custom function, LLM-as-judge
+  - **Stopping criteria**: variance convergence, patience (early stopping), threshold, improvement rate, composite
+  - State persistence via `alc.state` for incremental optimization across sessions
+  - `alc.tuning` integration for parameter merging
+- **tests/**: test suites for all 9 new packages (39 tests for optimize, 8 suites for orch/router)
+
+### Changed
+
+- **README**: updated package count (22 → 31), added Orchestration, Routing sections and optimize to Extraction/Optimization table
+
 ## [0.4.0] - 2026-03-19
 
 ### Added

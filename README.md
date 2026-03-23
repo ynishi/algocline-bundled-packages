@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (22)
+## Packages (31)
 
 ### Reasoning
 
@@ -60,6 +60,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 |---------|-------------|----------|
 | **[distill](distill/)** | MapReduce summarization/extraction. Chunks large text, extracts in parallel, and synthesizes | LLM x MapReduce (2024) |
 | **[cod](cod/)** | Chain-of-Density iterative compression. Rewrites summaries to progressively increase information density | Adams et al. (2023) |
+| **[optimize](optimize/)** | Modular parameter optimization orchestrator. Pluggable search (UCB1, OPRO, EA, greedy), evaluators (evalframe, custom, LLM judge), and stopping criteria. Persists state across sessions | DSPy (2023), OPRO (2023), EvoPrompt (2024) |
 
 ### Validation / Analysis
 
@@ -68,6 +69,24 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[cove](cove/)** | Chain-of-Verification. Draft, generate verification questions, answer independently, then revise to reduce hallucination | Dhuliawala et al. (2023) |
 | **[factscore](factscore/)** | Atomic claim decomposition + individual fact verification. Decomposes text into minimal factual claims and scores each | Min et al. (2023) |
 | **[review](review_and_investigate/)** | Multi-pass code review. Switchable between chunk mode and concerns mode | — |
+
+### Orchestration
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[orch_fixpipe](orch_fixpipe/)** | Deterministic fixed pipeline. Phases execute in strict order with gate/retry | Lobster (OpenClaw) |
+| **[orch_gatephase](orch_gatephase/)** | Gate-phase orchestration with pre/post hooks. Task-type-aware skip rules | Thin Agent / Fat Platform (Praetorian) |
+| **[orch_adaptive](orch_adaptive/)** | Adaptive depth orchestration. Adjusts phase count, retry budget, and context mode by task difficulty | DAAO (arXiv:2509.11079) |
+| **[orch_nver](orch_nver/)** | N-version programming. Execute N parallel variants, evaluate each, select best | Agentic SE Roadmap (arXiv:2509.06216) |
+| **[orch_escalate](orch_escalate/)** | Cascade escalation from light to heavy strategies. Minimizes cost for easy tasks | Microsoft + DAAO |
+
+### Routing
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[router_daao](router_daao/)** | Difficulty-aware routing with injectable confidence profiles | DAAO (arXiv:2509.11079) |
+| **[router_semantic](router_semantic/)** | Keyword matching with LLM fallback. 0-1 LLM calls | Microsoft Multi-Agent Reference Architecture |
+| **[router_capability](router_capability/)** | Capability-based registry router. Jaccard similarity agent matching | Dynamic Agent Registry |
 
 ### Synthesis
 
@@ -206,6 +225,15 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | sc | ~5 | Self-consistency (majority vote) |
 | plan_solve | ~2-3 | Plan then execute step by step |
 | s2a | ~2 | Context denoising (composable pre-filter) |
+| optimize | ~N (rounds) | Parameter optimization (1 eval call per round) |
+| orch_escalate | ~1-5 | Cascade escalation (stops early on easy tasks) |
+| orch_fixpipe | ~N (phases) | Fixed pipeline (1 call per phase + retries) |
+| orch_gatephase | ~N (phases) | Gate-phase orchestration with skip rules |
+| orch_adaptive | ~N (phases) | Adaptive depth (phases trimmed by difficulty) |
+| orch_nver | ~N×M | N variants × M phases each |
+| router_daao | ~1 | Single difficulty classification call |
+| router_semantic | ~0-1 | Keyword match first, LLM fallback if ambiguous |
+| router_capability | ~1 | Single requirement extraction call |
 | calibrate | ~1-2 | Confidence-gated reasoning |
 
 ## License
