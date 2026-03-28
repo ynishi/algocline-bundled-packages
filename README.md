@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (31)
+## Packages (37)
 
 ### Reasoning
 
@@ -30,6 +30,11 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[faithful](faithful/)** | Faithful CoT. Translates reasoning into formal representation (code/logic) for verification, then answers grounded in verified output | Lyu et al. (2023), Gao et al. "PAL" (2023) |
 | **[rstar](rstar/)** | Mutual reasoning verification. Two independent paths cross-verify each other. MCTS-level accuracy at ~1/3 the cost | Qi et al. (2024) |
 | **[bot](bot/)** | Buffer of Thoughts. Identifies problem type, applies structured thought template, then verifies. Meta-reasoning with reusable patterns | Yang et al. (2024) |
+| **[got](got/)** | Graph of Thoughts. DAG-structured reasoning with aggregation (many-to-one merge), refinement loops, and multi-path synthesis. Enables thought merging impossible in tree-based ToT | Besta et al. (AAAI 2024) |
+| **[model_first](model_first/)** | Model-First Reasoning. Constructs explicit problem model (entities, state variables, actions, constraints) before solving. Catches constraint violations that plan_solve misses | Rana & Kumar (2025) |
+| **[sketch](sketch/)** | Sketch-of-Thought. Cognitive-inspired efficient reasoning via 3 paradigms (Conceptual Chaining, Chunked Symbolism, Expert Lexicons) with adaptive routing. 60-84% token reduction vs CoT | Aytes et al. (EMNLP 2025) |
+| **[coa](coa/)** | Chain-of-Abstraction. Reasons with abstract placeholders, then grounds via parallel knowledge resolution. Decouples reasoning structure from concrete facts | Gao et al. (Meta/EPFL, COLING 2025) |
+| **[ab_mcts](ab_mcts/)** | Adaptive Branching MCTS. Thompson Sampling with dynamic wider/deeper decisions via GEN node mechanism. Consistently outperforms standard MCTS and repeated sampling | Inoue et al. (NeurIPS 2025 Spotlight) |
 
 ### Selection
 
@@ -69,6 +74,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[cove](cove/)** | Chain-of-Verification. Draft, generate verification questions, answer independently, then revise to reduce hallucination | Dhuliawala et al. (2023) |
 | **[factscore](factscore/)** | Atomic claim decomposition + individual fact verification. Decomposes text into minimal factual claims and scores each | Min et al. (2023) |
 | **[review](review_and_investigate/)** | Multi-pass code review. Switchable between chunk mode and concerns mode | — |
+| **[counterfactual_verify](counterfactual_verify/)** | Counterfactual faithfulness verification. Tests whether reasoning causally depends on inputs by simulating condition changes. Detects unfaithful CoT | Hase et al. (2026) |
 
 ### Orchestration
 
@@ -235,6 +241,12 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | router_semantic | ~0-1 | Keyword match first, LLM fallback if ambiguous |
 | router_capability | ~1 | Single requirement extraction call |
 | calibrate | ~1-2 | Confidence-gated reasoning |
+| got | ~11 | DAG reasoning: generate + score + refine + aggregate + synthesize |
+| ab_mcts | ~2×N+1 | Adaptive branching MCTS (N = budget, default 8 → ~17) |
+| counterfactual_verify | ~2+3×N | Causal faithfulness test (N = counterfactuals, default 2 → ~8-9) |
+| model_first | ~2-4 | Problem modeling then solving with constraint verification |
+| coa | ~2+N | Abstract chain + parallel grounding (N = placeholders) |
+| sketch | ~1-2 | Cognitive-inspired efficient reasoning (keyword route or LLM route) |
 
 ## License
 
