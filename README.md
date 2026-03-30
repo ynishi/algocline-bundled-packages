@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (37)
+## Packages (67)
 
 ### Reasoning
 
@@ -93,6 +93,15 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[router_daao](router_daao/)** | Difficulty-aware routing with injectable confidence profiles | DAAO (arXiv:2509.11079) |
 | **[router_semantic](router_semantic/)** | Keyword matching with LLM fallback. 0-1 LLM calls | Microsoft Multi-Agent Reference Architecture |
 | **[router_capability](router_capability/)** | Capability-based registry router. Jaccard similarity agent matching | Dynamic Agent Registry |
+| **[topo_route](topo_route/)** | Topology-aware meta-router. Analyzes task characteristics and recommends optimal topology (linear/star/DAG/mesh/debate) with package mappings. Same agents, different topology → up to 40% reliability variation | "From Spark to Fire" (Xie et al., AAMAS 2026), MAST (Cemri et al., 2025) |
+
+### Governance
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[lineage](lineage/)** | Pipeline-spanning claim lineage tracking. Extracts atomic claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Defense rate 0.32 → 0.89 | "From Spark to Fire" (Xie et al., AAMAS 2026) — lineage graph governance layer |
+| **[dissent](dissent/)** | Consensus inertia prevention. Forces adversarial challenge before finalizing multi-agent agreement. Composable with moa, panel, sc | "From Spark to Fire" (Xie et al., AAMAS 2026) — Consensus Inertia countermeasure; MAST F11 |
+| **[anti_cascade](anti_cascade/)** | Pipeline error cascade detection. Independently re-derives from original inputs at each step and compares with pipeline output to detect error amplification | "From Spark to Fire" (Xie et al., AAMAS 2026) — Cascade Amplification countermeasure; MAST F3/F9 |
 
 ### Synthesis
 
@@ -247,6 +256,10 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | model_first | ~2-4 | Problem modeling then solving with constraint verification |
 | coa | ~2+N | Abstract chain + parallel grounding (N = placeholders) |
 | sketch | ~1-2 | Cognitive-inspired efficient reasoning (keyword route or LLM route) |
+| lineage | ~2×N | Pipeline lineage tracking (N = steps; N extract + N-1 trace + 1 analysis = 2N) |
+| dissent | ~3-4 | Adversarial challenge + merit evaluation + conditional revision |
+| anti_cascade | ~1+2×N | Cascade detection (N = steps; re-derive + compare per step + summary) |
+| topo_route | ~1 | Single topology analysis and recommendation call |
 
 ## License
 
