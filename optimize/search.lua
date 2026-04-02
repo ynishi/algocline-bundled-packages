@@ -47,6 +47,16 @@
 ---     randomly (exploration). Converges fast but may get stuck in local
 ---     optima. Best for: fine-tuning around a known-good configuration.
 ---
+---   "breed" — PromptBreeder-style self-referential evolution
+---     Based on: Fernando et al. "PromptBreeder: Self-Referential
+---     Self-Improvement via Prompt Evolution" (2023, arXiv:2309.16797).
+---     GSM8K zero-shot: 83.9% (vs OPRO 80.2%). Extends EA with meta-
+---     mutation: mutation operators (mutation prompts) themselves evolve
+---     alongside the candidate population. Hyper-mutation rate controls
+---     how often mutation strategies are improved via LLM self-reflection.
+---     Best for: prompt/text parameter spaces where LLM-guided mutation
+---     can discover non-obvious improvements.
+---
 --- Custom strategies:
 ---   Pass a table with { init, propose, update } functions to M.resolve().
 
@@ -472,6 +482,205 @@ function greedy.update(state, params, score)
 end
 
 -- ============================================================
+-- Breed Strategy (PromptBreeder-style meta-evolution)
+-- Fernando et al. 2023 (arXiv:2309.16797): Evolves both the
+-- candidate population AND the mutation operators (mutation
+-- prompts) that generate new candidates. Hyper-mutation allows
+-- the mutation strategy itself to improve over time.
+-- ============================================================
+
+local breed = {}
+
+local BREED_DEFAULT_MUTATIONS = {
+    "Rephrase the parameters to be more precise, keeping the core approach.",
+    "Try a radically different parameter combination. Challenge assumptions.",
+    "Simplify: reduce to the minimal effective configuration.",
+}
+
+function breed.init(space, history)
+    local pop = {}
+    if history and #history.results > 0 then
+        local sorted = {}
+        for _, r in ipairs(history.results) do sorted[#sorted + 1] = r end
+        table.sort(sorted, function(a, b) return a.score > b.score end)
+        for i = 1, math.min(10, #sorted) do
+            pop[#pop + 1] = { params = sorted[i].params, score = sorted[i].score }
+        end
+    end
+    if #pop == 0 then
+        for _ = 1, 10 do
+            pop[#pop + 1] = { params = M.random_params(space), score = 0 }
+        end
+    end
+
+    -- Initialize mutation prompts with scores
+    local mut_prompts = {}
+    for _, m in ipairs(BREED_DEFAULT_MUTATIONS) do
+        mut_prompts[#mut_prompts + 1] = { text = m, total_score = 0, uses = 0 }
+    end
+
+    return {
+        space = space,
+        population = pop,
+        mutation_prompts = mut_prompts,
+        generation = 0,
+        hyper_mutation_rate = 0.15,
+    }
+end
+
+function breed.propose(state)
+    local pop = state.population
+    if #pop < 2 then return M.random_params(state.space) end
+
+    -- Tournament selection for parent
+    local function tournament()
+        local a = pop[math.random(#pop)]
+        local b = pop[math.random(#pop)]
+        return a.score >= b.score and a or b
+    end
+    local parent = tournament()
+
+    -- Select mutation prompt (UCB1-like over mutation prompts)
+    local muts = state.mutation_prompts
+    local best_mut = muts[1]
+    local best_mut_score = -math.huge
+    local total_uses = 0
+    for _, m in ipairs(muts) do total_uses = total_uses + m.uses end
+
+    for _, m in ipairs(muts) do
+        local s
+        if m.uses == 0 then
+            s = math.huge
+        else
+            s = m.total_score / m.uses
+                + math.sqrt(2 * math.log(total_uses + 1) / m.uses)
+        end
+        if s > best_mut_score then
+            best_mut_score = s
+            best_mut = m
+        end
+    end
+
+    -- Use LLM to apply mutation prompt to parent's params
+    local space_text = format_space(state.space)
+    local parent_text = alc.json_encode(parent.params)
+
+    local suggestion = alc.llm(
+        string.format(
+            "You are optimizing parameters to maximize a score.\n\n"
+                .. "Parameter space:\n%s\n\n"
+                .. "Parent parameters (score=%.4f):\n%s\n\n"
+                .. "Mutation strategy: %s\n\n"
+                .. "Apply the mutation strategy to the parent parameters and "
+                .. "propose improved values. Respond with ONLY a JSON object.",
+            space_text, parent.score, parent_text, best_mut.text
+        ),
+        {
+            system = "You are a parameter mutation operator. Return only valid JSON.",
+            max_tokens = 200,
+        }
+    )
+
+    -- Track which mutation was used (for update)
+    state._last_mutation_idx = nil
+    for i, m in ipairs(muts) do
+        if m == best_mut then state._last_mutation_idx = i; break end
+    end
+
+    local ok, parsed = pcall(alc.json_decode, suggestion)
+    if not ok or type(parsed) ~= "table" then
+        alc.log("warn", "breed: failed to parse LLM suggestion, falling back to EA-style")
+        -- Fallback: EA-style mutation
+        local child = {}
+        for name, spec in pairs(state.space) do
+            if math.random() < 0.3 then
+                child[name] = sample_param(spec)
+            else
+                child[name] = parent.params[name]
+            end
+        end
+        return child
+    end
+
+    -- Clamp to space bounds
+    local params = {}
+    for name, spec in pairs(state.space) do
+        local v = parsed[name]
+        if v == nil then
+            params[name] = parent.params[name] or sample_param(spec)
+        elseif spec.type == "choice" then
+            local valid = false
+            for _, cv in ipairs(spec.values or {}) do
+                if cv == v then valid = true; break end
+            end
+            params[name] = valid and v or sample_param(spec)
+        elseif spec.type == "int" then
+            v = math.floor(tonumber(v) or 0)
+            params[name] = math.max(spec.min or 0, math.min(spec.max or 10, v))
+        else
+            v = tonumber(v) or 0
+            params[name] = math.max(spec.min or 0, math.min(spec.max or 10, v))
+        end
+    end
+    return params
+end
+
+function breed.update(state, params, score)
+    local pop = state.population
+    pop[#pop + 1] = { params = params, score = score }
+
+    -- Update mutation prompt score
+    if state._last_mutation_idx then
+        local m = state.mutation_prompts[state._last_mutation_idx]
+        m.total_score = m.total_score + score
+        m.uses = m.uses + 1
+    end
+    state._last_mutation_idx = nil
+
+    -- Elitist truncation (keep top 20)
+    if #pop > 20 then
+        table.sort(pop, function(a, b) return a.score > b.score end)
+        while #pop > 20 do pop[#pop] = nil end
+    end
+
+    -- Hyper-mutation: evolve mutation prompts themselves
+    if math.random() < state.hyper_mutation_rate then
+        local muts = state.mutation_prompts
+        -- Pick the worst-performing mutation prompt
+        local worst_idx = 1
+        local worst_avg = math.huge
+        for i, m in ipairs(muts) do
+            local avg = m.uses > 0 and (m.total_score / m.uses) or math.huge
+            if m.uses > 0 and avg < worst_avg then
+                worst_avg = avg
+                worst_idx = i
+            end
+        end
+
+        if muts[worst_idx].uses > 0 then
+            local new_text = alc.llm(
+                string.format(
+                    "Current mutation strategy (avg score=%.2f):\n\"%s\"\n\n"
+                        .. "This strategy has been underperforming. Improve it to be "
+                        .. "a more effective way to mutate parameter combinations. "
+                        .. "Output ONLY the improved mutation strategy (1-2 sentences).",
+                    worst_avg, muts[worst_idx].text
+                ),
+                {
+                    system = "You are a meta-optimizer. Improve the mutation strategy itself.",
+                    max_tokens = 100,
+                }
+            )
+            muts[worst_idx] = { text = new_text, total_score = 0, uses = 0 }
+            alc.log("info", "optimize.breed: hyper-mutated mutation prompt #" .. worst_idx)
+        end
+    end
+
+    state.generation = state.generation + 1
+    return state
+end
+
+-- ============================================================
 -- Registry
 -- ============================================================
 
@@ -481,6 +690,7 @@ M.strategies = {
     opro    = opro,
     ea      = ea,
     greedy  = greedy,
+    breed   = breed,
 }
 
 --- Resolve a strategy by name or table.

@@ -3,8 +3,19 @@
 --- simulation (rollout to conclusion), backpropagation (update scores).
 --- Explores deep reasoning trees more efficiently than exhaustive search.
 ---
---- Based on: Hao et al., "Reasoning with Language Model is Planning with
---- World Model" (RAP, 2023, arXiv:2305.14992)
+--- Optional Reflection mechanism (ctx.reflection = true): when a simulation
+--- scores below the reflection threshold, the LLM generates a 1-sentence
+--- diagnosis of why that path failed. These reflections are accumulated and
+--- injected into subsequent expansion prompts, helping the search avoid
+--- repeating the same mistakes.
+---
+--- Based on:
+---   [1] Hao et al. "Reasoning with Language Model is Planning with
+---       World Model" (RAP, 2023, arXiv:2305.14992)
+---   [2] Zhou et al. "Language Agent Tree Search Unifies Reasoning, Acting,
+---       and Planning in Language Models" (LATS, ICML 2024, arXiv:2310.04406)
+---   [3] Xu et al. "CogMCTS: Cognitive-Guided Monte Carlo Tree Search"
+---       (2025, arXiv:2512.08609)
 ---
 --- Usage:
 ---   local mcts = require("mcts")
@@ -14,6 +25,9 @@
 --- ctx.iterations: Number of MCTS iterations (default: 6)
 --- ctx.max_depth: Maximum tree depth per rollout (default: 3)
 --- ctx.exploration: UCB1 exploration constant (default: 1.41)
+--- ctx.reflection: Enable reflection on low-score paths (default: false)
+--- ctx.reflection_threshold: Score below which reflection triggers (default: 4)
+--- ctx.max_reflections: Maximum stored reflections (default: 5)
 
 local M = {}
 
@@ -82,8 +96,25 @@ local function select_node(root, C)
     return node
 end
 
+--- Generate a reflection from a low-scoring path.
+local function reflect(task, path, score)
+    return alc.llm(
+        string.format(
+            "Task: %s\n\nReasoning path (scored %d/10):\n%s\n\n"
+                .. "In ONE sentence, explain why this reasoning path scored poorly. "
+                .. "Focus on the key flaw or wrong assumption.",
+            task, score, format_path(path)
+        ),
+        {
+            system = "You are a concise diagnostician. One sentence only.",
+            max_tokens = 80,
+        }
+    )
+end
+
 --- EXPANSION: Generate a child thought from this node.
-local function expand(task, node)
+--- reflection_buffer: optional list of past failure reflections to inject.
+local function expand(task, node, reflection_buffer)
     local path = path_to_node(node)
     local path_text = format_path(path)
 
@@ -94,22 +125,35 @@ local function expand(task, node)
         end
     end
 
+    -- Build reflection hint if available
+    local reflection_hint = ""
+    if reflection_buffer and #reflection_buffer > 0 then
+        local items = {}
+        for i, r in ipairs(reflection_buffer) do
+            items[#items + 1] = string.format("  - %s", r)
+        end
+        reflection_hint = "\n\nLessons from failed paths (AVOID these mistakes):\n"
+            .. table.concat(items, "\n") .. "\n"
+    end
+
     local prompt
     if #path == 0 then
         prompt = string.format(
             "Task: %s\n\n"
-                .. "%s"
+                .. "%s%s"
                 .. "Propose a first reasoning step. Be specific and concrete. 1-3 sentences.",
             task,
-            #node.children > 0 and ("Approaches already explored:\n" .. existing .. "\nPropose a DIFFERENT approach.\n\n") or ""
+            #node.children > 0 and ("Approaches already explored:\n" .. existing .. "\nPropose a DIFFERENT approach.\n\n") or "",
+            reflection_hint
         )
     else
         prompt = string.format(
             "Task: %s\n\nReasoning so far:\n%s\n"
-                .. "%s"
+                .. "%s%s"
                 .. "What is the next reasoning step? Be specific and concrete. 1-3 sentences.",
             task, path_text,
-            #node.children > 0 and ("Next steps already explored:\n" .. existing .. "\nPropose a DIFFERENT next step.\n\n") or ""
+            #node.children > 0 and ("Next steps already explored:\n" .. existing .. "\nPropose a DIFFERENT next step.\n\n") or "",
+            reflection_hint
         )
     end
 
@@ -211,22 +255,45 @@ function M.run(ctx)
     local iterations = ctx.iterations or 6
     local max_depth = ctx.max_depth or 3
     local C = ctx.exploration or 1.41
+    local use_reflection = ctx.reflection or false
+    local reflection_threshold = ctx.reflection_threshold or 4
+    local max_reflections = ctx.max_reflections or 5
 
     local root = new_node(nil, nil)
     root.visits = 1  -- avoid log(0)
+
+    -- Reflection buffer (LATS-style): accumulates failure diagnoses
+    local reflection_buffer = {}
 
     for i = 1, iterations do
         -- 1. Selection
         local leaf = select_node(root, C)
 
-        -- 2. Expansion
-        local child = expand(task, leaf)
+        -- 2. Expansion (inject reflections if enabled)
+        local child = expand(
+            task, leaf,
+            use_reflection and reflection_buffer or nil
+        )
 
         -- 3. Simulation
         local score = simulate(task, child, max_depth)
 
         -- 4. Backpropagation
         backpropagate(child, score)
+
+        -- 5. Reflection (LATS extension): learn from low-scoring paths
+        if use_reflection and score <= reflection_threshold then
+            local child_path = path_to_node(child)
+            local r = reflect(task, child_path, score)
+            if #reflection_buffer >= max_reflections then
+                table.remove(reflection_buffer, 1)  -- FIFO eviction
+            end
+            reflection_buffer[#reflection_buffer + 1] = r
+            alc.log("info", string.format(
+                "mcts: reflection added (score=%d, buffer=%d/%d)",
+                score, #reflection_buffer, max_reflections
+            ))
+        end
 
         alc.log("info", string.format(
             "mcts: iteration %d/%d — expanded node at depth %d, rollout score: %d",
