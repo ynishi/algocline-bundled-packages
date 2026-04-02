@@ -36,8 +36,3 @@
 ---@field description string One-line summary
 ---@field category string Category tag (e.g. "reasoning", "exploration")
 
--- ── M: the module table returned by require() ──
-
----@class AlcModule
----@field meta AlcMeta Package metadata
----@field run fun(ctx: AlcCtx): AlcCtx Entry point
