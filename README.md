@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (67)
+## Packages (71)
 
 ### Reasoning
 
@@ -102,6 +102,15 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[lineage](lineage/)** | Pipeline-spanning claim lineage tracking. Extracts atomic claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Defense rate 0.32 → 0.89 | "From Spark to Fire" (Xie et al., AAMAS 2026) — lineage graph governance layer |
 | **[dissent](dissent/)** | Consensus inertia prevention. Forces adversarial challenge before finalizing multi-agent agreement. Composable with moa, panel, sc | "From Spark to Fire" (Xie et al., AAMAS 2026) — Consensus Inertia countermeasure; MAST F11 |
 | **[anti_cascade](anti_cascade/)** | Pipeline error cascade detection. Independently re-derives from original inputs at each step and compares with pipeline output to detect error amplification | "From Spark to Fire" (Xie et al., AAMAS 2026) — Cascade Amplification countermeasure; MAST F3/F9 |
+
+### Exploration
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[qdaif](qdaif/)** | Quality-Diversity through AI Feedback. MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification. Produces diverse, high-quality solution populations | Bradley et al. (ICLR 2024), Mouret & Clune (2015) |
+| **[falsify](falsify/)** | Sequential Falsification. Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight | Sourati et al. (2025), Yamada et al. "AI Scientist v2" (2025) |
+| **[prompt_breed](prompt_breed/)** | Self-Referential Prompt Evolution. Evolves task prompts via genetic operators with meta-mutation — the mutation operators themselves evolve. Double evolutionary loop | Fernando et al. "PromptBreeder" (2023), Guo et al. "EvoPrompt" (ICLR 2024) |
+| **[coevolve](coevolve/)** | Challenger-Solver Co-evolution. Adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion | Singh et al. (2025), Faldor et al. "OMNI-EPIC" (ICLR 2025) |
 
 ### Synthesis
 
@@ -260,6 +269,10 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | dissent | ~3-4 | Adversarial challenge + merit evaluation + conditional revision |
 | anti_cascade | ~1+2×N | Cascade detection (N = steps; re-derive + compare per step + summary) |
 | topo_route | ~1 | Single topology analysis and recommendation call |
+| qdaif | ~seed+2×iter+1 | MAP-Elites archive (seed + mutate/evaluate per iteration + synthesis) |
+| falsify | ~1+rounds×hyp×2+1 | Falsification (seed + refute/judge per hypothesis per round + synthesis) |
+| prompt_breed | ~pop×gen×2+hyper | Prompt evolution (evaluate+mutate per individual per generation + hyper-mutations) |
+| coevolve | ~rounds×(prob×2+2) | Co-evolution (solve+judge per problem + analyze + challenge per round) |
 
 ## License
 

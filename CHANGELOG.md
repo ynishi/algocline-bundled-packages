@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-04-03
+
+### Added
+
+- **New "Exploration" category** for population-based and adversarial search strategies:
+  - **[qdaif](qdaif/)**: Quality-Diversity through AI Feedback — MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification (Bradley et al., ICLR 2024)
+  - **[falsify](falsify/)**: Sequential Falsification — Popper-style hypothesis exploration via active refutation, pruning, and successor derivation (Sourati et al., 2025; Yamada et al. "AI Scientist v2", 2025)
+  - **[prompt_breed](prompt_breed/)**: Self-Referential Prompt Evolution — evolves task prompts via genetic operators with meta-mutation (mutation operators themselves evolve) (Fernando et al. "PromptBreeder", 2023)
+  - **[coevolve](coevolve/)**: Challenger-Solver Co-evolution — adversarial self-play where Challenger generates problems at Solver's ability boundary (Singh et al., 2025; Faldor et al. "OMNI-EPIC", ICLR 2025)
+- **mcts**: LATS-style Reflection mechanism — failure diagnosis injection into expansion prompts
+- **optimize/search**: `breed` strategy — PromptBreeder-style meta-evolution for parameter optimization
+- **LuaLS LuaCats type annotations** for all 71 packages:
+  - `.luarc.json`: workspace.library configuration for `~/.algocline/types` + local `types/`
+  - `types/alc_pkg.d.lua`: AlcCtx, AlcMeta type definitions — module interface contract
+  - `*/init.lua`: `---@type AlcMeta`, `---@param ctx AlcCtx`, `---@return AlcCtx` annotations
+- **tests/test_exploration.lua**: 38 tests covering all 4 new exploration packages + 2 extensions
+
+### Fixed
+
+- **types/alc_pkg.d.lua**: removed unused `AlcModule` class (LuaLS inject-field warning)
+
+### Changed
+
+- **README**: updated package count (67 → 71), added Exploration section, updated LLM call counts table
+
 ## [0.7.0] - 2026-03-30
 
 ### Added
