@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (71)
+## Packages (77)
 
 ### Reasoning
 
@@ -24,7 +24,8 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 |---------|-------------|----------|
 | **[cot](cot/)** | Chain-of-Thought. Builds a step-by-step reasoning chain and synthesizes a final answer | Wei et al. (2022) |
 | **[maieutic](maieutic/)** | Recursive explanation tree with logical consistency filtering. Generates supporting/opposing arguments recursively and eliminates contradictions | Jung et al. (2022) |
-| **[reflect](reflect/)** | Iterative self-critique loop. Generate, critique, and revise until convergence | Madaan et al., "Self-Refine" (2023) |
+| **[reflect](reflect/)** | Iterative self-critique loop. Generate, critique, and revise within a single attempt until convergence. Polishes the current draft | Madaan et al., "Self-Refine" (2023) |
+| **[reflexion](reflexion/)** | Episodic memory self-improvement. Multiple independent attempts where failures are reflected on and stored as lessons. Each new attempt references accumulated reflections. reflect polishes one draft; reflexion learns across attempts. HumanEval 67%→91% | Shinn et al. (NeurIPS 2023) |
 | **[calibrate](calibrate/)** | Confidence-gated adaptive reasoning. Escalates to sc/panel/retry when confidence falls below threshold | CISC (ACL Findings 2025) |
 | **[plan_solve](plan_solve/)** | Plan-and-Solve. Devises an explicit step-by-step plan, then executes each step sequentially. More structured than CoT, lighter than decompose | Wang et al. (2023) |
 | **[faithful](faithful/)** | Faithful CoT. Translates reasoning into formal representation (code/logic) for verification, then answers grounded in verified output | Lyu et al. (2023), Gao et al. "PAL" (2023) |
@@ -35,12 +36,15 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[sketch](sketch/)** | Sketch-of-Thought. Cognitive-inspired efficient reasoning via 3 paradigms (Conceptual Chaining, Chunked Symbolism, Expert Lexicons) with adaptive routing. 60-84% token reduction vs CoT | Aytes et al. (EMNLP 2025) |
 | **[coa](coa/)** | Chain-of-Abstraction. Reasons with abstract placeholders, then grounds via parallel knowledge resolution. Decouples reasoning structure from concrete facts | Gao et al. (Meta/EPFL, COLING 2025) |
 | **[ab_mcts](ab_mcts/)** | Adaptive Branching MCTS. Thompson Sampling with dynamic wider/deeper decisions via GEN node mechanism. Consistently outperforms standard MCTS and repeated sampling | Inoue et al. (NeurIPS 2025 Spotlight) |
+| **[gumbel_search](gumbel_search/)** | Budget-optimal tree search. Sequential Halving for provably optimal budget allocation + Gumbel Top-k for unbiased candidate sampling. Outperforms standard decoding with just 5-15 simulations. Complementary to ab_mcts: ab_mcts excels with open budgets, gumbel_search excels under fixed budget constraints | "Revisiting Tree Search for LLMs" (2026), Karnin et al. (ICML 2013) |
 
 ### Selection
 
 | Package | Description | Based On |
 |---------|-------------|----------|
-| **[sc](sc/)** | Self-Consistency. Independently samples multiple reasoning paths and aggregates by majority vote | Wang et al. (2022) |
+| **[sc](sc/)** | Self-Consistency. Independently samples multiple reasoning paths and aggregates by majority vote. Best for tasks with canonical answer formats (numbers, options) | Wang et al. (2022) |
+| **[usc](usc/)** | Universal Self-Consistency. Extends SC to free-form tasks by having LLM select the most consistent response instead of majority voting. Works on open-ended QA, summarization, code generation where SC's answer extraction fails. Mathematically, majority vote is a special case of USC | Chen et al. (ICML 2024), Google DeepMind |
+| **[mbr_select](mbr_select/)** | Minimum Bayes Risk selection. Computes pairwise similarity for all candidate pairs and selects the one with highest expected agreement. Bayes-optimal under decision theory — no bracket luck or position bias unlike tournament-based rank. O(N²/2) but theoretically optimal | MBR (NAACL 2025), Eikema & Aziz (2020) |
 | **[ucb](ucb/)** | UCB1 hypothesis exploration. Generates, scores, and refines hypotheses using UCB1 selection | — |
 | **[rank](rank/)** | Best-of-N sampling with tournament selection. Pairwise comparison via LLM-as-Judge | Zheng et al. (2023) |
 | **[triad](triad/)** | Three-role adversarial debate. Proponent, opponent, and judge engage in multi-round argumentation | Du et al. (2023) |
@@ -75,6 +79,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[factscore](factscore/)** | Atomic claim decomposition + individual fact verification. Decomposes text into minimal factual claims and scores each | Min et al. (2023) |
 | **[review](review_and_investigate/)** | Multi-pass code review. Switchable between chunk mode and concerns mode | — |
 | **[counterfactual_verify](counterfactual_verify/)** | Counterfactual faithfulness verification. Tests whether reasoning causally depends on inputs by simulating condition changes. Detects unfaithful CoT | Hase et al. (2026) |
+| **[step_verify](step_verify/)** | Step-level reasoning verification (PRM-style). Scores each intermediate reasoning step for logical correctness, identifies the first point of failure, and re-derives from the last correct step. Unlike cove (fact-checking) or factscore (claim verification), targets logical validity of reasoning chains | PRM Survey (2025), ThinkPRM (2025), DiVeRSe |
 
 ### Orchestration
 
@@ -85,6 +90,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[orch_adaptive](orch_adaptive/)** | Adaptive depth orchestration. Adjusts phase count, retry budget, and context mode by task difficulty | DAAO (arXiv:2509.11079) |
 | **[orch_nver](orch_nver/)** | N-version programming. Execute N parallel variants, evaluate each, select best | Agentic SE Roadmap (arXiv:2509.06216) |
 | **[orch_escalate](orch_escalate/)** | Cascade escalation from light to heavy strategies. Minimizes cost for easy tasks | Microsoft + DAAO |
+| **[compute_alloc](compute_alloc/)** | Compute-optimal test-time scaling allocation. Dynamically selects reasoning paradigm (single/parallel/sequential/hybrid) and budget based on problem difficulty. Key insight: optimal method changes with difficulty — easy=direct, medium=SC, hard=reflect+verify. "Small model + optimal TTS > 14× larger model" | Snell et al. (ICLR 2025), TTS Survey (2025) |
 
 ### Routing
 
@@ -273,6 +279,12 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | falsify | ~1+rounds×hyp×2+1 | Falsification (seed + refute/judge per hypothesis per round + synthesis) |
 | prompt_breed | ~pop×gen×2+hyper | Prompt evolution (evaluate+mutate per individual per generation + hyper-mutations) |
 | coevolve | ~rounds×(prob×2+2) | Co-evolution (solve+judge per problem + analyze + challenge per round) |
+| usc | ~N+1 | Universal Self-Consistency (N samples + 1 consistency selection, default N=5 → ~6) |
+| mbr_select | ~N+N(N-1)/2 | Minimum Bayes Risk (N generation + pairwise similarity, default N=5 → ~15) |
+| step_verify | ~1+N+1 per round | Step-level verification (generate + N step verifications + synthesis, with re-derive rounds) |
+| compute_alloc | ~1+N | Compute-optimal allocation (1 difficulty classification + N strategy calls, varies by difficulty) |
+| gumbel_search | ~N+N×log₂(N) | Gumbel+Sequential Halving (N candidates + log₂(N) halving rounds, default N=8 → ~32) |
+| reflexion | ~trials×(1+1+1) | Episodic memory (attempt+evaluate+reflect per trial, default 3 trials → ~7-9) |
 
 ## License
 

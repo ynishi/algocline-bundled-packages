@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-03
+
+### Added
+
+- **6 new packages** based on 2024-2026 test-time compute scaling and selection research:
+  - **[usc](usc/)**: Universal Self-Consistency — extends SC to free-form tasks by having LLM select the most consistent response instead of majority voting. Works on open-ended QA, summarization, code generation where SC fails (Chen et al., ICML 2024, Google DeepMind)
+  - **[step_verify](step_verify/)**: Step-Level Verification (PRM-style) — scores each intermediate reasoning step for logical correctness, identifies the first point of failure, and re-derives from the last correct step. Targets logical validity unlike cove (fact-checking) or factscore (claim verification) (PRM Survey 2025, ThinkPRM 2025, DiVeRSe)
+  - **[compute_alloc](compute_alloc/)**: Compute-Optimal Test-Time Scaling Allocation — dynamically selects reasoning paradigm (single/parallel/sequential/hybrid) and budget based on problem difficulty. Key insight: optimal method changes with difficulty (Snell et al., ICLR 2025)
+  - **[gumbel_search](gumbel_search/)**: Budget-optimal tree search — Sequential Halving for provably optimal budget allocation + Gumbel Top-k for unbiased candidate sampling. Complementary to ab_mcts: excels under fixed budget constraints (Karnin et al., ICML 2013; "Revisiting Tree Search for LLMs" 2026)
+  - **[mbr_select](mbr_select/)**: Minimum Bayes Risk selection — computes pairwise similarity for all candidate pairs and selects the one with highest expected agreement. Bayes-optimal under decision theory, no bracket luck unlike tournament-based rank (MBR, NAACL 2025; Eikema & Aziz 2020)
+  - **[reflexion](reflexion/)**: Episodic Memory Self-Improvement — multiple independent attempts where failures are reflected on and stored as lessons. Each new attempt references accumulated reflections. HumanEval 67%→91% (Shinn et al., NeurIPS 2023)
+- **tests/test_tier1_2.lua**: 45 tests covering all 6 new packages (meta, validation, LLM call counts, index extraction, similarity matrix, episodic memory propagation)
+
+### Changed
+
+- **README**: updated package count (71 → 77), added new packages to Reasoning/Selection/Validation/Orchestration tables and LLM call counts table
+- **sc**: clarified description — "Best for tasks with canonical answer formats (numbers, options)" to distinguish from usc
+- **reflect**: clarified description — "within a single attempt" to distinguish from reflexion
+
 ## [0.8.0] - 2026-04-03
 
 ### Added
