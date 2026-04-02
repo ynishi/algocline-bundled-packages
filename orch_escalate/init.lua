@@ -15,6 +15,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "orch_escalate",
     version = "0.1.0",
@@ -157,6 +158,8 @@ local function execute_multi_phase(level, task, prev_output, feedback)
     return prev_phase, phase_outputs, llm_calls
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local levels = ctx.levels or DEFAULT_LEVELS

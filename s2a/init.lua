@@ -22,6 +22,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "s2a",
     version = "0.1.0",
@@ -29,6 +30,8 @@ M.meta = {
     category = "preprocessing",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local context = ctx.context or ""

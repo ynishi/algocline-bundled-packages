@@ -11,6 +11,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "ucb",
     version = "0.1.0",
@@ -26,6 +27,8 @@ local function ucb1(scores, idx, total_pulls)
     return avg + explore
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local rounds = ctx.rounds or 2

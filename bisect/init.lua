@@ -24,6 +24,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "bisect",
     version = "0.1.0",
@@ -126,6 +127,8 @@ local function find_first_error(task, steps, verify_tokens)
     return lo, bisect_log
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_repairs = ctx.max_repairs or 2

@@ -18,6 +18,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "maieutic",
     version = "0.1.0",
@@ -180,6 +181,8 @@ local function collect_evidence(node)
     return support, oppose
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local proposition = ctx.proposition or error("ctx.proposition is required")
     local max_depth = ctx.max_depth or 2

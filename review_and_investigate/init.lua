@@ -48,6 +48,7 @@ local function utf8_truncate(s, max_bytes)
     return s:sub(1, pos)
 end
 
+---@type AlcMeta
 M.meta = {
     name = "review_and_investigate",
     version = "0.1.0",
@@ -742,6 +743,8 @@ end
 
 -- ─── Entry Point ──────────────────────────────────────────
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local code = ctx.code or error("ctx.code is required")
     local context = ctx.context or ""

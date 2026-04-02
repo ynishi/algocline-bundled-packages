@@ -29,6 +29,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "sketch",
     version = "0.1.0",
@@ -213,6 +214,8 @@ local function execute_paradigm(task, paradigm_name, max_tokens)
     return sketch or response, answer or response
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_tokens = ctx.max_tokens or 200

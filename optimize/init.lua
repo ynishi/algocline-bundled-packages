@@ -62,6 +62,7 @@ math.randomseed(os.time())
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "optimize",
     version = "0.2.0",
@@ -122,6 +123,8 @@ local function build_ranking(results)
     return rankings
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local target = ctx.target or error("ctx.target is required")
     local space = ctx.space or error("ctx.space is required")

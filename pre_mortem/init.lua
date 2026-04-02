@@ -39,6 +39,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "pre_mortem",
     version = "0.1.0",
@@ -116,6 +117,8 @@ local function parse_proposals(raw)
     return proposals
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local raw_proposals = ctx.proposals or error("ctx.proposals is required")

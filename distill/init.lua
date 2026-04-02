@@ -18,6 +18,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "distill",
     version = "0.1.0",
@@ -25,6 +26,8 @@ M.meta = {
     category = "extraction",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local text = ctx.text or error("ctx.text is required")
     local goal = ctx.goal or "Summarize the key points"

@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "negation",
     version = "0.1.0",
@@ -73,6 +74,8 @@ local function parse_verdict(raw)
     return "refuted"
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_conditions = ctx.max_conditions or 5

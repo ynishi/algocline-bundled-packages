@@ -23,6 +23,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "deliberate",
     version = "0.1.0",
@@ -311,6 +312,8 @@ end
 
 -- ─── Entry Point ─────────────────────────────────────────
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local provided_options = ctx.options or nil

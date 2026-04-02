@@ -18,6 +18,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "cod",
     version = "0.1.0",
@@ -34,6 +35,8 @@ local function word_count(text)
     return count
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local text = ctx.text or error("ctx.text is required")
     local rounds = ctx.rounds or 3

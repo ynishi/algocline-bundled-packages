@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "intent_discovery",
     version = "0.1.0",
@@ -64,6 +65,8 @@ local function parse_options(raw)
     return options
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_rounds = ctx.max_rounds or 3

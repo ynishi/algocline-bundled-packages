@@ -37,6 +37,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "coevolve",
     version = "0.1.0",
@@ -224,6 +225,8 @@ end
 
 -- ─── Main ───
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local rounds = ctx.rounds or 4

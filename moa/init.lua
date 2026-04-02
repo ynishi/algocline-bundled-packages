@@ -28,6 +28,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "moa",
     version = "0.1.0",
@@ -44,6 +45,8 @@ local PERSONAS = {
     "You are a systems thinker who considers interactions and second-order effects.",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n_agents = ctx.n_agents or 3

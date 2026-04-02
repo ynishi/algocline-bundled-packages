@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "coa",
     version = "0.1.0",
@@ -109,6 +110,8 @@ local function format_tools(tools)
     return table.concat(parts, "\n")
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local tools = ctx.tools or {

@@ -14,6 +14,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "router_semantic",
     version = "0.1.0",
@@ -100,6 +101,8 @@ local function score_rules(task, rules)
     return scores
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local rules = ctx.rules or DEFAULT_RULES

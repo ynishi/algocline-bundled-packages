@@ -16,6 +16,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "decompose",
     version = "0.1.0",
@@ -36,6 +37,8 @@ local function parse_subtasks(raw, max)
     return tasks
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_subtasks = ctx.max_subtasks or 5

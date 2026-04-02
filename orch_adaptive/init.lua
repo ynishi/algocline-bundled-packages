@@ -17,6 +17,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "orch_adaptive",
     version = "0.1.0",
@@ -84,6 +85,8 @@ local function compress(output, mode)
     return summary, 1
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local phases = ctx.phases or error("ctx.phases is required")

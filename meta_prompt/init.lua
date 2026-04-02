@@ -15,6 +15,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "meta_prompt",
     version = "0.1.0",
@@ -22,6 +23,8 @@ M.meta = {
     category = "reasoning",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_experts = ctx.max_experts or 4

@@ -24,6 +24,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "prism",
     version = "0.1.0",
@@ -108,6 +109,8 @@ local function topo_sort(n, deps)
     return order
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_sub_intents = ctx.max_sub_intents or 8

@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "verify_first",
     version = "0.1.0",
@@ -57,6 +58,8 @@ local function extract_answer(text)
     return text
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local iterations = ctx.iterations or 1

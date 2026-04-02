@@ -10,6 +10,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "cot",
     version = "0.1.0",
@@ -17,6 +18,8 @@ M.meta = {
     category = "reasoning",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local depth = ctx.depth or 3

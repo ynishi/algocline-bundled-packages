@@ -37,6 +37,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "lineage",
     version = "0.1.0",
@@ -193,6 +194,8 @@ end
 
 -- ─── Main ───
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local steps = ctx.steps or error("ctx.steps is required")

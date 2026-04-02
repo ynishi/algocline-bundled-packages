@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "intent_belief",
     version = "0.1.0",
@@ -100,6 +101,8 @@ local function entropy(probs)
     return h
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n_hypotheses = ctx.n_hypotheses or 5

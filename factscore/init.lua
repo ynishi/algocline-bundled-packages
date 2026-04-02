@@ -17,6 +17,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "factscore",
     version = "0.1.0",
@@ -37,6 +38,8 @@ local function parse_claims(raw)
     return claims
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local text = ctx.text or error("ctx.text is required")
     local context = ctx.context

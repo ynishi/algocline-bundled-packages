@@ -17,6 +17,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "tot",
     version = "0.1.0",
@@ -98,6 +99,8 @@ local function generate_thoughts(task, path_so_far, breadth)
     return thoughts
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local breadth = ctx.breadth or 3

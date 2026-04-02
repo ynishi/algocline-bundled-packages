@@ -43,6 +43,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "robust_qa",
     version = "0.1.0",
@@ -50,6 +51,8 @@ M.meta = {
     category = "pipeline",
 }
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local gen_tokens = ctx.gen_tokens or 600

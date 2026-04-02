@@ -27,6 +27,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "cascade",
     version = "0.1.0",
@@ -203,6 +204,8 @@ local function level_ensemble(task, gen_tokens, verify_tokens)
     }
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local threshold = ctx.threshold or 0.8

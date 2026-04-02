@@ -17,6 +17,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "sot",
     version = "0.1.0",
@@ -37,6 +38,8 @@ local function parse_skeleton(raw, max)
     return sections
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local max_sections = ctx.max_sections or 6

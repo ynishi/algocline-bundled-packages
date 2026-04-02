@@ -25,6 +25,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "faithful",
     version = "0.1.0",
@@ -55,6 +56,8 @@ local function detect_format(task)
     return "code"
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local format = ctx.format or "auto"

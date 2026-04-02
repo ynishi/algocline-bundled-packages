@@ -28,6 +28,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "counterfactual_verify",
     version = "0.1.0",
@@ -84,6 +85,8 @@ local function parse_match(text)
     return true
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n_cf = ctx.n_counterfactuals or 2

@@ -12,6 +12,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "router_capability",
     version = "0.1.0",
@@ -102,6 +103,8 @@ end
 -- Expose for testing
 M._jaccard = jaccard
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local registry = ctx.registry or DEFAULT_REGISTRY

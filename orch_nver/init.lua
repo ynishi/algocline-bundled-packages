@@ -25,6 +25,7 @@ local function expand(template, vars)
     return result
 end
 
+---@type AlcMeta
 M.meta = {
     name = "orch_nver",
     version = "0.1.0",
@@ -93,6 +94,8 @@ local function majority_vote(variants, task, total_llm_calls)
     return variants[chosen].output, total_llm_calls
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n = ctx.n or 3

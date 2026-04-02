@@ -30,6 +30,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "critic",
     version = "0.1.0",
@@ -70,6 +71,8 @@ local function parse_feedback(text)
     return feedback:match("^%s*(.-)%s*$") or ""
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local rubric = ctx.rubric or DEFAULT_RUBRIC

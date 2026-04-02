@@ -46,6 +46,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "prompt_breed",
     version = "0.1.0",
@@ -222,6 +223,8 @@ end
 
 -- ─── Main ───
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local evaluator = ctx.evaluator or error("ctx.evaluator is required — evaluation criteria")

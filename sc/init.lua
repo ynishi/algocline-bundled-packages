@@ -15,6 +15,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "sc",
     version = "0.1.0",
@@ -33,6 +34,8 @@ local function extract_answer(reasoning, task)
     )
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n = ctx.n or 5

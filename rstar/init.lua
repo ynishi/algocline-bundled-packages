@@ -24,6 +24,7 @@
 
 local M = {}
 
+---@type AlcMeta
 M.meta = {
     name = "rstar",
     version = "0.1.0",
@@ -48,6 +49,8 @@ local function extract_conclusion(text)
     return last_line
 end
 
+---@param ctx AlcCtx
+---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local gen_tokens = ctx.gen_tokens or 400
