@@ -37,6 +37,18 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[coa](coa/)** | Chain-of-Abstraction. Reasons with abstract placeholders, then grounds via parallel knowledge resolution. Decouples reasoning structure from concrete facts | Gao et al. (Meta/EPFL, COLING 2025) |
 | **[ab_mcts](ab_mcts/)** | Adaptive Branching MCTS. Thompson Sampling with dynamic wider/deeper decisions via GEN node mechanism. Consistently outperforms standard MCTS and repeated sampling | Inoue et al. (NeurIPS 2025 Spotlight) |
 | **[gumbel_search](gumbel_search/)** | Budget-optimal tree search. Sequential Halving for provably optimal budget allocation + Gumbel Top-k for unbiased candidate sampling. Outperforms standard decoding with just 5-15 simulations. Complementary to ab_mcts: ab_mcts excels with open budgets, gumbel_search excels under fixed budget constraints | "Revisiting Tree Search for LLMs" (2026), Karnin et al. (ICML 2013) |
+| **[analogical](analogical/)** | Analogical prompting. Self-generates relevant analogies, extracts shared patterns, then applies the abstracted principle to the original problem | Yasunaga et al. (2023) |
+| **[contrastive](contrastive/)** | Contrastive CoT. Generates both correct and incorrect reasoning paths, learns from the contrast to strengthen the final answer | Chia et al. (2023) |
+| **[cumulative](cumulative/)** | Cumulative Reasoning. Proposer/verifier/reporter loop that accumulates verified facts incrementally until conclusion is reached | Zhang et al. (2024) |
+| **[diverse](diverse/)** | DiVERSe. Generates diverse reasoning paths with step-level verification and selects the best-verified path | Li et al. (2023) |
+| **[dmad](dmad/)** | Dialectical reasoning. Thesis, antithesis, and synthesis for deeper analysis through structured opposition | Du et al. (2023) |
+| **[least_to_most](least_to_most/)** | Least-to-Most prompting. Decomposes into ordered subproblems, solves simplest first, each solution feeds into the next | Zhou et al. (2022) |
+| **[mcts](mcts/)** | Monte Carlo Tree Search. Selection, expansion, simulation, backpropagation for systematic reasoning exploration with LATS-style reflection | RAP (2023), LATS (ICML 2024) |
+| **[meta_prompt](meta_prompt/)** | Meta-Prompting. Orchestrator identifies task type and dispatches to dynamically created specialist personas | Suzgun & Kalai (2024) |
+| **[php](php/)** | Progressive-Hint Prompting. Iterative re-solving where prior answers serve as progressive hints for refinement | Zheng et al. (2023) |
+| **[step_back](step_back/)** | Step-Back prompting. Abstracts the underlying principle first, then solves grounded in that principle | Zheng et al. (2023) |
+| **[tot](tot/)** | Tree-of-Thought. Branching reasoning with evaluation and pruning. Explores multiple reasoning paths simultaneously | Yao et al. (2023) |
+| **[verify_first](verify_first/)** | Verification-First prompting. Verifies a candidate answer before generating, reducing logical errors via reverse reasoning | arXiv:2511.21734 (2025) |
 
 ### Selection
 
@@ -80,6 +92,11 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[review](review_and_investigate/)** | Multi-pass code review. Switchable between chunk mode and concerns mode | — |
 | **[counterfactual_verify](counterfactual_verify/)** | Counterfactual faithfulness verification. Tests whether reasoning causally depends on inputs by simulating condition changes. Detects unfaithful CoT | Hase et al. (2026) |
 | **[step_verify](step_verify/)** | Step-level reasoning verification (PRM-style). Scores each intermediate reasoning step for logical correctness, identifies the first point of failure, and re-derives from the last correct step. Unlike cove (fact-checking) or factscore (claim verification), targets logical validity of reasoning chains | PRM Survey (2025), ThinkPRM (2025), DiVeRSe |
+| **[negation](negation/)** | Adversarial self-test. Generates destruction conditions (edge cases, counterexamples) and verifies the answer survives them. External challenge unlike reflect's internal critique | Huang et al. (2023) |
+| **[bisect](bisect/)** | Binary search for reasoning errors. Locates the first incorrect step in O(log n), then regenerates from that point. Surgical error correction | arXiv:2410.08146 (2024) |
+| **[blind_spot](blind_spot/)** | Self-Correction Blind Spot bypass. Re-presents the model's own output as an external source to trigger genuine error correction, overcoming self-correction failure modes | arXiv:2507.02778 (2025) |
+| **[claim_trace](claim_trace/)** | Span-level evidence attribution. Traces each claim to supporting source spans for transparent provenance. Composable post-filter for any generation | Bohnet et al. (2022), Gao et al. (2023) |
+| **[critic](critic/)** | Rubric-based structured evaluation. Per-dimension scoring with targeted revision of weak areas. More systematic than reflect's free-form critique | Zheng et al. (2023) |
 
 ### Orchestration
 
@@ -100,6 +117,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[router_semantic](router_semantic/)** | Keyword matching with LLM fallback. 0-1 LLM calls | Microsoft Multi-Agent Reference Architecture |
 | **[router_capability](router_capability/)** | Capability-based registry router. Jaccard similarity agent matching | Dynamic Agent Registry |
 | **[topo_route](topo_route/)** | Topology-aware meta-router. Analyzes task characteristics and recommends optimal topology (linear/star/DAG/mesh/debate) with package mappings. Same agents, different topology → up to 40% reliability variation | "From Spark to Fire" (Xie et al., AAMAS 2026), MAST (Cemri et al., 2025) |
+| **[cascade](cascade/)** | Multi-level difficulty routing. Escalates from fast to deep only when confidence is low. Cost-efficient for mixed-difficulty workloads | FrugalGPT (Chen et al., 2023), Lu et al. (2023) |
 
 ### Governance
 
@@ -117,6 +135,29 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[falsify](falsify/)** | Sequential Falsification. Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight | Sourati et al. (2025), Yamada et al. "AI Scientist v2" (2025) |
 | **[prompt_breed](prompt_breed/)** | Self-Referential Prompt Evolution. Evolves task prompts via genetic operators with meta-mutation — the mutation operators themselves evolve. Double evolutionary loop | Fernando et al. "PromptBreeder" (2023), Guo et al. "EvoPrompt" (ICLR 2024) |
 | **[coevolve](coevolve/)** | Challenger-Solver Co-evolution. Adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion | Singh et al. (2025), Faldor et al. "OMNI-EPIC" (ICLR 2025) |
+
+### Intent Understanding
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[ambig](ambig/)** | Underspecification detection. Detect-clarify-integrate pipeline for ambiguous inputs — identifies ambiguity, generates clarifying questions, integrates answers | AMBIG-SWE (ICLR 2026) |
+| **[prism](prism/)** | Cognitive-load-aware intent decomposition. Logical dependency ordering for minimal-friction clarification via topological sort | arXiv:2601.08653 (2026) |
+| **[intent_discovery](intent_discovery/)** | Exploratory intent formation. Discovers user goals through structured option presentation and iterative narrowing when intent is unclear | DiscoverLLM (arXiv:2602.03429, 2026) |
+| **[intent_belief](intent_belief/)** | Bayesian intent estimation. Hypothesis generation with iterative belief updates via diagnostic questions | arXiv:2510.18476 (2025) |
+
+### Planning
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[p_tts](p_tts/)** | Plan-Test-Then-Solve. Generates constraints/test cases before solving, then verifies the solution against the specification | Zhang et al. (2023) |
+
+### Combinators
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[deliberate](deliberate/)** | Structured deliberation. Abstracts principles, consults expert perspectives, stages debate, then produces ranked decision | — |
+| **[pre_mortem](pre_mortem/)** | Feasibility-gated proposal filtering. Prerequisite verification (factscore → contrastive → calibrate) before pairwise ranking | — |
+| **[robust_qa](robust_qa/)** | Three-phase QA pipeline. Constraint-first solving (p_tts), adversarial stress-test (negation), rubric evaluation (critic) | — |
 
 ### Synthesis
 
@@ -285,6 +326,41 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | compute_alloc | ~1+N | Compute-optimal allocation (1 difficulty classification + N strategy calls, varies by difficulty) |
 | gumbel_search | ~N+N×log₂(N) | Gumbel+Sequential Halving (N candidates + log₂(N) halving rounds, default N=8 → ~32) |
 | reflexion | ~trials×(1+1+1) | Episodic memory (attempt+evaluate+reflect per trial, default 3 trials → ~7-9) |
+| analogical | ~2×N+2 | Analogical reasoning (N analogy pairs + pattern extraction + solution, default N=2 → ~6) |
+| contrastive | ~2×N+1 | Contrastive CoT (N wrong-reasoning + error-analysis pairs + final answer, default N=2 → ~5) |
+| cumulative | ~3×rounds+1 | Cumulative reasoning (propose+verify+conclude per round + final report) |
+| diverse | ~2×N+1 | DiVERSe (N reasoning paths × score + final answer, default N=5 → ~11) |
+| dmad | ~2+2×rounds | Dialectical (thesis + antithesis+rebuttal per round + synthesis, default 2 rounds → ~6) |
+| least_to_most | ~N+2 | Least-to-Most (decompose + N subproblems + synthesis) |
+| mcts | ~budget×2+1 | MCTS (expand+simulate per node + conclusion, default budget=8 → ~17) |
+| meta_prompt | ~N+2 | Meta-Prompting (analysis + N expert consultations + synthesis, default N=3 → ~5) |
+| php | ~1+2×rounds | Progressive-Hint (initial + hint+verify per round, default 3 rounds → ~7) |
+| step_back | ~2×N+2-3 | Step-Back (N principle pairs + solution + verify, default N=1 → ~4-5) |
+| tot | ~N×2+1 | Tree-of-Thought (N thoughts × score + conclusion, budget-dependent) |
+| verify_first | ~2×rounds | Verification-First (candidate+verify per round, default 3 rounds → ~6) |
+| negation | ~2+N | Adversarial test (generate + conditions + N verifications + optional revision, default N=3 → ~5-6) |
+| bisect | ~1+log₂(N)+1 | Binary error search (chain + O(log n) verdicts + regeneration) |
+| blind_spot | ~2-3 | Blind spot bypass (initial + external correction + optional synthesis) |
+| claim_trace | ~1-2+N | Evidence attribution (optional generation + extraction + N claim attributions) |
+| critic | ~1+N+1 per round | Rubric evaluation (generation + N dimension scores + revision per round) |
+| cascade | ~1-5 | Difficulty escalation (1 if easy, up to 5 with perspectives+synthesis) |
+| ambig | ~3 | Underspecification detection (detect + clarify + integrate) |
+| prism | ~4 | Cognitive-load intent decomposition (decompose + dependencies + questions + specify) |
+| intent_discovery | ~2×rounds | Intent discovery (options + concretize per round) |
+| intent_belief | ~1+2×rounds+1 | Bayesian intent (prior + question+update per round + specify) |
+| p_tts | ~3+N per round | Plan-Test-Solve (plan + constraints + solve + N verifications, with retry) |
+| deliberate | variable | Structured deliberation (depends on number of experts and debate rounds) |
+| robust_qa | variable | Composite pipeline (p_tts + negation + critic stages) |
+| cot | ~N+1 | Chain-of-Thought (N reasoning steps + conclusion, default N=3 → ~4) |
+| cod | ~1+N | Chain-of-Density (initial summary + N densification rounds, default N=3 → ~4) |
+| decompose | ~1+N+1 | Task decomposition (decompose + N parallel subtasks + synthesis) |
+| distill | ~N+1 | MapReduce extraction (N parallel chunk extractions + synthesis) |
+| factscore | ~1+N | Atomic fact verification (claim extraction + N parallel claim verifications) |
+| maieutic | ~2×depth+2 | Recursive explanation tree (support+oppose per depth + verdict + synthesis) |
+| rank | ~N+log₂(N) | Tournament selection (N candidate generations + pairwise tournament rounds) |
+| review | ~6-8 | Multi-pass code review (detect + cluster + verify + diagnose + research + prescribe + report) |
+| sot | ~1+N | Skeleton-of-Thought (skeleton + N parallel section expansions) |
+| triad | ~2+2×rounds+1 | Three-role debate (2 openings + pro+opp per round + judge verdict, default 2 rounds → ~7) |
 
 ## License
 

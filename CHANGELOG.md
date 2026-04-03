@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **README**: updated package count (71 → 77), added new packages to Reasoning/Selection/Validation/Orchestration tables and LLM call counts table
+- **README**: added 26 previously unlisted packages (v0.1.0–v0.4.0 era) to category tables and LLM Call Counts — all 77 packages now listed. New sections: Intent Understanding, Planning, Combinators
 - **sc**: clarified description — "Best for tasks with canonical answer formats (numbers, options)" to distinguish from usc
 - **reflect**: clarified description — "within a single attempt" to distinguish from reflexion
 
