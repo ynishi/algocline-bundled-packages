@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (77)
+## Packages (85)
 
 ### Reasoning
 
@@ -150,6 +150,19 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[p_tts](p_tts/)** | Plan-Test-Then-Solve. Generates constraints/test cases before solving, then verifies the solution against the specification | Zhang et al. (2023) |
+
+### Simulation
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[abm](abm/)** | Agent-Based Model framework — Agent/Model/Scheduler + Monte Carlo runner + sensitivity sweep | — |
+| **[hybrid_abm](hybrid_abm/)** | LLM-as-Parameterizer ABM — LLM extracts simulation parameters, Pure Lua ABM runs Monte Carlo + sensitivity sweep | FCLAgent (arXiv:2510.12189), JASSS position paper (arXiv:2507.19364) |
+| **[epidemic_abm](epidemic_abm/)** | SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0 | Kermack & McKendrick (1927), Epstein (2006) |
+| **[opinion_abm](opinion_abm/)** | Hegselmann-Krause Bounded Confidence opinion dynamics — emergent consensus, polarization, or fragmentation | Hegselmann & Krause (JASSS 2002) |
+| **[evogame_abm](evogame_abm/)** | Evolutionary Game Theory ABM — iterated Prisoner's Dilemma / Hawk-Dove with selection and mutation | Axelrod (1984), Nowak & May (Nature 1992) |
+| **[schelling_abm](schelling_abm/)** | Schelling Segregation model — mild preferences produce strong emergent segregation on a 2D grid | Schelling (1971, 1978) |
+| **[sugarscape_abm](sugarscape_abm/)** | Sugarscape model — agents forage on a sugar landscape, emergent wealth inequality and Pareto-like distributions | Epstein & Axtell (1996) |
+| **[boids_abm](boids_abm/)** | Boids flocking model — separation, alignment, cohesion produce emergent flocking. Tunable weights for Hybrid LLM parameter optimization | Reynolds (SIGGRAPH 1987) |
 
 ### Combinators
 

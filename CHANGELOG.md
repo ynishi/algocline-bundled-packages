@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-04-04
+
+### Added
+
+- **New "Simulation" category** — Agent-Based Model framework + 7 model packages:
+  - **[abm](abm/)**: Core ABM framework — Agent/Model/Scheduler (Frame layer) + Monte Carlo runner + sensitivity sweep + statistics (Analysis layer). Two-layer architecture with combinator-pattern schedulers
+  - **[hybrid_abm](hybrid_abm/)**: LLM-as-Parameterizer ABM — LLM extracts simulation parameters (Phase A), Pure Lua ABM runs Monte Carlo (Phase B+C), sensitivity sweep (Phase D). Based on FCLAgent (arXiv:2510.12189)
+  - **[epidemic_abm](epidemic_abm/)**: SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0, herd immunity thresholds (Kermack & McKendrick 1927, Epstein 2006)
+  - **[opinion_abm](opinion_abm/)**: Hegselmann-Krause Bounded Confidence opinion dynamics — emergent consensus, polarization, or fragmentation determined by ε threshold (Hegselmann & Krause, JASSS 2002)
+  - **[evogame_abm](evogame_abm/)**: Evolutionary Game Theory ABM — iterated Prisoner's Dilemma / Hawk-Dove with fitness-proportionate selection and mutation. 6 classic strategies including Tit-for-Tat, Pavlov, Grudger (Axelrod 1984, Nowak & May 1992)
+  - **[schelling_abm](schelling_abm/)**: Schelling Segregation model — agents on a 2D toroidal grid relocate when local same-type fraction falls below tolerance threshold (Schelling 1971, 1978)
+  - **[sugarscape_abm](sugarscape_abm/)**: Sugarscape model — agents forage on a sugar landscape with heterogeneous metabolism/vision, emergent wealth inequality and Gini coefficient tracking (Epstein & Axtell 1996)
+  - **[boids_abm](boids_abm/)**: Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization (Reynolds, SIGGRAPH 1987)
+- **tests/test_abm.lua**: 43 tests covering ABM framework + hybrid_abm
+- **tests/test_abm_models.lua**: 20 tests covering epidemic, opinion, evogame, schelling models
+- **tests/test_abm_new_models.lua**: 10 tests covering sugarscape and boids models
+
+### Fixed
+
+- **evogame_abm**: replaced IIFE with plain for-loop for strategy count (readability)
+- **abm/frame/model**: changed 3-pass stepping (all before → all step → all after) to per-agent stepping (before → step → after per agent) — standard ABM activation semantics
+- **schelling_abm**: added guard for already-vacated cells during agent movement phase
+- **opinion_abm**: H-K bounded confidence comparison changed from `<` to `<=` (paper-compliant: |x_i - x_j| ≤ ε)
+- **abm/sweep**: tier escalation threshold changed from `> 0` to `> 0.001` (avoids floating-point false negatives)
+- **epidemic_abm, evogame_abm, opinion_abm, schelling_abm**: removed unnecessary `ctx.task` required check — task is not used in pure simulation models (available via comment for hybrid_abm integration)
+
+### Changed
+
+- **README**: updated package count (77 → 85), added Simulation section with 8 packages
+
 ## [0.9.0] - 2026-04-03
 
 ### Added
