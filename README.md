@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (85)
+## Packages (91)
 
 ### Reasoning
 
@@ -61,6 +61,12 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[rank](rank/)** | Best-of-N sampling with tournament selection. Pairwise comparison via LLM-as-Judge | Zheng et al. (2023) |
 | **[triad](triad/)** | Three-role adversarial debate. Proponent, opponent, and judge engage in multi-round argumentation | Du et al. (2023) |
 | **[moa](moa/)** | Mixture of Agents. Layered multi-agent aggregation — each layer's agents see all previous layer outputs for cross-pollination and refinement | Wang et al. (2024) |
+| **[ab_select](ab_select/)** | Adaptive Branching Selection. Multi-fidelity Thompson sampling over a fixed candidate pool — cheap→expensive evaluator cascade allocates expensive evaluations only to promising candidates. Unique multi-fidelity axis vs other selection packages | Inoue et al. "AB-MCTS" (NeurIPS 2025 Spotlight) |
+| **[listwise_rank](listwise_rank/)** | Zero-shot listwise reranking. Single-LLM-call permutation generation with sliding window for large N. Resolves the calibration problem of pointwise scoring (LLMs cannot output well-calibrated absolute scores). SOTA on TREC-DL/BEIR | Sun et al. "RankGPT" (EMNLP 2023), Pradeep et al. "RankZephyr" (2023) |
+| **[pairwise_rank](pairwise_rank/)** | Pairwise Ranking Prompting (PRP). Bidirectional pairwise comparisons (queries both A,B and B,A to cancel position bias) with Copeland-style aggregation. Highest-accuracy LLM reranker — Flan-UL2 20B with PRP matches GPT-4 on TREC-DL. Modes: allpair (O(N²)) or sorting (O(N log N)) | Qin et al. (NAACL 2024 Findings) |
+| **[setwise_rank](setwise_rank/)** | Setwise tournament reranking. LLM picks the single best from small sets (size k); winners advance through tournament rounds. Mid-cost/mid-accuracy sweet spot between listwise and pairwise; matches RankGPT on TREC-DL with comparable tokens | Zhuang et al. (SIGIR 2024) |
+| **[cs_pruner](cs_pruner/)** | Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill via Empirical-Bernstein CS over a multi-dimensional rubric. Four variants: polynomial-stitched, hoeffding, predictable plug-in betting (W-S&R 2024), and KL-LUCB (Kaufmann-Cappé 2013). Optional layer-2 Successive Halving with gap guard for small-N×D regimes where the CS floor cannot fire | Howard, Ramdas, McAuliffe, Sekhon (Ann. Stat. 2021), Waudby-Smith & Ramdas (JRSS-B 2024), Kaufmann & Cappé (JMLR 2013), Karnin-Koren-Somekh (ICML 2013) |
+| **[f_race](f_race/)** | Friedman race partial-data pruner. Block-wise rank assignment over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman χ² + Conover post-hoc test. Designed for small N (≤10) × D (≤30) where Empirical-Bernstein CS cannot fire — uses ranks instead of raw scores so it discriminates gaps as small as 0.3 at B=20 blocks | Friedman (JASA 1937), Birattari et al. (GECCO 2002), Conover (1999) |
 
 ### Preprocessing
 
@@ -374,6 +380,67 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | review | ~6-8 | Multi-pass code review (detect + cluster + verify + diagnose + research + prescribe + report) |
 | sot | ~1+N | Skeleton-of-Thought (skeleton + N parallel section expansions) |
 | triad | ~2+2×rounds+1 | Three-role debate (2 openings + pro+opp per round + judge verdict, default 2 rounds → ~7) |
+| ab_select | ~N+iterations | Multi-fidelity Thompson sampling (N candidates + Thompson-allocated evaluations until budget exhausted) |
+| listwise_rank | ~1 or ~⌈(N-w)/s⌉+1 | Listwise reranking (1 call if N ≤ window_size, sliding-window passes otherwise) |
+| pairwise_rank | ~N(N-1) (allpair) / ~N log₂ N (sorting) | PRP bidirectional pairwise (allpair: every pair × 2 directions; sorting: binary-insertion ×2) |
+| setwise_rank | ~top_k × (N − top_k/2) / (k − 1) | Setwise tournament — each of the top_k extractions runs a full ⌈log_k(N−r)⌉-round tournament. Summing the geometric series of rounds gives ~(N−r)/(k−1) LLM calls per extraction (NOT just ⌈N/k⌉; that is the first round only) |
+
+## Testing
+
+Tests live under `tests/` and use the `lust` (mlua-lspec) framework
+(`describe` / `it` / `expect`). The packages are pure Lua, so any Lua 5.4
+runtime that injects a `lust` global can run them, but the recommended
+runner is **[mlua-probe-mcp](https://crates.io/crates/mlua-probe-mcp)**,
+which ships with the framework pre-loaded.
+
+Install:
+
+```bash
+cargo install mlua-probe-mcp
+```
+
+### Running tests via mlua-probe
+
+mlua-probe is exposed as the `lua-debugger` MCP server in `.mcp.json`. From
+Claude Code (or any MCP client), invoke `test_launch` against a test file:
+
+```
+mcp__lua-debugger__test_launch(
+  code_file   = "tests/test_ranking_packages.lua",
+  search_paths = ["."]   # repo root, so pkg/?.lua and pkg/?/init.lua resolve
+)
+```
+
+Returns structured JSON: `{ passed, failed, total, tests: [{ suite, name, passed, error }] }`.
+
+### Running tests via the mlua-probe CLI
+
+If you have `mlua-probe` installed locally:
+
+```bash
+mlua-probe test tests/test_ranking_packages.lua --search-path .
+```
+
+### Adding a new test file
+
+1. Create `tests/test_<package>.lua`.
+2. Use the standard preamble (matches all existing test files):
+
+   ```lua
+   local describe, it, expect = lust.describe, lust.it, lust.expect
+   local REPO = os.getenv("PWD") or "."
+   package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+   ```
+
+3. Reset `package.loaded` between suites if you mock `_G.alc`:
+
+   ```lua
+   local function reset()
+       _G.alc = nil
+       for _, name in ipairs(PKG_NAMES) do package.loaded[name] = nil end
+   end
+   lust.after(reset)
+   ```
 
 ## License
 

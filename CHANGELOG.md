@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-04-08
+
+### Added
+
+- **6 new selection / ranking / partial-data pruning packages**:
+  - **[ab_select](ab_select/)**: Adaptive Branching Selection — multi-fidelity Thompson sampling over a fixed candidate pool; cheap→expensive evaluator cascade allocates expensive evaluations only to promising candidates (Inoue et al., "AB-MCTS", NeurIPS 2025 Spotlight)
+  - **[listwise_rank](listwise_rank/)**: Zero-shot listwise reranking — single-LLM-call permutation generation with sliding window for large N. Resolves the calibration problem of pointwise scoring (Sun et al., "RankGPT", EMNLP 2023; Pradeep et al., "RankZephyr", 2023)
+  - **[pairwise_rank](pairwise_rank/)**: Pairwise Ranking Prompting (PRP) — bidirectional pairwise comparisons (A,B and B,A to cancel position bias) with Copeland-style aggregation. Modes: allpair O(N²) or sorting O(N log N) (Qin et al., NAACL 2024 Findings)
+  - **[setwise_rank](setwise_rank/)**: Setwise tournament reranking — LLM picks the single best from small sets (size k); winners advance through tournament rounds. Mid-cost/mid-accuracy sweet spot between listwise and pairwise (Zhuang et al., SIGIR 2024)
+  - **[cs_pruner](cs_pruner/)**: Confidence-sequence partial-data pruner — anytime-valid per-candidate kill via Empirical-Bernstein CS over a multi-dimensional rubric. Four variants: `polynomial_stitched`, `hoeffding`, `betting` (W-S&R 2024 predictable plug-in), and `kl` (Kaufmann-Cappé KL-LUCB). Optional layer-2 Successive Halving with gap guard for small-N×D regimes where the CS floor cannot fire (Howard et al., Ann. Stat. 2021; Waudby-Smith & Ramdas, JRSS-B 2024; Kaufmann & Cappé, JMLR 2013)
+  - **[f_race](f_race/)**: Friedman race partial-data pruner — block-wise rank assignment over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman χ² + Conover post-hoc test. Designed for small N (≤10) × D (≤30) where EB-CS cannot fire (Friedman, JASA 1937; Birattari et al., GECCO 2002; Conover, 1999)
+- **tests/test_cs_pruner.lua**: 24 tests covering all four CS variants, layer-2 halving, gap guard, eval_order modes, and validation
+- **tests/test_f_race.lua**: Friedman race coverage
+- **tests/test_ranking_packages.lua**: shared tests for ab_select / listwise_rank / pairwise_rank / setwise_rank
+
+### Changed
+
+- **cs_pruner**: dropped the reserved `independent_bonferroni` aggregation mode from docstring and error message. Numerical analysis (N=6, D=20, δ=0.05, t=1/dim → `radius_floor ≈ 16.78`) showed the construction is structurally incompatible with the round-robin evaluation schedule, so the v0.2 placeholder has been removed rather than carried forward. `ctx.aggregation` now documents `scalarize` as the only supported value.
+- **README**: updated package count (85 → 91), added ranking/pruning packages to the Selection table and their LLM-call profiles to the table, added Testing section documenting the mlua-probe-mcp runner workflow
+
 ## [0.10.0] - 2026-04-04
 
 ### Added
