@@ -1,0 +1,825 @@
+{
+  "schema_version": "hub_index/v0",
+  "updated_at": "2026-04-12T12:38:10Z",
+  "packages": [
+    {
+      "name": "ab_mcts",
+      "version": "0.1.0",
+      "description": "Adaptive Branching MCTS — Thompson Sampling with dynamic ",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "ab_select",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "abm",
+      "version": "0.1.0-beta",
+      "description": "Agent-Based Model framework — Agent/Model/Scheduler ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "ambig",
+      "version": "0.1.0",
+      "description": "Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs",
+      "category": "intent",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "analogical",
+      "version": "0.1.0",
+      "description": "Analogical prompting — self-generate analogies, extract patterns, apply to original",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "anti_cascade",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "bisect",
+      "version": "0.1.0",
+      "description": "Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point",
+      "category": "debugging",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "blind_spot",
+      "version": "0.1.0",
+      "description": "Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction",
+      "category": "correction",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "boids_abm",
+      "version": "0.1.0",
+      "description": "Boids flocking model — separation, alignment, cohesion ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "bot",
+      "version": "0.1.0",
+      "description": "Buffer of Thoughts — identify problem type, apply thought template, verify",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "calibrate",
+      "version": "0.1.0",
+      "description": "Confidence-gated reasoning — fast path when confident, escalation when not",
+      "category": "meta",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cascade",
+      "version": "0.1.0",
+      "description": "Multi-level difficulty routing — escalate from fast to deep only when confidence is low",
+      "category": "routing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "claim_trace",
+      "version": "0.1.0",
+      "description": "Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance",
+      "category": "attribution",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "coa",
+      "version": "0.1.0",
+      "description": "Chain-of-Abstraction — reason with abstract placeholders, ",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cod",
+      "version": "0.1.0",
+      "description": "Chain-of-Density — iterative information densification with fidelity preservation",
+      "category": "optimization",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "coevolve",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "compute_alloc",
+      "version": "0.1.0",
+      "description": "Compute-optimal test-time scaling — dynamically selects ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "contrastive",
+      "version": "0.1.0",
+      "description": "Contrastive CoT — generate correct and incorrect reasoning, learn from contrast",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cot",
+      "version": "0.1.0",
+      "description": "Iterative chain-of-thought — cumulative reasoning steps, then synthesis",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "counterfactual_verify",
+      "version": "0.1.0",
+      "description": "Counterfactual faithfulness verification — tests whether ",
+      "category": "validation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cove",
+      "version": "0.1.0",
+      "description": "Draft-verify-revise — reduces hallucination via independent fact-checking",
+      "category": "validation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "critic",
+      "version": "0.1.0",
+      "description": "Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas",
+      "category": "evaluation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cs_pruner",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cumulative",
+      "version": "0.1.0",
+      "description": "Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "decompose",
+      "version": "0.1.0",
+      "description": "Task decomposition — LLM-driven split, parallel execution, merge",
+      "category": "planning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "deliberate",
+      "version": "0.1.0",
+      "description": "Structured deliberation — abstract principles, expert consultation, debate, ranked decision",
+      "category": "combinator",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "dissent",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "distill",
+      "version": "0.1.0",
+      "description": "MapReduce summarization — parallel chunk processing with unified reduction",
+      "category": "extraction",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "diverse",
+      "version": "0.1.0",
+      "description": "DiVERSe — diverse reasoning paths with step-level verification and selection",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "dmad",
+      "version": "0.1.0",
+      "description": "Dialectical reasoning — thesis, antithesis, and synthesis for deeper analysis",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "epidemic_abm",
+      "version": "0.1.0",
+      "description": "SIR Agent-Based epidemic model — stochastic individual-level ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "evogame_abm",
+      "version": "0.1.0",
+      "description": "Evolutionary Game Theory ABM — iterated games with ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "f_race",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "factscore",
+      "version": "0.1.0",
+      "description": "Atomic claim decomposition — per-claim factual verification with scoring",
+      "category": "validation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "faithful",
+      "version": "0.1.0",
+      "description": "Faithful CoT — formalize reasoning into code/logic for verification, then answer",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "falsify",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "got",
+      "version": "0.1.0",
+      "description": "Graph of Thoughts — DAG-structured reasoning with aggregation, ",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "gumbel_search",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "hybrid_abm",
+      "version": "0.1.0",
+      "description": "LLM-as-Parameterizer ABM — LLM extracts sim parameters, ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "intent_belief",
+      "version": "0.1.0",
+      "description": "Bayesian intent estimation — hypothesis generation with iterative belief updates via diagnostic questions",
+      "category": "intent",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "intent_discovery",
+      "version": "0.1.0",
+      "description": "Exploratory intent formation — discover user goals through structured option presentation and iterative narrowing",
+      "category": "intent",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "least_to_most",
+      "version": "0.1.0",
+      "description": "Least-to-Most — decompose into ordered subproblems, solve simplest first, build up",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "lineage",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "listwise_rank",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "maieutic",
+      "version": "0.1.0",
+      "description": "Maieutic prompting — recursive explanation tree with logical consistency verification",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "mbr_select",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "mcts",
+      "version": "0.1.0",
+      "description": "Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "meta_prompt",
+      "version": "0.1.0",
+      "description": "Meta-Prompting — orchestrator identifies and dispatches to specialist personas",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "moa",
+      "version": "0.1.0",
+      "description": "Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement",
+      "category": "selection",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "model_first",
+      "version": "0.1.0",
+      "description": "Model-First Reasoning — construct explicit problem model ",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "negation",
+      "version": "0.1.0",
+      "description": "Adversarial self-test — generate destruction conditions and verify answer survival",
+      "category": "validation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "opinion_abm",
+      "version": "0.1.0",
+      "description": "Hegselmann-Krause Bounded Confidence opinion dynamics — ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "optimize",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "orch_adaptive",
+      "version": "0.1.0",
+      "description": "Adaptive depth orchestration based on task difficulty. ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "orch_escalate",
+      "version": "0.1.0",
+      "description": "Cascade escalation: start with lightest strategy, ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "orch_fixpipe",
+      "version": "0.1.0",
+      "description": "Deterministic fixed pipeline with gate/retry. ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "orch_gatephase",
+      "version": "0.1.0",
+      "description": "Phase orchestration with pre/post hooks and skip rules. ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "orch_nver",
+      "version": "0.1.0",
+      "description": "N-version programming: execute N parallel variants, ",
+      "category": "orchestration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "p_tts",
+      "version": "0.1.0",
+      "description": "Plan-Test-Then-Solve — generate constraints before solving, verify solution against specification",
+      "category": "planning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "pairwise_rank",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "panel",
+      "version": "0.1.0",
+      "description": "Multi-perspective deliberation — distinct roles engage, moderator synthesizes",
+      "category": "synthesis",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "php",
+      "version": "0.1.0",
+      "description": "Progressive-Hint Prompting — iterative re-solving with prior answers as hints",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "plan_solve",
+      "version": "0.1.0",
+      "description": "Plan-and-Solve — devise an explicit plan, then execute step by step",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "pre_mortem",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "prism",
+      "version": "0.1.0",
+      "description": "Cognitive-load-aware intent decomposition — logical dependency ordering for minimal-friction clarification",
+      "category": "intent",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "prompt_breed",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "qdaif",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "rank",
+      "version": "0.1.0",
+      "description": "Tournament selection — generate candidates, pairwise LLM-as-Judge ranking",
+      "category": "selection",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "reflect",
+      "version": "0.1.0",
+      "description": "Self-critique loop — generate, critique, revise until convergence",
+      "category": "refinement",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "reflexion",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "review_and_investigate",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "robust_qa",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "router_capability",
+      "version": "0.1.0",
+      "description": "Capability-based routing using agent registry metadata matching. ",
+      "category": "routing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "router_daao",
+      "version": "0.1.0",
+      "description": "Difficulty-aware task routing based on DAAO (arxiv 2509.11079). ",
+      "category": "routing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "router_semantic",
+      "version": "0.1.0",
+      "description": "Keyword/pattern-based routing with LLM fallback. ",
+      "category": "routing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "rstar",
+      "version": "0.1.0",
+      "description": "Mutual reasoning verification — two paths cross-verify each other for efficient accuracy",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "s2a",
+      "version": "0.1.0",
+      "description": "System 2 Attention — strip irrelevant context before reasoning to reduce distraction and sycophancy",
+      "category": "preprocessing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "sc",
+      "version": "0.1.0",
+      "description": "Independent multi-path sampling with majority vote aggregation",
+      "category": "aggregation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "schelling_abm",
+      "version": "0.1.0",
+      "description": "Schelling Segregation model — agents on a 2D grid relocate ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "setwise_rank",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "sketch",
+      "version": "0.1.0",
+      "description": "Sketch-of-Thought — cognitive-inspired efficient reasoning. ",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "sot",
+      "version": "0.1.0",
+      "description": "Skeleton-of-Thought — outline-first parallel section generation",
+      "category": "generation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "step_back",
+      "version": "0.1.0",
+      "description": "Step-Back prompting — abstract the principle first, then solve from principles",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "step_verify",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "sugarscape_abm",
+      "version": "0.1.0",
+      "description": "Sugarscape model — agents forage on a sugar landscape, ",
+      "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "topo_route",
+      "version": "0.1.0",
+      "description": "Topology-aware meta-router — analyzes task characteristics ",
+      "category": "routing",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "tot",
+      "version": "0.1.0",
+      "description": "Tree-of-Thought — branching reasoning with evaluation and pruning",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "triad",
+      "version": "0.1.0",
+      "description": "Adversarial 3-role debate — proponent/opponent/judge with multi-round argumentation",
+      "category": "adversarial",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "ucb",
+      "version": "0.1.0",
+      "description": "UCB1 hypothesis space exploration — generate, score, select, refine",
+      "category": "selection",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "usc",
+      "version": "0.1.0",
+      "description": "Universal Self-Consistency — LLM-based consistency selection ",
+      "category": "aggregation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "verify_first",
+      "version": "0.1.0",
+      "description": "Verification-First prompting — verify a candidate answer before generating, reducing logical errors via reverse reasoning",
+      "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    }
+  ]
+}
