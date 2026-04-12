@@ -53,6 +53,8 @@
 --- ctx.defaults  (optional): Base parameter defaults (merged with arm params)
 --- ctx.strategy_opts (optional): Extra opts passed to target strategy
 --- ctx.eval_fn   (optional): Custom evaluation function (for evaluator="custom")
+--- ctx.auto_card (optional): Emit a Card on completion (default: false)
+--- ctx.card_pkg  (optional): Card pkg.name override (default: "optimize_{target}")
 
 local search_mod = require("optimize.search")
 local eval_mod   = require("optimize.eval")
@@ -65,7 +67,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name = "optimize",
-    version = "0.2.0",
+    version = "0.3.0",
     description = "Modular parameter optimization orchestrator. "
         .. "Composes pluggable search strategies (UCB1, OPRO, EA, greedy), "
         .. "evaluators (evalframe, custom, LLM judge), and stopping criteria "
@@ -121,6 +123,55 @@ local function build_ranking(results)
     end
     table.sort(rankings, function(a, b) return a.avg_score > b.avg_score end)
     return rankings
+end
+
+--- Emit a Card from optimize results (Two-Tier Content Policy).
+--- Tier 1 (Card body): aggregate scalars, optimize config, top_k ranking.
+--- Tier 2 (samples.jsonl): per-round history (one row per round).
+local function emit_card(ctx, result, history)
+    local pkg_name = ctx.card_pkg or ("optimize_" .. (ctx.name or ctx.target))
+    local search_name = type(ctx.search) == "string" and ctx.search or "ucb"
+    local eval_name = type(ctx.evaluator) == "string" and ctx.evaluator or "evalframe"
+    local stop_name = type(ctx.stop) == "string" and ctx.stop or "variance"
+
+    local top_k = {}
+    for i, arm in ipairs(result.top_5) do
+        top_k[i] = {
+            rank = i,
+            avg_score = arm.avg_score,
+            pulls = arm.pulls,
+            params = arm.params,
+        }
+    end
+
+    local card = alc.card.create({
+        pkg = { name = pkg_name },
+        scenario = { name = ctx.scenario_name
+            or (type(ctx.scenario) == "string" and ctx.scenario)
+            or (type(ctx.scenario) == "table" and ctx.scenario.name)
+            or "unknown" },
+        params = result.best_params,
+        stats = { best_score = result.best_score },
+        optimize = {
+            target = ctx.target,
+            search = search_name,
+            evaluator = eval_name,
+            stop = stop_name,
+            rounds_used = result.rounds_used,
+            total_evaluations = result.total_evaluations,
+            arm_count = result.arm_count,
+            stop_reason = result.stop_reason,
+            history_key = result.history_key,
+            top_k = top_k,
+        },
+    })
+
+    -- Tier 2: per-round history as samples sidecar
+    if history.results and #history.results > 0 then
+        alc.card.write_samples(card.card_id, history.results)
+    end
+
+    return card.card_id
 end
 
 ---@param ctx AlcCtx
@@ -219,6 +270,13 @@ function M.run(ctx)
     }
     for i = 1, math.min(5, #rankings) do
         ctx.result.top_5[i] = rankings[i]
+    end
+
+    -- Emit Card if opted in
+    if ctx.auto_card then
+        local card_id = emit_card(ctx, ctx.result, history)
+        ctx.result.card_id = card_id
+        alc.log("info", "optimize: card emitted — " .. card_id)
     end
 
     return ctx

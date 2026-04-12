@@ -61,6 +61,26 @@ local function mock_alc(llm_fn)
                 return ks
             end,
         },
+        card = {
+            _cards = {},
+            _samples = {},
+            _id_counter = 0,
+            create = function(payload)
+                _G.alc.card._id_counter = _G.alc.card._id_counter + 1
+                local pkg_name = payload.pkg and payload.pkg.name or "unknown"
+                local card_id = pkg_name .. "_card_" .. _G.alc.card._id_counter
+                payload.card_id = card_id
+                _G.alc.card._cards[card_id] = payload
+                return { card_id = card_id, path = "/mock/" .. card_id .. ".toml" }
+            end,
+            write_samples = function(card_id, samples)
+                _G.alc.card._samples[card_id] = samples
+                return "/mock/" .. card_id .. ".samples.jsonl"
+            end,
+            get = function(card_id)
+                return _G.alc.card._cards[card_id]
+            end,
+        },
     }
     return call_log
 end
@@ -569,7 +589,7 @@ describe("optimize: meta", function()
         package.loaded["optimize.stop"] = nil
         local m = require("optimize")
         expect(m.meta.name).to.equal("optimize")
-        expect(m.meta.version).to.equal("0.2.0")
+        expect(m.meta.version).to.equal("0.3.0")
         expect(m.meta.category).to.equal("optimization")
     end)
 
@@ -916,5 +936,132 @@ describe("optimize: alc.tuning integration", function()
 
         expect(#tuning_calls > 0).to.equal(true)
         expect(tuning_calls[1].defaults.other_param).to.equal("keep")
+    end)
+end)
+
+-- ================================================================
+-- auto_card integration tests
+-- ================================================================
+
+describe("optimize: auto_card emits Card with two-tier data", function()
+    lust.after(reset)
+
+    it("creates Card (Tier 1) and samples (Tier 2) when auto_card=true", function()
+        mock_alc(function() return "mock" end)
+        install_mock_evalframe(function(n) return 0.5 + n * 0.05 end)
+        package.loaded["optimize"] = nil
+        package.loaded["optimize.search"] = nil
+        package.loaded["optimize.eval"] = nil
+        package.loaded["optimize.stop"] = nil
+        local m = require("optimize")
+
+        local ctx = m.run({
+            target = "card_test_target",
+            space = { x = { type = "float", min = 0.0, max = 1.0, step = 0.5 } },
+            scenario = {
+                name = "test_scenario",
+                { _is_binding = true },
+                cases = { { _is_case = true, input = "t", expected = "r" } },
+            },
+            rounds = 3,
+            auto_card = true,
+        })
+
+        -- card_id should be set in result
+        expect(ctx.result.card_id).to_not.equal(nil)
+
+        -- Tier 1: Card body should exist with optimize section
+        local card = alc.card.get(ctx.result.card_id)
+        expect(card).to_not.equal(nil)
+        expect(card.optimize).to_not.equal(nil)
+        expect(card.optimize.target).to.equal("card_test_target")
+        expect(card.optimize.search).to.equal("ucb")
+        expect(card.optimize.evaluator).to.equal("evalframe")
+        expect(card.optimize.rounds_used).to.equal(3)
+        expect(card.optimize.top_k).to_not.equal(nil)
+        expect(card.stats.best_score).to_not.equal(nil)
+        expect(card.params).to_not.equal(nil)
+        expect(card.pkg.name).to.equal("optimize_card_test_target")
+
+        -- Tier 2: samples sidecar should contain per-round history
+        local samples = alc.card._samples[ctx.result.card_id]
+        expect(samples).to_not.equal(nil)
+        expect(#samples).to.equal(3)
+        expect(samples[1].round).to.equal(1)
+        expect(samples[1].score).to_not.equal(nil)
+        expect(samples[1].params).to_not.equal(nil)
+    end)
+
+    it("does not emit Card when auto_card is false/absent", function()
+        mock_alc(function() return "mock" end)
+        install_mock_evalframe(function() return 0.7 end)
+        package.loaded["optimize"] = nil
+        package.loaded["optimize.search"] = nil
+        package.loaded["optimize.eval"] = nil
+        package.loaded["optimize.stop"] = nil
+        local m = require("optimize")
+
+        local ctx = m.run({
+            target = "no_card_test",
+            space = { x = { type = "float", min = 0.0, max = 1.0, step = 0.5 } },
+            scenario = {
+                { _is_binding = true },
+                cases = { { _is_case = true, input = "t", expected = "r" } },
+            },
+            rounds = 2,
+        })
+
+        expect(ctx.result.card_id).to.equal(nil)
+    end)
+
+    it("respects card_pkg override", function()
+        mock_alc(function() return "mock" end)
+        install_mock_evalframe(function() return 0.8 end)
+        package.loaded["optimize"] = nil
+        package.loaded["optimize.search"] = nil
+        package.loaded["optimize.eval"] = nil
+        package.loaded["optimize.stop"] = nil
+        local m = require("optimize")
+
+        local ctx = m.run({
+            target = "pkg_override_test",
+            space = { x = { type = "float", min = 0.0, max = 1.0, step = 0.5 } },
+            scenario = {
+                name = "test_scn",
+                { _is_binding = true },
+                cases = { { _is_case = true, input = "t", expected = "r" } },
+            },
+            rounds = 2,
+            auto_card = true,
+            card_pkg = "my_custom_pkg",
+        })
+
+        local card = alc.card.get(ctx.result.card_id)
+        expect(card.pkg.name).to.equal("my_custom_pkg")
+    end)
+
+    it("scenario name extracted from string scenario", function()
+        mock_alc(function() return "mock" end)
+        install_mock_evalframe(function() return 0.6 end)
+        package.loaded["optimize"] = nil
+        package.loaded["optimize.search"] = nil
+        package.loaded["optimize.eval"] = nil
+        package.loaded["optimize.stop"] = nil
+        local m = require("optimize")
+
+        local ctx = m.run({
+            target = "scn_name_test",
+            space = { x = { type = "float", min = 0.0, max = 1.0, step = 0.5 } },
+            scenario = {
+                { _is_binding = true },
+                cases = { { _is_case = true, input = "t", expected = "r" } },
+            },
+            scenario_name = "gsm8k_100",
+            rounds = 2,
+            auto_card = true,
+        })
+
+        local card = alc.card.get(ctx.result.card_id)
+        expect(card.scenario.name).to.equal("gsm8k_100")
     end)
 end)
