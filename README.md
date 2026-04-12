@@ -87,7 +87,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 |---------|-------------|----------|
 | **[distill](distill/)** | MapReduce summarization/extraction. Chunks large text, extracts in parallel, and synthesizes | LLM x MapReduce (2024) |
 | **[cod](cod/)** | Chain-of-Density iterative compression. Rewrites summaries to progressively increase information density | Adams et al. (2023) |
-| **[optimize](optimize/)** | Modular parameter optimization orchestrator. Pluggable search (UCB1, OPRO, EA, greedy), evaluators (evalframe, custom, LLM judge), and stopping criteria. Persists state across sessions | DSPy (2023), OPRO (2023), EvoPrompt (2024) |
+| **[optimize](optimize/)** | Modular parameter optimization orchestrator. Pluggable search (UCB1, OPRO, EA, greedy), evaluators (evalframe, custom, LLM judge), and stopping criteria. Auto Card emission on completion (two-tier). Persists state across sessions | DSPy (2023), OPRO (2023), EvoPrompt (2024) |
 
 ### Validation / Analysis
 

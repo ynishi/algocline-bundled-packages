@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-04-12
+
+### Changed
+
+- **optimize** v0.2.0 → v0.3.0: auto_card support — emits a Card on optimization completion with two-tier content policy (Tier 1 body: config + best_params + best_score + top_k ranking; Tier 2 samples.jsonl: per-round history). Opt-in via `ctx.auto_card = true`
+- **tests/test_optimize.lua**: added 4 auto_card tests (basic emit, card_pkg override, opt-out default, samples sidecar)
+
 ## [0.11.0] - 2026-04-08
 
 ### Added
