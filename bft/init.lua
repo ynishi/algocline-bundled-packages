@@ -1,16 +1,37 @@
 --- bft — Byzantine Fault Tolerance impossibility bounds
 ---
 --- Pure-computation utility for BFT quorum thresholds and validation.
---- No LLM calls; used as a foundation by higher-level packages (e.g. pbft).
+--- No LLM calls; used as a governance primitive by higher-level packages
+--- (e.g. pbft, dissent, anti_cascade).
 ---
---- Based on: Lamport, Shostak, Pease. "The Byzantine Generals Problem".
---- ACM TOPLAS 4(3), 382-401, 1982. DOI:10.1145/357172.357176
+--- Theory:
+---   Lamport, Shostak, Pease. "The Byzantine Generals Problem".
+---   ACM TOPLAS 4(3), pp.382-401, 1982. DOI:10.1145/357172.357176
 ---
---- Core result (Theorem 1): With oral messages, agreement is possible
---- iff n >= 3f + 1, where n = total nodes, f = faulty nodes.
---- Required quorum: 2f + 1 (any two quorums share >= 1 honest node).
+---   Core result (Theorem 1): With oral messages, agreement is possible
+---   iff n >= 3f + 1, where n = total nodes, f = faulty nodes.
+---   Required quorum: 2f + 1 (any two quorums share >= 1 honest node).
 ---
---- With signed messages (SM(m), section 4): n >= f + 2 suffices.
+---   With signed messages (SM(m), section 4): n >= f + 2 suffices.
+---
+--- Multi-Agent / Swarm context:
+---   In LLM agent swarms, "Byzantine faults" map to hallucinating,
+---   adversarial, or compromised agents that may produce arbitrarily
+---   wrong outputs. BFT bounds answer the governance question:
+---     "Given N agents, how many can fail before consensus breaks?"
+---
+---   Practical applications:
+---   - Panel sizing: given expected hallucination rate f/n, compute
+---     minimum panel size n >= 3f+1 for reliable majority vote
+---   - pbft integration: BFT bounds determine quorum thresholds
+---     for the 3-phase consensus protocol
+---   - Signed-message mode: when agents produce verifiable outputs
+---     (e.g. code with unit tests), the weaker n >= f+2 bound applies,
+---     allowing smaller panels
+---
+---   Related: "From Spark to Fire" (Xie et al., AAMAS 2026) shows that
+---   single faulty agents can cascade through multi-agent pipelines —
+---   BFT bounds quantify the structural resilience of the system.
 ---
 --- Usage:
 ---   local bft = require("bft")
@@ -25,8 +46,10 @@ M.meta = {
     name = "bft",
     version = "0.1.0",
     description = "Byzantine Fault Tolerance bounds — quorum thresholds "
-        .. "and impossibility validation (Lamport-Shostak-Pease 1982)",
-    category = "foundation",
+        .. "and impossibility validation for multi-agent governance. "
+        .. "Computes minimum panel sizes and fault tolerance limits "
+        .. "(Lamport-Shostak-Pease 1982, Theorem 1: n >= 3f+1).",
+    category = "governance",
 }
 
 --- Validate whether BFT agreement is possible with oral messages.

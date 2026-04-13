@@ -1,18 +1,43 @@
 --- cost_pareto — Multi-objective Pareto dominance computation
 ---
 --- Pure-computation utility for comparing candidates on multiple
---- objectives (accuracy, cost, diversity, etc.) using Pareto dominance.
+--- objectives (accuracy, cost, diversity, latency, etc.) using
+--- Pareto dominance and frontier extraction.
 ---
---- Based on: Kapoor, Stroebl, Siegel, Nadgir, Narayanan (Princeton).
---- "AI Agents That Matter". arXiv:2407.01502, 2024.
+--- Theory:
+---   Pareto optimality (Vilfredo Pareto, 1896): candidate A dominates
+---   candidate B iff A is at least as good as B on ALL objectives and
+---   strictly better on at least one. The Pareto frontier is the set
+---   of all non-dominated candidates.
 ---
---- Key finding: HumanEval warming baseline ($2.45 / 93.2%) Pareto-
---- dominates LATS ($134.50 / 88.0%) and Reflexion ($3.90 / 87.8%).
---- This package makes such comparisons systematic and automatic.
+---   Applied to AI agents by:
+---   Kapoor, Stroebl, Siegel, Nadgir, Narayanan (Princeton).
+---   "AI Agents That Matter". arXiv:2407.01502, 2024.
+---
+---   Key finding: HumanEval warming baseline ($2.45 / 93.2%) Pareto-
+---   dominates LATS ($134.50 / 88.0%) and Reflexion ($3.90 / 87.8%).
+---
+--- Multi-Agent / Swarm context:
+---   Multi-agent strategies often improve accuracy at massive cost
+---   increases. Pareto analysis prevents the trap of chasing marginal
+---   accuracy gains with disproportionate resource expenditure.
+---
+---   - Strategy selection: frontier() extracts non-dominated agent
+---     configurations from a candidate pool. Only Pareto-optimal
+---     configurations should be considered for deployment.
+---   - Baseline gate: is_dominated() checks if a complex multi-agent
+---     strategy is Pareto-dominated by a simple baseline (e.g.,
+---     single-agent + Self-Consistency). If dominated, the complex
+---     strategy should be rejected regardless of absolute accuracy.
+---   - Layered ranking: layers() assigns candidates to Pareto layers
+---     (layer 0 = frontier, layer 1 = next frontier, etc.) for
+---     progressive elimination in tournament-style agent selection.
+---   - Connects to eval_guard (N5 baseline gate), inverse_u (more
+---     agents at declining accuracy = dominated), and mwu (weight
+---     allocation should favor Pareto-optimal agents).
 ---
 --- Convention: ALL objectives are "higher is better". For cost,
 --- pass the negative or inverse (e.g., -cost or 1/cost).
---- Alternatively, specify objective directions explicitly.
 ---
 --- Usage:
 ---   local cp = require("cost_pareto")
@@ -26,9 +51,11 @@ local M = {}
 M.meta = {
     name = "cost_pareto",
     version = "0.1.0",
-    description = "Multi-objective Pareto dominance — compare candidates "
-        .. "on accuracy/cost/diversity (Kapoor 2024)",
-    category = "foundation",
+    description = "Multi-objective Pareto dominance — frontier extraction, "
+        .. "dominance testing, and layered ranking for agent strategy "
+        .. "selection on accuracy/cost/diversity trade-offs "
+        .. "(Kapoor et al. 'AI Agents That Matter', 2024).",
+    category = "selection",
 }
 
 --- Extract numeric values from a candidate table.

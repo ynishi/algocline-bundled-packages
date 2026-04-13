@@ -1,19 +1,45 @@
 --- eval_guard — Evaluation safety gates (N2 + N3 + N4 Red Lines)
 ---
---- Pure-computation gate checks for evaluation safety.
---- Each gate returns (passed, reason) and can be used independently
---- or combined via check_all().
+--- Pure-computation gate checks for evaluation safety in multi-agent
+--- systems. Each gate returns (passed, reason) and can be used
+--- independently or combined via check_all().
 ---
 --- Gates:
----   N2 self_critique  — Huang ICLR 2024: intrinsic self-correction
----                        degrades accuracy without external grader
----   N3 baseline       — Wang Q ACL 2024 + Kapoor 2024: multi-agent
----                        must run with same-budget SC/CoT baseline
----   N4 contamination  — Zhu EMNLP 2024: absolute accuracy on standard
----                        benchmarks is unreliable (GSM8K -22.9pt)
+---   N2 self_critique  — Huang et al. ICLR 2024: "Large Language Models
+---                        Cannot Self-Correct Reasoning Yet". Intrinsic
+---                        self-correction degrades accuracy without an
+---                        external grader (GPT-4 GSM8K 95.5→89.0).
+---   N3 baseline       — Wang Q et al. ACL 2024 Findings + Kapoor 2024:
+---                        multi-agent must run with same-budget SC/CoT
+---                        baseline for fair comparison. Without baseline,
+---                        complex multi-agent setups often lose to simple
+---                        single-agent + Self-Consistency.
+---   N4 contamination  — Zhu et al. EMNLP 2024: absolute accuracy on
+---                        standard benchmarks is unreliable due to data
+---                        contamination (GSM8K -22.9pt, MMLU -19.0pt
+---                        after decontamination).
 ---
 --- N1 (inverse_u) and N5 (cost_pareto) are separate packages due to
 --- non-trivial computation. This package handles structural checks.
+---
+--- Multi-Agent / Swarm context:
+---   These gates are pre-flight checks before trusting any multi-agent
+---   evaluation result. Without them, common pitfalls go undetected:
+---
+---   - N2: Reflexion/self-critique loops without external verification
+---     are a known failure mode in multi-agent pipelines (MAST F5).
+---     The gate enforces that self-correction always has a ground-truth
+---     signal (unit test, symbolic check, cross-model verification).
+---   - N3: The most common multi-agent evaluation error is comparing
+---     a 5-agent system against a single agent WITHOUT equalizing the
+---     compute budget. This gate enforces baseline fairness.
+---   - N4: Standard benchmarks (GSM8K, MMLU, HumanEval) are
+---     contaminated in most LLMs. The gate requires hold-out delta +
+---     cost + Pareto as the evaluation criterion set.
+---   - check_all() runs all three gates and produces a combined report,
+---     suitable for automated pipeline enforcement.
+---   - Composable with scoring_rule (calibration measurement after
+---     gates pass) and cost_pareto (N5 Pareto dominance check).
 ---
 --- Usage:
 ---   local eg = require("eval_guard")
@@ -30,9 +56,12 @@ local M = {}
 M.meta = {
     name = "eval_guard",
     version = "0.1.0",
-    description = "Evaluation safety gates — self-critique guard (N2), "
-        .. "baseline enforcement (N3), contamination shield (N4)",
-    category = "foundation",
+    description = "Evaluation safety gates for multi-agent systems — "
+        .. "self-critique guard (N2, Huang ICLR 2024), baseline "
+        .. "enforcement (N3, Wang-Kapoor 2024), contamination shield "
+        .. "(N4, Zhu EMNLP 2024). Pre-flight checks before trusting "
+        .. "any multi-agent evaluation result.",
+    category = "validation",
 }
 
 --- N2: Self-critique gate.

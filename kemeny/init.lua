@@ -5,22 +5,7 @@
 --- rankings. The Kemeny rule is the UNIQUE aggregation method satisfying
 --- Condorcet consistency + neutrality + consistency (Young-Levenglick 1978).
 ---
---- Central formula:
----   σ* = argmin_{σ} Σ_{k=1}^{N} d_KT(σ, σ_k)
----
---- where d_KT is the Kendall tau distance (number of pairwise disagreements).
----
---- Computational complexity: NP-hard (Bartholdi, Tovey, Trick 1989).
----   - m ≤ 8 candidates: exact computation via full enumeration (m! ≤ 40320)
----   - m > 8: Borda count approximation (O(N·m), Kemeny 2-approximation)
----
---- Also provides:
----   - Borda count (de Borda 1781): independent rank aggregation method
----     with its own axiomatic characterization (Young 1974)
----   - Condorcet winner detection from pairwise majority matrix
----   - Kendall tau distance computation
----
---- Based on:
+--- Theory:
 ---   Kemeny, J. G. "Mathematics without Numbers". Daedalus 88(4),
 ---   pp.577-591, 1959.
 ---
@@ -30,6 +15,46 @@
 ---   Bartholdi, J., Tovey, C., Trick, M. "Voting schemes for which it can
 ---   be difficult to tell who won the election". Social Choice and Welfare 6,
 ---   pp.157-165, 1989.
+---
+---   Central formula:
+---     σ* = argmin_{σ} Σ_{k=1}^{N} d_KT(σ, σ_k)
+---
+---   where d_KT is the Kendall tau distance (pairwise disagreements).
+---
+---   Computational complexity: NP-hard (Bartholdi et al. 1989).
+---     - m ≤ 8 candidates: exact via full enumeration (m! ≤ 40320)
+---     - m > 8: Borda count approximation (O(N·m), 2-approximation)
+---
+--- Multi-Agent / Swarm context:
+---   When multiple agents produce rankings (e.g., ordering solution
+---   candidates, prioritizing hypotheses, sorting search results),
+---   Kemeny-Young provides the axiomatically optimal way to merge them
+---   into a single consensus ranking.
+---
+---   - Rank aggregation: aggregate() auto-selects exact (m ≤ 8) or
+---     Borda (m > 8) to merge agent rankings. The result minimizes
+---     total disagreement with all agents — a principled alternative
+---     to ad-hoc "take the first agent's ranking" approaches.
+---   - Condorcet consistency: if one candidate beats every other in
+---     pairwise majority, the Kemeny ranking places it first.
+---     condorcet_winner() detects this case directly.
+---   - Pairwise analysis: pairwise() builds the majority matrix,
+---     showing for each pair (a, b) how many agents prefer a over b.
+---     Reveals consensus strength and Condorcet cycles.
+---   - Kendall tau distance: kendall_tau() measures how much two
+---     rankings disagree, enabling diversity measurement across agents
+---     (connects to ensemble_div and condorcet independence).
+---   - Extends majority vote (condorcet, sc) from binary outcomes
+---     to full ranking aggregation.
+---   - Composable with listwise_rank, pairwise_rank, setwise_rank
+---     for LLM-generated rankings, and with scoring_rule for
+---     evaluating ranking quality.
+---
+--- Also provides:
+---   - Borda count (de Borda 1781): independent rank aggregation
+---     with its own axiomatic characterization (Young 1974)
+---   - Condorcet winner detection from pairwise majority matrix
+---   - Kendall tau distance computation
 ---
 --- Usage:
 ---   local kemeny = require("kemeny")
@@ -42,10 +67,11 @@ local M = {}
 M.meta = {
     name = "kemeny",
     version = "0.1.0",
-    description = "Kemeny-Young rank aggregation — distance-minimizing "
-        .. "consensus ranking with axiomatic uniqueness "
-        .. "(Kemeny 1959, Young-Levenglick 1978)",
-    category = "foundation",
+    description = "Kemeny-Young rank aggregation — axiomatically unique "
+        .. "consensus ranking that minimizes total Kendall tau distance. "
+        .. "Merges multiple agent rankings into optimal consensus with "
+        .. "Condorcet consistency (Kemeny 1959, Young-Levenglick 1978).",
+    category = "aggregation",
 }
 
 -- ─── Internal helpers ───

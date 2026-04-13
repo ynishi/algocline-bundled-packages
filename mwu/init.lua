@@ -5,23 +5,7 @@
 --- optimal O(√(T ln N)) regret bound against ANY adversarial loss
 --- sequence — no stochastic assumption required.
 ---
---- Update rule (Littlestone-Warmuth 1994):
----   w_i(t+1) = w_i(t) · (1 - η · ℓ_i(t))
----
---- Normalized distribution:
----   p_i(t) = w_i(t) / Σ_j w_j(t)
----
---- Regret bound (Theorem):
----   Regret_T = Σ_t p(t)·ℓ(t) - min_i Σ_t ℓ_i(t)
----            ≤ (ln N)/η + η·T
----
----   Optimal η = √(ln N / T) yields: Regret_T ≤ 2√(T ln N)
----
---- Difference from UCB1 (ucb package):
----   UCB1: stochastic bandits (i.i.d. losses), selects ONE arm
----   MWU:  adversarial setting (arbitrary losses), outputs WEIGHT DISTRIBUTION
----
---- Based on:
+--- Theory:
 ---   Littlestone, N., Warmuth, M. K. "The Weighted Majority Algorithm".
 ---   Information and Computation 108(2), pp.212-261, 1994.
 ---
@@ -31,6 +15,43 @@
 ---
 ---   Cesa-Bianchi, N., Lugosi, G. "Prediction, Learning, and Games".
 ---   Cambridge University Press, 2006. §2.1-2.3.
+---
+---   Update rule:
+---     w_i(t+1) = w_i(t) · (1 - η · ℓ_i(t))
+---
+---   Normalized distribution:
+---     p_i(t) = w_i(t) / Σ_j w_j(t)
+---
+---   Regret bound:
+---     Regret_T = Σ_t p(t)·ℓ(t) - min_i Σ_t ℓ_i(t)
+---              ≤ (ln N)/η + η·T
+---     Optimal η = √(ln N / T) yields: Regret_T ≤ 2√(T ln N)
+---
+--- Multi-Agent / Swarm context:
+---   MWU is the principled way to learn agent weights over time in
+---   an adversarial environment (where tasks/prompts can change
+---   arbitrarily between rounds). Unlike UCB1 which selects ONE arm,
+---   MWU outputs a full WEIGHT DISTRIBUTION over all agents.
+---
+---   - Dynamic weight learning: as agents are evaluated on successive
+---     tasks, MWU concentrates weight on consistently good performers
+---     while maintaining exploration. No i.i.d. assumption required —
+---     works even if an adversary chooses the worst possible tasks.
+---   - Regret guarantee: total loss of the weighted mixture is at most
+---     2√(T ln N) worse than the BEST single agent in hindsight.
+---     This bound holds against any sequence of tasks.
+---   - Doubling trick: when T (number of rounds) is unknown in advance,
+---     the doubling trick maintains O(√(T ln N)) regret by restarting
+---     with doubled epoch lengths and recalculated η.
+---   - Log-space computation: weights are maintained in log-space to
+---     prevent numerical underflow when agents have extreme loss
+---     contrast over many rounds.
+---   - Difference from UCB1 (ucb package):
+---     UCB1: stochastic bandits (i.i.d. losses), selects ONE arm
+---     MWU:  adversarial setting (arbitrary losses), outputs DISTRIBUTION
+---   - Composable with panel/moa (weight the agent mixture), shapley
+---     (post-hoc attribution), and scoring_rule (loss from calibration
+---     scores as input to MWU).
 ---
 --- Usage:
 ---   local mwu = require("mwu")
@@ -49,10 +70,11 @@ local M = {}
 M.meta = {
     name = "mwu",
     version = "0.1.0",
-    description = "Multiplicative Weights Update — adversarial online learning "
-        .. "with O(√(T ln N)) regret bound (Littlestone-Warmuth 1994, "
-        .. "Freund-Schapire 1997)",
-    category = "foundation",
+    description = "Multiplicative Weights Update — adversarial online agent "
+        .. "weight learning with O(√(T ln N)) regret bound. Learns optimal "
+        .. "agent mixture weights over time without stochastic assumptions "
+        .. "(Littlestone-Warmuth 1994, Freund-Schapire 1997).",
+    category = "selection",
 }
 
 -- ─── Updater class ───

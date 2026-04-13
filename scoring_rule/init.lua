@@ -5,19 +5,7 @@
 --- if reporting one's true belief maximizes expected score, and
 --- "strictly proper" if this maximum is unique.
 ---
---- Properness (Savage 1971):
----   S is proper ⟺ ∀q: E_{Y~q}[S(q, Y)] ≥ E_{Y~q}[S(p, Y)]  ∀p
----   Strictly proper: equality only when p = q
----
---- Provided rules (all strictly proper):
----   Brier (1950):     S(p, y) = -(p - y)²
----   Logarithmic:      S(p, y) = y·ln(p) + (1-y)·ln(1-p)
----   Spherical:        S(p, y) = [p·y + (1-p)·(1-y)] / √(p² + (1-p)²)
----
---- Also provides Expected Calibration Error (ECE, Naeini+ AAAI 2015)
---- and calibration curve computation for binned analysis.
----
---- Based on:
+--- Theory:
 ---   Brier, G. W. "Verification of forecasts expressed in terms of
 ---   probability". Monthly Weather Review 78(1), pp.1-3, 1950.
 ---
@@ -29,6 +17,40 @@
 ---
 ---   Naeini, M. P., Cooper, G. F., Hauskrecht, M. "Obtaining Well Calibrated
 ---   Probabilities Using Bayesian Binning into Quantiles". AAAI 2015.
+---
+---   Properness (Savage 1971):
+---     S is proper ⟺ ∀q: E_{Y~q}[S(q, Y)] ≥ E_{Y~q}[S(p, Y)]  ∀p
+---     Strictly proper: equality only when p = q
+---
+---   Provided rules (all strictly proper):
+---     Brier (1950):     S(p, y) = -(p - y)²
+---     Logarithmic:      S(p, y) = y·ln(p) + (1-y)·ln(1-p)
+---     Spherical:        S(p, y) = [p·y + (1-p)·(1-y)] / √(p² + (1-p)²)
+---
+--- Multi-Agent / Swarm context:
+---   Proper scoring rules are the mathematically correct way to evaluate
+---   whether an agent's confidence matches its actual accuracy. An agent
+---   that says "80% sure" should be right ~80% of the time.
+---
+---   - Agent calibration audit: evaluate() scores a series of
+---     agent predictions against outcomes. Poorly calibrated agents
+---     (overconfident or underconfident) are identified quantitatively.
+---   - Calibration diagnosis: calibration() computes the Expected
+---     Calibration Error (ECE) with binned analysis, and flags
+---     whether the agent is systematically overconfident or
+---     underconfident. This is critical for trust — an overconfident
+---     agent's "90% sure" answers may only be right 60% of the time.
+---   - Multi-agent comparison: compare() ranks multiple agents by
+---     calibration quality, identifying which agent's probability
+---     estimates are most trustworthy. The best-calibrated agent
+---     should receive the highest weight in ensemble decisions.
+---   - Rule selection: Brier is robust and easy to interpret;
+---     log score is more sensitive to extreme miscalibration;
+---     spherical has less extreme penalties than log.
+---   - Connects to mwu (calibration scores as loss input for weight
+---     learning), condorcet (well-calibrated p > 0.5 validates the
+---     Jury Theorem), and eval_guard (calibration as evaluation
+---     quality metric).
 ---
 --- Usage:
 ---   local sr = require("scoring_rule")
@@ -43,9 +65,10 @@ M.meta = {
     name = "scoring_rule",
     version = "0.1.0",
     description = "Proper Scoring Rules — Brier, logarithmic, spherical "
-        .. "scores + ECE calibration measurement "
-        .. "(Brier 1950, Gneiting-Raftery JASA 2007)",
-    category = "foundation",
+        .. "scores + ECE calibration measurement for evaluating agent "
+        .. "prediction quality. Audits whether agent confidence matches "
+        .. "actual accuracy (Brier 1950, Gneiting-Raftery JASA 2007).",
+    category = "evaluation",
 }
 
 -- ─── Internal helpers ───

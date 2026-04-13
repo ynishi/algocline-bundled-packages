@@ -1,17 +1,41 @@
 --- condorcet — Condorcet Jury Theorem probability calculator
 ---
 --- Pure-computation utility for majority-vote probability under
---- independent voters. Detects Anti-Jury conditions (p < 0.5)
---- and estimates required group size for target accuracy.
+--- independent voters. Detects Anti-Jury conditions (p < 0.5),
+--- estimates required group size for target accuracy, and measures
+--- inter-agent correlation to verify the independence assumption.
 ---
---- Based on: Condorcet 1785, "Essai sur l'application de l'analyse..."
---- Modern formalization: SEP "Jury Theorems", Dietrich 2008 et al.
+--- Theory:
+---   Condorcet, M. "Essai sur l'application de l'analyse à la
+---   probabilité des décisions rendues à la pluralité des voix", 1785.
+---   Modern formalization: Dietrich & List "Jury Theorems", SEP, 2008.
 ---
---- Core formula:
----   P(Maj_n) = SUM_{k=ceil(n/2)}^{n} C(n,k) * p^k * (1-p)^{n-k}
+---   Core formula:
+---     P(Maj_n) = SUM_{k=ceil(n/2)}^{n} C(n,k) * p^k * (1-p)^{n-k}
 ---
---- Jury Theorem:  UI + UC (p > 0.5) => P(Maj_n) -> 1 as n -> inf
---- Anti-Jury:     p < 0.5 => P(Maj_n) -> 0 as n -> inf
+---   Jury Theorem: Under Uniform Independence (UI) and Uniform
+---   Competence p > 0.5 (UC), P(Maj_n) → 1 as n → ∞.
+---   Anti-Jury: If p < 0.5, P(Maj_n) → 0 as n → ∞ — adding
+---   more voters makes the group *worse*.
+---
+--- Multi-Agent / Swarm context:
+---   The Jury Theorem is the mathematical foundation for why
+---   multi-agent voting (sc, panel, moa) can outperform single agents.
+---   It also explains when it fails:
+---
+---   - Panel sizing: optimal_n() computes the minimum number of
+---     agents needed to reach a target accuracy (e.g. 95%).
+---   - Anti-Jury detection: is_anti_jury() catches the dangerous
+---     case where agents are worse than random (p < 0.5), meaning
+---     Self-Consistency and majority vote will *degrade* with more
+---     agents. This validates the Chen NeurIPS 2024 finding
+---     (see inverse_u package).
+---   - Independence verification: correlation() measures pairwise
+---     Pearson correlation between agent outputs. High correlation
+---     (same model/prompt) violates UI and weakens the theorem's
+---     guarantee — prompting strategy diversification.
+---   - Composable with sc, panel, moa, pbft as the theoretical
+---     justification for their majority-vote aggregation.
 ---
 --- Usage:
 ---   local condorcet = require("condorcet")
@@ -25,8 +49,10 @@ M.meta = {
     name = "condorcet",
     version = "0.1.0",
     description = "Condorcet Jury Theorem — majority-vote probability, "
-        .. "Anti-Jury detection, optimal group sizing",
-    category = "foundation",
+        .. "Anti-Jury detection, optimal panel sizing, and independence "
+        .. "verification for multi-agent voting systems "
+        .. "(Condorcet 1785, Dietrich-List 2008).",
+    category = "aggregation",
 }
 
 -- ─── Combinatorics helpers ───

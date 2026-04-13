@@ -3,16 +3,39 @@
 --- Pure-computation utility for detecting non-monotonic accuracy
 --- scaling when increasing the number of LLM agents/calls.
 ---
---- Based on: Chen, Davis, Hanin, Bailis, Stoica, Zaharia, Zou.
---- "Are More LM Calls All You Need?" NeurIPS 2024. arXiv:2403.02419
+--- Theory:
+---   Chen, Davis, Hanin, Bailis, Stoica, Zaharia, Zou.
+---   "Are More LM Calls All You Need? Scaling Laws in Multi-Agent Systems."
+---   NeurIPS 2024. arXiv:2403.02419
 ---
---- Theorem 2: For a synthetic dataset D_{alpha,p1,p2},
---- if p1 + p2 > 1 AND alpha < 1 - 1/t, then Vote / Filter-Vote
---- accuracy is inverse-U shaped in N (number of agents).
+---   Theorem 2: For a synthetic dataset D_{α,p1,p2},
+---   if p1 + p2 > 1 AND α < 1 - 1/t, then Vote / Filter-Vote
+---   accuracy is inverse-U shaped in N (number of agents).
 ---
---- Practical implication: blindly increasing N can DEGRADE accuracy
---- on the hard query subset. This package detects the peak and
---- recommends early stopping.
+---   This directly contradicts the naive assumption that "more agents
+---   = better accuracy". The mechanism: on hard queries (accuracy < 0.5),
+---   majority vote amplifies the wrong answer as N grows.
+---
+--- Multi-Agent / Swarm context:
+---   This is a critical safety gate for any multi-agent system that
+---   scales by adding more agents (sc, panel, moa, pbft).
+---
+---   - Scaling validation: detect() analyzes an accuracy-by-N series
+---     to identify whether performance has peaked and is declining.
+---     Run this after each round of agent addition.
+---   - Early stopping: should_stop() provides a binary go/no-go
+---     decision — if 2+ consecutive accuracy drops are observed,
+---     stop adding agents immediately.
+---   - Theoretical verification: chen_condition() checks whether
+---     the formal conditions of Theorem 2 hold for a given task
+---     distribution (easy/hard split, per-subset accuracy).
+---   - Connects to condorcet (Anti-Jury is the p < 0.5 case),
+---     ensemble_div (low diversity + inverse-U co-occur), and
+---     cost_pareto (more agents at declining accuracy = Pareto-
+---     dominated by smaller panel).
+---   - Used as gate G1 in agent swarm orchestration: before
+---     spawning additional agents, check if the inverse-U has
+---     already been reached.
 ---
 --- Usage:
 ---   local iu = require("inverse_u")
@@ -25,9 +48,11 @@ local M = {}
 M.meta = {
     name = "inverse_u",
     version = "0.1.0",
-    description = "Inverse-U scaling detection — detect non-monotonic "
-        .. "accuracy-vs-N curves (Chen NeurIPS 2024 Theorem 2)",
-    category = "foundation",
+    description = "Inverse-U scaling detection — detects non-monotonic "
+        .. "accuracy-vs-N curves where adding more agents degrades "
+        .. "performance. Safety gate for multi-agent scaling "
+        .. "(Chen et al. NeurIPS 2024, Theorem 2).",
+    category = "validation",
 }
 
 --- Detect inverse-U pattern in an accuracy-by-N series.

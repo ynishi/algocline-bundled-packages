@@ -3,22 +3,43 @@
 --- Pure-computation utility for ensemble diversity measurement.
 --- Implements the fundamental identity: E = E_bar - A_bar
 ---
----   E     = ensemble squared error = (V - t)^2
----   E_bar = weighted average individual error = SUM w_a * (V^a - t)^2
----   A_bar = ambiguity (diversity) = SUM w_a * (V^a - V)^2
+---   E     = ensemble squared error = (V - t)²
+---   E_bar = weighted average individual error = Σ w_a · (V^a - t)²
+---   A_bar = ambiguity (diversity) = Σ w_a · (V^a - V)²
 ---
 --- This identity holds WITHOUT any independence assumption and for
 --- arbitrary weight distributions. It is exact, not an approximation.
 ---
---- Key insight: A_bar > 0 => E < E_bar (ensemble always beats the
+--- Key insight: A_bar > 0 ⟹ E < E_bar (ensemble always beats the
 --- weighted average of individuals when there is any disagreement).
 ---
---- Based on: Krogh, Vedelsby. "Neural Network Ensembles, Cross Validation,
---- and Active Learning". NeurIPS 7, pp.231-238, 1995 (Eq. 6).
+--- Theory:
+---   Krogh, Vedelsby. "Neural Network Ensembles, Cross Validation,
+---   and Active Learning". NeurIPS 7, pp.231-238, 1995 (Eq. 6).
 ---
---- Hong-Page's Diversity Prediction Theorem (PNAS 2004) is the same
---- identity restated: "crowd error = avg individual error - diversity".
---- Unified here per foundations_selected.md F4 + OQ-5.
+---   Hong, Page. "Groups of diverse problem solvers can outperform
+---   groups of high-ability problem solvers". PNAS 101(46),
+---   pp.16385-16389, 2004. (Same identity restated as the Diversity
+---   Prediction Theorem: crowd error = avg error - diversity.)
+---
+--- Multi-Agent / Swarm context:
+---   This decomposition answers the fundamental question of multi-agent
+---   systems: "Does adding another agent actually help?"
+---
+---   - Diversity monitoring: A_bar measures how much agents disagree.
+---     If A_bar ≈ 0, agents are redundant (same model/prompt producing
+---     near-identical outputs). Diversity is the ONLY mechanism by which
+---     ensembles reduce error — without it, more agents are pure waste.
+---   - Ensemble health: decompose() verifies the identity E = E_bar - A_bar
+---     in real time, providing a live diagnostic of ensemble quality.
+---   - Weight optimization: non-uniform weights (e.g. from mwu or ucb)
+---     are fully supported. The identity holds for arbitrary weights.
+---   - Composable with panel, moa, sc as a diagnostic layer: run
+---     decompose() on agent outputs to measure whether the ensemble
+---     is actually benefiting from diversity or just adding cost.
+---   - Connects to condorcet (independence assumption) and inverse_u
+---     (diminishing returns): low diversity often co-occurs with
+---     high correlation and inverse-U scaling.
 ---
 --- Usage:
 ---   local ed = require("ensemble_div")
@@ -32,8 +53,10 @@ M.meta = {
     name = "ensemble_div",
     version = "0.1.0",
     description = "Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity "
-        .. "E = E_bar - A_bar for ensemble diversity measurement",
-    category = "foundation",
+        .. "E = Ē − Ā for ensemble diversity measurement. Quantifies "
+        .. "how much agent disagreement reduces ensemble error "
+        .. "(Krogh-Vedelsby NeurIPS 1995, Hong-Page PNAS 2004).",
+    category = "aggregation",
 }
 
 -- ─── Internal helpers ───
