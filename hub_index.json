@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-13T13:05:21Z",
+  "updated_at": "2026-04-13T14:59:49Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -67,9 +67,9 @@
     },
     {
       "name": "bft",
-      "version": "0.1.0",
-      "description": "Byzantine Fault Tolerance bounds — quorum thresholds ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -175,9 +175,9 @@
     },
     {
       "name": "condorcet",
-      "version": "0.1.0",
-      "description": "Condorcet Jury Theorem — majority-vote probability, ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -193,9 +193,9 @@
     },
     {
       "name": "cost_pareto",
-      "version": "0.1.0",
-      "description": "Multi-objective Pareto dominance — compare candidates ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -310,9 +310,9 @@
     },
     {
       "name": "ensemble_div",
-      "version": "0.1.0",
-      "description": "Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -328,9 +328,9 @@
     },
     {
       "name": "eval_guard",
-      "version": "0.1.0",
-      "description": "Evaluation safety gates — self-critique guard (N2), ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -427,9 +427,18 @@
     },
     {
       "name": "inverse_u",
-      "version": "0.1.0",
-      "description": "Inverse-U scaling detection — detect non-monotonic ",
-      "category": "foundation",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "kemeny",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -511,6 +520,15 @@
       "version": "0.1.0",
       "description": "Model-First Reasoning — construct explicit problem model ",
       "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "mwu",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -786,7 +804,25 @@
       "best_card": null
     },
     {
+      "name": "scoring_rule",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "setwise_rank",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "shapley",
       "version": "",
       "description": "",
       "category": "",

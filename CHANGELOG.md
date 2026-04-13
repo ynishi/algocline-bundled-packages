@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-04-13
+
+### Added
+
+- **12 new packages** for multi-agent/Swarm foundations:
+  - **[shapley](shapley/)**: Shapley Value — axiomatically unique agent contribution attribution via exact O(2^n) computation or Monte Carlo permutation sampling (Shapley 1953, Ghorbani-Zou AISTATS 2019)
+  - **[mwu](mwu/)**: Multiplicative Weights Update — adversarial online agent weight learning with O(√(T ln N)) regret bound, doubling trick, log-space stability (Littlestone-Warmuth 1994, Freund-Schapire 1997)
+  - **[kemeny](kemeny/)**: Kemeny-Young rank aggregation — axiomatically unique consensus ranking minimizing total Kendall tau distance. Exact for m ≤ 8, Borda fallback (Kemeny 1959, Young-Levenglick 1978)
+  - **[scoring_rule](scoring_rule/)**: Proper Scoring Rules — Brier, logarithmic, spherical scores + ECE calibration measurement for agent prediction quality audit (Brier 1950, Gneiting-Raftery JASA 2007)
+  - **[bft](bft/)**: Byzantine Fault Tolerance bounds — quorum thresholds and impossibility validation (Lamport-Shostak-Pease 1982)
+  - **[pbft](pbft/)**: Practical BFT — 3-phase LLM consensus with BFT quorum guarantees (Castro-Liskov OSDI 1999)
+  - **[condorcet](condorcet/)**: Condorcet Jury Theorem — majority-vote probability, Anti-Jury detection, optimal panel sizing (Condorcet 1785)
+  - **[ensemble_div](ensemble_div/)**: Ambiguity Decomposition — Krogh-Vedelsby identity E = Ē − Ā for ensemble diversity measurement (NeurIPS 1995, Hong-Page PNAS 2004)
+  - **[aco](aco/)**: Ant Colony Optimization — discrete path search with pheromone update and convergence detection (Dorigo 1996, Gutjahr 2000)
+  - **[inverse_u](inverse_u/)**: Inverse-U scaling detection — non-monotonic accuracy-vs-N safety gate (Chen et al. NeurIPS 2024)
+  - **[cost_pareto](cost_pareto/)**: Multi-objective Pareto dominance — frontier extraction and strategy selection (Kapoor et al. 2024)
+  - **[eval_guard](eval_guard/)**: Evaluation safety gates — self-critique (N2), baseline enforcement (N3), contamination shield (N4)
+- **tests/test_foundations.lua**: 79 tests for bft, condorcet, ensemble_div, inverse_u, cost_pareto, eval_guard
+- **tests/test_foundations_phase2.lua**: 19 tests for pbft, aco
+- **tests/test_shapley.lua**: 38 tests including axiom verification
+- **tests/test_mwu.lua**: 24 tests including regret bound verification
+- **tests/test_kemeny.lua**: 35 tests including Condorcet consistency axiom
+- **tests/test_scoring_rule.lua**: 37 tests including properness verification
+
+### Changed
+
+- **Category recategorization**: removed "foundation" catch-all category. All 12 packages now use purpose-aligned categories: governance (bft), aggregation (condorcet, ensemble_div, kemeny, pbft), validation (inverse_u, eval_guard), selection (cost_pareto, mwu), attribution (shapley), evaluation (scoring_rule), exploration (aco)
+- **Documentation enrichment**: all 12 packages' Lua doc headers and meta.description updated with detailed theory references, multi-agent/Swarm usage context, and cross-package composability notes
+- **README**: updated package count (91 → 103), added all 12 packages to appropriate sections, added new Aggregation and Attribution sections
+
 ## [0.11.2] - 2026-04-12
 
 ### Added

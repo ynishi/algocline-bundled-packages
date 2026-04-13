@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (91)
+## Packages (103)
 
 ### Reasoning
 
@@ -67,6 +67,23 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[setwise_rank](setwise_rank/)** | Setwise tournament reranking. LLM picks the single best from small sets (size k); winners advance through tournament rounds. Mid-cost/mid-accuracy sweet spot between listwise and pairwise; matches RankGPT on TREC-DL with comparable tokens | Zhuang et al. (SIGIR 2024) |
 | **[cs_pruner](cs_pruner/)** | Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill via Empirical-Bernstein CS over a multi-dimensional rubric. Four variants: polynomial-stitched, hoeffding, predictable plug-in betting (W-S&R 2024), and KL-LUCB (Kaufmann-Cappé 2013). Optional layer-2 Successive Halving with gap guard for small-N×D regimes where the CS floor cannot fire | Howard, Ramdas, McAuliffe, Sekhon (Ann. Stat. 2021), Waudby-Smith & Ramdas (JRSS-B 2024), Kaufmann & Cappé (JMLR 2013), Karnin-Koren-Somekh (ICML 2013) |
 | **[f_race](f_race/)** | Friedman race partial-data pruner. Block-wise rank assignment over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman χ² + Conover post-hoc test. Designed for small N (≤10) × D (≤30) where Empirical-Bernstein CS cannot fire — uses ranks instead of raw scores so it discriminates gaps as small as 0.3 at B=20 blocks | Friedman (JASA 1937), Birattari et al. (GECCO 2002), Conover (1999) |
+| **[mwu](mwu/)** | Multiplicative Weights Update. Adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions. Doubling trick for unknown T, log-space computation for numerical stability | Littlestone & Warmuth (1994), Freund & Schapire (1997) |
+| **[cost_pareto](cost_pareto/)** | Multi-objective Pareto dominance. Frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs. HumanEval warming $2.45/93.2% dominates LATS $134.50/88.0% | Kapoor et al. "AI Agents That Matter" (2024) |
+
+### Aggregation
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[condorcet](condorcet/)** | Condorcet Jury Theorem. Majority-vote probability, Anti-Jury detection, optimal panel sizing, and independence verification for multi-agent voting systems. Quantifies when adding agents helps vs hurts | Condorcet (1785), Dietrich & List (2008) |
+| **[ensemble_div](ensemble_div/)** | Ambiguity Decomposition. Krogh-Vedelsby identity E = Ē − Ā — the ensemble always beats the weighted average of individuals when there is any disagreement. Quantifies how much agent diversity reduces ensemble error | Krogh & Vedelsby (NeurIPS 1995), Hong & Page (PNAS 2004) |
+| **[kemeny](kemeny/)** | Kemeny-Young rank aggregation. Axiomatically unique consensus ranking that minimizes total Kendall tau distance. Exact for m ≤ 8, Borda fallback for larger candidate sets. Condorcet-consistent | Kemeny (1959), Young & Levenglick (1978) |
+| **[pbft](pbft/)** | Practical Byzantine Fault Tolerance. 3-phase LLM consensus (propose → prepare → commit) with BFT quorum guarantees. Tolerates f Byzantine agents given n ≥ 3f+1 | Castro & Liskov (OSDI 1999) |
+
+### Attribution
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[shapley](shapley/)** | Shapley Value. Axiomatically unique agent contribution attribution via exact O(2^n) computation or Monte Carlo permutation sampling. Identifies essential, redundant, and harmful agents in multi-agent ensembles | Shapley (1953), Ghorbani & Zou "Data Shapley" (AISTATS 2019) |
 
 ### Preprocessing
 
@@ -103,6 +120,9 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[blind_spot](blind_spot/)** | Self-Correction Blind Spot bypass. Re-presents the model's own output as an external source to trigger genuine error correction, overcoming self-correction failure modes | arXiv:2507.02778 (2025) |
 | **[claim_trace](claim_trace/)** | Span-level evidence attribution. Traces each claim to supporting source spans for transparent provenance. Composable post-filter for any generation | Bohnet et al. (2022), Gao et al. (2023) |
 | **[critic](critic/)** | Rubric-based structured evaluation. Per-dimension scoring with targeted revision of weak areas. More systematic than reflect's free-form critique | Zheng et al. (2023) |
+| **[inverse_u](inverse_u/)** | Inverse-U scaling detection. Detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling — catches the peak and recommends early stopping | Chen et al. (NeurIPS 2024), Theorem 2 |
+| **[eval_guard](eval_guard/)** | Evaluation safety gates. Self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight checks before trusting any multi-agent evaluation result | Huang (ICLR 2024), Wang (ACL 2024), Zhu (EMNLP 2024) |
+| **[scoring_rule](scoring_rule/)** | Proper Scoring Rules. Brier, logarithmic, spherical scores + Expected Calibration Error (ECE) for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy. Strictly proper: honest reporting maximizes expected score | Brier (1950), Gneiting & Raftery (JASA 2007), Naeini (AAAI 2015) |
 
 ### Orchestration
 
@@ -132,6 +152,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[lineage](lineage/)** | Pipeline-spanning claim lineage tracking. Extracts atomic claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Defense rate 0.32 → 0.89 | "From Spark to Fire" (Xie et al., AAMAS 2026) — lineage graph governance layer |
 | **[dissent](dissent/)** | Consensus inertia prevention. Forces adversarial challenge before finalizing multi-agent agreement. Composable with moa, panel, sc | "From Spark to Fire" (Xie et al., AAMAS 2026) — Consensus Inertia countermeasure; MAST F11 |
 | **[anti_cascade](anti_cascade/)** | Pipeline error cascade detection. Independently re-derives from original inputs at each step and compares with pipeline output to detect error amplification | "From Spark to Fire" (Xie et al., AAMAS 2026) — Cascade Amplification countermeasure; MAST F3/F9 |
+| **[bft](bft/)** | Byzantine Fault Tolerance bounds. Quorum thresholds and impossibility validation for multi-agent governance. Computes minimum panel sizes and fault tolerance limits (Theorem 1: n ≥ 3f+1 for oral messages, n ≥ f+2 for signed messages) | Lamport, Shostak & Pease (1982) |
 
 ### Exploration
 
@@ -141,6 +162,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[falsify](falsify/)** | Sequential Falsification. Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight | Sourati et al. (2025), Yamada et al. "AI Scientist v2" (2025) |
 | **[prompt_breed](prompt_breed/)** | Self-Referential Prompt Evolution. Evolves task prompts via genetic operators with meta-mutation — the mutation operators themselves evolve. Double evolutionary loop | Fernando et al. "PromptBreeder" (2023), Guo et al. "EvoPrompt" (ICLR 2024) |
 | **[coevolve](coevolve/)** | Challenger-Solver Co-evolution. Adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion | Singh et al. (2025), Faldor et al. "OMNI-EPIC" (ICLR 2025) |
+| **[aco](aco/)** | Ant Colony Optimization. Discrete path search with pheromone update, evaporation, and convergence detection. Pure computation engine + LLM-integrated mode for search space exploration | Dorigo (1996), Gutjahr (2000) |
 
 ### Intent Understanding
 
