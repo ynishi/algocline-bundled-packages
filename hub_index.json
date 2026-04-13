@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-12T12:38:10Z",
+  "updated_at": "2026-04-13T13:05:21Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -30,6 +30,15 @@
       "best_card": null
     },
     {
+      "name": "aco",
+      "version": "0.1.0",
+      "description": "Ant Colony Optimization — discrete path search with ",
+      "category": "exploration",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "ambig",
       "version": "0.1.0",
       "description": "Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs",
@@ -52,6 +61,15 @@
       "version": "",
       "description": "",
       "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "bft",
+      "version": "0.1.0",
+      "description": "Byzantine Fault Tolerance bounds — quorum thresholds ",
+      "category": "foundation",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -156,10 +174,28 @@
       "best_card": null
     },
     {
+      "name": "condorcet",
+      "version": "0.1.0",
+      "description": "Condorcet Jury Theorem — majority-vote probability, ",
+      "category": "foundation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "contrastive",
       "version": "0.1.0",
       "description": "Contrastive CoT — generate correct and incorrect reasoning, learn from contrast",
       "category": "reasoning",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "cost_pareto",
+      "version": "0.1.0",
+      "description": "Multi-objective Pareto dominance — compare candidates ",
+      "category": "foundation",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -273,10 +309,28 @@
       "best_card": null
     },
     {
+      "name": "ensemble_div",
+      "version": "0.1.0",
+      "description": "Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity ",
+      "category": "foundation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "epidemic_abm",
       "version": "0.1.0",
       "description": "SIR Agent-Based epidemic model — stochastic individual-level ",
       "category": "simulation",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "eval_guard",
+      "version": "0.1.0",
+      "description": "Evaluation safety gates — self-critique guard (N2), ",
+      "category": "foundation",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -367,6 +421,15 @@
       "version": "0.1.0",
       "description": "Exploratory intent formation — discover user goals through structured option presentation and iterative narrowing",
       "category": "intent",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "inverse_u",
+      "version": "0.1.0",
+      "description": "Inverse-U scaling detection — detect non-monotonic ",
+      "category": "foundation",
       "source": "",
       "card_count": 0,
       "best_card": null
@@ -547,6 +610,15 @@
       "version": "0.1.0",
       "description": "Multi-perspective deliberation — distinct roles engage, moderator synthesizes",
       "category": "synthesis",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "pbft",
+      "version": "0.1.0",
+      "description": "PBFT-inspired 3-phase LLM consensus — propose, validate, ",
+      "category": "aggregation",
       "source": "",
       "card_count": 0,
       "best_card": null

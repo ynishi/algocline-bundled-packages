@@ -1,0 +1,201 @@
+--- cost_pareto — Multi-objective Pareto dominance computation
+---
+--- Pure-computation utility for comparing candidates on multiple
+--- objectives (accuracy, cost, diversity, etc.) using Pareto dominance.
+---
+--- Based on: Kapoor, Stroebl, Siegel, Nadgir, Narayanan (Princeton).
+--- "AI Agents That Matter". arXiv:2407.01502, 2024.
+---
+--- Key finding: HumanEval warming baseline ($2.45 / 93.2%) Pareto-
+--- dominates LATS ($134.50 / 88.0%) and Reflexion ($3.90 / 87.8%).
+--- This package makes such comparisons systematic and automatic.
+---
+--- Convention: ALL objectives are "higher is better". For cost,
+--- pass the negative or inverse (e.g., -cost or 1/cost).
+--- Alternatively, specify objective directions explicitly.
+---
+--- Usage:
+---   local cp = require("cost_pareto")
+---   local a = {accuracy = 0.93, neg_cost = -2.45}
+---   local b = {accuracy = 0.88, neg_cost = -134.50}
+---   cp.dominates(a, b) -- => true (a dominates b)
+
+local M = {}
+
+---@type AlcMeta
+M.meta = {
+    name = "cost_pareto",
+    version = "0.1.0",
+    description = "Multi-objective Pareto dominance — compare candidates "
+        .. "on accuracy/cost/diversity (Kapoor 2024)",
+    category = "foundation",
+}
+
+--- Extract numeric values from a candidate table.
+--- Returns a sorted list of (key, value) pairs for deterministic comparison.
+local function extract_objectives(candidate, keys)
+    local vals = {}
+    for _, k in ipairs(keys) do
+        local v = candidate[k]
+        if type(v) ~= "number" then
+            error("cost_pareto: objective '" .. k .. "' must be a number, got " .. tostring(v))
+        end
+        vals[#vals + 1] = v
+    end
+    return vals
+end
+
+--- Get sorted objective keys from a candidate.
+local function get_keys(candidate)
+    local keys = {}
+    for k, v in pairs(candidate) do
+        if type(v) == "number" then
+            keys[#keys + 1] = k
+        end
+    end
+    table.sort(keys)
+    return keys
+end
+
+--- Check if candidate A Pareto-dominates candidate B.
+--- A dominates B iff: for all objectives, A >= B, AND
+--- for at least one objective, A > B.
+---
+--- All objectives are "higher is better". For cost, pass negative values.
+---
+---@param a table candidate A with numeric objective fields
+---@param b table candidate B with numeric objective fields
+---@param keys table|nil explicit list of objective keys (default: all numeric keys)
+---@return boolean dominates true if A dominates B
+function M.dominates(a, b, keys)
+    if type(a) ~= "table" or type(b) ~= "table" then
+        error("cost_pareto.dominates: candidates must be tables")
+    end
+    keys = keys or get_keys(a)
+    if #keys == 0 then
+        error("cost_pareto.dominates: no numeric objectives found")
+    end
+    local va = extract_objectives(a, keys)
+    local vb = extract_objectives(b, keys)
+
+    local all_ge = true
+    local any_gt = false
+    for i = 1, #keys do
+        if va[i] < vb[i] then
+            all_ge = false
+            break
+        end
+        if va[i] > vb[i] then
+            any_gt = true
+        end
+    end
+    return all_ge and any_gt
+end
+
+--- Compute the Pareto frontier from a list of candidates.
+--- Returns only non-dominated candidates.
+---
+---@param candidates table list of candidate tables
+---@param keys table|nil explicit list of objective keys
+---@return table frontier list of non-dominated candidates (with original indices)
+function M.frontier(candidates, keys)
+    if type(candidates) ~= "table" or #candidates == 0 then
+        error("cost_pareto.frontier: need a non-empty list of candidates")
+    end
+    keys = keys or get_keys(candidates[1])
+    if #keys == 0 then
+        error("cost_pareto.frontier: no numeric objectives found")
+    end
+
+    local result = {}
+    for i = 1, #candidates do
+        local dominated = false
+        for j = 1, #candidates do
+            if i ~= j and M.dominates(candidates[j], candidates[i], keys) then
+                dominated = true
+                break
+            end
+        end
+        if not dominated then
+            local entry = {}
+            for k, v in pairs(candidates[i]) do entry[k] = v end
+            entry._index = i
+            result[#result + 1] = entry
+        end
+    end
+    return result
+end
+
+--- Check if a candidate is dominated by a baseline.
+--- This is the N5 gate: if the simple baseline dominates your candidate,
+--- the candidate should be rejected.
+---
+---@param candidate table the candidate to test
+---@param baseline table the baseline (e.g., warming + SC)
+---@param keys table|nil objective keys
+---@return boolean is_dominated true if baseline dominates candidate
+---@return string reason
+function M.is_dominated(candidate, baseline, keys)
+    keys = keys or get_keys(candidate)
+    if M.dominates(baseline, candidate, keys) then
+        return true, "baseline Pareto-dominates candidate on all objectives"
+    end
+    return false, "candidate is not dominated by baseline"
+end
+
+--- Rank candidates by Pareto layers.
+--- Layer 0 = Pareto frontier, Layer 1 = frontier after removing layer 0, etc.
+---
+---@param candidates table list of candidate tables
+---@param keys table|nil objective keys
+---@return table layers list of layers, each a list of {candidate, _index, _layer}
+function M.layers(candidates, keys)
+    if type(candidates) ~= "table" or #candidates == 0 then
+        error("cost_pareto.layers: need a non-empty list of candidates")
+    end
+    keys = keys or get_keys(candidates[1])
+
+    -- Track which candidates are still active
+    local active = {}
+    for i = 1, #candidates do active[i] = true end
+
+    local layers = {}
+    local layer_idx = 0
+
+    while true do
+        -- Collect indices of active candidates
+        local alive = {}
+        for i = 1, #candidates do
+            if active[i] then alive[#alive + 1] = i end
+        end
+        if #alive == 0 then break end
+
+        -- Find non-dominated among active
+        local layer = {}
+        for _, i in ipairs(alive) do
+            local dominated = false
+            for _, j in ipairs(alive) do
+                if i ~= j and M.dominates(candidates[j], candidates[i], keys) then
+                    dominated = true
+                    break
+                end
+            end
+            if not dominated then
+                local entry = {}
+                for k, v in pairs(candidates[i]) do entry[k] = v end
+                entry._index = i
+                entry._layer = layer_idx
+                layer[#layer + 1] = entry
+                active[i] = false
+            end
+        end
+
+        if #layer == 0 then break end  -- safety
+        layers[#layers + 1] = layer
+        layer_idx = layer_idx + 1
+    end
+
+    return layers
+end
+
+return M
