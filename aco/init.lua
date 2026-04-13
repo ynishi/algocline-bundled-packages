@@ -302,10 +302,19 @@ end
 --- LLM-integrated run: generate node labels via LLM, then optimize paths.
 ---
 --- ctx.task (required): problem description
---- ctx.nodes: list of node descriptions (default: LLM generates 5 steps)
+--- ctx.nodes: list of node descriptions (default: LLM generates 4-6 steps)
 --- ctx.budget: ACO iterations (default: 20)
 --- ctx.n_ants: ants per iteration (default: 5)
 --- ctx.rho: evaporation rate (default: 0.2)
+--- ctx.alpha: pheromone weight exponent (default: 1.0)
+--- ctx.beta: heuristic weight exponent (default: 2.0)
+--- ctx.stagnation: iterations without improvement to stop (default: 5)
+--- ctx.seed: RNG seed (default: 42)
+--- ctx.answer_tokens: max tokens for final answer (default: 500)
+--- ctx.decompose_system: system prompt for node generation phase
+--- ctx.eval_system: system prompt for path evaluation phase
+--- ctx.exec_system: system prompt for final answer phase
+--- ctx.eval_fn: custom evaluation function(path) -> score (bypasses LLM eval)
 ---
 ---@param ctx AlcCtx
 ---@return AlcCtx
@@ -314,6 +323,13 @@ function M.run(ctx)
     local budget = ctx.budget or 20
     local n_ants = ctx.n_ants or 5
     local rho = ctx.rho or 0.2
+    local stagnation = ctx.stagnation or 5
+    local decompose_system = ctx.decompose_system or
+        "You are a task decomposition expert. List steps clearly."
+    local eval_system = ctx.eval_system or
+        "You are an evaluator. Rate 1-10. Reply with only the number."
+    local exec_system = ctx.exec_system or
+        "You are an expert executor. Follow the optimized approach sequence."
 
     -- Generate or use provided nodes
     local node_labels
@@ -326,7 +342,7 @@ function M.run(ctx)
                 .. "List each on a separate line, numbered 1-N. Be specific.",
                 task
             ),
-            { system = "You are a task decomposition expert. List steps clearly.",
+            { system = decompose_system,
               max_tokens = 300 }
         )
         node_labels = {}
@@ -358,40 +374,46 @@ function M.run(ctx)
     -- Create colony
     local colony = M.new(graph, {
         rho = rho,
+        alpha = ctx.alpha or 1.0,
+        beta = ctx.beta or 2.0,
         n_ants = n_ants,
         seed = ctx.seed or 42,
     })
 
-    -- Evaluation function: LLM scores a path
-    local eval_cache = {}
-    local function eval_path(path)
-        -- Skip START/END for description
-        local steps = {}
-        for i = 2, #path - 1 do
-            steps[#steps + 1] = path[i]
-        end
-        local key = table.concat(steps, " -> ")
-        if eval_cache[key] then return eval_cache[key] end
+    -- Evaluation function: custom or LLM-scored
+    local eval_fn
+    if ctx.eval_fn then
+        eval_fn = ctx.eval_fn
+    else
+        local eval_cache = {}
+        eval_fn = function(path)
+            -- Skip START/END for description
+            local steps = {}
+            for i = 2, #path - 1 do
+                steps[#steps + 1] = path[i]
+            end
+            local key = table.concat(steps, " -> ")
+            if eval_cache[key] then return eval_cache[key] end
 
-        local score_raw = alc.llm(
-            string.format(
-                "Task: %s\n\nProposed approach sequence:\n%s\n\n"
-                .. "Rate this approach sequence on a scale of 1-10 for "
-                .. "effectiveness, coherence, and completeness. "
-                .. "Reply with ONLY the number.",
-                task, key
-            ),
-            { system = "You are an evaluator. Rate 1-10. Reply with only the number.",
-              max_tokens = 10 }
-        )
-        local score = tonumber(tostring(score_raw):match("(%d+%.?%d*)")) or 5
-        score = math.max(1, math.min(10, score)) / 10  -- normalize to [0.1, 1.0]
-        eval_cache[key] = score
-        return score
+            local score_raw = alc.llm(
+                string.format(
+                    "Task: %s\n\nProposed approach sequence:\n%s\n\n"
+                    .. "Rate this approach sequence on a scale of 1-10 for "
+                    .. "effectiveness, coherence, and completeness. "
+                    .. "Reply with ONLY the number.",
+                    task, key
+                ),
+                { system = eval_system, max_tokens = 10 }
+            )
+            local score = tonumber(tostring(score_raw):match("(%d+%.?%d*)")) or 5
+            score = math.max(1, math.min(10, score)) / 10  -- normalize to [0.1, 1.0]
+            eval_cache[key] = score
+            return score
+        end
     end
 
     -- Run ACO
-    colony:run(eval_path, { max_iter = budget, stagnation = 5 })
+    colony:run(eval_fn, { max_iter = budget, stagnation = stagnation })
 
     -- Extract best path description
     local best_path, best_score = colony:best()
@@ -409,7 +431,7 @@ function M.run(ctx)
             .. "Execute this approach to solve the task. Provide a complete answer.",
             task, table.concat(best_steps, "\n-> ")
         ),
-        { system = "You are an expert executor. Follow the optimized approach sequence.",
+        { system = exec_system,
           max_tokens = ctx.answer_tokens or 500 }
     )
 

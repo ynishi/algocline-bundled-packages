@@ -26,6 +26,9 @@
 --- ctx.gen_tokens: Max tokens per proposal (default: 400)
 --- ctx.vote_tokens: Max tokens per vote (default: 200)
 --- ctx.synth_tokens: Max tokens for synthesis (default: 500)
+--- ctx.gen_system: System prompt for proposal phase (default: built-in)
+--- ctx.vote_system: System prompt for voting phase (default: built-in)
+--- ctx.synth_system: System prompt for synthesis phase (default: built-in)
 
 local bft = require("bft")
 
@@ -65,6 +68,13 @@ function M.run(ctx)
     local gen_tokens = ctx.gen_tokens or 400
     local vote_tokens = ctx.vote_tokens or 200
     local synth_tokens = ctx.synth_tokens or 500
+    local gen_system = ctx.gen_system
+    local vote_system = ctx.vote_system or
+        "You are a critical reviewer. Vote for the best proposal. "
+        .. "Reply with only the proposal number."
+    local synth_system = ctx.synth_system or
+        "You are a neutral synthesizer. Combine the best elements "
+        .. "from all proposals into a single coherent answer."
 
     -- Validate BFT conditions
     local ok, reason = bft.validate(n, f)
@@ -84,7 +94,7 @@ function M.run(ctx)
                 task, i, n
             ),
             {
-                system = string.format(
+                system = gen_system or string.format(
                     "You are agent #%d in a %d-agent consensus protocol. "
                     .. "Answer independently without assuming what others might say.",
                     i, n),
@@ -111,17 +121,19 @@ function M.run(ctx)
                 task, n, listing, i, n
             ),
             {
-                system = "You are a critical reviewer. Vote for the best proposal. "
-                    .. "Reply with only the proposal number.",
+                system = vote_system,
                 max_tokens = vote_tokens,
             }
         )
-        -- Parse vote number
+        -- Parse vote number.
+        -- Fallback: if LLM returns unparseable output, agent votes for its
+        -- own proposal. This is the safest default — it disperses votes
+        -- rather than concentrating them on an arbitrary candidate.
         local vote_num = tonumber(tostring(vote_raw):match("(%d+)"))
         if vote_num and vote_num >= 1 and vote_num <= n then
             votes[i] = vote_num
         else
-            votes[i] = i  -- fallback: vote for own proposal
+            votes[i] = i
         end
     end
 
@@ -149,8 +161,7 @@ function M.run(ctx)
                 task, n, listing
             ),
             {
-                system = "You are a neutral synthesizer. Combine the best elements "
-                    .. "from all proposals into a single coherent answer.",
+                system = synth_system,
                 max_tokens = synth_tokens,
             }
         )

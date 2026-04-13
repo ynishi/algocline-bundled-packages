@@ -208,8 +208,15 @@ describe("condorcet", function()
             expect(math.abs(m[1][2] - (-1.0)) < 1e-6).to.equal(true)
         end)
 
-        it("returns near 0 for uncorrelated", function()
-            -- Orthogonal-ish vectors
+        it("returns near 0 for uncorrelated vectors", function()
+            -- dx = {-2, 1, 0, 1, 0}, dy = {0, -1, 2, 0, -1}
+            -- sum_xy = 0 + (-1) + 0 + 0 + 0 = -1
+            -- sum_x2 = 6, sum_y2 = 6, r = -1/6 ≈ -0.167
+            local m, _ = condorcet.correlation({{1,4,3,4,3}, {3,2,5,3,2}})
+            expect(math.abs(m[1][2]) < 0.3).to.equal(true)
+        end)
+
+        it("returns -1.0 for alternating anti-correlated pattern", function()
             local m, _ = condorcet.correlation({{1,0,1,0}, {0,1,0,1}})
             expect(math.abs(m[1][2] - (-1.0)) < 1e-6).to.equal(true)
         end)
@@ -363,6 +370,31 @@ describe("inverse_u", function()
         it("handles single element", function()
             local r = iu.detect({0.70})
             expect(r.trend).to.equal("insufficient")
+        end)
+
+        it("detects noisy when peak at end but non-monotonic", function()
+            -- 0.7 → 0.8 → 0.6 → 0.9: peak at idx 4 (end), not monotone up
+            local r = iu.detect({0.7, 0.8, 0.6, 0.9})
+            expect(r.trend).to.equal("noisy")
+            expect(r.peak_idx).to.equal(4)
+        end)
+
+        it("detects noisy when peak at start but non-monotonic", function()
+            -- 0.9 → 0.7 → 0.8 → 0.6: peak at idx 1 (start), not monotone down
+            local r = iu.detect({0.9, 0.7, 0.8, 0.6})
+            expect(r.trend).to.equal("noisy")
+            expect(r.peak_idx).to.equal(1)
+        end)
+    end)
+
+    describe("detect with opts", function()
+        it("uses custom flat_epsilon", function()
+            -- Range = 0.001, default epsilon 1e-6 would NOT be flat
+            local r1 = iu.detect({0.700, 0.701, 0.700})
+            expect(r1.trend).to_not.equal("flat")
+            -- But with large epsilon it IS flat
+            local r2 = iu.detect({0.700, 0.701, 0.700}, { flat_epsilon = 0.01 })
+            expect(r2.trend).to.equal("flat")
         end)
     end)
 

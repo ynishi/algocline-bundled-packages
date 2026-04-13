@@ -35,18 +35,21 @@ M.meta = {
 --- starting from N=1 at index 1.
 ---
 ---@param accuracy_by_n table list of accuracy values {acc_n1, acc_n2, ...}
+---@param opts table|nil optional { flat_epsilon: number (default 1e-6) }
 ---@return table result {
 ---   peak_idx: index with highest accuracy,
 ---   peak_n: N value at peak (= peak_idx),
 ---   peak_acc: accuracy at peak,
 ---   is_declining: true if last 2+ entries decline from peak,
 ---   consecutive_drops: number of consecutive drops from peak,
----   trend: "monotone_up" | "inverse_u" | "monotone_down" | "flat" | "insufficient"
+---   trend: "monotone_up" | "inverse_u" | "monotone_down" | "flat" | "noisy" | "insufficient"
 --- }
-function M.detect(accuracy_by_n)
+function M.detect(accuracy_by_n, opts)
     if type(accuracy_by_n) ~= "table" then
         error("inverse_u.detect: expected a table of accuracy values")
     end
+    opts = opts or {}
+    local flat_epsilon = opts.flat_epsilon or 1e-6
     local n = #accuracy_by_n
     if n == 0 then
         error("inverse_u.detect: empty accuracy series")
@@ -81,10 +84,18 @@ function M.detect(accuracy_by_n)
         end
     end
 
-    -- Classify trend
+    -- Flat detection first: if range is tiny, nothing else matters
+    local min_v, max_v = accuracy_by_n[1], accuracy_by_n[1]
+    for i = 2, n do
+        if accuracy_by_n[i] < min_v then min_v = accuracy_by_n[i] end
+        if accuracy_by_n[i] > max_v then max_v = accuracy_by_n[i] end
+    end
+
     local trend
-    if peak_idx == 1 then
-        -- Check if monotonically decreasing
+    if max_v - min_v < flat_epsilon then
+        trend = "flat"
+    elseif peak_idx == 1 then
+        -- Peak at start: monotone_down or noisy (non-monotonic but peak at edge)
         local all_down = true
         for i = 2, n do
             if accuracy_by_n[i] >= accuracy_by_n[i - 1] then
@@ -92,9 +103,9 @@ function M.detect(accuracy_by_n)
                 break
             end
         end
-        trend = all_down and "monotone_down" or "flat"
+        trend = all_down and "monotone_down" or "noisy"
     elseif peak_idx == n then
-        -- Check if monotonically increasing
+        -- Peak at end: monotone_up or noisy
         local all_up = true
         for i = 2, n do
             if accuracy_by_n[i] <= accuracy_by_n[i - 1] then
@@ -102,19 +113,9 @@ function M.detect(accuracy_by_n)
                 break
             end
         end
-        trend = all_up and "monotone_up" or "flat"
+        trend = all_up and "monotone_up" or "noisy"
     else
         trend = "inverse_u"
-    end
-
-    -- Flat detection: if range is tiny
-    local min_v, max_v = accuracy_by_n[1], accuracy_by_n[1]
-    for i = 2, n do
-        if accuracy_by_n[i] < min_v then min_v = accuracy_by_n[i] end
-        if accuracy_by_n[i] > max_v then max_v = accuracy_by_n[i] end
-    end
-    if max_v - min_v < 1e-6 then
-        trend = "flat"
     end
 
     return {
@@ -133,11 +134,12 @@ end
 ---
 ---@param accuracy_by_n table list of accuracy values
 ---@param min_drops integer consecutive drops to trigger stop (default: 2)
+---@param opts table|nil optional { flat_epsilon: number } passed to detect()
 ---@return boolean should_stop true if should stop adding agents
 ---@return string reason
-function M.should_stop(accuracy_by_n, min_drops)
+function M.should_stop(accuracy_by_n, min_drops, opts)
     min_drops = min_drops or 2
-    local r = M.detect(accuracy_by_n)
+    local r = M.detect(accuracy_by_n, opts)
     if r.consecutive_drops >= min_drops then
         return true, string.format(
             "inverse-U detected: peak at N=%d (acc=%.4f), %d consecutive drops. Stop adding agents.",

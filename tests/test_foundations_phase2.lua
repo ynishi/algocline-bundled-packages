@@ -124,6 +124,31 @@ describe("pbft", function()
         expect(#ctx.result.proposals).to.equal(3)
         expect(ctx.result.proposals[1]).to.equal("Answer 1")
     end)
+
+    it("uses injected system prompts", function()
+        local captured_systems = {}
+        mock_alc(function(prompt, opts, idx)
+            captured_systems[#captured_systems + 1] = opts.system
+            if idx <= 3 then return "Proposal " .. idx end
+            if idx <= 6 then return "1" end
+            return "Synthesis"
+        end)
+
+        local pbft = require("pbft")
+        pbft.run({
+            task = "test",
+            gen_system = "CUSTOM_GEN",
+            vote_system = "CUSTOM_VOTE",
+        })
+        -- Phase 1: 3 proposals should use gen_system
+        expect(captured_systems[1]).to.equal("CUSTOM_GEN")
+        expect(captured_systems[2]).to.equal("CUSTOM_GEN")
+        expect(captured_systems[3]).to.equal("CUSTOM_GEN")
+        -- Phase 2: 3 votes should use vote_system
+        expect(captured_systems[4]).to.equal("CUSTOM_VOTE")
+        expect(captured_systems[5]).to.equal("CUSTOM_VOTE")
+        expect(captured_systems[6]).to.equal("CUSTOM_VOTE")
+    end)
 end)
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -310,5 +335,64 @@ describe("aco (LLM-integrated)", function()
         })
 
         expect(ctx.result.n_nodes).to.equal(3)
+    end)
+
+    it("uses injected system prompts", function()
+        local captured_systems = {}
+        mock_alc(function(prompt, opts, idx)
+            captured_systems[#captured_systems + 1] = opts.system
+            if prompt:find("Break this task") then
+                return "1. Step X\n2. Step Y\n3. Step Z"
+            elseif prompt:find("Rate") then
+                return "7"
+            else
+                return "Final answer."
+            end
+        end)
+
+        local aco = require("aco")
+        aco.run({
+            task = "Test inject",
+            budget = 1,
+            n_ants = 1,
+            decompose_system = "CUSTOM_DECOMPOSE",
+            eval_system = "CUSTOM_EVAL",
+            exec_system = "CUSTOM_EXEC",
+        })
+
+        -- First call = decomposition
+        expect(captured_systems[1]).to.equal("CUSTOM_DECOMPOSE")
+        -- Last call = execution
+        expect(captured_systems[#captured_systems]).to.equal("CUSTOM_EXEC")
+        -- Middle calls = evaluation
+        for i = 2, #captured_systems - 1 do
+            expect(captured_systems[i]).to.equal("CUSTOM_EVAL")
+        end
+    end)
+
+    it("uses custom eval_fn bypassing LLM eval", function()
+        local llm_eval_called = false
+        mock_alc(function(prompt, opts, idx)
+            if prompt:find("Rate") then
+                llm_eval_called = true
+                return "5"
+            end
+            if prompt:find("Break this task") then
+                return "1. A\n2. B\n3. C"
+            end
+            return "Done."
+        end)
+
+        local aco = require("aco")
+        local ctx = aco.run({
+            task = "Test eval_fn",
+            nodes = { "X", "Y", "Z" },
+            budget = 3,
+            n_ants = 2,
+            eval_fn = function(path) return #path end,
+        })
+
+        expect(llm_eval_called).to.equal(false)
+        expect(ctx.result.best_score > 0).to.equal(true)
     end)
 end)
