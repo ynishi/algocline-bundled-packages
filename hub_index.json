@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-13T14:59:49Z",
+  "updated_at": "2026-04-14T16:24:55Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -700,6 +700,24 @@
       "version": "0.1.0",
       "description": "Tournament selection — generate candidates, pairwise LLM-as-Judge ranking",
       "category": "selection",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "recipe_ranking_funnel",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "recipe_safe_panel",
+      "version": "",
+      "description": "",
+      "category": "",
       "source": "",
       "card_count": 0,
       "best_card": null

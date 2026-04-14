@@ -34,6 +34,17 @@ local function extract_answer(reasoning, task)
     )
 end
 
+--- Normalize an answer string for vote counting.
+--- Lowercase, trim, collapse whitespace, strip trailing punctuation.
+local function normalize_for_vote(s)
+    if type(s) ~= "string" then return "" end
+    local t = s:lower()
+    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    t = t:gsub("%s+", " ")
+    t = t:gsub("[%.%!%?%,%;%:]+$", "")
+    return t
+end
+
 ---@param ctx AlcCtx
 ---@return AlcCtx
 function M.run(ctx)
@@ -88,10 +99,41 @@ function M.run(ctx)
         }
     )
 
+    -- Build vote distribution from extracted answers for downstream consumers
+    -- (recipe_safe_panel, inverse_u, calibrate) that need the raw vote signal
+    -- rather than only the LLM-synthesized consensus string.
+    local votes = {}
+    local vote_counts = {}
+    local first_raw_by_norm = {}
+    for i, p in ipairs(paths) do
+        local norm = normalize_for_vote(p.answer)
+        votes[i] = norm
+        vote_counts[norm] = (vote_counts[norm] or 0) + 1
+        if first_raw_by_norm[norm] == nil then
+            first_raw_by_norm[norm] = p.answer
+        end
+    end
+
+    -- Majority answer: highest count, tie-broken by first occurrence.
+    local majority_norm, majority_count = nil, 0
+    for i = 1, #paths do
+        local norm = votes[i]
+        local c = vote_counts[norm]
+        if c > majority_count then
+            majority_norm, majority_count = norm, c
+        end
+    end
+    local answer = majority_norm and first_raw_by_norm[majority_norm] or nil
+
     ctx.result = {
         consensus = consensus,
+        answer = answer,
+        answer_norm = majority_norm,
         paths = paths,
+        votes = votes,
+        vote_counts = vote_counts,
         n_sampled = n,
+        total_llm_calls = 2 * n + 1,
     }
     return ctx
 end
