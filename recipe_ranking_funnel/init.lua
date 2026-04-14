@@ -17,6 +17,15 @@
 ---                              average score. Keep top_k2 (default:
 ---                              min(top_k1, 5)).
 ---                              Cost: top_k1 LLM calls.
+---                              ACTIVATION: with default top_k1 =
+---                              ceil(N/3) and top_k2 = min(top_k1, 5),
+---                              Stage 2 only fires when top_k1 > 5,
+---                              i.e. N >= 16. For N ≤ 15 with defaults,
+---                              #survivors_1 == top_k2 so Stage 2 is
+---                              skipped (flagged in stages[2].name =
+---                              "scoring_skipped"). To force Stage 2 on
+---                              smaller N, pass ctx.top_k2 explicitly
+---                              lower than top_k1.
 ---
 ---   Stage 3: pairwise_rank   — Precise pairwise comparison of the
 ---                              final top_k2 candidates in allpair
@@ -62,7 +71,12 @@
 --- ctx.top_k2: Stage 2→3 cutoff (default: min(top_k1, 5))
 --- ctx.window_size: listwise_rank window (default: 20)
 --- ctx.scoring_axes: Custom axes for Stage 2 (default: 3 standard axes)
---- ctx.gen_tokens: Max tokens per LLM call (default: 400)
+--- ctx.gen_tokens: Max tokens per LLM call in Stage 1 (listwise) and
+---     Stage 2 (scoring). (default: 400)
+--- ctx.judge_gen_tokens: Max tokens per pairwise judgement call in
+---     Stage 3 (and in the N<6 direct-pairwise bypass). Pairwise
+---     judgements only need a short verdict (e.g. "A>B"), so this
+---     defaults to 20 — lower than gen_tokens on purpose. (default: 20)
 
 local M = {}
 
@@ -88,15 +102,26 @@ M.caveats = {
     "listwise_rank window_size < ceil(N/2) causes top candidates to be "
         .. "missed in sliding-window passes"
         .. " → recipe auto-raises window_size to ceil(N/2)",
-    "N < 6 makes the 3-stage funnel overhead counterproductive "
-        .. "(more LLM calls than direct pairwise)"
-        .. " → recipe falls back to direct pairwise_rank",
+    "N < 6 makes the 3-stage funnel lose discriminative power: "
+        .. "Stage 1 (listwise) top_k1 = ceil(N/3) drops to 2 at N=5, "
+        .. "forcing Stage 3 (pairwise allpair) onto only 2 items (a single "
+        .. "comparison). For small N the funnel is actually CHEAPER than "
+        .. "direct allpair (N=5: ~3 calls vs 20), but the aggressive "
+        .. "pre-screening leaves no middle ground for pairwise to evaluate"
+        .. " → recipe falls back to direct pairwise_rank so all N items "
+        .. "get a full bidirectional comparison",
     "pairwise_rank allpair on N > 12 causes cost explosion "
         .. "(>264 LLM calls for bidirectional)"
         .. " → top_k2 capped at 12 (default 5 is safe)",
     "Stage 2 scoring axes must match the ranking criterion; "
         .. "generic axes on domain-specific tasks lose discriminative power"
         .. " → provide ctx.scoring_axes for specialized domains",
+    "Stage 2 (multi-axis scoring) is skipped for N ≤ 15 with default "
+        .. "top_k1/top_k2 because #survivors_1 == top_k2 ⇒ nothing to score "
+        .. "further. Users expecting a 3-stage funnel at N=8 will actually "
+        .. "get Stage 1 → Stage 3 only (funnel_shape = {N, top_k1, top_k1})"
+        .. " → pass ctx.top_k2 explicitly smaller than top_k1, or raise N "
+        .. "above 15, to force Stage 2 to fire",
 }
 
 --- Empirical verification results.
@@ -224,6 +249,7 @@ function M.run(ctx)
 
     local N = #candidates
     local gen_tokens = ctx.gen_tokens or 400
+    local judge_gen_tokens = ctx.judge_gen_tokens or 20
     local stages = {}
     local total_llm_calls = 0
 
@@ -232,7 +258,9 @@ function M.run(ctx)
     -- ═══════════════════════════════════════════════════════════════
     if N < 6 then
         alc.log("info", string.format(
-            "recipe_ranking_funnel: N=%d < 6, bypassing funnel → direct pairwise",
+            "recipe_ranking_funnel: N=%d < 6, bypassing funnel → direct "
+                .. "pairwise (aggressive screening would leave too few items "
+                .. "for Stage 3 to discriminate)",
             N
         ))
 
@@ -241,8 +269,18 @@ function M.run(ctx)
             task = task,
             candidates = candidates,
             method = "allpair",
-            gen_tokens = 20,
+            gen_tokens = judge_gen_tokens,
         })
+
+        -- Same baseline formula as the non-bypass path; for N<6 the funnel
+        -- short-circuits, so the actual calls == the naive-baseline calls.
+        local naive_calls = N * (N - 1)
+        local savings_pct = 0
+        if naive_calls > 0 then
+            savings_pct = math.floor(
+                (1 - pr.result.total_llm_calls / naive_calls) * 100
+            )
+        end
 
         ctx.result = {
             ranking = pr.result.ranked,
@@ -251,13 +289,40 @@ function M.run(ctx)
             funnel_bypassed = true,
             bypass_reason = "N < 6",
             total_llm_calls = pr.result.total_llm_calls,
-            stages = { {
-                name = "direct_pairwise",
-                input_count = N,
-                output_count = N,
-                llm_calls = pr.result.total_llm_calls,
-            } },
-            funnel_shape = { N },
+            naive_baseline_calls = naive_calls,
+            naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
+            savings_percent = savings_pct,
+            -- Emit 3 stages so consumers can safely index stages[1..3]
+            -- regardless of the bypass path. Stages 1 and 2 are marked
+            -- skipped; stage 3 carries the direct-pairwise result.
+            stages = {
+                {
+                    name = "listwise_skipped",
+                    input_count = N,
+                    output_count = N,
+                    llm_calls = 0,
+                    reason = "N < 6 bypass",
+                },
+                {
+                    name = "scoring_skipped",
+                    input_count = N,
+                    output_count = N,
+                    llm_calls = 0,
+                    reason = "N < 6 bypass",
+                },
+                {
+                    name = "direct_pairwise",
+                    input_count = N,
+                    output_count = N,
+                    llm_calls = pr.result.total_llm_calls,
+                    position_bias_splits = pr.result.position_bias_splits,
+                    both_tie_pairs = pr.result.both_tie_pairs,
+                },
+            },
+            -- funnel_shape matches the non-bypass convention
+            -- ([S1-input, S2-input, S3-input]). In the bypass, all three
+            -- conceptual stages see N candidates: no reduction happens.
+            funnel_shape = { N, N, N },
         }
         return ctx
     end
@@ -271,11 +336,25 @@ function M.run(ctx)
 
     local window_size = ctx.window_size or 20
 
-    -- Caveat: window_size too small loses top candidates
+    -- Caveat: window_size too small loses top candidates.
+    --
+    -- Rationale: listwise_rank slides with stride = ceil(window_size/2).
+    -- For a true top-K to survive every sliding pass, the final head
+    -- window [1, window_size] must contain the K-th best item. With
+    -- window_size < ceil(N/2) the stride is small enough that the best
+    -- items can bounce out of the head window on intermediate passes,
+    -- which statistically biases them downward. Setting window_size >=
+    -- ceil(N/2) guarantees the final head window covers the top half
+    -- of positions, which keeps the K-th item reachable for K <= N/2.
+    --
+    -- The raise is skipped when window_size >= N (single-call path inside
+    -- listwise_rank — no sliding, no risk).
     local min_window = math.ceil(N / 2)
     if window_size < min_window and N > window_size then
         alc.log("warn", string.format(
-            "recipe_ranking_funnel: window_size %d < ceil(N/2)=%d, raising",
+            "recipe_ranking_funnel: window_size %d < ceil(N/2)=%d, raising "
+                .. "(listwise stride = ceil(window/2) needs window >= N/2 "
+                .. "to keep top items in the final head window)",
             window_size, min_window
         ))
         window_size = min_window
@@ -358,7 +437,7 @@ function M.run(ctx)
             local raw = alc.llm(prompt, {
                 system = "You are a precise evaluator. Output only scores "
                     .. "in the requested format.",
-                max_tokens = 200,
+                max_tokens = gen_tokens,
             })
             s2_calls = s2_calls + 1
 
@@ -383,10 +462,16 @@ function M.run(ctx)
             }
         end
 
-        -- Sort by score descending
+        -- Sort by Stage 2 score descending. Note: Stage 1's ordinal
+        -- ranking is intentionally DISCARDED here except as a tie-break
+        -- when two candidates receive identical Stage 2 scores. Stage 2
+        -- is a stronger (multi-axis) evaluator than Stage 1 (pure
+        -- listwise ordering), so we let its scores dominate. If you
+        -- want Stage 1's rank to carry more weight, lift top_k1 so more
+        -- survivors reach Stage 3 directly.
         table.sort(scored, function(a, b)
             if a.score ~= b.score then return a.score > b.score end
-            return a.stage1_rank < b.stage1_rank  -- tie-break by Stage 1 rank
+            return a.stage1_rank < b.stage1_rank
         end)
 
         -- Keep top_k2
@@ -434,7 +519,7 @@ function M.run(ctx)
         task = task,
         candidates = survivors_1,
         method = "allpair",
-        gen_tokens = 20,
+        gen_tokens = judge_gen_tokens,
     })
 
     local s3_calls = s3.result.total_llm_calls
@@ -470,12 +555,18 @@ function M.run(ctx)
     -- Assemble result
     -- ═══════════════════════════════════════════════════════════════
 
-    -- Estimate token savings vs naive pairwise on all N
-    local naive_calls = N * (N - 1)  -- allpair bidirectional
+    -- Estimate token savings vs the most-expensive naive alternative:
+    -- pairwise_rank allpair in bidirectional mode on all N candidates
+    -- (= N*(N-1) LLM calls). The comparison is apples-to-apples for users
+    -- who would otherwise use pairwise_rank for the whole set; if your
+    -- baseline is single-pass pairwise (N*(N-1)/2) or listwise-only
+    -- (N/window_size), the savings number below over-reports.
+    local naive_calls = N * (N - 1)
     local savings_pct = math.floor((1 - total_llm_calls / naive_calls) * 100)
 
     alc.log("info", string.format(
-        "recipe_ranking_funnel: DONE — %d total calls vs %d naive (-%d%%)",
+        "recipe_ranking_funnel: DONE — %d total calls vs %d naive "
+            .. "(pairwise allpair bidirectional, -%d%%)",
         total_llm_calls, naive_calls, savings_pct
     ))
 
@@ -486,8 +577,12 @@ function M.run(ctx)
         funnel_bypassed = false,
         total_llm_calls = total_llm_calls,
         naive_baseline_calls = naive_calls,
+        naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
         savings_percent = savings_pct,
         stages = stages,
+        -- funnel_shape = [input-to-Stage-1, input-to-Stage-2, input-to-Stage-3]
+        --              = [N, survivors-after-Stage-1, survivors-after-Stage-2]
+        -- Length is always 3. Bypass path emits {N, N, N} (no reduction).
         funnel_shape = { N, stages[1].output_count, stages[2].output_count },
     }
     return ctx

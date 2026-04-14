@@ -90,6 +90,9 @@ function M.run(ctx)
     ))
     alc.stats.record("initial_confidence", confidence)
 
+    -- Phase 1 cost: 1 LLM call (answer + confidence in a single prompt).
+    local total_llm_calls = 1
+
     -- Phase 2: Accept or escalate
     if confidence >= threshold then
         ctx.result = {
@@ -97,6 +100,7 @@ function M.run(ctx)
             confidence = confidence,
             escalated = false,
             strategy = "direct",
+            total_llm_calls = total_llm_calls,
         }
         return ctx
     end
@@ -120,11 +124,13 @@ function M.run(ctx)
                 max_tokens = gen_tokens,
             }
         )
+        total_llm_calls = total_llm_calls + 1
         ctx.result = {
             answer = retry_answer,
             confidence = confidence,
             escalated = true,
             strategy = "retry",
+            total_llm_calls = total_llm_calls,
         }
     elseif fallback == "panel" then
         local panel_pkg = require("panel")
@@ -133,12 +139,17 @@ function M.run(ctx)
         }
         for k, v in pairs(fallback_opts) do panel_ctx[k] = v end
         local panel_result = panel_pkg.run(panel_ctx)
+        -- panel issues one LLM call per role plus one synthesis call.
+        local panel_calls = (panel_result.result.arguments
+            and (#panel_result.result.arguments + 1)) or 0
+        total_llm_calls = total_llm_calls + panel_calls
         ctx.result = {
             answer = panel_result.result.synthesis,
             confidence = confidence,
             escalated = true,
             strategy = "panel",
             fallback_detail = panel_result.result,
+            total_llm_calls = total_llm_calls,
         }
     else
         -- Default: ensemble
@@ -148,12 +159,15 @@ function M.run(ctx)
         }
         for k, v in pairs(fallback_opts) do ens_ctx[k] = v end
         local ens_result = sc.run(ens_ctx)
+        total_llm_calls = total_llm_calls
+            + (ens_result.result.total_llm_calls or 0)
         ctx.result = {
             answer = ens_result.result.consensus,
             confidence = confidence,
             escalated = true,
             strategy = "ensemble",
             fallback_detail = ens_result.result,
+            total_llm_calls = total_llm_calls,
         }
     end
 

@@ -34,15 +34,20 @@ local function extract_answer(reasoning, task)
     )
 end
 
---- Normalize an answer string for vote counting.
---- Lowercase, trim, collapse whitespace, strip trailing punctuation.
-local function normalize_for_vote(s)
+--- Trim leading/trailing whitespace and strip trailing punctuation.
+--- Preserves original casing (used for display / downstream prompts).
+local function clean_answer(s)
     if type(s) ~= "string" then return "" end
-    local t = s:lower()
-    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    local t = s:gsub("^%s+", ""):gsub("%s+$", "")
     t = t:gsub("%s+", " ")
     t = t:gsub("[%.%!%?%,%;%:]+$", "")
     return t
+end
+
+--- Normalize an answer string for vote counting.
+--- Lowercase on top of clean_answer.
+local function normalize_for_vote(s)
+    return clean_answer(s):lower()
 end
 
 ---@param ctx AlcCtx
@@ -62,6 +67,11 @@ function M.run(ctx)
         "Consider edge cases and exceptions first.",
     }
 
+    -- Count LLM calls during execution rather than computing it post-hoc.
+    -- This stays correct if any branch ever changes (e.g. caching the
+    -- extract step, or making consensus conditional).
+    local total_llm_calls = 0
+
     -- Sample N independent reasoning paths
     local paths = {}
     for i = 1, n do
@@ -76,7 +86,9 @@ function M.run(ctx)
                 max_tokens = 400,
             }
         )
+        total_llm_calls = total_llm_calls + 1
         local answer = extract_answer(reasoning, task)
+        total_llm_calls = total_llm_calls + 1
         paths[i] = { reasoning = reasoning, answer = answer }
     end
 
@@ -98,19 +110,25 @@ function M.run(ctx)
             max_tokens = 300,
         }
     )
+    total_llm_calls = total_llm_calls + 1
 
     -- Build vote distribution from extracted answers for downstream consumers
     -- (recipe_safe_panel, inverse_u, calibrate) that need the raw vote signal
     -- rather than only the LLM-synthesized consensus string.
+    --
+    -- For `answer` (the representative string passed to downstream prompts)
+    -- we use the clean_answer'd form of the first raw match, not the raw
+    -- string. This guarantees downstream consumers see "Tokyo" rather than
+    -- either "Tokyo." or "tokyo" depending on sampling order.
     local votes = {}
     local vote_counts = {}
-    local first_raw_by_norm = {}
+    local first_clean_by_norm = {}
     for i, p in ipairs(paths) do
         local norm = normalize_for_vote(p.answer)
         votes[i] = norm
         vote_counts[norm] = (vote_counts[norm] or 0) + 1
-        if first_raw_by_norm[norm] == nil then
-            first_raw_by_norm[norm] = p.answer
+        if first_clean_by_norm[norm] == nil then
+            first_clean_by_norm[norm] = clean_answer(p.answer)
         end
     end
 
@@ -123,7 +141,7 @@ function M.run(ctx)
             majority_norm, majority_count = norm, c
         end
     end
-    local answer = majority_norm and first_raw_by_norm[majority_norm] or nil
+    local answer = majority_norm and first_clean_by_norm[majority_norm] or nil
 
     ctx.result = {
         consensus = consensus,
@@ -133,7 +151,7 @@ function M.run(ctx)
         votes = votes,
         vote_counts = vote_counts,
         n_sampled = n,
-        total_llm_calls = 2 * n + 1,
+        total_llm_calls = total_llm_calls,
     }
     return ctx
 end

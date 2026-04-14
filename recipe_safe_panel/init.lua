@@ -18,11 +18,15 @@
 ---     with diversity hints to maximize independence. The majority
 ---     answer is extracted via vote counting.
 ---
----   Stage 3: inverse_u — Scaling health check
----     Analyzes the vote distribution to detect whether the panel
----     has reached or passed its accuracy peak. If the inverse-U
----     pattern (Chen et al. NeurIPS 2024) is detected, warns that
----     adding more agents would hurt.
+---   Stage 3: inverse_u — Vote-prefix stability check
+---     Builds a progressive-majority series from the first 3, 5, 7,
+---     ... votes of the single sc run (all from the same panel), then
+---     feeds it to inverse_u.detect as a lightweight stability proxy.
+---     NOTE: This is NOT a true inverse-U test. Chen et al. (NeurIPS
+---     2024) concerns the accuracy curve across independent panels of
+---     increasing size; a prefix of one run tends to approach the
+---     majority fraction monotonically and will usually report "safe".
+---     A true inverse-U test requires repeating sc.run at multiple N.
 ---
 ---   Stage 4: calibrate — Meta-confidence gate
 ---     Synthesizes panel vote margin, Condorcet expected accuracy,
@@ -84,27 +88,69 @@ M.caveats = {
     "p_estimate < 0.5 (Anti-Jury) makes majority vote provably harmful"
         .. " — adding more agents drives accuracy toward 0, not 1"
         .. " → recipe ABORTs with anti_jury=true and recommendation",
-    "inverse_u detection needs >= 5 data points to be meaningful"
-        .. " → recipe skips inverse_u check when panel size < 5",
+    "inverse_u detection needs >= 3 series points to be meaningful, and "
+        .. "the prefix accuracy series is only sampled at odd k >= 3 "
+        .. "(k = 3, 5, 7, ...). So Stage 3 requires a panel of n >= 7 to "
+        .. "produce a 3-point series; at n in {3, 5} the stage is skipped "
+        .. "(logged as 'insufficient data points')"
+        .. " → run with max_n >= 7 if you need Stage 3 to fire; smaller "
+        .. "panels rely entirely on Condorcet expected accuracy + calibrate "
+        .. "confidence gating",
     "sc samples from same model/prompt violate Condorcet's independence "
         .. "assumption — correlated agents weaken the theorem's guarantee"
         .. " → sc uses diversity hints; recipe adds correlation warning "
         .. "when vote unanimity is suspiciously high",
     "condorcet.optimal_n() assumes independence — with correlated agents "
         .. "the actual required N is higher"
-        .. " → recipe applies 1.5x multiplier when p_estimate < 0.65 "
-        .. "(low competence + correlation is the worst case)",
+        .. " → recipe applies a 1.5x multiplier when p_estimate < 0.65. "
+        .. "NOTE: 1.5x is a recipe-level HEURISTIC, not a theorem. It is "
+        .. "chosen to approximately compensate for the sample-size inflation "
+        .. "implied by a moderate intra-panel correlation (ρ ≈ 0.2–0.3) in "
+        .. "the effective-N formula N_eff = N / (1 + (N-1)·ρ). For stronger "
+        .. "correlation, or to replace this with a measured adjustment, pass "
+        .. "your own ctx.max_n or pre-compute recommended_n with condorcet "
+        .. "and disable this recipe layer.",
     "max_n cap can make target_accuracy unreachable"
         .. " → recipe reports actual expected accuracy rather than "
         .. "silently claiming the target was met",
+    "Stage 3 inverse_u uses a single-run vote prefix as an accuracy proxy, "
+        .. "not independent panels of increasing size (Chen et al. scenario)"
+        .. " → the prefix series is biased toward monotone convergence and "
+        .. "rarely triggers; treat the 'safe' signal as weak evidence only. "
+        .. "For a true inverse-U test, call sc.run at multiple N and feed "
+        .. "the resulting accuracy curve to inverse_u.detect directly.",
 }
 
 --- Empirical verification results.
+---
+--- Stage coverage of the current runs:
+---   Stage 1 (condorcet)     — verified: Anti-Jury gate + optimal_n path.
+---   Stage 2 (sc)            — verified: panel sampling + plurality vote.
+---   Stage 3 (vote_prefix)   — NOT EXERCISED. Every recorded run uses
+---                             max_n = 3, but the prefix-stability series
+---                             needs length ≥ 3, and the series is sampled
+---                             only at odd k ≥ 3 — that requires n ≥ 7.
+---                             Stage 3's behaviour in these runs is always
+---                             "skipped (panel too small / scaling_check
+---                             disabled)", not "safe" from actual inverse_u
+---                             detection.
+---   Stage 4 (calibrate)     — verified: confidence + retry path.
+---
+--- To validate Stage 3 empirically, re-run with max_n ≥ 7 and
+--- scaling_check = true, and capture whether inverse_u.detect fires on
+--- the resulting prefix series. Until then, Stage 3 is covered by
+--- theoretical_basis only.
 M.verified = {
     theoretical_basis = {
         "Condorcet Jury Theorem (1785): P(Maj_n) → 1 as n → ∞ when p > 0.5",
         "Chen et al. NeurIPS 2024 Theorem 2: inverse-U when α < 1-1/t",
         "Wang et al. 2022: Self-Consistency improves accuracy via majority vote",
+    },
+    stage_coverage = {
+        stage_1_condorcet = "verified",
+        stage_2_sc = "verified",
+        stage_3_vote_prefix = "not_exercised (max_n < 7 in all runs)",
+        stage_4_calibrate = "verified",
     },
     e2e_runs = {
         {
@@ -116,7 +162,8 @@ M.verified = {
             panel_size = 3,
             answer = "Tokyo",
             confidence = 0.99,
-            vote_margin = 1.0,
+            plurality_fraction = 1.0,
+            margin_gap = 1.0,
             condorcet_expected_acc = 0.939,
             total_llm_calls = 8,
             graders_passed = 6,
@@ -150,16 +197,31 @@ M.verified = {
 -- ─── Internal helpers ───
 
 --- Analyze vote distribution for consensus quality signals.
---- Returns margin (majority fraction), entropy, and unanimity flag.
+--- Returns:
+---   plurality_fraction — max_count / total. This is the TOP-answer share,
+---     NOT a majority-vs-runner-up gap. On a 2-2-1 split with n=5 it is
+---     0.4 even though no answer has a strict majority. Named explicitly
+---     to avoid confusion with the LLM-as-judge "winning margin" idiom.
+---   margin_gap — (max_count - runner_up_count) / total. True margin-of-
+---     victory. 0 when the vote is tied at the top.
+---   norm_entropy — Shannon entropy normalized by log(n_distinct).
+---   unanimous — all votes agree.
 local function analyze_votes(vote_counts, total)
     local max_count = 0
+    local runner_up = 0
     local n_distinct = 0
     for _, count in pairs(vote_counts) do
-        if count > max_count then max_count = count end
+        if count > max_count then
+            runner_up = max_count
+            max_count = count
+        elseif count > runner_up then
+            runner_up = count
+        end
         n_distinct = n_distinct + 1
     end
 
-    local margin = max_count / total
+    local plurality_fraction = max_count / total
+    local margin_gap = (max_count - runner_up) / total
 
     -- Shannon entropy of vote distribution (normalized by log(n_distinct))
     local entropy = 0
@@ -173,8 +235,10 @@ local function analyze_votes(vote_counts, total)
     local norm_entropy = max_entropy > 0 and entropy / max_entropy or 0
 
     return {
-        margin = margin,
+        plurality_fraction = plurality_fraction,
+        margin_gap = margin_gap,
         max_count = max_count,
+        runner_up_count = runner_up,
         n_distinct = n_distinct,
         norm_entropy = norm_entropy,
         unanimous = (n_distinct == 1),
@@ -210,6 +274,17 @@ function M.run(ctx)
     local conf_threshold = ctx.confidence_threshold or 0.7
     local do_scaling = ctx.scaling_check ~= false
     local gen_tokens = ctx.gen_tokens or 400
+
+    -- Majority vote requires an odd panel of >= 3. Enforcing this at the
+    -- input boundary avoids silent odd-enforcement overriding max_n below.
+    if type(max_n) ~= "number" or max_n < 3 then
+        error(string.format(
+            "recipe_safe_panel: max_n must be >= 3 for a meaningful majority "
+                .. "vote panel (got %s). Use a direct single-agent call for "
+                .. "smaller sizes.",
+            tostring(max_n)
+        ))
+    end
 
     local stages = {}
     local total_llm_calls = 0
@@ -258,14 +333,30 @@ function M.run(ctx)
     end
 
     -- Compute optimal panel size
-    local recommended_n = condorcet.optimal_n(p_est, target)
+    local recommended_n, optimal_prob = condorcet.optimal_n(p_est, target)
 
-    -- Caveat: correlation adjustment for low competence
+    -- Caveat: optimal_n returns nil when p <= 0.5 or target unreachable
+    -- within the search ceiling. Anti-Jury above catches p < 0.5; here we
+    -- handle p == 0.5 and unreachable-target cases by degrading to max_n.
+    if recommended_n == nil then
+        alc.log("warn", string.format(
+            "recipe_safe_panel: optimal_n unreachable (p=%.2f, target=%.2f). "
+                .. "Falling back to max_n=%d and reporting actual expected accuracy.",
+            p_est, target, max_n
+        ))
+        recommended_n = max_n
+        optimal_prob = nil
+    end
+
+    -- Caveat: correlation adjustment for low competence.
+    -- 1.5x is a recipe-level HEURISTIC (see M.caveats) corresponding to
+    -- intra-panel correlation ρ ≈ 0.2–0.3 under the effective-sample-size
+    -- formula N_eff = N / (1 + (N-1)·ρ). Not a theorem.
     if p_est < 0.65 then
         local adjusted = math.ceil(recommended_n * 1.5)
         alc.log("info", string.format(
             "recipe_safe_panel: low p=%.2f, applying 1.5x correlation "
-                .. "adjustment: %d → %d",
+                .. "adjustment (heuristic, ρ≈0.2-0.3): %d → %d",
             p_est, recommended_n, adjusted
         ))
         recommended_n = adjusted
@@ -280,11 +371,24 @@ function M.run(ctx)
         recommended_n = max_n
     end
 
-    -- Ensure odd for clean majority
+    -- Ensure odd for clean majority. If rounding up would exceed max_n, we
+    -- must step down by 2 — but that is a silent accuracy reduction, so log
+    -- it explicitly rather than absorbing the downgrade.
     if recommended_n % 2 == 0 then
-        recommended_n = recommended_n + 1
-        if recommended_n > max_n then
-            recommended_n = recommended_n - 2
+        local bumped = recommended_n + 1
+        if bumped > max_n then
+            local downgraded = recommended_n - 1
+            if downgraded < 3 then downgraded = 3 end
+            alc.log("warn", string.format(
+                "recipe_safe_panel: odd-enforcement cannot round up %d within "
+                    .. "max_n=%d → downgrading to %d. Expected accuracy will "
+                    .. "be lower than the capped-even target. Raise max_n to "
+                    .. "%d to avoid this downgrade.",
+                recommended_n, max_n, downgraded, bumped
+            ))
+            recommended_n = downgraded
+        else
+            recommended_n = bumped
         end
     end
     if recommended_n < 3 then recommended_n = 3 end
@@ -325,8 +429,10 @@ function M.run(ctx)
     local answer_norm = sc_result.result.answer_norm
     local vote_counts = sc_result.result.vote_counts or {}
     local votes = sc_result.result.votes or {}
+    -- sc always emits total_llm_calls (2n reasoning+extract + 1 consensus);
+    -- keep a conservative legacy fallback for pre-refactor sc versions.
     local sc_calls = sc_result.result.total_llm_calls
-        or (recommended_n * 2)  -- samples + extractions
+        or (2 * recommended_n + 1)
     total_llm_calls = total_llm_calls + sc_calls
 
     -- Analyze vote distribution
@@ -336,7 +442,10 @@ function M.run(ctx)
         name = "sc",
         panel_size = recommended_n,
         answer = answer,
-        vote_margin = vote_info.margin,
+        -- plurality_fraction: top-answer share (max_count / n).
+        plurality_fraction = vote_info.plurality_fraction,
+        -- margin_gap: strict (top - runner-up) / n. Zero on a top tie.
+        margin_gap = vote_info.margin_gap,
         n_distinct_answers = vote_info.n_distinct,
         unanimous = vote_info.unanimous,
         llm_calls = sc_calls,
@@ -352,10 +461,11 @@ function M.run(ctx)
     end
 
     alc.log("info", string.format(
-        "recipe_safe_panel: Stage 2 — answer='%s', margin=%.0f%%, "
-            .. "%d distinct answers (%d calls)",
+        "recipe_safe_panel: Stage 2 — answer='%s', plurality=%.0f%% "
+            .. "(gap=%.0f%%), %d distinct answers (%d calls)",
         tostring(answer):sub(1, 50),
-        vote_info.margin * 100,
+        vote_info.plurality_fraction * 100,
+        vote_info.margin_gap * 100,
         vote_info.n_distinct,
         sc_calls
     ))
@@ -368,7 +478,10 @@ function M.run(ctx)
 
     local has_votes = type(votes) == "table" and #votes >= 5
     if do_scaling and recommended_n >= 5 and has_votes then
-        alc.log("info", "recipe_safe_panel: ═══ Stage 3/4 — inverse_u ═══")
+        alc.log("info",
+            "recipe_safe_panel: ═══ Stage 3/4 — vote-prefix stability "
+                .. "(inverse_u on single-run prefix) ═══"
+        )
 
         local inverse_u = require("inverse_u")
 
@@ -382,9 +495,11 @@ function M.run(ctx)
 
             if not scaling_safe then
                 alc.log("warn", string.format(
-                    "recipe_safe_panel: INVERSE-U DETECTED — accuracy peaked "
-                        .. "at series point %d with %d consecutive drops. "
-                        .. "Do NOT add more agents.",
+                    "recipe_safe_panel: vote-prefix DECLINE DETECTED — the "
+                        .. "progressive-majority series dropped from its peak "
+                        .. "at point %d for %d consecutive steps. This is a "
+                        .. "weak signal of panel instability, not a true "
+                        .. "inverse-U; verify with independent re-runs.",
                     peak_info.peak_idx or 0,
                     peak_info.consecutive_drops or 0
                 ))
@@ -392,12 +507,13 @@ function M.run(ctx)
         else
             alc.log("info",
                 "recipe_safe_panel: Stage 3 — insufficient data points "
-                    .. "for inverse_u analysis"
+                    .. "for prefix stability analysis"
             )
         end
 
         stages[3] = {
-            name = "inverse_u",
+            name = "vote_prefix_stability",
+            signal_type = "single_run_prefix_proxy",
             series_length = #series,
             is_safe = scaling_safe,
             peak_idx = peak_info and peak_info.peak_idx,
@@ -420,7 +536,7 @@ function M.run(ctx)
         ))
 
         stages[3] = {
-            name = "inverse_u_skipped",
+            name = "vote_prefix_stability_skipped",
             reason = skip_reason,
             is_safe = true,
         }
@@ -438,23 +554,25 @@ function M.run(ctx)
             .. "Task: %s\n\n"
             .. "Panel result:\n"
             .. "  Answer: %s\n"
-            .. "  Vote margin: %.0f%% (%d/%d agents agree)\n"
+            .. "  Plurality: %.0f%% (%d/%d agents picked this answer)\n"
+            .. "  Margin over runner-up: %.0f%%\n"
             .. "  Distinct answers: %d\n"
             .. "  Expected accuracy (Condorcet, p=%.2f): %.1f%%\n"
-            .. "  Scaling safety (inverse-U): %s\n\n"
+            .. "  Vote-prefix stability: %s\n\n"
             .. "Based on this information, how confident should we be "
             .. "in the panel's answer?",
         recommended_n,
         task,
         tostring(answer),
-        vote_info.margin * 100,
+        vote_info.plurality_fraction * 100,
         vote_info.max_count,
         recommended_n,
+        vote_info.margin_gap * 100,
         vote_info.n_distinct,
         p_est,
         expected_acc * 100,
-        scaling_safe and "SAFE (no decline detected)"
-            or "WARNING (inverse-U pattern detected)"
+        scaling_safe and "STABLE (no decline in prefix series)"
+            or "UNSTABLE (prefix majority declined from its peak)"
     )
 
     local cal_result = calibrate.run({
@@ -465,7 +583,11 @@ function M.run(ctx)
     })
 
     local confidence = cal_result.result.confidence or 0.5
-    local cal_calls = cal_result.result.escalated and 2 or 1
+    -- Prefer calibrate's reported call count; fall back to retry-mode estimate
+    -- (escalated → 2 calls, direct → 1 call) for backward compatibility with
+    -- older calibrate versions that didn't emit total_llm_calls.
+    local cal_calls = cal_result.result.total_llm_calls
+        or (cal_result.result.escalated and 2 or 1)
     total_llm_calls = total_llm_calls + cal_calls
 
     local needs_investigation = confidence < conf_threshold
@@ -491,11 +613,12 @@ function M.run(ctx)
     -- ═══════════════════════════════════════════════════════════════
     alc.log("info", string.format(
         "recipe_safe_panel: DONE — answer='%s', confidence=%.2f, "
-            .. "panel=%d, margin=%.0f%%, %d total calls",
+            .. "panel=%d, plurality=%.0f%% (gap=%.0f%%), %d total calls",
         tostring(answer):sub(1, 50),
         confidence,
         recommended_n,
-        vote_info.margin * 100,
+        vote_info.plurality_fraction * 100,
+        vote_info.margin_gap * 100,
         total_llm_calls
     ))
 
@@ -503,7 +626,8 @@ function M.run(ctx)
         answer = answer,
         confidence = confidence,
         panel_size = recommended_n,
-        vote_margin = vote_info.margin,
+        plurality_fraction = vote_info.plurality_fraction,
+        margin_gap = vote_info.margin_gap,
         vote_counts = vote_counts,
         n_distinct_answers = vote_info.n_distinct,
         expected_accuracy = expected_acc,
