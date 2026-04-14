@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **2 new `recipe` category packages** composing foundations into end-to-end strategies:
+  - **[recipe_safe_panel](recipe_safe_panel/)**: safety-first panel QA. Composes `condorcet` (panel sizing + Anti-Jury), `sc` (self-consistency), `inverse_u` (optional scaling check), `calibrate` (confidence). Auto `M.verified.alc_eval_runs` recorded math_basic pass_rate = 1.0 (7/7) at 8 LLM calls/case under `max_n=3`.
+  - **[recipe_ranking_funnel](recipe_ranking_funnel/)**: listwise → pairwise ranking funnel. Composes `listwise_rank` (coarse screening) and `pairwise_rank` (precise finalization). Verified N=8 population ranking: 7 calls vs naive all-pairs 56 (87% savings), top-1 correct.
+- **`M.verified` convention**: recipe packages expose `theoretical_basis` + measured `e2e_runs` / `alc_eval_runs` only — no unverified claims. Populated empirically via agent-block E2E harness.
+- **scripts/e2e/ agent-block harness** (`common.lua` + per-recipe drivers): runs full ReAct loop against real `alc.llm` / `alc_eval`, persists graded results to `workspace/e2e-results/<timestamp>/<name>.json`.
+  - `recipe_safe_panel.lua`: single-case smoke (Capital of Japan)
+  - `recipe_ranking_funnel.lua`: single-case smoke (Country population 2026)
+  - `recipe_safe_panel_eval.lua`: multi-case `alc_eval` sweep (math_basic, 7 cases) with recipe-level budget caps (`max_n=3`, `scaling_check=false`)
+- **justfile**: `just e2e <name>` / `just e2e-all` with `allow-agent` group for task-mcp exposure.
+- **tests/test_recipe_ranking_funnel.lua**, **tests/test_recipe_safe_panel.lua**: structural + M.verified validation tests.
+
+### Changed
+
+- **sc** `ctx.result`: bridge API gap for recipe consumption. Added `answer_norm`, `votes` (normalized), `vote_counts`, `n_sampled`, `total_llm_calls = 2n+1` alongside existing `consensus` / `answer` / `paths`. Normalization = lowercase + whitespace collapse + trailing punctuation strip.
+- **hub_index.json**: regenerated to 105 packages (adds `recipe_ranking_funnel`, `recipe_safe_panel`).
+- **README**: package count 103 → 105, added `### Recipes` section under package catalog.
+
 ## [0.12.0] - 2026-04-13
 
 ### Added

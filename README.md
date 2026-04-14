@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (103)
+## Packages (105)
 
 ### Reasoning
 
@@ -205,6 +205,15 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[panel](panel/)** | Multi-role deliberation. Multiple roles discuss and a moderator synthesizes | — |
+
+### Recipes
+
+End-to-end strategies that compose multiple packages into a single `run(ctx)` entry point, with recorded `M.verified` empirical results (measured runs only — no hand-wavy claims).
+
+| Package | Description | Composes |
+|---------|-------------|----------|
+| **[recipe_safe_panel](recipe_safe_panel/)** | Safety-first panel QA. Condorcet-sized panel → self-consistency → optional inverse-U scaling check → calibrated confidence. Anti-Jury / needs_investigation safety gates. math_basic pass_rate 1.0 (7/7) at 8 LLM calls/case (max_n=3) | condorcet, sc, inverse_u, calibrate |
+| **[recipe_ranking_funnel](recipe_ranking_funnel/)** | Listwise → pairwise ranking funnel. 8→3→3 funnel shape on population ranking yielded 7 LLM calls vs naive all-pairs 56 (87% savings), top-1 correct | listwise_rank, pairwise_rank |
 
 ## Usage
 
