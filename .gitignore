@@ -2,3 +2,5 @@
 .mcp.json
 workspace/
 .worktrees/
+.env
+
