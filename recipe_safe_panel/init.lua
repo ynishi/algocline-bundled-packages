@@ -123,7 +123,28 @@ M.verified = {
             graders_total = 6,
         },
     },
-    -- TODO: multi-case pass_rate with statistical significance
+    alc_eval_runs = {
+        {
+            scenario = "math_basic",
+            cases = 7,
+            harness = "agent-block scripts/e2e/recipe_safe_panel_eval.lua → alc_eval",
+            model = "claude-haiku-4-5-20251001",
+            run_id = "2026-04-15_021851",
+            opts = {
+                p_estimate = 0.85, target_accuracy = 0.7,
+                max_n = 3, confidence_threshold = 0.6, scaling_check = false,
+            },
+            pass_rate = 1.0,
+            cases_passed = 7,
+            total_llm_calls = 56,
+            llm_calls_per_case = 8,
+            mean_confidence = 0.99,
+            anti_jury_triggers = 0,
+            needs_investigation = 0,
+            card_id = "recipe_safe_panel_model_20260414T172053_c551b6",
+            exec_time_sec = 119.1,
+        },
+    },
 }
 
 -- ─── Internal helpers ───
