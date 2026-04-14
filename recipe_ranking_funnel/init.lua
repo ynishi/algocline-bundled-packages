@@ -254,7 +254,10 @@ function M.run(ctx)
     local total_llm_calls = 0
 
     -- ═══════════════════════════════════════════════════════════════
-    -- Caveat: N < 6 → direct pairwise (funnel overhead not worth it)
+    -- Caveat: N < 6 → direct pairwise. The funnel is CHEAPER at small N
+    -- (e.g. N=5: ~3 calls vs allpair 20), but Stage 1's top_k1=ceil(N/3)
+    -- drops to 2, leaving Stage 3 with only a single comparison. Bypass
+    -- so every item gets full bidirectional scrutiny.
     -- ═══════════════════════════════════════════════════════════════
     if N < 6 then
         alc.log("info", string.format(
@@ -282,10 +285,25 @@ function M.run(ctx)
             )
         end
 
+        -- Normalize pairwise_rank's ranked shape ({rank, index, score, text})
+        -- to the non-bypass shape ({rank, text, original_index, pairwise_score})
+        -- so consumers can read result.ranking uniformly regardless of path.
+        -- In the bypass, pairwise operates on the full original candidate
+        -- array, so pr_item.index IS already the 1-based original index.
+        local final_ranking = {}
+        for _, pr_item in ipairs(pr.result.ranked) do
+            final_ranking[#final_ranking + 1] = {
+                rank = pr_item.rank,
+                text = pr_item.text,
+                original_index = pr_item.index,
+                pairwise_score = pr_item.score,
+            }
+        end
+
         ctx.result = {
-            ranking = pr.result.ranked,
-            best = pr.result.best,
-            best_index = pr.result.best_index,
+            ranking = final_ranking,
+            best = final_ranking[1].text,
+            best_index = final_ranking[1].original_index,
             funnel_bypassed = true,
             bypass_reason = "N < 6",
             total_llm_calls = pr.result.total_llm_calls,

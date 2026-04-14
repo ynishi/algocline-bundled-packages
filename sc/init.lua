@@ -12,6 +12,18 @@
 --- ctx.task (required): The problem to solve
 --- ctx.n: Number of reasoning paths to sample (default: 5)
 --- ctx.temperature_hint: Hint text for diversity (default: varies per sample)
+--- ctx.gen_tokens: Max tokens per reasoning path (default: 400). Controls
+---     how long each independent chain-of-thought can be. Setting this too
+---     low truncates reasoning and lowers per-agent accuracy p, which
+---     directly weakens Condorcet guarantees for downstream consumers.
+--- ctx.extract_tokens: Max tokens for the per-path answer extraction step
+---     (default: 100). Keep this small — the extraction prompt asks for
+---     ONE short sentence, so more tokens waste budget without improving
+---     the vote signal.
+--- ctx.consensus_tokens: Max tokens for the final LLM-side vote-count
+---     synthesis (default: 300). The structured `vote_counts` field is
+---     computed independently, so this only affects the human-readable
+---     `consensus` string.
 
 local M = {}
 
@@ -24,13 +36,16 @@ M.meta = {
 }
 
 --- Extract a concise final answer from a reasoning chain.
-local function extract_answer(reasoning, task)
+local function extract_answer(reasoning, task, extract_tokens)
     return alc.llm(
         string.format(
             "Original question: %s\n\nReasoning:\n%s\n\nExtract ONLY the final answer in one short sentence. No explanation.",
             task, reasoning
         ),
-        { system = "Extract the final answer concisely. One sentence max.", max_tokens = 100 }
+        {
+            system = "Extract the final answer concisely. One sentence max.",
+            max_tokens = extract_tokens,
+        }
     )
 end
 
@@ -55,6 +70,9 @@ end
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n = ctx.n or 5
+    local gen_tokens = ctx.gen_tokens or 400
+    local extract_tokens = ctx.extract_tokens or 100
+    local consensus_tokens = ctx.consensus_tokens or 300
 
     -- Diversity hints to encourage different reasoning paths
     local diversity_hints = {
@@ -83,11 +101,11 @@ function M.run(ctx)
             ),
             {
                 system = "You are a careful reasoner. Think through the problem thoroughly before answering.",
-                max_tokens = 400,
+                max_tokens = gen_tokens,
             }
         )
         total_llm_calls = total_llm_calls + 1
-        local answer = extract_answer(reasoning, task)
+        local answer = extract_answer(reasoning, task, extract_tokens)
         total_llm_calls = total_llm_calls + 1
         paths[i] = { reasoning = reasoning, answer = answer }
     end
@@ -107,7 +125,7 @@ function M.run(ctx)
         ),
         {
             system = "You are a precise vote counter. Identify the majority answer. Be exact.",
-            max_tokens = 300,
+            max_tokens = consensus_tokens,
         }
     )
     total_llm_calls = total_llm_calls + 1
