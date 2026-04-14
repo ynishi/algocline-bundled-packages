@@ -473,6 +473,94 @@ mlua-probe test tests/test_ranking_packages.lua --search-path .
    lust.after(reset)
    ```
 
+## End-to-End (E2E) Testing
+
+The `tests/` suite exercises package internals with a mocked `_G.alc`. E2E
+scenarios under `scripts/e2e/` drive the same packages **through a real LLM
+and a live algocline MCP session**, using
+[agent-block](https://crates.io/crates/agent-block) as the ReAct driver.
+
+### Prerequisites
+
+```bash
+cargo install agent-block      # ReAct driver (runs the Lua scenario)
+cargo install algocline        # `alc` MCP server on PATH
+```
+
+`.env` at the repo root must export `ANTHROPIC_API_KEY`. `.env` is git-ignored.
+
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+```
+
+### Running E2E scenarios
+
+Scenarios are run via `just` recipes (the `justfile` at repo root is
+`allow-agent` tagged so it is also invokable through `task-mcp`):
+
+```bash
+just e2e recipe_safe_panel      # run one scenario
+just e2e recipe_ranking_funnel
+just e2e-all                    # run every scripts/e2e/*.lua (except common.lua)
+```
+
+Direct invocation without `just`:
+
+```bash
+agent-block -s scripts/e2e/recipe_safe_panel.lua -p .
+```
+
+### Output
+
+Each run persists a JSON report to
+`workspace/e2e-results/<timestamp>/<scenario>.json` with agent trace (turns,
+tokens, final answer) and per-grader pass/fail. stdout also prints a summary:
+
+```
+=== E2E recipe_safe_panel: PASS ===
+  [PASS] agent_ok
+  [PASS] answer_tokyo
+  [PASS] max_turns:15
+  [PASS] max_tokens:200000
+  [PASS] anti_jury_not_triggered
+  [PASS] reports_panel_size
+```
+
+### Authoring a new E2E
+
+1. Create `scripts/e2e/<name>.lua`.
+2. Require the shared harness and call `common.run { ... }`:
+
+   ```lua
+   local common = require("scripts.e2e.common")
+   return common.run({
+       name    = "my_recipe",
+       prompt  = "... task for the agent ...",
+       graders = {
+           common.graders.agent_ok,
+           common.graders.answer_contains("expected"),
+           common.graders.max_turns(15),
+           common.graders.custom("my_check", function(result)
+               return result.agent.final_answer:match("pattern") ~= nil
+           end),
+       },
+   })
+   ```
+
+3. Run `just e2e <name>` and iterate. See `scripts/e2e/common.lua` for the full
+   grader API (`agent_ok`, `answer_contains`, `answer_excludes`, `max_turns`,
+   `max_tokens`, `custom`).
+
+### Notes
+
+- E2E runs are **non-deterministic** (live LLM) and **billable**. Prefer unit
+  tests (`just test`) for tight loops; run E2E on meaningful changes only.
+- agent-block spawns the `alc` MCP server as a child process, so `alc` must be
+  on `PATH` and the current working directory must contain `alc.toml` (the
+  repo root already does).
+- Set `ALGOCLINE_LOG_DIR` or other algocline env vars before invoking
+  `agent-block` if you need verbose session logs.
+
 ## License
 
 MIT OR Apache-2.0
