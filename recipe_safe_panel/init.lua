@@ -106,7 +106,24 @@ M.verified = {
         "Chen et al. NeurIPS 2024 Theorem 2: inverse-U when α < 1-1/t",
         "Wang et al. 2022: Self-Consistency improves accuracy via majority vote",
     },
-    -- TODO: populate with alc_eval results once eval scenarios are defined
+    e2e_runs = {
+        {
+            scenario = "Capital of Japan (factual QA, single case)",
+            harness = "agent-block scripts/e2e/recipe_safe_panel.lua",
+            model = "claude-haiku-4-5-20251001",
+            run_id = "2026-04-15_021159",
+            opts = { p_estimate = 0.85, target_accuracy = 0.7, max_n = 3 },
+            panel_size = 3,
+            answer = "Tokyo",
+            confidence = 0.99,
+            vote_margin = 1.0,
+            condorcet_expected_acc = 0.939,
+            total_llm_calls = 8,
+            graders_passed = 6,
+            graders_total = 6,
+        },
+    },
+    -- TODO: multi-case pass_rate with statistical significance
 }
 
 -- ─── Internal helpers ───

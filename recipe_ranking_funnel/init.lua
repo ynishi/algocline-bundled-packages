@@ -101,19 +101,31 @@ M.caveats = {
 
 --- Empirical verification results.
 --- Do not populate this table with estimates or illustrative numbers.
---- Only fill after running alc_eval against a real ranking scenario.
+--- Only fill after running a real scenario through the E2E harness.
 M.verified = {
     theoretical_basis = {
         "Sun et al., EMNLP 2023: sliding-window listwise ranking",
         "Qin et al., NAACL 2024: pairwise ranking prompting (PRP) "
             .. "with bidirectional position-bias cancellation",
     },
-    -- TODO: populate with alc_eval results
-    -- token_reduction = "<measured>",
-    -- pass_rate      = <measured>,
-    -- tested_on      = "<scenario name>",
-    -- models         = { "<actual model id>" },
-    -- n_trials       = <actual>,
+    e2e_runs = {
+        {
+            scenario = "Country population 2026 ranking (N=8, single case)",
+            harness = "agent-block scripts/e2e/recipe_ranking_funnel.lua",
+            model = "claude-haiku-4-5-20251001",
+            run_id = "2026-04-15_021239",
+            opts = { top_k1 = 3, window_size = 20 },
+            funnel_shape = { 8, 3, 3 },
+            top_1 = "India",
+            top_1_correct = true,
+            total_llm_calls = 7,
+            naive_baseline_calls = 56,  -- N*(N-1) allpair bidirectional
+            savings_percent = 87,
+            graders_passed = 7,
+            graders_total = 8,  -- mentions_china failed (report-format issue, not ranking)
+        },
+    },
+    -- TODO: larger N scenarios; multi-trial pass_rate for top-1 and top-K
 }
 
 -- ─── Internal helpers ───
