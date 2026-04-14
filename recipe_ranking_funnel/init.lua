@@ -122,6 +122,16 @@ M.caveats = {
         .. "get Stage 1 → Stage 3 only (funnel_shape = {N, top_k1, top_k1})"
         .. " → pass ctx.top_k2 explicitly smaller than top_k1, or raise N "
         .. "above 15, to force Stage 2 to fire",
+    "pairwise_rank.compare_pair fails LOUDLY (error() raised) when a "
+        .. "single LLM verdict cannot be parsed — this is intentional "
+        .. "(silent tie would systematically bias Copeland aggregation). "
+        .. "Consequence for this recipe: a single unparseable verdict "
+        .. "aborts Stage 3 (main path) or the whole N<6 bypass. There is "
+        .. "no per-pair retry / fallback. Mitigation: keep judge_gen_tokens "
+        .. "small (default 20) and the pairwise prompt strict so LLMs "
+        .. "reliably emit 'Verdict: A/B/tie'; on production workloads wrap "
+        .. "the recipe call in pcall if robust continuation matters more "
+        .. "than bias-free ranking.",
 }
 
 --- Empirical verification results.
@@ -310,6 +320,9 @@ function M.run(ctx)
             naive_baseline_calls = naive_calls,
             naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
             savings_percent = savings_pct,
+            -- Bypass path has no Stage 2 scoring, so nothing to flag.
+            needs_attention = false,
+            attention_reasons = {},
             -- Emit 3 stages so consumers can safely index stages[1..3]
             -- regardless of the bypass path. Stages 1 and 2 are marked
             -- skipped; stage 3 carries the direct-pairwise result.
@@ -588,6 +601,25 @@ function M.run(ctx)
         total_llm_calls, naive_calls, savings_pct
     ))
 
+    -- Escalate stage-internal warnings to a single top-level flag so callers
+    -- don't have to walk `stages[]`. Currently tracks Stage 2 scoring parse
+    -- failures: if half or more of the scoring calls returned an unparseable
+    -- score, the Stage 3 ordering effectively collapses to the Stage 1
+    -- ordinal ranking (all survivors tie at the 5.0 default) — the recipe
+    -- still returns a ranking, but its discriminative power is gone.
+    local attention_reasons = {}
+    local s2 = stages[2]
+    if s2 and s2.parse_failures and s2.parse_failures > 0 then
+        local scored_n = s2.input_count or 0
+        if scored_n > 0 and s2.parse_failures >= math.ceil(scored_n / 2) then
+            attention_reasons[#attention_reasons + 1] = string.format(
+                "stage_2_parse_failure_rate_high:%d/%d",
+                s2.parse_failures, scored_n
+            )
+        end
+    end
+    local needs_attention = #attention_reasons > 0
+
     ctx.result = {
         ranking = final_ranking,
         best = final_ranking[1].text,
@@ -597,6 +629,8 @@ function M.run(ctx)
         naive_baseline_calls = naive_calls,
         naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
         savings_percent = savings_pct,
+        needs_attention = needs_attention,
+        attention_reasons = attention_reasons,
         stages = stages,
         -- funnel_shape = [input-to-Stage-1, input-to-Stage-2, input-to-Stage-3]
         --              = [N, survivors-after-Stage-1, survivors-after-Stage-2]

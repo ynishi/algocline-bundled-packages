@@ -119,6 +119,17 @@ M.caveats = {
         .. "rarely triggers; treat the 'safe' signal as weak evidence only. "
         .. "For a true inverse-U test, call sc.run at multiple N and feed "
         .. "the resulting accuracy curve to inverse_u.detect directly.",
+    "ctx.p_estimate is the USER'S ESTIMATE of per-agent accuracy and is "
+        .. "trusted as-is. Default 0.7 is applied silently when omitted, "
+        .. "which means a caller who does not pass p_estimate on a task "
+        .. "where the real p < 0.5 will NOT trigger the Anti-Jury abort — "
+        .. "the recipe will happily run a panel that provably degrades "
+        .. "with N. The Anti-Jury gate only protects callers who pass a "
+        .. "truthful p_estimate"
+        .. " → always set ctx.p_estimate explicitly for new task domains. "
+        .. "When unsure, run a small pilot (e.g. sc.run with n=1 over a "
+        .. "labeled sample) and feed condorcet.estimate_p() into p_estimate "
+        .. "before invoking this recipe.",
 }
 
 --- Empirical verification results.
@@ -575,21 +586,26 @@ function M.run(ctx)
             or "UNSTABLE (prefix majority declined from its peak)"
     )
 
+    -- We want calibrate's confidence reading only — not its retry escalation.
+    -- calibrate.run with fallback="retry" generates a retry_answer but does
+    -- NOT reassess confidence; the recipe uses only result.confidence and
+    -- discards result.answer, so escalation is a pure 1-call waste here.
+    -- Force threshold=0 so calibrate always takes the direct (non-escalated)
+    -- 1-call path, and let the recipe apply its own conf_threshold gate
+    -- below via needs_investigation.
     local cal_result = calibrate.run({
         task = cal_task,
-        threshold = conf_threshold,
-        fallback = "retry",  -- retry only — don't spawn another panel
+        threshold = 0,
+        fallback = "retry",  -- never reached with threshold=0; kept for safety
         gen_tokens = 300,
     })
 
     local confidence = cal_result.result.confidence or 0.5
-    -- Prefer calibrate's reported call count; fall back to retry-mode estimate
-    -- (escalated → 2 calls, direct → 1 call) for backward compatibility with
-    -- older calibrate versions that didn't emit total_llm_calls.
-    local cal_calls = cal_result.result.total_llm_calls
-        or (cal_result.result.escalated and 2 or 1)
+    local cal_calls = cal_result.result.total_llm_calls or 1
     total_llm_calls = total_llm_calls + cal_calls
 
+    -- Recipe-level gate. Independent from calibrate.escalated, which is
+    -- always false here (we pinned calibrate's internal threshold to 0).
     local needs_investigation = confidence < conf_threshold
 
     stages[4] = {
@@ -597,7 +613,7 @@ function M.run(ctx)
         confidence = confidence,
         threshold = conf_threshold,
         needs_investigation = needs_investigation,
-        escalated = cal_result.result.escalated or false,
+        escalated = false,  -- forced by threshold=0 above
         llm_calls = cal_calls,
     }
 
