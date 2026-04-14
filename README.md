@@ -215,6 +215,37 @@ End-to-end strategies that compose multiple packages into a single `run(ctx)` en
 | **[recipe_safe_panel](recipe_safe_panel/)** | Safety-first panel QA. Condorcet-sized panel → self-consistency → optional inverse-U scaling check → calibrated confidence. Anti-Jury / needs_investigation safety gates. math_basic pass_rate 1.0 (7/7) at 8 LLM calls/case (max_n=3) | condorcet, sc, inverse_u, calibrate |
 | **[recipe_ranking_funnel](recipe_ranking_funnel/)** | Listwise → pairwise ranking funnel. 8→3→3 funnel shape on population ranking yielded 7 LLM calls vs naive all-pairs 56 (87% savings), top-1 correct | listwise_rank, pairwise_rank |
 
+#### Current limitations — recipe test coverage
+
+Recipes currently have **three** tiers of verification. Not every recipe has
+every tier; see the matrix below.
+
+| Tier | Runner | Purpose | Location |
+|---|---|---|---|
+| Unit tests (mocked `_G.alc`) | `mlua-probe` / `just test` | Stage transitions, index mapping, API contracts, cost accounting | `tests/test_recipe_*.lua` |
+| E2E (single-case, live LLM) | `agent-block` / `just e2e <name>` | ReAct-loop + MCP + real LLM on one prompt, with custom graders | `scripts/e2e/<recipe>.lua` |
+| Scenario eval (multi-case pass_rate) | `alc_eval` via `agent-block` | pass@1 over an installed scenario (e.g. `math_basic`) | `scripts/e2e/<recipe>_eval.lua` |
+
+Coverage at time of writing:
+
+| Recipe | Unit | E2E (single-case) | Scenario eval (multi-case) |
+|---|---|---|---|
+| recipe_safe_panel | ✓ (22 tests) | ✓ (`scripts/e2e/recipe_safe_panel.lua`) | ✓ (`recipe_safe_panel_eval.lua`, math_basic 7/7) |
+| recipe_ranking_funnel | ✓ (19 tests) | ✓ (`scripts/e2e/recipe_ranking_funnel.lua`) | ✗ — **not yet authored** |
+
+Gaps:
+
+- **recipe_ranking_funnel has no scenario-eval harness** (no
+  `recipe_ranking_funnel_eval.lua`). The existing scenarios under
+  `~/.algocline/scenarios/` (`factual_basic`, `reasoning_basic`, `math_basic`,
+  …) are QA-style (single answer), not ranking-style (population → ordering),
+  so a dedicated ranking scenario is a prerequisite.
+- `M.verified.scenarios` in `recipe_ranking_funnel/init.lua` therefore reports
+  the single-case E2E only; no multi-case pass_rate is available for this
+  recipe.
+- Scenario-eval runs are non-deterministic and billable; treat each verified
+  number as one sample, not a tight confidence interval.
+
 ## Usage
 
 ```lua
