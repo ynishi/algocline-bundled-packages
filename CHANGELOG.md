@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `recipe_safe_panel_eval.lua`: multi-case `alc_eval` sweep (math_basic, 7 cases) with recipe-level budget caps (`max_n=3`, `scaling_check=false`)
 - **justfile**: `just e2e <name>` / `just e2e-all` with `allow-agent` group for task-mcp exposure.
 - **tests/test_recipe_ranking_funnel.lua**, **tests/test_recipe_safe_panel.lua**: structural + M.verified validation tests.
+- **`calibrate.assess(ctx)`**: 1-LLM-call primitive exposing calibrate's Phase 1 (answer + self-assessed confidence) without threshold/escalation logic. `M.run` now delegates Phase 1 to `assess`, and `recipe_safe_panel` consumes it directly (replacing the earlier `calibrate.run({threshold=0, fallback="retry"})` workaround).
 
 ### Changed
 
