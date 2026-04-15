@@ -175,6 +175,31 @@ describe("recipe_ranking_funnel._internal.parse_scoring_response", function()
         expect(math.abs(s - 5.0) < 1e-9).to.equal(true)
     end)
 
+    it("AVERAGE line case-insensitive (Average / average)", function()
+        -- Previously the matcher was uppercase-only; LLMs that echo
+        -- the field as "Average: 8" would fall through to per-axis
+        -- parsing. Now both casings should match.
+        expect(parse("Average: 8.0", axes)).to.equal(8.0)
+        expect(parse("average: 7.5", axes)).to.equal(7.5)
+    end)
+
+    it("per-axis case-insensitive (Correctness / CORRECTNESS)", function()
+        -- LLMs often capitalize axis names even when the prompt asks
+        -- lowercase. Without case-insensitive matching, per-axis
+        -- fallback silently produces 0 parseable scores → nil → the
+        -- caller's 5.0 default for every candidate, collapsing Stage 2
+        -- discriminative power.
+        local raw = "Correctness: 9\nCompleteness: 7\nRelevance: 8"
+        local s = parse(raw, axes)
+        -- (9+7+8)/3 = 8.0
+        expect(math.abs(s - 8.0) < 1e-9).to.equal(true)
+
+        local raw2 = "CORRECTNESS: 6\nCOMPLETENESS: 4\nRELEVANCE: 2"
+        local s2 = parse(raw2, axes)
+        -- (6+4+2)/3 = 4.0
+        expect(math.abs(s2 - 4.0) < 1e-9).to.equal(true)
+    end)
+
     it("returns nil on fully unparseable input", function()
         local raw = "I think the answer is pretty good."
         local s = parse(raw, axes)

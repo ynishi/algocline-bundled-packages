@@ -55,7 +55,12 @@
 ---   return safe_panel.run(ctx)
 ---
 --- ctx.task (required): The problem to solve
---- ctx.p_estimate: Estimated per-agent accuracy (default: 0.7)
+--- ctx.p_estimate (required): Estimated per-agent accuracy in (0, 1].
+---     REQUIRED with no default — silent fallback to 0.7 would bypass
+---     the Anti-Jury gate on tasks where the real p < 0.5. Estimate via
+---     a pilot (sc.run at n=1 over a labeled sample, then
+---     condorcet.estimate_p) or pass an explicit value based on task
+---     difficulty.
 --- ctx.target_accuracy: Target majority-vote accuracy (default: 0.95)
 --- ctx.max_n: Maximum panel size (default: 15)
 --- ctx.confidence_threshold: Calibrate gate threshold (default: 0.7)
@@ -120,16 +125,15 @@ M.caveats = {
         .. "For a true inverse-U test, call sc.run at multiple N and feed "
         .. "the resulting accuracy curve to inverse_u.detect directly.",
     "ctx.p_estimate is the USER'S ESTIMATE of per-agent accuracy and is "
-        .. "trusted as-is. Default 0.7 is applied silently when omitted, "
-        .. "which means a caller who does not pass p_estimate on a task "
-        .. "where the real p < 0.5 will NOT trigger the Anti-Jury abort — "
-        .. "the recipe will happily run a panel that provably degrades "
-        .. "with N. The Anti-Jury gate only protects callers who pass a "
-        .. "truthful p_estimate"
-        .. " → always set ctx.p_estimate explicitly for new task domains. "
-        .. "When unsure, run a small pilot (e.g. sc.run with n=1 over a "
-        .. "labeled sample) and feed condorcet.estimate_p() into p_estimate "
-        .. "before invoking this recipe.",
+        .. "trusted as-is. It is REQUIRED (no silent default): omitting "
+        .. "it raises an error. This was a deliberate break from the "
+        .. "initial 0.7 default — that default silently bypassed the "
+        .. "Anti-Jury abort on tasks where the real p < 0.5, defeating "
+        .. "the main safety guarantee of this recipe"
+        .. " → always set ctx.p_estimate explicitly. When unsure, run a "
+        .. "small pilot (e.g. sc.run with n=1 over a labeled sample) and "
+        .. "feed condorcet.estimate_p() into p_estimate before invoking "
+        .. "this recipe.",
     "Stage 4 (calibrate) is invoked with threshold=0 on every non-abort "
         .. "run, pinning calibrate to its direct 1-call phase. The recipe "
         .. "consumes only result.confidence and applies its own "
@@ -321,7 +325,32 @@ end
 ---@return AlcCtx
 function M.run(ctx)
     local task = ctx.task or error("recipe_safe_panel: ctx.task is required")
-    local p_est = ctx.p_estimate or 0.7
+
+    -- p_estimate is REQUIRED. A silent default (previously 0.7) would let
+    -- a caller who forgot to pass it run a panel on a task where the real
+    -- p < 0.5, silently bypassing the Anti-Jury gate — the exact failure
+    -- mode this recipe is designed to prevent. Force the caller to commit
+    -- to a number.
+    local p_est = ctx.p_estimate
+    if p_est == nil then
+        error(
+            "recipe_safe_panel: ctx.p_estimate is REQUIRED (no default). "
+                .. "A silent fallback would bypass the Anti-Jury gate on "
+                .. "tasks where the real p < 0.5. Run a small pilot "
+                .. "(sc.run at n=1 over a labeled sample) and feed "
+                .. "condorcet.estimate_p() in, or pass an explicit value "
+                .. "based on task difficulty.",
+            2
+        )
+    end
+    if type(p_est) ~= "number" or p_est <= 0 or p_est > 1 then
+        error(string.format(
+            "recipe_safe_panel: ctx.p_estimate must be a number in (0, 1], "
+                .. "got %s",
+            tostring(p_est)
+        ), 2)
+    end
+
     local target = ctx.target_accuracy or 0.95
     local max_n = ctx.max_n or 15
     local conf_threshold = ctx.confidence_threshold or 0.7
@@ -590,21 +619,36 @@ function M.run(ctx)
                     peak_info.consecutive_drops or 0
                 ))
             end
+
+            stages[3] = {
+                name = "vote_prefix_stability",
+                signal_type = "single_run_prefix_proxy",
+                series_length = #series,
+                is_safe = scaling_safe,
+                peak_idx = peak_info and peak_info.peak_idx,
+                consecutive_drops = peak_info and peak_info.consecutive_drops,
+            }
         else
             alc.log("info",
                 "recipe_safe_panel: Stage 3 — insufficient data points "
                     .. "for prefix stability analysis"
             )
+            -- Unify with the outer-else skip branch: when the series is
+            -- too short for inverse_u.detect, Stage 3 is effectively
+            -- skipped. Using the `_skipped` suffix lets consumers test
+            -- `stages[3].name:find("skipped")` without also inspecting
+            -- `series_length`.
+            stages[3] = {
+                name = "vote_prefix_stability_skipped",
+                signal_type = "single_run_prefix_proxy",
+                reason = string.format(
+                    "insufficient data points (need series length >= 3, got %d)",
+                    #series
+                ),
+                series_length = #series,
+                is_safe = true,
+            }
         end
-
-        stages[3] = {
-            name = "vote_prefix_stability",
-            signal_type = "single_run_prefix_proxy",
-            series_length = #series,
-            is_safe = scaling_safe,
-            peak_idx = peak_info and peak_info.peak_idx,
-            consecutive_drops = peak_info and peak_info.consecutive_drops,
-        }
     else
         local skip_reason
         if not do_scaling then

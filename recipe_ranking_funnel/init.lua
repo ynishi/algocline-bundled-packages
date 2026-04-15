@@ -236,20 +236,29 @@ end
 
 --- Parse multi-axis score from LLM response.
 --- Returns the AVERAGE score, or nil on parse failure.
+--- Matching is case-insensitive on both the AVERAGE line and per-axis lines:
+--- LLMs frequently echo axis names with different casing ("Correctness: 8")
+--- than the prompt template ("correctness: <number>"). Without lowercasing,
+--- per-axis fallback silently fails and every candidate collapses to the
+--- 5.0 default, destroying Stage 2's discriminative power.
 local function parse_scoring_response(raw, axes)
-    -- Try AVERAGE line first
-    local avg = raw:match("AVERAGE:%s*([%d%.]+)")
+    local raw_lc = raw:lower()
+
+    -- Try AVERAGE line first (case-insensitive).
+    local avg = raw_lc:match("average:%s*([%d%.]+)")
     if avg then
         local n = tonumber(avg)
         if n and n >= 0 and n <= 10 then return n end
     end
 
-    -- Fallback: parse individual axis scores and compute average
+    -- Fallback: parse individual axis scores and compute average.
+    -- Lowercase both the haystack and the axis name so "Correctness: 8"
+    -- matches an axis named "correctness".
     local total = 0
     local count = 0
     for _, ax in ipairs(axes) do
-        local pattern = ax.name .. ":%s*([%d%.]+)"
-        local m = raw:match(pattern)
+        local pattern = ax.name:lower() .. ":%s*([%d%.]+)"
+        local m = raw_lc:match(pattern)
         if m then
             local n = tonumber(m)
             if n and n >= 0 and n <= 10 then
@@ -343,7 +352,12 @@ function M.run(ctx)
             bypass_reason = "N < 6",
             total_llm_calls = pr.result.total_llm_calls,
             naive_baseline_calls = naive_calls,
-            naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
+            -- Distinct from the non-bypass kind because the bypass path is
+            -- NOT a counterfactual — it IS the "naive" allpair run. The
+            -- `bypass_` prefix lets consumers pattern-match the distinction
+            -- without re-reading `funnel_bypassed`. savings_percent is nil
+            -- (not 0) to signal "savings is n/a here", not "zero saved".
+            naive_baseline_kind = "bypass_direct_pairwise_allpair_bidirectional",
             savings_percent = savings_pct,
             -- Bypass path has no Stage 2 scoring, so nothing to flag.
             needs_attention = false,
@@ -618,6 +632,13 @@ function M.run(ctx)
     -- baseline is single-pass pairwise (N*(N-1)/2) or listwise-only
     -- (N/window_size), the savings number below over-reports.
     local naive_calls = N * (N - 1)
+    -- savings_pct becomes negative if total_llm_calls > naive_calls. Under
+    -- the current funnel design this is unreachable for N >= 6: Stage 3
+    -- runs allpair on top_k2 <= 5 items (default), while the naive baseline
+    -- allpairs all N, so the funnel is strictly cheaper. No defensive clamp
+    -- is applied — an unreachable guard would only add branch noise. If a
+    -- future change widens top_k2 beyond N*(N-1)/(N<6-cap) this may turn
+    -- negative; treat a negative savings_pct as a bug signal, not a value.
     local savings_pct = math.floor((1 - total_llm_calls / naive_calls) * 100)
 
     alc.log("info", string.format(

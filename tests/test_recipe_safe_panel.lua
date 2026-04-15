@@ -173,9 +173,35 @@ describe("recipe_safe_panel.run", function()
     end)
 
     it("errors on max_n < 3", function()
-        local ok, err = pcall(safe_panel.run, { task = "t", max_n = 2 })
+        local ok, err = pcall(safe_panel.run, { task = "t", max_n = 2, p_estimate = 0.7 })
         expect(ok).to.equal(false)
         expect(err:find("max_n")).to.exist()
+    end)
+
+    it("errors on missing p_estimate (no silent default)", function()
+        -- Previously ctx.p_estimate defaulted to 0.7, which silently
+        -- bypassed the Anti-Jury gate on tasks where the real p < 0.5.
+        -- The default has been removed; p_estimate is now REQUIRED.
+        local ok, err = pcall(safe_panel.run, { task = "t" })
+        expect(ok).to.equal(false)
+        expect(err:find("p_estimate")).to.exist()
+    end)
+
+    it("errors on non-numeric p_estimate", function()
+        local ok, err = pcall(safe_panel.run, {
+            task = "t", p_estimate = "high"
+        })
+        expect(ok).to.equal(false)
+        expect(err:find("p_estimate")).to.exist()
+    end)
+
+    it("errors on p_estimate out of (0, 1]", function()
+        local ok1 = pcall(safe_panel.run, { task = "t", p_estimate = 0 })
+        expect(ok1).to.equal(false)
+        local ok2 = pcall(safe_panel.run, { task = "t", p_estimate = 1.5 })
+        expect(ok2).to.equal(false)
+        local ok3 = pcall(safe_panel.run, { task = "t", p_estimate = -0.1 })
+        expect(ok3).to.equal(false)
     end)
 end)
 
