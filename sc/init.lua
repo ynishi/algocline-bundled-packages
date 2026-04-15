@@ -174,4 +174,10 @@ function M.run(ctx)
     return ctx
 end
 
+-- ─── Test hooks ───
+M._internal = {
+    clean_answer = clean_answer,
+    normalize_for_vote = normalize_for_vote,
+}
+
 return M

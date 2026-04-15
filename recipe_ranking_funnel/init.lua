@@ -159,6 +159,30 @@ M.verified = {
             graders_passed = 7,
             graders_total = 8,  -- mentions_china failed (report-format issue, not ranking)
         },
+        {
+            scenario = "N<6 bypass: TIOBE 2026 ranking (N=4, direct pairwise)",
+            harness = "agent-block scripts/e2e/recipe_ranking_funnel_bypass.lua",
+            model = "claude-haiku-4-5-20251001",
+            run_id = "2026-04-15_091159",
+            opts = { candidates_n = 4, gen_tokens = 200 },
+            funnel_bypassed = true,
+            bypass_reason = "N < 6",
+            funnel_shape = { 4, 4, 4 },  -- all 3 stages receive N=4 (skipped stages pass-through)
+            top_1 = "Python",
+            top_1_correct = true,
+            total_llm_calls = 12,  -- N*(N-1) = 4*3 bidirectional pairwise
+            naive_baseline_calls = 12,
+            savings_percent = nil,  -- NOT 0 — bypass makes savings undefined (P6 fix)
+            graders_passed = 7,
+            graders_total = 8,  -- python_top_ranked regex missed markdown-table "🥇 1 | Python"
+            verifies = {
+                "funnel_bypassed = true",
+                "bypass_reason = 'N < 6'",
+                "savings_percent = nil (P6 fix, not 0)",
+                "stages[1..3] all emitted (listwise_skipped, scoring_skipped, pairwise_direct)",
+                "ranking shape matches main path",
+            },
+        },
     },
     -- TODO: larger N scenarios; multi-trial pass_rate for top-1 and top-K
 }
@@ -236,8 +260,10 @@ local function parse_scoring_response(raw, axes)
     end
     if count > 0 then return total / count end
 
-    -- Last resort: use alc.parse_score if available
-    if alc.parse_score then
+    -- Last resort: use alc.parse_score if available. The `alc and ...`
+    -- guard keeps this helper callable from pure unit tests where the
+    -- alc global is not injected.
+    if alc and alc.parse_score then
         local n = alc.parse_score(raw)
         if n and n >= 0 and n <= 10 then return n end
     end
@@ -286,14 +312,13 @@ function M.run(ctx)
         })
 
         -- Same baseline formula as the non-bypass path; for N<6 the funnel
-        -- short-circuits, so the actual calls == the naive-baseline calls.
+        -- short-circuits and actually RUNS the naive baseline (direct
+        -- allpair pairwise). Savings is therefore not defined — surface
+        -- nil instead of 0, so consumers can distinguish "funnel saved
+        -- nothing" from "bypass means savings is n/a". funnel_bypassed
+        -- = true already signals the bypass.
         local naive_calls = N * (N - 1)
-        local savings_pct = 0
-        if naive_calls > 0 then
-            savings_pct = math.floor(
-                (1 - pr.result.total_llm_calls / naive_calls) * 100
-            )
-        end
+        local savings_pct = nil
 
         -- Normalize pairwise_rank's ranked shape ({rank, index, score, text})
         -- to the non-bypass shape ({rank, text, original_index, pairwise_score})
@@ -639,5 +664,14 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- ─── Test hooks ───
+-- Expose pure helpers for unit testing. Not part of the public API;
+-- prefix = `_internal` is the convention used by other recipe packages.
+M._internal = {
+    DEFAULT_SCORING_AXES = DEFAULT_SCORING_AXES,
+    build_scoring_prompt = build_scoring_prompt,
+    parse_scoring_response = parse_scoring_response,
+}
 
 return M

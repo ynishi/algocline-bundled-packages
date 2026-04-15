@@ -130,6 +130,22 @@ M.caveats = {
         .. "When unsure, run a small pilot (e.g. sc.run with n=1 over a "
         .. "labeled sample) and feed condorcet.estimate_p() into p_estimate "
         .. "before invoking this recipe.",
+    "Stage 4 (calibrate) is invoked with threshold=0 on every non-abort "
+        .. "run, pinning calibrate to its direct 1-call phase. The recipe "
+        .. "consumes only result.confidence and applies its own "
+        .. "conf_threshold gate via needs_investigation; escalated retry "
+        .. "would waste a call without reassessing confidence. Consequence: "
+        .. "every non-abort run pays a fixed +1 LLM call on top of sc's "
+        .. "2n+1. Budget for the recipe is therefore 2n+2 LLM calls in "
+        .. "steady state (plus optional Stage 3 which is call-free)."
+        .. " → when sizing cost caps include the +1 calibrate call; when "
+        .. "abort-gated, cost is 0 LLM calls (Stage 1 is pure math).",
+    "p_estimate = 0.5 is treated like Anti-Jury: the recipe aborts with "
+        .. "aborted=true and anti_jury=false (distinguished as coin-flip). "
+        .. "At p=0.5, P(Maj_n) = 0.5 for every odd n, so a panel adds no "
+        .. "signal"
+        .. " → improve agent quality before using any voting strategy; do "
+        .. "not pass p_estimate=0.5 hoping the panel will rescue it.",
 }
 
 --- Empirical verification results.
@@ -179,6 +195,32 @@ M.verified = {
             total_llm_calls = 8,
             graders_passed = 6,
             graders_total = 6,
+        },
+        {
+            scenario = "Anti-Jury abort (p_estimate=0.3 → refuse panel)",
+            harness = "agent-block scripts/e2e/recipe_safe_panel_anti_jury.lua",
+            model = "claude-haiku-4-5-20251001",
+            run_id = "2026-04-15_091138",
+            opts = {
+                p_estimate = 0.3, target_accuracy = 0.95,
+                max_n = 7, confidence_threshold = 0.6, scaling_check = false,
+            },
+            aborted = true,
+            anti_jury = true,
+            panel_size = 0,
+            answer = nil,  -- no panel sampled
+            total_llm_calls = 0,  -- Stage 1 pure-math abort
+            abort_reason_excerpt = "Anti-Jury: p=0.30 < 0.5",
+            agent_turns = 2,
+            graders_passed = 8,
+            graders_total = 8,
+            verifies = {
+                "aborted/anti_jury flags set",
+                "zero LLM calls (no panel sampled)",
+                "abort_reason surfaces p value",
+                "answer = nil",
+                "result shape unified with main path",
+            },
         },
     },
     alc_eval_runs = {
@@ -311,20 +353,22 @@ function M.run(ctx)
 
     local condorcet = require("condorcet")
 
-    -- Caveat: Anti-Jury check
-    if condorcet.is_anti_jury(p_est) then
+    -- Caveat: Anti-Jury / coin-flip check.
+    -- is_anti_jury returns true only for p < 0.5. We additionally treat
+    -- p == 0.5 as abort-worthy: Condorcet at p = 0.5 gives majority = 0.5
+    -- exactly, regardless of n, so adding agents is pure waste. Without
+    -- this gate the recipe would fall through to optimal_n (which returns
+    -- nil for p ≤ 0.5) → max_n fallback → silently run a useless panel.
+    if p_est <= 0.5 then
         alc.log("error", string.format(
-            "recipe_safe_panel: ABORT — Anti-Jury detected (p=%.2f < 0.5). "
-                .. "Majority vote will DEGRADE accuracy with more agents.",
+            "recipe_safe_panel: ABORT — p=%.2f ≤ 0.5. Majority vote cannot "
+                .. "improve accuracy (p<0.5 degrades, p=0.5 stays at 0.5).",
             p_est
         ))
 
-        ctx.result = {
-            answer = nil,
-            confidence = 0,
-            panel_size = 0,
-            anti_jury = true,
-            aborted = true,
+        local is_anti = p_est < 0.5
+        local abort_reason
+        if is_anti then
             abort_reason = string.format(
                 "Anti-Jury: p=%.2f < 0.5. Condorcet Jury Theorem guarantees "
                     .. "that majority vote accuracy → 0 as N → ∞. "
@@ -333,11 +377,42 @@ function M.run(ctx)
                     .. "(2) use expert routing instead of voting, "
                     .. "(3) use pairwise_rank for comparison-based selection.",
                 p_est
-            ),
+            )
+        else
+            abort_reason = string.format(
+                "Coin-flip: p=%.2f = 0.5. Majority vote accuracy is 0.5 for "
+                    .. "every n — adding agents does nothing. Improve agent "
+                    .. "quality before using any voting-based strategy.",
+                p_est
+            )
+        end
+
+        -- Emit the SAME result shape as the main path so consumers can
+        -- read any field without branching on `aborted`. Voting-signal
+        -- fields are zero/empty (no panel was run); safety fields reflect
+        -- the abort.
+        ctx.result = {
+            answer = nil,
+            confidence = 0,
+            panel_size = 0,
+            plurality_fraction = 0,
+            margin_gap = 0,
+            vote_counts = {},
+            n_distinct_answers = 0,
+            expected_accuracy = 0,
+            target_met = false,
+            is_safe = false,
+            anti_jury = is_anti,
+            aborted = true,
+            needs_investigation = true,
+            unanimous = false,
+            total_llm_calls = 0,
+            abort_reason = abort_reason,
             stages = { {
-                name = "condorcet_anti_jury",
+                name = is_anti and "condorcet_anti_jury"
+                    or "condorcet_coin_flip",
                 p_estimate = p_est,
-                is_anti_jury = true,
+                is_anti_jury = is_anti,
             } },
         }
         return ctx
@@ -658,5 +733,12 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- ─── Test hooks ───
+-- Expose pure helpers for unit testing. Not part of the public API.
+M._internal = {
+    analyze_votes = analyze_votes,
+    build_accuracy_proxy = build_accuracy_proxy,
+}
 
 return M

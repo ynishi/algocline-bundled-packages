@@ -138,3 +138,86 @@ describe("recipe_ranking_funnel.run", function()
         expect(ok).to.equal(false)
     end)
 end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Internal helpers (pure, LLM-free) — unit tests
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("recipe_ranking_funnel._internal.parse_scoring_response", function()
+    local parse = funnel._internal.parse_scoring_response
+    local axes = funnel._internal.DEFAULT_SCORING_AXES
+
+    it("parses AVERAGE line when present", function()
+        local raw = "correctness: 8\ncompleteness: 7\nrelevance: 9\nAVERAGE: 8.0"
+        local s = parse(raw, axes)
+        expect(s).to.equal(8.0)
+    end)
+
+    it("rejects AVERAGE out of range (>10)", function()
+        local raw = "AVERAGE: 99"
+        -- falls back to per-axis; no per-axis here, no alc.parse_score:
+        -- should return nil rather than accepting 99.
+        local s = parse(raw, axes)
+        expect(s == nil or (s >= 0 and s <= 10)).to.equal(true)
+    end)
+
+    it("computes mean from per-axis scores when AVERAGE missing", function()
+        local raw = "correctness: 6\ncompleteness: 8\nrelevance: 10"
+        local s = parse(raw, axes)
+        -- (6+8+10)/3 = 8.0
+        expect(math.abs(s - 8.0) < 1e-9).to.equal(true)
+    end)
+
+    it("partial per-axis: mean over what is parseable", function()
+        local raw = "correctness: 4\ncompleteness: 6"  -- relevance missing
+        local s = parse(raw, axes)
+        -- (4+6)/2 = 5.0
+        expect(math.abs(s - 5.0) < 1e-9).to.equal(true)
+    end)
+
+    it("returns nil on fully unparseable input", function()
+        local raw = "I think the answer is pretty good."
+        local s = parse(raw, axes)
+        -- no AVERAGE, no parseable per-axis scores, no alc.parse_score
+        -- in this test env → nil (the pcall-guarded fallback is safe).
+        local ok = (s == nil)
+        if not ok then
+            -- alc.parse_score may have produced a value; accept only if
+            -- within [0, 10].
+            ok = (type(s) == "number" and s >= 0 and s <= 10)
+        end
+        expect(ok).to.equal(true)
+    end)
+end)
+
+describe("recipe_ranking_funnel._internal.build_scoring_prompt", function()
+    local build = funnel._internal.build_scoring_prompt
+    local axes = funnel._internal.DEFAULT_SCORING_AXES
+
+    it("includes task, candidate, and all axis names", function()
+        local p = build("rank by quality", "widget X", axes)
+        expect(p:find("rank by quality", 1, true)).to.exist()
+        expect(p:find("widget X", 1, true)).to.exist()
+        for _, ax in ipairs(axes) do
+            expect(p:find(ax.name, 1, true)).to.exist()
+        end
+    end)
+
+    it("asks for AVERAGE line", function()
+        local p = build("t", "c", axes)
+        expect(p:find("AVERAGE", 1, true)).to.exist()
+    end)
+end)
+
+describe("recipe_ranking_funnel._internal.DEFAULT_SCORING_AXES", function()
+    it("has exactly 3 axes", function()
+        expect(#funnel._internal.DEFAULT_SCORING_AXES).to.equal(3)
+    end)
+
+    it("each axis has name and description", function()
+        for _, ax in ipairs(funnel._internal.DEFAULT_SCORING_AXES) do
+            expect(type(ax.name)).to.equal("string")
+            expect(type(ax.description)).to.equal("string")
+        end
+    end)
+end)

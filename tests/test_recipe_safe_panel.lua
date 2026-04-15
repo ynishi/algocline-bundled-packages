@@ -166,4 +166,108 @@ describe("recipe_safe_panel.run", function()
         expect(ok).to.equal(false)
         expect(err:find("task")).to.exist()
     end)
+
+    it("errors on non-numeric max_n", function()
+        local ok = pcall(safe_panel.run, { task = "t", max_n = "big" })
+        expect(ok).to.equal(false)
+    end)
+
+    it("errors on max_n < 3", function()
+        local ok, err = pcall(safe_panel.run, { task = "t", max_n = 2 })
+        expect(ok).to.equal(false)
+        expect(err:find("max_n")).to.exist()
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Internal helpers (pure, LLM-free) — unit tests
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("recipe_safe_panel._internal.analyze_votes", function()
+    local analyze = safe_panel._internal.analyze_votes
+
+    it("unanimous vote: plurality=1, gap=1, n_distinct=1", function()
+        local r = analyze({ ["Tokyo"] = 5 }, 5)
+        expect(r.plurality_fraction).to.equal(1.0)
+        expect(r.margin_gap).to.equal(1.0)
+        expect(r.n_distinct).to.equal(1)
+        expect(r.unanimous).to.equal(true)
+    end)
+
+    it("clear majority: 3-2 → plurality=0.6, gap=0.2", function()
+        local r = analyze({ a = 3, b = 2 }, 5)
+        expect(math.abs(r.plurality_fraction - 0.6) < 1e-9).to.equal(true)
+        expect(math.abs(r.margin_gap - 0.2) < 1e-9).to.equal(true)
+        expect(r.n_distinct).to.equal(2)
+        expect(r.unanimous).to.equal(false)
+    end)
+
+    it("top tie: margin_gap = 0", function()
+        local r = analyze({ a = 3, b = 3, c = 1 }, 7)
+        -- plurality_fraction is top share (3/7), NOT (6/7).
+        expect(math.abs(r.plurality_fraction - 3/7) < 1e-9).to.equal(true)
+        expect(r.margin_gap).to.equal(0)
+    end)
+
+    it("all distinct: max=1, gap=0", function()
+        local r = analyze({ a = 1, b = 1, c = 1 }, 3)
+        expect(r.max_count).to.equal(1)
+        expect(r.runner_up_count).to.equal(1)
+        expect(r.margin_gap).to.equal(0)
+        expect(r.n_distinct).to.equal(3)
+    end)
+
+    it("unanimous has norm_entropy = 0", function()
+        local r = analyze({ a = 3 }, 3)
+        expect(r.norm_entropy).to.equal(0)
+    end)
+
+    it("all-distinct has norm_entropy = 1 (max uncertainty)", function()
+        local r = analyze({ a = 1, b = 1, c = 1 }, 3)
+        expect(math.abs(r.norm_entropy - 1) < 1e-9).to.equal(true)
+    end)
+end)
+
+describe("recipe_safe_panel._internal.build_accuracy_proxy", function()
+    local build = safe_panel._internal.build_accuracy_proxy
+
+    it("empty series for n=3 votes (only i=3 sampled)", function()
+        -- At i=3 we sample; any i < 3 is skipped, and at i=3 match-ratio
+        -- is 2/3 if all three match.
+        local s = build({ "a", "a", "a" }, "a")
+        expect(#s).to.equal(1)
+        expect(math.abs(s[1] - 1.0) < 1e-9).to.equal(true)
+    end)
+
+    it("n=5 votes → series length 2 (k=3,5)", function()
+        local s = build({ "a", "a", "b", "a", "a" }, "a")
+        expect(#s).to.equal(2)
+        -- k=3: votes[1..3] = {a,a,b}, matches=2 → 2/3
+        -- k=5: votes[1..5] = {a,a,b,a,a}, matches=4 → 4/5
+        expect(math.abs(s[1] - 2/3) < 1e-9).to.equal(true)
+        expect(math.abs(s[2] - 4/5) < 1e-9).to.equal(true)
+    end)
+
+    it("n=7 votes → series length 3 (k=3,5,7)", function()
+        local s = build({ "a", "b", "a", "b", "a", "a", "a" }, "a")
+        expect(#s).to.equal(3)
+        -- k=3: {a,b,a} matches=2 → 2/3
+        -- k=5: {a,b,a,b,a} matches=3 → 3/5
+        -- k=7: all 7, matches=5 → 5/7
+        expect(math.abs(s[1] - 2/3) < 1e-9).to.equal(true)
+        expect(math.abs(s[2] - 3/5) < 1e-9).to.equal(true)
+        expect(math.abs(s[3] - 5/7) < 1e-9).to.equal(true)
+    end)
+
+    it("n=2 votes → empty series (no odd k >= 3)", function()
+        local s = build({ "a", "a" }, "a")
+        expect(#s).to.equal(0)
+    end)
+
+    it("no matches at all → series of zeros", function()
+        local s = build({ "a", "a", "a", "a", "a" }, "b")
+        expect(#s).to.equal(2)
+        expect(s[1]).to.equal(0)
+        expect(s[2]).to.equal(0)
+    end)
 end)
