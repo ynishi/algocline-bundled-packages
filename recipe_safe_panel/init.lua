@@ -134,14 +134,17 @@ M.caveats = {
         .. "small pilot (e.g. sc.run with n=1 over a labeled sample) and "
         .. "feed condorcet.estimate_p() into p_estimate before invoking "
         .. "this recipe.",
-    "Stage 4 (calibrate) is invoked with threshold=0 on every non-abort "
-        .. "run, pinning calibrate to its direct 1-call phase. The recipe "
-        .. "consumes only result.confidence and applies its own "
-        .. "conf_threshold gate via needs_investigation; escalated retry "
-        .. "would waste a call without reassessing confidence. Consequence: "
-        .. "every non-abort run pays a fixed +1 LLM call on top of sc's "
-        .. "2n+1. Budget for the recipe is therefore 2n+2 LLM calls in "
-        .. "steady state (plus optional Stage 3 which is call-free)."
+    "Stage 4 (calibrate) is invoked via calibrate.assess, not calibrate."
+        .. "run — the recipe consumes only result.confidence and applies "
+        .. "its own conf_threshold gate via needs_investigation. assess "
+        .. "is exactly calibrate's 1-call Phase 1 (answer + self-assessed "
+        .. "confidence) with no escalation, matching what this recipe "
+        .. "needs; escalation inside calibrate would not reassess "
+        .. "confidence and therefore cannot improve the signal this "
+        .. "recipe reads. Consequence: every non-abort run pays a fixed "
+        .. "+1 LLM call on top of sc's 2n+1. Budget for the recipe is "
+        .. "therefore 2n+2 LLM calls in steady state (plus optional Stage "
+        .. "3 which is call-free)."
         .. " → when sizing cost caps include the +1 calibrate call; when "
         .. "abort-gated, cost is 0 LLM calls (Stage 1 is pure math).",
     "p_estimate = 0.5 is treated like Anti-Jury: the recipe aborts with "
@@ -154,23 +157,22 @@ M.caveats = {
 
 --- Empirical verification results.
 ---
---- Stage coverage of the current runs:
----   Stage 1 (condorcet)     — verified: Anti-Jury gate + optimal_n path.
----   Stage 2 (sc)            — verified: panel sampling + plurality vote.
----   Stage 3 (vote_prefix)   — NOT EXERCISED. Every recorded run uses
----                             max_n = 3, but the prefix-stability series
----                             needs length ≥ 3, and the series is sampled
----                             only at odd k ≥ 3 — that requires n ≥ 7.
----                             Stage 3's behaviour in these runs is always
----                             "skipped (panel too small / scaling_check
----                             disabled)", not "safe" from actual inverse_u
----                             detection.
----   Stage 4 (calibrate)     — verified: confidence + retry path.
+--- Note on Stage 3 (vote_prefix): In every recorded run max_n = 3, but the
+--- prefix-stability series needs length >= 3 sampled at odd k >= 3, which
+--- requires n >= 7. Stage 3 therefore reports "skipped (panel too small /
+--- scaling_check disabled)" in all current runs — that string is not
+--- evidence of inverse_u detecting "safe"; it means the stage did not run.
+--- See `stage_coverage` entry for Stage 3 below for the structured coverage
+--- status and the action required to close the gap.
 ---
---- To validate Stage 3 empirically, re-run with max_n ≥ 7 and
---- scaling_check = true, and capture whether inverse_u.detect fires on
---- the resulting prefix series. Until then, Stage 3 is covered by
---- theoretical_basis only.
+--- Shape of `stage_coverage` (stable contract; see R3 design note):
+---   Array of { stage, name, status, evidence[, reason, to_verify] }.
+---   `status`: "verified" | "not_exercised" | "theoretical_only"
+---   `evidence`: array of run_id strings from e2e_runs / alc_eval_runs
+---               that actually exercised this stage.
+---   `reason` / `to_verify`: present when status != "verified"; reason
+---               explains why coverage is missing, to_verify prescribes
+---               the concrete run that would close the gap.
 M.verified = {
     theoretical_basis = {
         "Condorcet Jury Theorem (1785): P(Maj_n) → 1 as n → ∞ when p > 0.5",
@@ -178,10 +180,53 @@ M.verified = {
         "Wang et al. 2022: Self-Consistency improves accuracy via majority vote",
     },
     stage_coverage = {
-        stage_1_condorcet = "verified",
-        stage_2_sc = "verified",
-        stage_3_vote_prefix = "not_exercised (max_n < 7 in all runs)",
-        stage_4_calibrate = "verified",
+        {
+            stage = 1,
+            name = "condorcet",
+            status = "verified",
+            -- Anti-Jury gate exercised by run 2; optimal_n + p>0.5 path
+            -- exercised by runs 1 and 3.
+            evidence = {
+                "2026-04-15_021159",
+                "2026-04-15_091138",
+                "2026-04-15_021851",
+            },
+        },
+        {
+            stage = 2,
+            name = "sc",
+            status = "verified",
+            -- Panel sampling + plurality vote exercised by non-aborted
+            -- runs. Run 2 aborts at Stage 1 so does NOT evidence Stage 2.
+            evidence = {
+                "2026-04-15_021159",
+                "2026-04-15_021851",
+            },
+        },
+        {
+            stage = 3,
+            name = "vote_prefix",
+            status = "not_exercised",
+            reason = "max_n < 7 in all recorded runs; prefix series is "
+                .. "sampled at odd k >= 3, which requires n >= 7 to yield "
+                .. "the 3-point minimum inverse_u.detect needs.",
+            to_verify = "re-run recipe_safe_panel with max_n >= 7 and "
+                .. "scaling_check = true; confirm stages[3] reports a "
+                .. "series with length >= 3 rather than 'skipped', and "
+                .. "capture whether inverse_u.detect flags the series.",
+            evidence = {},
+        },
+        {
+            stage = 4,
+            name = "calibrate",
+            status = "verified",
+            -- Confidence-gate path exercised by non-aborted runs. Run 2
+            -- aborts at Stage 1 so does NOT evidence Stage 4.
+            evidence = {
+                "2026-04-15_021159",
+                "2026-04-15_021851",
+            },
+        },
     },
     e2e_runs = {
         {
@@ -705,17 +750,15 @@ function M.run(ctx)
             or "UNSTABLE (prefix majority declined from its peak)"
     )
 
-    -- We want calibrate's confidence reading only — not its retry escalation.
-    -- calibrate.run with fallback="retry" generates a retry_answer but does
-    -- NOT reassess confidence; the recipe uses only result.confidence and
-    -- discards result.answer, so escalation is a pure 1-call waste here.
-    -- Force threshold=0 so calibrate always takes the direct (non-escalated)
-    -- 1-call path, and let the recipe apply its own conf_threshold gate
-    -- below via needs_investigation.
-    local cal_result = calibrate.run({
+    -- Use calibrate.assess: the recipe consumes only the confidence reading
+    -- and applies its own conf_threshold gate below via needs_investigation.
+    -- calibrate.run's built-in escalation would be wrong here — its retry
+    -- path does NOT reassess confidence, so it cannot improve the signal
+    -- this recipe uses; previously we worked around that by forcing
+    -- threshold=0 on calibrate.run, but assess() makes the intent explicit
+    -- and removes the dead `fallback` parameter from the call site.
+    local cal_result = calibrate.assess({
         task = cal_task,
-        threshold = 0,
-        fallback = "retry",  -- never reached with threshold=0; kept for safety
         gen_tokens = 300,
     })
 
@@ -723,8 +766,9 @@ function M.run(ctx)
     local cal_calls = cal_result.result.total_llm_calls or 1
     total_llm_calls = total_llm_calls + cal_calls
 
-    -- Recipe-level gate. Independent from calibrate.escalated, which is
-    -- always false here (we pinned calibrate's internal threshold to 0).
+    -- Recipe-level gate. calibrate.assess has no escalation concept, so
+    -- escalation is necessarily absent here; the recipe decides on its own
+    -- whether to surface `needs_investigation` based on conf_threshold.
     local needs_investigation = confidence < conf_threshold
 
     stages[4] = {
@@ -732,7 +776,9 @@ function M.run(ctx)
         confidence = confidence,
         threshold = conf_threshold,
         needs_investigation = needs_investigation,
-        escalated = false,  -- forced by threshold=0 above
+        -- `escalated` kept false-valued for stages[] shape parity with
+        -- earlier versions; assess() has no escalation path.
+        escalated = false,
         llm_calls = cal_calls,
     }
 

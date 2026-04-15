@@ -16,14 +16,18 @@
 ---     how long each independent chain-of-thought can be. Setting this too
 ---     low truncates reasoning and lowers per-agent accuracy p, which
 ---     directly weakens Condorcet guarantees for downstream consumers.
---- ctx.extract_tokens: Max tokens for the per-path answer extraction step
----     (default: 100). Keep this small — the extraction prompt asks for
----     ONE short sentence, so more tokens waste budget without improving
----     the vote signal.
---- ctx.consensus_tokens: Max tokens for the final LLM-side vote-count
----     synthesis (default: 300). The structured `vote_counts` field is
----     computed independently, so this only affects the human-readable
----     `consensus` string.
+---
+--- NOTE on other token budgets (extract / consensus): intentionally NOT
+--- exposed as ctx knobs.
+---
+--- Evaluated by simulating plausible consumer workflows (long reasoning,
+--- budget cap, UI display, downstream parser, custom extraction shape):
+--- no workflow can tune these integers alone without ALSO changing the
+--- coupled prompt or signal path. See call-site comments below for the
+--- per-knob analysis. If a future workflow truly demands tuning, design
+--- the coupled pieces together (prompt override + token budget, or
+--- structured contract + parser + budget) — do NOT simply expose the
+--- integers.
 
 local M = {}
 
@@ -36,7 +40,21 @@ M.meta = {
 }
 
 --- Extract a concise final answer from a reasoning chain.
-local function extract_answer(reasoning, task, extract_tokens)
+---
+--- NOTE: `max_tokens = 100` is hardcoded by design, NOT a knob.
+--- Rationale: the prompt contract ("ONE short sentence", system "One
+--- sentence max") is itself a hard constraint on output length. Raising
+--- max_tokens cannot lengthen output beyond what the prompt permits, and
+--- lowering it only risks truncating the one-sentence answer mid-word.
+--- The integer and the prompt are coupled — one cannot be tuned without
+--- the other.
+---
+--- If a caller ever needs a different extraction shape (multi-sentence
+--- answer, structured JSON, etc.), design it properly: expose both the
+--- prompt override AND the matching token budget together, with a
+--- validator that rejects inconsistent pairs. Do NOT re-expose
+--- `extract_tokens` alone.
+local function extract_answer(reasoning, task)
     return alc.llm(
         string.format(
             "Original question: %s\n\nReasoning:\n%s\n\nExtract ONLY the final answer in one short sentence. No explanation.",
@@ -44,7 +62,7 @@ local function extract_answer(reasoning, task, extract_tokens)
         ),
         {
             system = "Extract the final answer concisely. One sentence max.",
-            max_tokens = extract_tokens,
+            max_tokens = 100,
         }
     )
 end
@@ -71,8 +89,6 @@ function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     local n = ctx.n or 5
     local gen_tokens = ctx.gen_tokens or 400
-    local extract_tokens = ctx.extract_tokens or 100
-    local consensus_tokens = ctx.consensus_tokens or 300
 
     -- Diversity hints to encourage different reasoning paths
     local diversity_hints = {
@@ -105,7 +121,7 @@ function M.run(ctx)
             }
         )
         total_llm_calls = total_llm_calls + 1
-        local answer = extract_answer(reasoning, task, extract_tokens)
+        local answer = extract_answer(reasoning, task)
         total_llm_calls = total_llm_calls + 1
         paths[i] = { reasoning = reasoning, answer = answer }
     end
@@ -116,6 +132,18 @@ function M.run(ctx)
         answers_list = answers_list .. string.format("Path %d answer: %s\n", i, p.answer)
     end
 
+    -- NOTE: `max_tokens = 300` is hardcoded by design, NOT a knob.
+    -- Rationale: the `consensus` field is a human-readable prose summary.
+    -- Downstream decision signals (`answer`, `answer_norm`, `vote_counts`)
+    -- are computed independently from the extracted per-path answers —
+    -- they do NOT depend on this LLM call's output. So this budget only
+    -- affects display text; it is cosmetic, not a quality lever.
+    --
+    -- If a caller ever needs the LLM to drive the decision (e.g. by
+    -- parsing its output as the authoritative vote), redesign the signal
+    -- path FIRST: define a structured contract, add a parser, and only
+    -- then expose the budget together with those pieces. Do NOT
+    -- re-expose `consensus_tokens` as a standalone knob.
     local consensus = alc.llm(
         string.format(
             "Question: %s\n\nMultiple reasoning paths produced these answers:\n%s\n"
@@ -125,7 +153,7 @@ function M.run(ctx)
         ),
         {
             system = "You are a precise vote counter. Identify the majority answer. Be exact.",
-            max_tokens = consensus_tokens,
+            max_tokens = 300,
         }
     )
     total_llm_calls = total_llm_calls + 1

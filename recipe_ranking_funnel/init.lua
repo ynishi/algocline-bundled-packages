@@ -360,8 +360,9 @@ function M.run(ctx)
             naive_baseline_kind = "bypass_direct_pairwise_allpair_bidirectional",
             savings_percent = savings_pct,
             -- Bypass path has no Stage 2 scoring, so nothing to flag.
-            needs_attention = false,
-            attention_reasons = {},
+            -- Still emit `warnings = {}` so consumers can uniformly
+            -- check `#result.warnings > 0` regardless of code path.
+            warnings = {},
             -- Emit 3 stages so consumers can safely index stages[1..3]
             -- regardless of the bypass path. Stages 1 and 2 are marked
             -- skipped; stage 3 carries the direct-pairwise result.
@@ -647,24 +648,66 @@ function M.run(ctx)
         total_llm_calls, naive_calls, savings_pct
     ))
 
-    -- Escalate stage-internal warnings to a single top-level flag so callers
-    -- don't have to walk `stages[]`. Currently tracks Stage 2 scoring parse
-    -- failures: if half or more of the scoring calls returned an unparseable
-    -- score, the Stage 3 ordering effectively collapses to the Stage 1
-    -- ordinal ranking (all survivors tie at the 5.0 default) — the recipe
-    -- still returns a ranking, but its discriminative power is gone.
-    local attention_reasons = {}
+    -- Top-level structured diagnostics.
+    --
+    -- Shape (stable contract; extend by adding new `code`s):
+    --   warnings = {
+    --     {
+    --       code     = "<identifier, snake_case>",
+    --       severity = "warn" | "critical",
+    --       data     = { ... raw numbers for the consumer to re-threshold ... },
+    --       message  = "<one-line human-readable summary>",
+    --     },
+    --     ...
+    --   }
+    --
+    -- Why structured rather than a boolean + string array:
+    --   - Future failure modes (Stage 1 inconsistency, Stage 3 tie spikes,
+    --     etc.) must be addable without breaking existing consumers.
+    --   - Consumers with different thresholds can re-derive from `data`
+    --     instead of being locked to our baked-in cutoffs.
+    --   - `message` serves HIL/log use cases directly; `code` serves
+    --     machine routing; `data` serves re-thresholding. One record
+    --     covers all three consumer shapes without duplication.
+    --
+    -- Consumers check `#result.warnings > 0` for the "any issue?" path.
+    -- We intentionally do NOT emit a separate `needs_attention` boolean
+    -- to avoid two fields carrying the same bit.
+    local warnings = {}
+
+    -- WARN: stage_2_parse_failure_rate_high
+    -- Half or more of Stage 2 scoring calls returned unparseable scores.
+    -- Effect: all unparseable candidates collapse to the 5.0 default, so
+    -- Stage 3 input ordering is dominated by the 5.0 tie-break (Stage 1
+    -- ordinal). The recipe still returns a ranking, but its Stage-2
+    -- discriminative power is gone. Threshold 0.5 is hardcoded here
+    -- because it is the point at which majority-default reduces Stage 2
+    -- to a tie-break stage; consumers wanting a stricter cutoff re-check
+    -- via `data.rate`.
     local s2 = stages[2]
     if s2 and s2.parse_failures and s2.parse_failures > 0 then
         local scored_n = s2.input_count or 0
         if scored_n > 0 and s2.parse_failures >= math.ceil(scored_n / 2) then
-            attention_reasons[#attention_reasons + 1] = string.format(
-                "stage_2_parse_failure_rate_high:%d/%d",
-                s2.parse_failures, scored_n
-            )
+            local rate = s2.parse_failures / scored_n
+            warnings[#warnings + 1] = {
+                code = "stage_2_parse_failure_rate_high",
+                severity = "warn",
+                data = {
+                    parse_failures = s2.parse_failures,
+                    scored_n = scored_n,
+                    rate = rate,
+                    threshold = 0.5,
+                },
+                message = string.format(
+                    "Stage 2 parse failures %d/%d (%.0f%%) >= 50%%; "
+                        .. "scoring effectively collapsed to Stage 1 "
+                        .. "ordinal ranking (unparseable candidates "
+                        .. "defaulted to 5.0 and tie-break by Stage 1 rank)",
+                    s2.parse_failures, scored_n, rate * 100
+                ),
+            }
         end
     end
-    local needs_attention = #attention_reasons > 0
 
     ctx.result = {
         ranking = final_ranking,
@@ -675,8 +718,7 @@ function M.run(ctx)
         naive_baseline_calls = naive_calls,
         naive_baseline_kind = "pairwise_rank_allpair_bidirectional",
         savings_percent = savings_pct,
-        needs_attention = needs_attention,
-        attention_reasons = attention_reasons,
+        warnings = warnings,
         stages = stages,
         -- funnel_shape = [input-to-Stage-1, input-to-Stage-2, input-to-Stage-3]
         --              = [N, survivors-after-Stage-1, survivors-after-Stage-2]
