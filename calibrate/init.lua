@@ -9,12 +9,13 @@
 ---
 --- Usage:
 ---   local calibrate = require("calibrate")
----   return calibrate.run(ctx)
+---   return calibrate.run(ctx)        -- full gated escalation
+---   return calibrate.assess(ctx)     -- confidence assessment only (1 call)
 ---
 --- ctx.task (required): The task to solve
---- ctx.threshold: Confidence threshold 0.0-1.0 (default: 0.7)
---- ctx.fallback: Strategy on low confidence — "ensemble", "panel", "retry" (default: "ensemble")
---- ctx.fallback_opts: Options passed to fallback strategy (default: {})
+--- ctx.threshold: Confidence threshold 0.0-1.0 (default: 0.7) [run only]
+--- ctx.fallback: Strategy on low confidence — "ensemble", "panel", "retry" (default: "ensemble") [run only]
+--- ctx.fallback_opts: Options passed to fallback strategy (default: {}) [run only]
 --- ctx.gen_tokens: Max tokens for initial attempt (default: 400)
 
 local M = {}
@@ -52,16 +53,24 @@ local function parse_confidence(raw)
     return 0.0
 end
 
+--- Self-assess only: answer + confidence in a single LLM call.
+---
+--- Use this when the caller performs its own confidence-based routing
+--- (e.g. recipe_safe_panel applies a recipe-level `needs_investigation`
+--- gate on the returned confidence, and does not want calibrate's own
+--- threshold/escalation logic — calibrate's built-in retry does NOT
+--- reassess confidence, so it cannot improve the signal such callers
+--- consume).
+---
+--- Public contract: exactly 1 LLM call, no escalation, no threshold.
+--- `M.run` delegates here for its Phase 1, guaranteeing that both
+--- entry points share the same prompt and parser.
 ---@param ctx AlcCtx
 ---@return AlcCtx
-function M.run(ctx)
+function M.assess(ctx)
     local task = ctx.task or error("ctx.task is required")
-    local threshold = ctx.threshold or 0.7
-    local fallback = ctx.fallback or "ensemble"
-    local fallback_opts = ctx.fallback_opts or {}
     local gen_tokens = ctx.gen_tokens or 400
 
-    -- Phase 1: Initial attempt with confidence self-assessment
     local response = alc.llm(
         string.format(
             "Task: %s\n\n"
@@ -80,15 +89,39 @@ function M.run(ctx)
         }
     )
 
-    -- Parse answer and confidence
     local answer = response:match("ANSWER:%s*(.-)%s*CONFIDENCE:") or response
     local conf_raw = response:match("CONFIDENCE:%s*(.+)") or ""
     local confidence = parse_confidence(conf_raw)
 
+    alc.stats.record("initial_confidence", confidence)
+
+    ctx.result = {
+        answer = answer,
+        confidence = confidence,
+        total_llm_calls = 1,
+    }
+    return ctx
+end
+
+---@param ctx AlcCtx
+---@return AlcCtx
+function M.run(ctx)
+    local task = ctx.task or error("ctx.task is required")
+    local threshold = ctx.threshold or 0.7
+    local fallback = ctx.fallback or "ensemble"
+    local fallback_opts = ctx.fallback_opts or {}
+    local gen_tokens = ctx.gen_tokens or 400
+
+    -- Phase 1: delegated to M.assess (1 LLM call, answer + confidence).
+    M.assess(ctx)
+    local assessed = ctx.result
+    local answer = assessed.answer
+    local confidence = assessed.confidence
+    local total_llm_calls = assessed.total_llm_calls
+
     alc.log("info", string.format(
         "calibrate: confidence=%.2f, threshold=%.2f", confidence, threshold
     ))
-    alc.stats.record("initial_confidence", confidence)
 
     -- Phase 2: Accept or escalate
     if confidence >= threshold then
@@ -97,6 +130,7 @@ function M.run(ctx)
             confidence = confidence,
             escalated = false,
             strategy = "direct",
+            total_llm_calls = total_llm_calls,
         }
         return ctx
     end
@@ -120,11 +154,13 @@ function M.run(ctx)
                 max_tokens = gen_tokens,
             }
         )
+        total_llm_calls = total_llm_calls + 1
         ctx.result = {
             answer = retry_answer,
             confidence = confidence,
             escalated = true,
             strategy = "retry",
+            total_llm_calls = total_llm_calls,
         }
     elseif fallback == "panel" then
         local panel_pkg = require("panel")
@@ -133,12 +169,17 @@ function M.run(ctx)
         }
         for k, v in pairs(fallback_opts) do panel_ctx[k] = v end
         local panel_result = panel_pkg.run(panel_ctx)
+        -- panel issues one LLM call per role plus one synthesis call.
+        local panel_calls = (panel_result.result.arguments
+            and (#panel_result.result.arguments + 1)) or 0
+        total_llm_calls = total_llm_calls + panel_calls
         ctx.result = {
             answer = panel_result.result.synthesis,
             confidence = confidence,
             escalated = true,
             strategy = "panel",
             fallback_detail = panel_result.result,
+            total_llm_calls = total_llm_calls,
         }
     else
         -- Default: ensemble
@@ -148,12 +189,15 @@ function M.run(ctx)
         }
         for k, v in pairs(fallback_opts) do ens_ctx[k] = v end
         local ens_result = sc.run(ens_ctx)
+        total_llm_calls = total_llm_calls
+            + (ens_result.result.total_llm_calls or 0)
         ctx.result = {
             answer = ens_result.result.consensus,
             confidence = confidence,
             escalated = true,
             strategy = "ensemble",
             fallback_detail = ens_result.result,
+            total_llm_calls = total_llm_calls,
         }
     end
 

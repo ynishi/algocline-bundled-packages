@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **2 new `recipe` category packages** composing foundations into end-to-end strategies:
+  - **[recipe_safe_panel](recipe_safe_panel/)**: safety-first panel QA. Composes `condorcet` (panel sizing + Anti-Jury), `sc` (self-consistency), `inverse_u` (optional scaling check), `calibrate` (confidence). Auto `M.verified.alc_eval_runs` recorded math_basic pass_rate = 1.0 (7/7) at 8 LLM calls/case under `max_n=3`.
+  - **[recipe_ranking_funnel](recipe_ranking_funnel/)**: listwise → pairwise ranking funnel. Composes `listwise_rank` (coarse screening) and `pairwise_rank` (precise finalization). Verified N=8 population ranking: 7 calls vs naive all-pairs 56 (87% savings), top-1 correct.
+- **`M.verified` convention**: recipe packages expose `theoretical_basis` + measured `e2e_runs` / `alc_eval_runs` only — no unverified claims. Populated empirically via agent-block E2E harness.
+- **scripts/e2e/ agent-block harness** (`common.lua` + per-recipe drivers): runs full ReAct loop against real `alc.llm` / `alc_eval`, persists graded results to `workspace/e2e-results/<timestamp>/<name>.json`.
+  - `recipe_safe_panel.lua`: single-case smoke (Capital of Japan)
+  - `recipe_ranking_funnel.lua`: single-case smoke (Country population 2026)
+  - `recipe_safe_panel_eval.lua`: multi-case `alc_eval` sweep (math_basic, 7 cases) with recipe-level budget caps (`max_n=3`, `scaling_check=false`)
+- **justfile**: `just e2e <name>` / `just e2e-all` with `allow-agent` group for task-mcp exposure.
+- **tests/test_recipe_ranking_funnel.lua**, **tests/test_recipe_safe_panel.lua**: structural + M.verified validation tests.
+- **`calibrate.assess(ctx)`**: 1-LLM-call primitive exposing calibrate's Phase 1 (answer + self-assessed confidence) without threshold/escalation logic. `M.run` now delegates Phase 1 to `assess`, and `recipe_safe_panel` consumes it directly (replacing the earlier `calibrate.run({threshold=0, fallback="retry"})` workaround).
+
+### Changed
+
+- **sc** `ctx.result`: bridge API gap for recipe consumption. Added `answer_norm`, `votes` (normalized), `vote_counts`, `n_sampled`, `total_llm_calls` alongside existing `consensus` / `answer` / `paths`. `total_llm_calls` is now counted during execution (previously hardcoded `2n+1`). Representative `answer` is trimmed + trailing-punctuation-stripped so downstream prompts see "Tokyo" rather than "Tokyo." or "tokyo" depending on sampling order. Normalization = lowercase + whitespace collapse + trailing punctuation strip.
+- **calibrate** `ctx.result`: added `total_llm_calls` on every return path — direct = 1, retry = 2, panel = 1 + roles + 1, ensemble = 1 + sc.total_llm_calls. Downstream consumers (e.g. recipe_safe_panel) can now read the accurate count instead of hardcoding.
+- **recipe_safe_panel**: reads `cal_result.result.total_llm_calls` when present, with the previous `escalated ? 2 : 1` heuristic as backward-compat fallback.
+- **recipe_safe_panel** Stage 3: renamed `inverse_u` → `vote_prefix_stability`. The stage uses a single-run vote prefix as an accuracy proxy, which is NOT the independent-panel inverse-U scenario from Chen et al. NeurIPS 2024; log messages, stage names, and caveats now state this explicitly.
+- **recipe_ranking_funnel**: added `ctx.judge_gen_tokens` (default 20) — pairwise judgement calls in Stage 3 (and the N<6 bypass) no longer silently override `ctx.gen_tokens`; short-verdict token cap is now an explicit knob.
+- **recipe_ranking_funnel**: `funnel_shape` is now always a 3-element array and documented with explicit semantics (`[S1-input, S2-input, S3-input]`). The N<6 bypass path emits `{N, N, N}` with the same convention so downstream consumers don't need to special-case array length. Bypass path also now reports `naive_baseline_calls` / `naive_baseline_kind` / `savings_percent` fields (previously missing).
+- **recipe_ranking_funnel** `ctx.result`: added `naive_baseline_kind = "pairwise_rank_allpair_bidirectional"` so the `savings_percent` denominator is self-documenting; clarified in comments that this over-reports vs single-pass or listwise-only baselines.
+- **recipe_ranking_funnel**: documented the `min_window = ceil(N/2)` rule (listwise stride = ceil(window/2), so window ≥ N/2 is needed to keep top items reachable in the final head window) and that Stage 2 intentionally discards Stage 1's ordinal ranking except as a tie-break.
+- **recipe_safe_panel**: `1.5x` correlation-adjustment multiplier is now documented as a recipe-level HEURISTIC (not a theorem) corresponding to intra-panel correlation ρ ≈ 0.2–0.3 under the effective-sample-size formula `N_eff = N / (1 + (N-1)·ρ)`.
+- **recipe_safe_panel**: odd-enforcement downgrade (when rounding the recommended panel size up would exceed `max_n`, the recipe rounds DOWN by 2 instead) now emits an explicit warn log identifying the downgrade and the `max_n` value needed to avoid it. Previously silent.
+- **recipe_safe_panel** caveats: replaced "inverse_u needs ≥ 5 data points" (incorrect) with the accurate statement that Stage 3 requires panel `n ≥ 7` in practice, because the prefix series is sampled only at odd k ≥ 3 (so n=3 gives 1 point, n=5 gives 2 points — both below inverse_u's 3-point threshold).
+- **hub_index.json**: regenerated to 105 packages (adds `recipe_ranking_funnel`, `recipe_safe_panel`).
+- **README**: package count 103 → 105, added `### Recipes` section under package catalog.
+
+### Fixed
+
+- **recipe_safe_panel**: guarded `condorcet.optimal_n()` returning nil (unreachable target or p == 0.5 edge). Previously the next line (`ceil(recommended_n * 1.5)`) would crash with a nil-arithmetic error. Falls back to `max_n` with a warning log instead.
+- **recipe_safe_panel**: validates `ctx.max_n` at entry — errors clearly on `max_n < 3` or non-numeric, eliminating the corner case where the odd-enforcement floor of 3 could silently exceed the configured cap.
+
 ## [0.12.0] - 2026-04-13
 
 ### Added

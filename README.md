@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (103)
+## Packages (105)
 
 ### Reasoning
 
@@ -205,6 +205,46 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[panel](panel/)** | Multi-role deliberation. Multiple roles discuss and a moderator synthesizes | — |
+
+### Recipes
+
+End-to-end strategies that compose multiple packages into a single `run(ctx)` entry point, with recorded `M.verified` empirical results (measured runs only — no hand-wavy claims).
+
+| Package | Description | Composes |
+|---------|-------------|----------|
+| **[recipe_safe_panel](recipe_safe_panel/)** | Safety-first panel QA. Condorcet-sized panel → self-consistency → optional inverse-U scaling check → calibrated confidence. Anti-Jury / needs_investigation safety gates. math_basic pass_rate 1.0 (7/7) at 8 LLM calls/case (max_n=3) | condorcet, sc, inverse_u, calibrate |
+| **[recipe_ranking_funnel](recipe_ranking_funnel/)** | Listwise → pairwise ranking funnel. 8→3→3 funnel shape on population ranking yielded 7 LLM calls vs naive all-pairs 56 (87% savings), top-1 correct | listwise_rank, pairwise_rank |
+
+#### Current limitations — recipe test coverage
+
+Recipes currently have **three** tiers of verification. Not every recipe has
+every tier; see the matrix below.
+
+| Tier | Runner | Purpose | Location |
+|---|---|---|---|
+| Unit tests (mocked `_G.alc`) | `mlua-probe` / `just test` | Stage transitions, index mapping, API contracts, cost accounting | `tests/test_recipe_*.lua` |
+| E2E (single-case, live LLM) | `agent-block` / `just e2e <name>` | ReAct-loop + MCP + real LLM on one prompt, with custom graders | `scripts/e2e/<recipe>.lua` |
+| Scenario eval (multi-case pass_rate) | `alc_eval` via `agent-block` | pass@1 over an installed scenario (e.g. `math_basic`) | `scripts/e2e/<recipe>_eval.lua` |
+
+Coverage at time of writing:
+
+| Recipe | Unit | E2E (single-case) | Scenario eval (multi-case) |
+|---|---|---|---|
+| recipe_safe_panel | ✓ (22 tests) | ✓ (`scripts/e2e/recipe_safe_panel.lua`) | ✓ (`recipe_safe_panel_eval.lua`, math_basic 7/7) |
+| recipe_ranking_funnel | ✓ (19 tests) | ✓ (`scripts/e2e/recipe_ranking_funnel.lua`) | ✗ — **not yet authored** |
+
+Gaps:
+
+- **recipe_ranking_funnel has no scenario-eval harness** (no
+  `recipe_ranking_funnel_eval.lua`). The existing scenarios under
+  `~/.algocline/scenarios/` (`factual_basic`, `reasoning_basic`, `math_basic`,
+  …) are QA-style (single answer), not ranking-style (population → ordering),
+  so a dedicated ranking scenario is a prerequisite.
+- `M.verified.scenarios` in `recipe_ranking_funnel/init.lua` therefore reports
+  the single-case E2E only; no multi-case pass_rate is available for this
+  recipe.
+- Scenario-eval runs are non-deterministic and billable; treat each verified
+  number as one sample, not a tight confidence interval.
 
 ## Usage
 
@@ -463,6 +503,94 @@ mlua-probe test tests/test_ranking_packages.lua --search-path .
    end
    lust.after(reset)
    ```
+
+## End-to-End (E2E) Testing
+
+The `tests/` suite exercises package internals with a mocked `_G.alc`. E2E
+scenarios under `scripts/e2e/` drive the same packages **through a real LLM
+and a live algocline MCP session**, using
+[agent-block](https://crates.io/crates/agent-block) as the ReAct driver.
+
+### Prerequisites
+
+```bash
+cargo install agent-block      # ReAct driver (runs the Lua scenario)
+cargo install algocline        # `alc` MCP server on PATH
+```
+
+`.env` at the repo root must export `ANTHROPIC_API_KEY`. `.env` is git-ignored.
+
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+```
+
+### Running E2E scenarios
+
+Scenarios are run via `just` recipes (the `justfile` at repo root is
+`allow-agent` tagged so it is also invokable through `task-mcp`):
+
+```bash
+just e2e recipe_safe_panel      # run one scenario
+just e2e recipe_ranking_funnel
+just e2e-all                    # run every scripts/e2e/*.lua (except common.lua)
+```
+
+Direct invocation without `just`:
+
+```bash
+agent-block -s scripts/e2e/recipe_safe_panel.lua -p .
+```
+
+### Output
+
+Each run persists a JSON report to
+`workspace/e2e-results/<timestamp>/<scenario>.json` with agent trace (turns,
+tokens, final answer) and per-grader pass/fail. stdout also prints a summary:
+
+```
+=== E2E recipe_safe_panel: PASS ===
+  [PASS] agent_ok
+  [PASS] answer_tokyo
+  [PASS] max_turns:15
+  [PASS] max_tokens:200000
+  [PASS] anti_jury_not_triggered
+  [PASS] reports_panel_size
+```
+
+### Authoring a new E2E
+
+1. Create `scripts/e2e/<name>.lua`.
+2. Require the shared harness and call `common.run { ... }`:
+
+   ```lua
+   local common = require("scripts.e2e.common")
+   return common.run({
+       name    = "my_recipe",
+       prompt  = "... task for the agent ...",
+       graders = {
+           common.graders.agent_ok,
+           common.graders.answer_contains("expected"),
+           common.graders.max_turns(15),
+           common.graders.custom("my_check", function(result)
+               return result.agent.final_answer:match("pattern") ~= nil
+           end),
+       },
+   })
+   ```
+
+3. Run `just e2e <name>` and iterate. See `scripts/e2e/common.lua` for the full
+   grader API (`agent_ok`, `answer_contains`, `answer_excludes`, `max_turns`,
+   `max_tokens`, `custom`).
+
+### Notes
+
+- E2E runs are **non-deterministic** (live LLM) and **billable**. Prefer unit
+  tests (`just test`) for tight loops; run E2E on meaningful changes only.
+- agent-block spawns the `alc` MCP server as a child process, so `alc` must be
+  on `PATH` and the current working directory must contain `alc.toml` (the
+  repo root already does).
+- Set `ALGOCLINE_LOG_DIR` or other algocline env vars before invoking
+  `agent-block` if you need verbose session logs.
 
 ## License
 
