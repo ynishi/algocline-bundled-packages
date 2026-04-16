@@ -34,7 +34,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name = "sc",
-    version = "0.1.0",
+    version = "0.2.0",
     description = "Independent multi-path sampling with majority vote aggregation",
     category = "aggregation",
 }

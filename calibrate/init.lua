@@ -23,7 +23,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name = "calibrate",
-    version = "0.1.0",
+    version = "0.2.0",
     description = "Confidence-gated reasoning — fast path when confident, escalation when not",
     category = "meta",
 }
