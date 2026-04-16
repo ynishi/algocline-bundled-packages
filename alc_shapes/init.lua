@@ -5,11 +5,13 @@
 ---   local ok, reason = S.check(value, S.voted)
 ---   local x = S.assert(value, "voted", "where")
 ---
---- P0 note: the shape dictionary is intentionally empty. P1 adds
---- voted / assessed / paneled / etc. Adding a new shape is one line:
----   M.voted = T.shape({ answer = T.string, ... }, { open = true })
----
 --- See workspace/tasks/shape-convention/design.md.
+---
+--- NOTE: meta.result_shape is a single string today. Packages with
+--- multiple entry points (e.g. calibrate.run vs calibrate.assess)
+--- declare the primary shape in meta and document secondary shapes
+--- in docstrings. A future `meta.shapes("key")` accessor is a
+--- possible extension — tracked in design.md §将来検討.
 
 local T = require("alc_shapes.t")
 local check = require("alc_shapes.check")
@@ -18,15 +20,38 @@ local luacats = require("alc_shapes.luacats")
 
 local M = {}
 
--- ── shape dictionary (P0: empty) ─────────────────────────────────────
--- P1 will add entries such as:
---   M.voted = T.shape({
---       answer      = T.string:describe("Majority answer"),
---       answer_norm = T.string:describe("Normalized vote key"),
---       vote_counts = T.table,
---       paths       = T.array_of(T.table),
---       ...
---   }, { open = true })
+-- ── shape dictionary ─────────────────────────────────────────────────
+
+M.voted = T.shape({
+    consensus       = T.string:describe("LLM-synthesized majority summary"),
+    answer          = T.string:is_optional():describe("Majority answer (nil when no paths converge)"),
+    answer_norm     = T.string:is_optional():describe("Normalized vote key"),
+    paths           = T.array_of(T.table):describe("Per-path { reasoning, answer } records"),
+    votes           = T.array_of(T.string):describe("Normalized vote per path, 1-indexed"),
+    vote_counts     = T.table:describe("{ [norm] = count } tally"),
+    n_sampled       = T.number:describe("Number of sampled paths"),
+    total_llm_calls = T.number,
+}, { open = true })
+
+M.paneled = T.shape({
+    arguments = T.array_of(T.table):describe("Per-role { role, text } records"),
+    synthesis = T.string:describe("Moderator synthesis"),
+}, { open = true })
+
+M.assessed = T.shape({
+    answer          = T.string,
+    confidence      = T.number:describe("Self-assessed confidence 0.0–1.0"),
+    total_llm_calls = T.number,
+}, { open = true })
+
+M.calibrated = T.shape({
+    answer          = T.string,
+    confidence      = T.number:describe("Initial self-assessed confidence"),
+    escalated       = T.boolean:describe("Whether fallback was triggered"),
+    strategy        = T.one_of({ "direct", "retry", "panel", "ensemble" }),
+    total_llm_calls = T.number,
+    fallback_detail = T.table:is_optional():describe("Fallback strategy result (voted/paneled)"),
+}, { open = true })
 
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check

@@ -26,6 +26,7 @@ M.meta = {
     version = "0.2.0",
     description = "Confidence-gated reasoning — fast path when confident, escalation when not",
     category = "meta",
+    result_shape = "calibrated",
 }
 
 --- Extract confidence score from LLM self-assessment.
@@ -54,6 +55,7 @@ local function parse_confidence(raw)
 end
 
 --- Self-assess only: answer + confidence in a single LLM call.
+--- Returns shape `assessed` (see alc_shapes.assessed).
 ---
 --- Use this when the caller performs its own confidence-based routing
 --- (e.g. recipe_safe_panel applies a recipe-level `needs_investigation`
@@ -100,6 +102,7 @@ function M.assess(ctx)
         confidence = confidence,
         total_llm_calls = 1,
     }
+    require("alc_shapes").assert_dev(ctx.result, "assessed", "calibrate.assess")
     return ctx
 end
 
@@ -132,6 +135,7 @@ function M.run(ctx)
             strategy = "direct",
             total_llm_calls = total_llm_calls,
         }
+        require("alc_shapes").assert_dev(ctx.result, "calibrated", "calibrate.run/direct")
         return ctx
     end
 
@@ -164,11 +168,13 @@ function M.run(ctx)
         }
     elseif fallback == "panel" then
         local panel_pkg = require("panel")
+        local Shapes = require("alc_shapes")
         local panel_ctx = {
             task = task,
         }
         for k, v in pairs(fallback_opts) do panel_ctx[k] = v end
         local panel_result = panel_pkg.run(panel_ctx)
+        Shapes.assert(panel_result.result, "paneled", "calibrate: panel fallback")
         -- panel issues one LLM call per role plus one synthesis call.
         local panel_calls = (panel_result.result.arguments
             and (#panel_result.result.arguments + 1)) or 0
@@ -184,11 +190,13 @@ function M.run(ctx)
     else
         -- Default: ensemble
         local sc = require("sc")
+        local Shapes = require("alc_shapes")
         local ens_ctx = {
             task = task,
         }
         for k, v in pairs(fallback_opts) do ens_ctx[k] = v end
         local ens_result = sc.run(ens_ctx)
+        Shapes.assert(ens_result.result, "voted", "calibrate: ensemble fallback")
         total_llm_calls = total_llm_calls
             + (ens_result.result.total_llm_calls or 0)
         ctx.result = {
@@ -201,6 +209,7 @@ function M.run(ctx)
         }
     end
 
+    require("alc_shapes").assert_dev(ctx.result, "calibrated", "calibrate.run/" .. fallback)
     return ctx
 end
 

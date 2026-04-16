@@ -37,6 +37,7 @@ M.meta = {
     version = "0.2.0",
     description = "Independent multi-path sampling with majority vote aggregation",
     category = "aggregation",
+    result_shape = "voted",
 }
 
 --- Extract a concise final answer from a reasoning chain.
@@ -199,6 +200,7 @@ function M.run(ctx)
         n_sampled = n,
         total_llm_calls = total_llm_calls,
     }
+    require("alc_shapes").assert_dev(ctx.result, "voted", "sc.run")
     return ctx
 end
 

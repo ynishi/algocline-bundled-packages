@@ -16,6 +16,7 @@ M.meta = {
     version = "0.1.0",
     description = "Multi-perspective deliberation — distinct roles engage, moderator synthesizes",
     category = "synthesis",
+    result_shape = "paneled",
 }
 
 ---@param ctx AlcCtx
@@ -72,6 +73,7 @@ function M.run(ctx)
         arguments = arguments,
         synthesis = synthesis,
     }
+    require("alc_shapes").assert_dev(ctx.result, "paneled", "panel.run")
     return ctx
 end
 
