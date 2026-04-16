@@ -97,6 +97,40 @@ function M.one_of(values)
     return setmetatable({ kind = "one_of", values = copy }, schema_mt)
 end
 
+function M.discriminated(tag, variants)
+    if type(tag) ~= "string" or tag == "" then
+        error("alc_shapes.t: discriminated expects non-empty string tag", 2)
+    end
+    if type(variants) ~= "table" then
+        error("alc_shapes.t: discriminated expects variants table", 2)
+    end
+    local count = 0
+    for k, v in pairs(variants) do
+        if type(k) ~= "string" then
+            error("alc_shapes.t: discriminated variant key must be string, got " .. type(k), 2)
+        end
+        if not is_schema(v) or rawget(v, "kind") ~= "shape" then
+            error(string.format(
+                "alc_shapes.t: discriminated variant '%s' must be a shape schema", k), 2)
+        end
+        count = count + 1
+    end
+    if count == 0 then
+        error("alc_shapes.t: discriminated expects at least one variant", 2)
+    end
+    return setmetatable({ kind = "discriminated", tag = tag, variants = variants }, schema_mt)
+end
+
+function M.map_of(key, val)
+    if not is_schema(key) then
+        error("alc_shapes.t: map_of expects a schema as key argument", 2)
+    end
+    if not is_schema(val) then
+        error("alc_shapes.t: map_of expects a schema as val argument", 2)
+    end
+    return setmetatable({ kind = "map_of", key = key, val = val }, schema_mt)
+end
+
 M._internal = {
     schema_mt   = schema_mt,
     combinators = combinators,

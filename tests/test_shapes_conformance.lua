@@ -251,9 +251,9 @@ describe("shape conformance: shape validation against mock data", function()
             naive_baseline_kind = "bypass_direct_pairwise_allpair_bidirectional",
             warnings = {},
             stages = {
-                { name = "listwise_skipped", input_count = 3, output_count = 3, llm_calls = 0 },
-                { name = "scoring_skipped", input_count = 3, output_count = 3, llm_calls = 0 },
-                { name = "direct_pairwise", input_count = 3, output_count = 3, llm_calls = 6 },
+                { name = "listwise_skipped", input_count = 3, output_count = 3, llm_calls = 0, reason = "N < 6 bypass" },
+                { name = "scoring_skipped", input_count = 3, output_count = 3, llm_calls = 0, reason = "survivors <= top_k2" },
+                { name = "direct_pairwise", input_count = 3, output_count = 3, llm_calls = 6, position_bias_splits = 0, both_tie_pairs = 0 },
             },
             funnel_shape = { 3, 3, 3 },
         }
@@ -276,9 +276,9 @@ describe("shape conformance: shape validation against mock data", function()
                   data = { rate = 0.4 }, message = "40% parse failures" },
             },
             stages = {
-                { name = "listwise_rank" },
-                { name = "multi_axis_scoring" },
-                { name = "pairwise_rank_allpair" },
+                { name = "listwise_rank", input_count = 20, output_count = 7, llm_calls = 5, window_size = 10 },
+                { name = "multi_axis_scoring", input_count = 7, output_count = 5, llm_calls = 7, axes_count = 3, parse_failures = 2, score_range = { min = 2.0, max = 8.5 } },
+                { name = "pairwise_rank_allpair", input_count = 5, output_count = 5, llm_calls = 8, position_bias_splits = 2, both_tie_pairs = 1 },
             },
             funnel_shape = { 20, 7, 5 },
         }
@@ -302,7 +302,7 @@ describe("shape conformance: shape validation against mock data", function()
             unanimous = false,
             total_llm_calls = 0,
             abort_reason = "anti-jury detected",
-            stages = { { name = "condorcet_anti_jury", p_estimate = 0.3 } },
+            stages = { { name = "condorcet_anti_jury", p_estimate = 0.3, is_anti_jury = true } },
         }
         expect(S.check(mock, S.safe_paneled)).to.equal(true)
     end)
@@ -325,10 +325,10 @@ describe("shape conformance: shape validation against mock data", function()
             unanimous = false,
             total_llm_calls = 8,
             stages = {
-                { name = "condorcet" },
-                { name = "sc" },
-                { name = "vote_prefix_stability" },
-                { name = "calibrate" },
+                { name = "condorcet", p_estimate = 0.8, recommended_n = 7, expected_accuracy = 0.94, target_accuracy = 0.9, target_met = true },
+                { name = "sc", panel_size = 7, answer = "Tokyo", plurality_fraction = 0.71, margin_gap = 0.43, n_distinct_answers = 2, unanimous = false, llm_calls = 7 },
+                { name = "vote_prefix_stability", signal_type = "single_run_prefix_proxy", series_length = 7, is_safe = true, peak_idx = 3, consecutive_drops = 0 },
+                { name = "calibrate", confidence = 0.85, threshold = 0.3, needs_investigation = false, escalated = false, llm_calls = 1 },
             },
         }
         expect(S.check(mock, S.safe_paneled)).to.equal(true)

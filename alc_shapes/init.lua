@@ -31,7 +31,7 @@ M.voted = T.shape({
         answer    = T.string,
     })):describe("Per-path reasoning + extracted answer"),
     votes           = T.array_of(T.string):describe("Normalized vote per path, 1-indexed"),
-    vote_counts     = T.table:describe("{ [norm] = count } tally"),
+    vote_counts     = T.map_of(T.string, T.number):describe("{ [norm] = count } tally"),
     n_sampled       = T.number:describe("Number of sampled paths"),
     total_llm_calls = T.number,
 }, { open = true })
@@ -113,6 +113,55 @@ M.pairwise_ranked = T.shape({
 
 -- ── recipe shapes ────────────────────────────────────────────────────
 
+local funnel_stage = T.discriminated("name", {
+    listwise_rank = T.shape({
+        name         = T.one_of({ "listwise_rank" }),
+        input_count  = T.number,
+        output_count = T.number,
+        llm_calls    = T.number,
+        window_size  = T.number,
+    }),
+    listwise_skipped = T.shape({
+        name         = T.one_of({ "listwise_skipped" }),
+        input_count  = T.number,
+        output_count = T.number,
+        llm_calls    = T.number,
+        reason       = T.string,
+    }),
+    multi_axis_scoring = T.shape({
+        name           = T.one_of({ "multi_axis_scoring" }),
+        input_count    = T.number,
+        output_count   = T.number,
+        llm_calls      = T.number,
+        axes_count     = T.number,
+        parse_failures = T.number,
+        score_range    = T.shape({ min = T.number, max = T.number }),
+    }),
+    scoring_skipped = T.shape({
+        name         = T.one_of({ "scoring_skipped" }),
+        input_count  = T.number,
+        output_count = T.number,
+        llm_calls    = T.number,
+        reason       = T.string,
+    }),
+    pairwise_rank_allpair = T.shape({
+        name                 = T.one_of({ "pairwise_rank_allpair" }),
+        input_count          = T.number,
+        output_count         = T.number,
+        llm_calls            = T.number,
+        position_bias_splits = T.number,
+        both_tie_pairs       = T.number,
+    }),
+    direct_pairwise = T.shape({
+        name                 = T.one_of({ "direct_pairwise" }),
+        input_count          = T.number,
+        output_count         = T.number,
+        llm_calls            = T.number,
+        position_bias_splits = T.number,
+        both_tie_pairs       = T.number,
+    }),
+})
+
 M.funnel_ranked = T.shape({
     ranking     = T.array_of(T.shape({
         rank           = T.number,
@@ -134,9 +183,63 @@ M.funnel_ranked = T.shape({
         data     = T.table:describe("Diagnostic payload (structure varies by code)"),
         message  = T.string:describe("Human-readable summary"),
     })):describe("Diagnostic warnings"),
-    stages      = T.array_of(T.table):describe("Per-stage detail (heterogeneous, keyed by name)"),
+    stages       = T.array_of(funnel_stage):describe("Per-stage detail (discriminated by name)"),
     funnel_shape = T.array_of(T.number):describe("Candidate counts per stage [N, s1_out, s2_out]"),
 }, { open = true })
+
+local safe_panel_stage = T.discriminated("name", {
+    condorcet = T.shape({
+        name              = T.one_of({ "condorcet" }),
+        p_estimate        = T.number,
+        recommended_n     = T.number,
+        expected_accuracy = T.number,
+        target_accuracy   = T.number,
+        target_met        = T.boolean,
+    }),
+    condorcet_anti_jury = T.shape({
+        name         = T.one_of({ "condorcet_anti_jury" }),
+        p_estimate   = T.number,
+        is_anti_jury = T.boolean,
+    }),
+    condorcet_coin_flip = T.shape({
+        name         = T.one_of({ "condorcet_coin_flip" }),
+        p_estimate   = T.number,
+        is_anti_jury = T.boolean,
+    }),
+    sc = T.shape({
+        name               = T.one_of({ "sc" }),
+        panel_size         = T.number,
+        answer             = T.string,
+        plurality_fraction = T.number,
+        margin_gap         = T.number,
+        n_distinct_answers = T.number,
+        unanimous          = T.boolean,
+        llm_calls          = T.number,
+    }),
+    vote_prefix_stability = T.shape({
+        name              = T.one_of({ "vote_prefix_stability" }),
+        signal_type       = T.string,
+        series_length     = T.number,
+        is_safe           = T.boolean,
+        peak_idx          = T.number,
+        consecutive_drops = T.number,
+    }),
+    vote_prefix_stability_skipped = T.shape({
+        name          = T.one_of({ "vote_prefix_stability_skipped" }),
+        signal_type   = T.string,
+        reason        = T.string,
+        series_length = T.number,
+        is_safe       = T.boolean,
+    }),
+    calibrate = T.shape({
+        name                = T.one_of({ "calibrate" }),
+        confidence          = T.number,
+        threshold           = T.number,
+        needs_investigation = T.boolean,
+        escalated           = T.boolean,
+        llm_calls           = T.number,
+    }),
+})
 
 M.safe_paneled = T.shape({
     answer       = T.string:is_optional():describe("Consensus answer (nil on abort)"),
@@ -144,7 +247,7 @@ M.safe_paneled = T.shape({
     panel_size   = T.number:describe("Actual panel size used"),
     plurality_fraction = T.number:describe("Top-answer vote fraction"),
     margin_gap   = T.number:describe("(top - runner_up) / n"),
-    vote_counts  = T.table:describe("{ [normalized_answer] = count } tally"),
+    vote_counts  = T.map_of(T.string, T.number):describe("{ [normalized_answer] = count } tally"),
     n_distinct_answers = T.number:describe("Count of unique answers"),
     expected_accuracy  = T.number:describe("Condorcet expected majority accuracy"),
     target_met         = T.boolean:describe("Whether expected accuracy >= target"),
@@ -155,7 +258,7 @@ M.safe_paneled = T.shape({
     unanimous          = T.boolean:describe("All votes identical"),
     total_llm_calls    = T.number,
     abort_reason       = T.string:is_optional():describe("Abort reason (nil when not aborted)"),
-    stages             = T.array_of(T.table):describe("Per-stage detail (heterogeneous, keyed by name)"),
+    stages             = T.array_of(safe_panel_stage):describe("Per-stage detail (discriminated by name)"),
 }, { open = true })
 
 -- ── public API re-export ─────────────────────────────────────────────

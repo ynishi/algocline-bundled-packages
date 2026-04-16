@@ -107,6 +107,50 @@ handlers.shape = function(value, schema, path)
     return true
 end
 
+handlers.discriminated = function(value, schema, path)
+    if type(value) ~= "table" then
+        return false, string.format(
+            "shape violation at %s: expected table, got %s",
+            path, type(value))
+    end
+    local tag = schema.tag
+    local tag_val = value[tag]
+    if tag_val == nil then
+        return false, string.format(
+            "shape violation at %s: missing discriminant field '%s'",
+            path, tag)
+    end
+    local variant = schema.variants[tag_val]
+    if variant == nil then
+        local keys = {}
+        for k in pairs(schema.variants) do keys[#keys + 1] = k end
+        table.sort(keys)
+        local parts = {}
+        for i = 1, #keys do parts[i] = string.format("%q", keys[i]) end
+        return false, string.format(
+            "shape violation at %s: discriminant '%s' = %q not in [%s]",
+            path, tag, tostring(tag_val), table.concat(parts, ", "))
+    end
+    return handlers.shape(value, variant, path)
+end
+
+handlers.map_of = function(value, schema, path)
+    if type(value) ~= "table" then
+        return false, string.format(
+            "shape violation at %s: expected table (map), got %s",
+            path, type(value))
+    end
+    for k, v in pairs(value) do
+        local key_path = path .. "[key=" .. tostring(k) .. "]"
+        local ok, reason = check_node(k, schema.key, key_path)
+        if not ok then return false, reason end
+        local val_path = path .. "[" .. tostring(k) .. "]"
+        ok, reason = check_node(v, schema.val, val_path)
+        if not ok then return false, reason end
+    end
+    return true
+end
+
 handlers.one_of = function(value, schema, path)
     local vs = schema.values
     for i = 1, #vs do

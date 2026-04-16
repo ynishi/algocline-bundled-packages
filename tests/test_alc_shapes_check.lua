@@ -132,6 +132,86 @@ describe("alc_shapes.check one_of", function()
     end)
 end)
 
+describe("alc_shapes.check map_of", function()
+    local sch = T.map_of(T.string, T.number)
+
+    it("passes valid string->number map", function()
+        expect(S.check({ tokyo = 3, paris = 2 }, sch)).to.equal(true)
+    end)
+
+    it("passes empty table", function()
+        expect(S.check({}, sch)).to.equal(true)
+    end)
+
+    it("fails when value is not a table", function()
+        local ok, reason = S.check("notmap", sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected table")).to.exist()
+    end)
+
+    it("fails on wrong value type", function()
+        local ok, reason = S.check({ a = "notnum" }, sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected number")).to.exist()
+    end)
+
+    it("fails on wrong key type (integer key)", function()
+        local bad = {}
+        bad[1] = 42
+        local ok, reason = S.check(bad, sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected string")).to.exist()
+    end)
+end)
+
+describe("alc_shapes.check discriminated", function()
+    local sch = T.discriminated("name", {
+        alpha = T.shape({ name = T.one_of({"alpha"}), x = T.number }),
+        beta  = T.shape({ name = T.one_of({"beta"}),  y = T.string }),
+    })
+
+    it("passes correct variant (alpha)", function()
+        expect(S.check({ name = "alpha", x = 42 }, sch)).to.equal(true)
+    end)
+
+    it("passes correct variant (beta)", function()
+        expect(S.check({ name = "beta", y = "hi" }, sch)).to.equal(true)
+    end)
+
+    it("fails when discriminant field is missing", function()
+        local ok, reason = S.check({ x = 42 }, sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("missing discriminant")).to.exist()
+    end)
+
+    it("fails on unknown discriminant value", function()
+        local ok, reason = S.check({ name = "gamma" }, sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("not in")).to.exist()
+    end)
+
+    it("validates variant-specific fields", function()
+        local ok, reason = S.check({ name = "alpha", x = "notnum" }, sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected number")).to.exist()
+    end)
+
+    it("fails when value is not a table", function()
+        local ok, reason = S.check("notatable", sch)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected table")).to.exist()
+    end)
+
+    it("works inside array_of", function()
+        local arr_sch = T.array_of(sch)
+        local ok = S.check({
+            { name = "alpha", x = 1 },
+            { name = "beta",  y = "z" },
+        }, arr_sch)
+        expect(ok).to.equal(true)
+    end)
+end)
+
 describe("alc_shapes.check described passthrough", function()
     it("passes if inner passes, fails if inner fails", function()
         local sch = T.string:describe("user name")

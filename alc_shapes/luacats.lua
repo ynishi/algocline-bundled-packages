@@ -69,6 +69,12 @@ local function type_of(node)
             return "(" .. inner_type .. "|nil)[]"
         end
         return inner_type .. "[]"
+    elseif kind == "discriminated" then
+        return "table"
+    elseif kind == "map_of" then
+        local k = type_of(rawget(node, "key"))
+        local v = type_of(rawget(node, "val"))
+        return "table<" .. k .. ", " .. v .. ">"
     elseif kind == "shape" then
         -- inline nested shape renders as `table` (no anonymous class emitted).
         return "table"

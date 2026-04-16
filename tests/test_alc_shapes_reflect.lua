@@ -115,6 +115,43 @@ describe("alc_shapes.reflect.walk", function()
         expect(seen_prim).to.equal(true)
     end)
 
+    it("descends into map_of key and val", function()
+        local sch = T.shape({
+            m = T.map_of(T.string, T.number),
+        })
+        local kinds = {}
+        S.walk(sch, function(node)
+            kinds[#kinds + 1] = rawget(node, "kind")
+        end)
+        -- shape + map_of + key:prim(string) + val:prim(number)
+        local found_map = false
+        local prim_count = 0
+        for _, k in ipairs(kinds) do
+            if k == "map_of" then found_map = true end
+            if k == "prim" then prim_count = prim_count + 1 end
+        end
+        expect(found_map).to.equal(true)
+        expect(prim_count >= 2).to.equal(true)
+    end)
+
+    it("descends into discriminated variants (sorted)", function()
+        local sch = T.discriminated("t", {
+            b = T.shape({ t = T.string, x = T.number }),
+            a = T.shape({ t = T.string, y = T.boolean }),
+        })
+        local kinds = {}
+        S.walk(sch, function(node)
+            kinds[#kinds + 1] = rawget(node, "kind")
+        end)
+        -- discriminated + 2 shapes + their fields
+        expect(kinds[1]).to.equal("discriminated")
+        local shape_count = 0
+        for _, k in ipairs(kinds) do
+            if k == "shape" then shape_count = shape_count + 1 end
+        end
+        expect(shape_count).to.equal(2)
+    end)
+
     it("errors on non-function visitor", function()
         local ok = pcall(S.walk, T.shape({ a = T.string }), "not a func")
         expect(ok).to.equal(false)

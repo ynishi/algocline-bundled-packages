@@ -88,6 +88,22 @@ describe("alc_shapes.LuaCats.class_for", function()
         expect(out:match('---@field mode "a"|"b"')).to.exist()
     end)
 
+    it("maps map_of to table<K, V>", function()
+        local sch = T.shape({ counts = T.map_of(T.string, T.number) })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field counts table<string, number>")).to.exist()
+    end)
+
+    it("maps discriminated to table", function()
+        local sch = T.shape({
+            stages = T.array_of(T.discriminated("name", {
+                a = T.shape({ name = T.string }),
+            })),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field stages table%[%]")).to.exist()
+    end)
+
     it("maps inline nested shape to bare table", function()
         local sch = T.shape({ inner = T.shape({ x = T.string }) })
         local out = S.LuaCats.class_for("C", sch)

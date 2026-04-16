@@ -78,6 +78,15 @@ function M.walk(schema, visitor)
             for i = 1, #names do visit(fields_tbl[names[i]]) end
         elseif kind == "array_of" then
             visit(rawget(node, "elem"))
+        elseif kind == "discriminated" then
+            local variants = rawget(node, "variants")
+            local keys = {}
+            for k in pairs(variants) do keys[#keys + 1] = k end
+            table.sort(keys)
+            for i = 1, #keys do visit(variants[keys[i]]) end
+        elseif kind == "map_of" then
+            visit(rawget(node, "key"))
+            visit(rawget(node, "val"))
         elseif kind == "optional" or kind == "described" then
             visit(rawget(node, "inner"))
         end

@@ -23,7 +23,7 @@
 ---@field naive_baseline_kind string @Baseline method identifier
 ---@field ranking table[] @Final ranking
 ---@field savings_percent? number @LLM call savings vs baseline (nil on bypass)
----@field stages table[] @Per-stage detail (heterogeneous, keyed by name)
+---@field stages table[] @Per-stage detail (discriminated by name)
 ---@field total_llm_calls number
 ---@field warnings table[] @Diagnostic warnings
 
@@ -66,11 +66,11 @@
 ---@field needs_investigation boolean @True if meta-confidence below threshold
 ---@field panel_size number @Actual panel size used
 ---@field plurality_fraction number @Top-answer vote fraction
----@field stages table[] @Per-stage detail (heterogeneous, keyed by name)
+---@field stages table[] @Per-stage detail (discriminated by name)
 ---@field target_met boolean @Whether expected accuracy >= target
 ---@field total_llm_calls number
 ---@field unanimous boolean @All votes identical
----@field vote_counts table @{ [normalized_answer] = count } tally
+---@field vote_counts table<string, number> @{ [normalized_answer] = count } tally
 
 ---@class AlcResultTournament
 ---@field best string @Winner text
@@ -86,5 +86,5 @@
 ---@field n_sampled number @Number of sampled paths
 ---@field paths table[] @Per-path reasoning + extracted answer
 ---@field total_llm_calls number
----@field vote_counts table @{ [norm] = count } tally
+---@field vote_counts table<string, number> @{ [norm] = count } tally
 ---@field votes string[] @Normalized vote per path, 1-indexed
