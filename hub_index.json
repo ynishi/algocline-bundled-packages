@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-15T03:42:35Z",
+  "updated_at": "2026-04-16T23:41:25Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -41,6 +41,16 @@
       "card_count": 0,
       "best_card": null,
       "docstring": "aco — Ant Colony Optimization for discrete path search\n\nImplements the Ant System (Dorigo 1996) with convergence guarantees\nfrom Gutjahr 2000 (GBAS). Provides both a pure-computation engine\nand an LLM-integrated run(ctx) for workflow/path optimization.\n\nBased on:\nDorigo, Maniezzo, Colorni. \"Ant system: optimization by a colony\nof cooperating agents\". IEEE TSMC-B 26(1), 29-41, 1996.\n\nGutjahr, W. J. \"A Graph-based Ant System and its convergence\".\nFuture Generation Computer Systems 16, 873-888, 2000.\n\nCore equations:\nTransition probability (Eq.1):\np_{xy}^k = [tau_{xy}^alpha * eta_{xy}^beta] /\nSUM_z [tau_{xz}^alpha * eta_{xz}^beta]\n\nPheromone update (Eq.2):\ntau_{xy}(t+1) = (1 - rho) * tau_{xy}(t) + SUM_k delta_tau_{xy}^k\n\nStützle-Dorigo 2002: pheromone bounds [tau_min, tau_max]\nprevent premature convergence (MAX-MIN AS).\n\nUsage (pure engine):\nlocal aco = require(\"aco\")\nlocal colony = aco.new(graph, {rho = 0.1})\ncolony:iterate(eval_fn)\nlocal best = colony:best()\n\nUsage (LLM-integrated):\nreturn aco.run(ctx)\n-- ctx.task, ctx.nodes, ctx.budget"
+    },
+    {
+      "name": "alc_shapes",
+      "version": "",
+      "description": "",
+      "category": "",
+      "source": "",
+      "card_count": 0,
+      "best_card": null,
+      "docstring": "alc_shapes — SSoT for the result shape convention.\n\nUsage:\nlocal S = require(\"alc_shapes\")\nlocal ok, reason = S.check(value, S.voted)\nlocal x = S.assert(value, \"voted\", \"where\")\n\nSee workspace/tasks/shape-convention/design.md.\n\nNOTE: meta.result_shape is a single string today. Packages with\nmultiple entry points (e.g. calibrate.run vs calibrate.assess)\ndeclare the primary shape in meta and document secondary shapes\nin docstrings. A future `meta.shapes(\"key\")` accessor is a\npossible extension — tracked in design.md §将来検討."
     },
     {
       "name": "ambig",
