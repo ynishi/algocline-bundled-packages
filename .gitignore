@@ -1,6 +1,5 @@
-.claude/
+.claude
 .mcp.json
-workspace/
-.worktrees/
+workspace
+.worktrees
 .env
-
