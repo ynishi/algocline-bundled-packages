@@ -48,3 +48,13 @@ test:
 # [group('allow-agent')]
 pkg-list:
     alc pkg list
+
+# Regenerate types/alc_shapes.d.lua from alc_shapes/init.lua (SSoT).
+# [group('allow-agent')]
+gen-shapes:
+    lua scripts/gen_shapes_luacats.lua > types/alc_shapes.d.lua
+
+# Verify types/alc_shapes.d.lua matches the current alc_shapes/init.lua (drift check).
+# [group('allow-agent')]
+verify-shapes:
+    lua scripts/gen_shapes_luacats.lua | diff - types/alc_shapes.d.lua
