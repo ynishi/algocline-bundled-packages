@@ -3,11 +3,16 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
--- Rely on the test runner's search_paths (mlua-probe) rather than PWD.
--- When this test is invoked via
---   mcp__lua-debugger__test_launch(code_file=..., search_paths=[REPO])
--- the worktree path is prepended to package.path and wins over any
--- same-named package (e.g. an installed sc shadow) on a different path.
+-- Dual-mode header: works via both
+--   (a) `mlua-probe test tests/` CLI            — PWD fallback below
+--   (b) `mcp__lua-debugger__test_launch(search_paths=[REPO])` — MCP prepend
+-- Both paths (a) and (b) end up prepending the worktree to package.path,
+-- so the worktree copy wins over any installed same-named package.
+-- Direct `lua tests/*.lua` is NOT supported — `lust` global is only
+-- injected by mlua-probe (CLI or MCP).
+local REPO = os.getenv("PWD") or "."
+package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+
 package.loaded["sc"] = nil
 local sc = require("sc")
 
