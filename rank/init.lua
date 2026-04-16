@@ -25,6 +25,7 @@ M.meta = {
     version = "0.1.0",
     description = "Tournament selection — generate candidates, pairwise LLM-as-Judge ranking",
     category = "selection",
+    result_shape = "tournament",
 }
 
 --- Pairwise comparison: returns "A" or "B".
@@ -136,6 +137,7 @@ function M.run(ctx)
         candidates = candidates,
         matches = match_log,
     }
+    require("alc_shapes").assert_dev(ctx.result, "tournament", "rank.run")
     return ctx
 end
 

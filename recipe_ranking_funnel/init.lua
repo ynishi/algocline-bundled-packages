@@ -88,6 +88,7 @@ M.meta = {
         .. "multi-axis scoring, pairwise final rank. -87% calls vs naive "
         .. "pairwise on N=8 (verified). Encodes known failure modes as caveats.",
     category = "recipe",
+    result_shape = "funnel_ranked",
 }
 
 --- Packages composed by this recipe, in execution order.
@@ -395,6 +396,7 @@ function M.run(ctx)
             -- conceptual stages see N candidates: no reduction happens.
             funnel_shape = { N, N, N },
         }
+        require("alc_shapes").assert_dev(ctx.result, "funnel_ranked", "recipe_ranking_funnel.run/bypass")
         return ctx
     end
 
@@ -725,6 +727,7 @@ function M.run(ctx)
         -- Length is always 3. Bypass path emits {N, N, N} (no reduction).
         funnel_shape = { N, stages[1].output_count, stages[2].output_count },
     }
+    require("alc_shapes").assert_dev(ctx.result, "funnel_ranked", "recipe_ranking_funnel.run")
     return ctx
 end
 

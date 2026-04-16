@@ -62,6 +62,7 @@ M.meta = {
         .. "Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the "
         .. "calibration problem.",
     category = "selection",
+    result_shape = "pairwise_ranked",
 }
 
 --- Ask the LLM which of two candidates is better. Returns one of:
@@ -282,6 +283,7 @@ function M.run(ctx)
         position_bias_splits = splits,
         both_tie_pairs = ties,
     }
+    require("alc_shapes").assert_dev(ctx.result, "pairwise_ranked", "pairwise_rank.run")
     return ctx
 end
 

@@ -60,6 +60,7 @@ M.meta = {
         .. "generation in 1 LLM call. Resolves the calibration problem of "
         .. "pointwise scoring. Sliding window for large N.",
     category = "selection",
+    result_shape = "listwise_ranked",
 }
 
 --- Format a window of candidates as numbered passages.
@@ -262,6 +263,7 @@ function M.run(ctx)
         n_candidates = n,
         total_llm_calls = total_calls,
     }
+    require("alc_shapes").assert_dev(ctx.result, "listwise_ranked", "listwise_rank.run")
     return ctx
 end
 

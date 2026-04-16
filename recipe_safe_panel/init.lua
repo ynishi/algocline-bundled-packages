@@ -78,6 +78,7 @@ M.meta = {
         .. "Composes condorcet + sc + inverse_u + calibrate with known "
         .. "failure mode awareness.",
     category = "recipe",
+    result_shape = "safe_paneled",
 }
 
 --- Packages composed by this recipe, in execution order.
@@ -489,6 +490,7 @@ function M.run(ctx)
                 is_anti_jury = is_anti,
             } },
         }
+        require("alc_shapes").assert_dev(ctx.result, "safe_paneled", "recipe_safe_panel.run/abort")
         return ctx
     end
 
@@ -821,6 +823,7 @@ function M.run(ctx)
         total_llm_calls = total_llm_calls,
         stages = stages,
     }
+    require("alc_shapes").assert_dev(ctx.result, "safe_paneled", "recipe_safe_panel.run")
     return ctx
 end
 

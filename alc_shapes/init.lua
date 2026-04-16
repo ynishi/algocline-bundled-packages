@@ -59,6 +59,105 @@ M.calibrated = T.shape({
     fallback_detail = T.table:is_optional():describe("Fallback strategy result (voted/paneled)"),
 }, { open = true })
 
+-- ── ranking shapes ───────────────────────────────────────────────────
+
+local ranked_item_3 = T.shape({
+    rank  = T.number,
+    index = T.number,
+    text  = T.string,
+})
+
+local ranked_item_4 = T.shape({
+    rank  = T.number,
+    index = T.number,
+    score = T.number,
+    text  = T.string,
+})
+
+M.tournament = T.shape({
+    best        = T.string:describe("Winner text"),
+    best_index  = T.number:describe("Winner original index (1-based)"),
+    total_wins  = T.number:describe("Winner's win count"),
+    candidates  = T.array_of(T.string):describe("Input candidate texts"),
+    matches     = T.array_of(T.shape({
+        a      = T.number:describe("Index of first candidate"),
+        b      = T.number:describe("Index of second candidate"),
+        winner = T.number:describe("Index of the winner"),
+        reason = T.string:describe("Judge verdict explanation"),
+    })):describe("Pairwise match log"),
+}, { open = true })
+
+M.listwise_ranked = T.shape({
+    ranked      = T.array_of(ranked_item_3):describe("Full ranking"),
+    top_k       = T.array_of(ranked_item_3):describe("Top-k subset"),
+    killed      = T.array_of(ranked_item_3):describe("Eliminated candidates"),
+    best        = T.string:describe("Top-ranked text"),
+    best_index  = T.number:describe("Top-ranked original index (1-based)"),
+    n_candidates    = T.number,
+    total_llm_calls = T.number,
+}, { open = true })
+
+M.pairwise_ranked = T.shape({
+    ranked      = T.array_of(ranked_item_4):describe("Full ranking with scores"),
+    top_k       = T.array_of(ranked_item_4):describe("Top-k subset"),
+    killed      = T.array_of(ranked_item_4):describe("Eliminated candidates"),
+    best        = T.string:describe("Top-ranked text"),
+    best_index  = T.number:describe("Top-ranked original index (1-based)"),
+    method          = T.one_of({ "allpair", "sorting" }):describe("Comparison strategy"),
+    score_semantics = T.one_of({ "copeland", "rank_inverse" }):describe("Score interpretation"),
+    n_candidates        = T.number,
+    total_llm_calls     = T.number,
+    position_bias_splits = T.number:describe("Position-bias correction splits"),
+    both_tie_pairs       = T.number:describe("Pairs that tied in both directions"),
+}, { open = true })
+
+-- ── recipe shapes ────────────────────────────────────────────────────
+
+M.funnel_ranked = T.shape({
+    ranking     = T.array_of(T.shape({
+        rank           = T.number,
+        text           = T.string,
+        original_index = T.number:describe("Pre-funnel candidate index (1-based)"),
+        pairwise_score = T.number:describe("Copeland score from pairwise stage"),
+    })):describe("Final ranking"),
+    best            = T.string:describe("Top-ranked text"),
+    best_index      = T.number:describe("Top-ranked original index (1-based)"),
+    funnel_bypassed = T.boolean:describe("True when N < 6 bypasses funnel stages"),
+    bypass_reason   = T.string:is_optional():describe("Reason for bypass (nil when not bypassed)"),
+    total_llm_calls     = T.number,
+    naive_baseline_calls = T.number:describe("Hypothetical full-pairwise call count"),
+    naive_baseline_kind  = T.string:describe("Baseline method identifier"),
+    savings_percent = T.number:is_optional():describe("LLM call savings vs baseline (nil on bypass)"),
+    warnings        = T.array_of(T.shape({
+        code     = T.string:describe("Machine-readable warning identifier"),
+        severity = T.one_of({ "warn", "critical" }),
+        data     = T.table:describe("Diagnostic payload (structure varies by code)"),
+        message  = T.string:describe("Human-readable summary"),
+    })):describe("Diagnostic warnings"),
+    stages      = T.array_of(T.table):describe("Per-stage detail (heterogeneous, keyed by name)"),
+    funnel_shape = T.array_of(T.number):describe("Candidate counts per stage [N, s1_out, s2_out]"),
+}, { open = true })
+
+M.safe_paneled = T.shape({
+    answer       = T.string:is_optional():describe("Consensus answer (nil on abort)"),
+    confidence   = T.number:describe("Meta-confidence estimate"),
+    panel_size   = T.number:describe("Actual panel size used"),
+    plurality_fraction = T.number:describe("Top-answer vote fraction"),
+    margin_gap   = T.number:describe("(top - runner_up) / n"),
+    vote_counts  = T.table:describe("{ [normalized_answer] = count } tally"),
+    n_distinct_answers = T.number:describe("Count of unique answers"),
+    expected_accuracy  = T.number:describe("Condorcet expected majority accuracy"),
+    target_met         = T.boolean:describe("Whether expected accuracy >= target"),
+    is_safe            = T.boolean:describe("Vote-prefix stability safe flag"),
+    anti_jury          = T.boolean:describe("Condorcet anti-jury detection"),
+    aborted            = T.boolean:describe("True if early-abort triggered"),
+    needs_investigation = T.boolean:describe("True if meta-confidence below threshold"),
+    unanimous          = T.boolean:describe("All votes identical"),
+    total_llm_calls    = T.number,
+    abort_reason       = T.string:is_optional():describe("Abort reason (nil when not aborted)"),
+    stages             = T.array_of(T.table):describe("Per-stage detail (heterogeneous, keyed by name)"),
+}, { open = true })
+
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check
 M.assert       = check.assert
