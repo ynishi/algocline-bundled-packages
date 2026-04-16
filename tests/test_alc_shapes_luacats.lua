@@ -55,6 +55,33 @@ describe("alc_shapes.LuaCats.class_for", function()
         expect(out:match("---@field grid number%[%]%[%]")).to.exist()
     end)
 
+    it("preserves array element optional as (T|nil)[] (Q2)", function()
+        local sch = T.shape({ items = T.array_of(T.number:is_optional()) })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field items %(number|nil%)%[%]")).to.exist()
+    end)
+
+    it("distinguishes optional-array from array-of-optional (Q2)", function()
+        -- optional-outside: `items?` with inner number[]
+        local a = T.shape({ items = T.array_of(T.number):is_optional() })
+        local out_a = S.LuaCats.class_for("C", a)
+        expect(out_a:match("---@field items%? number%[%]")).to.exist()
+        -- optional-inside: `items` required but elements may be nil
+        local b = T.shape({ items = T.array_of(T.number:is_optional()) })
+        local out_b = S.LuaCats.class_for("C", b)
+        expect(out_b:match("---@field items %(number|nil%)%[%]")).to.exist()
+        -- and crucially, the optional-inside case must NOT carry `items?`
+        expect(out_b:match("---@field items%?")).to_not.exist()
+    end)
+
+    it("treats described wrapper as transparent inside array_of (Q2)", function()
+        local sch = T.shape({
+            items = T.array_of(T.number:is_optional():describe("maybe count")),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field items %(number|nil%)%[%]")).to.exist()
+    end)
+
     it("maps one_of(strings) to quoted literal union", function()
         local sch = T.shape({ mode = T.one_of({ "a", "b" }) })
         local out = S.LuaCats.class_for("C", sch)

@@ -170,6 +170,55 @@ describe("alc_shapes.assert behavior", function()
     end)
 end)
 
+describe("alc_shapes.check determinism (Q1)", function()
+    it("reports the alphabetically-first failing field across multiple violations", function()
+        -- All three fields are non-strings; sorted iteration must report 'alpha' first.
+        local sch = T.shape({
+            zulu  = T.string,
+            alpha = T.string,
+            mike  = T.string,
+        })
+        local _, reason = S.check({ zulu = 1, alpha = 2, mike = 3 }, sch)
+        expect(reason:match("%$%.alpha")).to.exist()
+        expect(reason:match("%$%.zulu")).to_not.exist()
+    end)
+
+    it("reports alphabetically-first unexpected key under strict mode", function()
+        local strict = T.shape({ a = T.string }, { open = false })
+        local _, reason = S.check({ a = "x", zulu = 1, alpha = 2 }, strict)
+        expect(reason:match("%$%.alpha")).to.exist()
+        expect(reason:match("%$%.zulu")).to_not.exist()
+    end)
+end)
+
+describe("alc_shapes reserved-name guard (Q3)", function()
+    local internal = require("alc_shapes")._internal
+
+    it("exposes the reserved-name list", function()
+        expect(type(internal.RESERVED_SHAPE_NAMES)).to.equal("table")
+        expect(internal.RESERVED_SHAPE_NAMES[1]).to.equal("any")
+    end)
+
+    it("rejects a module that registers 'any' as a shape", function()
+        local fake = { any = T.shape({ x = T.string }) }
+        local ok, err = pcall(internal.assert_no_reserved_shapes, fake)
+        expect(ok).to.equal(false)
+        expect(err:match("reserved")).to.exist()
+        expect(err:match("'any'")).to.exist()
+    end)
+
+    it("tolerates non-shape values under reserved names (e.g. a function)", function()
+        local fake = { any = function() end }
+        local ok = pcall(internal.assert_no_reserved_shapes, fake)
+        expect(ok).to.equal(true)
+    end)
+
+    it("tolerates the current module (P0 dict is empty)", function()
+        local ok = pcall(internal.assert_no_reserved_shapes, require("alc_shapes"))
+        expect(ok).to.equal(true)
+    end)
+end)
+
 describe("alc_shapes.is_dev_mode / assert_dev", function()
     it("is_dev_mode depends on ALC_SHAPE_CHECK env", function()
         local active = (os.getenv("ALC_SHAPE_CHECK") == "1")

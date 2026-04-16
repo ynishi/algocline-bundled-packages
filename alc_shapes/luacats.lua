@@ -44,7 +44,31 @@ local function type_of(node)
     elseif kind == "described" then
         return type_of(rawget(node, "inner"))
     elseif kind == "array_of" then
-        return type_of(rawget(node, "elem")) .. "[]"
+        -- Preserve inner-optional semantics:
+        --   array_of(T)            -> T[]
+        --   array_of(optional(T))  -> (T|nil)[]
+        -- Zod distinguishes z.string().array() vs z.string().optional().array()
+        -- the same way; silently flattening to T[] would lose the nil admission.
+        -- `described` wrappers are transparent (doc-only).
+        -- See workspace/tasks/shape-convention/design.md §P0 修正メモ Q2.
+        local elem = rawget(node, "elem")
+        local had_optional = false
+        while true do
+            local k = rawget(elem, "kind")
+            if k == "optional" then
+                had_optional = true
+                elem = rawget(elem, "inner")
+            elseif k == "described" then
+                elem = rawget(elem, "inner")
+            else
+                break
+            end
+        end
+        local inner_type = type_of(elem)
+        if had_optional then
+            return "(" .. inner_type .. "|nil)[]"
+        end
+        return inner_type .. "[]"
     elseif kind == "shape" then
         -- inline nested shape renders as `table` (no anonymous class emitted).
         return "table"

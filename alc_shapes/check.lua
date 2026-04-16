@@ -71,21 +71,37 @@ handlers.shape = function(value, schema, path)
             path, type(value))
     end
     local fields = schema.fields
-    -- required/optional field checks
-    for name, sub_schema in pairs(fields) do
+    -- Determinism: sort field names so first-fail reports the same
+    -- violating field across runs. Lua `pairs` order is unspecified;
+    -- tableshape / Zod / Joi all leave this to implementation but we
+    -- require reproducibility for CI + conformance tests.
+    -- See workspace/tasks/shape-convention/design.md §P0 修正メモ Q1.
+    local names = {}
+    for name in pairs(fields) do names[#names + 1] = name end
+    table.sort(names)
+    for i = 1, #names do
+        local name = names[i]
+        local sub_schema = fields[name]
         local sub_path = (path == "$") and ("$." .. name) or (path .. "." .. name)
         local sub_val = value[name]
         local ok, reason = check_node(sub_val, sub_schema, sub_path)
         if not ok then return false, reason end
     end
-    -- strict mode: reject extra keys when open=false
+    -- strict mode: reject extra keys when open=false. Also sorted
+    -- for deterministic error reporting (Q1).
     if schema.open == false then
-        for name, _ in pairs(value) do
+        local extra = {}
+        for name in pairs(value) do
             if type(name) == "string" and fields[name] == nil then
-                local sub_path = (path == "$") and ("$." .. name) or (path .. "." .. name)
-                return false, string.format(
-                    "shape violation at %s: unexpected field", sub_path)
+                extra[#extra + 1] = name
             end
+        end
+        table.sort(extra)
+        if extra[1] ~= nil then
+            local name = extra[1]
+            local sub_path = (path == "$") and ("$." .. name) or (path .. "." .. name)
+            return false, string.format(
+                "shape violation at %s: unexpected field", sub_path)
         end
     end
     return true
