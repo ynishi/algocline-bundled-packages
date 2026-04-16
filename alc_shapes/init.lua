@@ -26,7 +26,10 @@ M.voted = T.shape({
     consensus       = T.string:describe("LLM-synthesized majority summary"),
     answer          = T.string:is_optional():describe("Majority answer (nil when no paths converge)"),
     answer_norm     = T.string:is_optional():describe("Normalized vote key"),
-    paths           = T.array_of(T.table):describe("Per-path { reasoning, answer } records"),
+    paths           = T.array_of(T.shape({
+        reasoning = T.string,
+        answer    = T.string,
+    })):describe("Per-path reasoning + extracted answer"),
     votes           = T.array_of(T.string):describe("Normalized vote per path, 1-indexed"),
     vote_counts     = T.table:describe("{ [norm] = count } tally"),
     n_sampled       = T.number:describe("Number of sampled paths"),
@@ -34,7 +37,10 @@ M.voted = T.shape({
 }, { open = true })
 
 M.paneled = T.shape({
-    arguments = T.array_of(T.table):describe("Per-role { role, text } records"),
+    arguments = T.array_of(T.shape({
+        role = T.string,
+        text = T.string,
+    })):describe("Per-role position statements"),
     synthesis = T.string:describe("Moderator synthesis"),
 }, { open = true })
 

@@ -80,9 +80,12 @@ describe("shape conformance: shape validation against mock data", function()
     end)
 
     it("voted shape accepts result with nil answer (no convergence)", function()
+        -- answer/answer_norm are optional at top level, but each path
+        -- always has both reasoning and answer (extract_answer always
+        -- returns a string even if unhelpful).
         local mock = {
             consensus = "No clear answer",
-            paths = { { reasoning = "..." } },
+            paths = { { reasoning = "...", answer = "unclear" } },
             votes = { "" },
             vote_counts = {},
             n_sampled = 1,

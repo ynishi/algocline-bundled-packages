@@ -14,7 +14,7 @@
 ---@field total_llm_calls number
 
 ---@class AlcResultPaneled
----@field arguments table[] @Per-role { role, text } records
+---@field arguments table[] @Per-role position statements
 ---@field synthesis string @Moderator synthesis
 
 ---@class AlcResultVoted
@@ -22,7 +22,7 @@
 ---@field answer_norm? string @Normalized vote key
 ---@field consensus string @LLM-synthesized majority summary
 ---@field n_sampled number @Number of sampled paths
----@field paths table[] @Per-path { reasoning, answer } records
+---@field paths table[] @Per-path reasoning + extracted answer
 ---@field total_llm_calls number
 ---@field vote_counts table @{ [norm] = count } tally
 ---@field votes string[] @Normalized vote per path, 1-indexed
