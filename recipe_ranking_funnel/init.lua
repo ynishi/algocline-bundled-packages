@@ -85,8 +85,8 @@ M.meta = {
     name = "recipe_ranking_funnel",
     version = "0.1.0",
     description = "Verified 3-stage ranking funnel — listwise screening, "
-        .. "multi-axis scoring, pairwise final rank. -71% tokens vs naive "
-        .. "pairwise on N=30. Encodes known failure modes as caveats.",
+        .. "multi-axis scoring, pairwise final rank. -87% calls vs naive "
+        .. "pairwise on N=8 (verified). Encodes known failure modes as caveats.",
     category = "recipe",
 }
 
