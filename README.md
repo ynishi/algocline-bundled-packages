@@ -246,6 +246,19 @@ Gaps:
 - Scenario-eval runs are non-deterministic and billable; treat each verified
   number as one sample, not a tight confidence interval.
 
+## Result Shape Convention
+
+Packages declare the shape of their `ctx.result` via `meta.result_shape`, validated at runtime by **[alc_shapes](alc_shapes/)**. This ensures consumers can rely on documented fields without tight coupling.
+
+```lua
+local S = require("alc_shapes")
+S.assert(result, "voted", "my_consumer")  -- loud fail if shape violated
+```
+
+9 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), and discriminated unions (`T.discriminated`).
+
+See [alc_shapes/README.md](alc_shapes/README.md) for the full API reference (combinators, validator, reflection, codegen).
+
 ## Usage
 
 ```lua
@@ -308,12 +321,17 @@ M.meta = {
     version = "0.1.0",
     description = "My custom strategy",
     category = "reasoning",
+    result_shape = "my_shape",  -- optional: register in alc_shapes/init.lua
 }
 
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     -- Implement using alc.llm(), alc.map(), etc.
     ctx.result = { answer = "..." }
+
+    -- Optional: self-defense assert (runs only when ALC_SHAPE_CHECK=1)
+    local S = require("alc_shapes")
+    S.assert_dev(ctx.result, "my_shape", "my-strategy.run")
     return ctx
 end
 

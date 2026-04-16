@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **alc_shapes**: Result Shape Convention — DSL-based schema definitions for `ctx.result` validation across packages.
+  - **P0**: Core library (`alc_shapes/`) — DSL combinators (`T.shape`, `T.array_of`, `T.one_of`, `T.string`, `T.number`, `T.boolean`, `T.table`, `T.any`), validator (`check`/`assert`/`assert_dev`), reflection (`fields`/`walk`), LuaCATS codegen (`class_for`/`gen`). Dev-mode assert via `ALC_SHAPE_CHECK=1`. Deterministic field-name-sorted error reporting. Reserved-name guard for "any". `types/alc_shapes.d.lua` auto-generated from SSoT (`alc_shapes/init.lua`).
+  - **P1**: Shape definitions for `sc` (voted), `calibrate` (calibrated + assessed), `panel` (paneled) — producer `meta.result_shape` declarations + `assert_dev` self-defense.
+  - **P2-P4**: Shape definitions for `rank` (tournament), `listwise_rank` (listwise_ranked), `pairwise_rank` (pairwise_ranked), `recipe_ranking_funnel` (funnel_ranked), `recipe_safe_panel` (safe_paneled). Nested shapes with `ranked_item` variable reuse for DRY.
+  - **DSL extensions**: `T.map_of(K, V)` for key/value typed maps (tableshape `types.map_of` / Zod `z.record()` equivalent), `T.discriminated(tag, variants)` for tag-dispatched heterogeneous unions (Zod `z.discriminatedUnion` equivalent). Resolves `T.table` fallbacks in `vote_counts` (→ `map_of(string, number)`) and `stages[]` (→ `discriminated("name", {...})` with 6 funnel variants + 7 safe_panel variants).
+- **alc_shapes/README.md**: DSL API reference (combinators, validator, reflection, codegen, type mappings).
+- **tests/test_alc_shapes_t.lua**: 34 tests (DSL combinator structure, input validation, rawget invariants).
+- **tests/test_alc_shapes_check.lua**: 42 tests (primitives, shape, array_of, one_of, map_of, discriminated, assert behavior, determinism, reserved-name guard, dev-mode).
+- **tests/test_alc_shapes_luacats.lua**: 20 tests (class_for field rendering, type mappings, gen output).
+- **tests/test_alc_shapes_reflect.lua**: 11 tests (fields extraction, walk traversal, map_of/discriminated descent).
+- **tests/test_shapes_conformance.lua**: 44 tests (meta declarations for 8 packages, mock data validation for 9 shapes, open-table tolerance).
+
+### Changed
+
+- **README**: added Result Shape Convention section with link to `alc_shapes/README.md`, updated "Writing your own package" with `result_shape` declaration.
+
 ## [0.13.0] - 2026-04-16
 
 ### Added
