@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING** (`docs/hub/*.json` wire): `result_shape` is now a
+  kind-tagged JSON object (`type_to_json` form) instead of a
+  human-readable string. Consumers must switch from string match
+  to `kind` dispatch:
+  - `T.ref(name)` → `{"kind":"label","name":"..."}`
+  - inline `T.shape(...)` → `{"kind":"shape","shape":{...}}`
+  - other schemas → `{"kind":"primitive|array_of|map_of|one_of|discriminated",...}`
+
+  `input_shape` and `result_shape` now share the same discriminated
+  wire format, so a single walker can process both. This unblocks
+  alc_hub_info chain dispatch (pkg A.result → pkg B.input), LLM
+  context injection with structural semantics, and cross-pkg type
+  integrity lint.
+
+  Role split: `docs/hub/*.json` is the machine contract (structured),
+  while `docs/narrative/*.md` YAML frontmatter `result_shape:` remains
+  a human-readable string (shape_type_string form). See
+  `workspace/tasks/1776402892-97073-docs-sot-proto/pipeline-spec.md §7.4`
+  and `ee4-design.md`.
+
 ## [0.14.0] - 2026-04-17
 
 ### Added

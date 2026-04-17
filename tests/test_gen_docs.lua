@@ -663,7 +663,11 @@ describe("tools.docs.projections.hub_entry", function()
         expect(json:find('"version":"1.2.3"', 1, true) ~= nil).to.equal(true)
         expect(json:find('"category":"cat"', 1, true) ~= nil).to.equal(true)
         expect(json:find('"description":"d"', 1, true) ~= nil).to.equal(true)
-        expect(json:find('"result_shape":"h.Result"', 1, true) ~= nil)
+        -- result_shape is now a kind-tagged JSON object (EE4). T.ref
+        -- emits {kind:"label", name:"..."} — consumers dispatch on kind
+        -- and look up `name` in the shape registry.
+        expect(json:find(
+            '"result_shape":{"kind":"label","name":"h.Result"}', 1, true) ~= nil)
             .to.equal(true)
         -- input_shape is a nested Shape JSON.
         expect(json:find('"input_shape":', 1, true) ~= nil).to.equal(true)
@@ -671,6 +675,35 @@ describe("tools.docs.projections.hub_entry", function()
         -- narrative_md escapes newlines as \n (embedded verbatim string).
         expect(json:find('"narrative_md":"', 1, true) ~= nil).to.equal(true)
         expect(json:find("\\n# H", 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("emits result_shape as label JSON for T.ref (registry case)", function()
+        local info = PI.make_pkg_info(
+            { name = "r", version = "1", category = "c",
+              description = "d", source_path = "r/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = T.ref("voted") }
+        )
+        local json = Projections.hub_entry(info)
+        expect(json:find(
+            '"result_shape":{"kind":"label","name":"voted"}', 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("emits result_shape as structured JSON for inline T.shape", function()
+        local info = PI.make_pkg_info(
+            { name = "i", version = "1", category = "c",
+              description = "d", source_path = "i/init.lua" },
+            { title = "I", summary = "s", sections = {} },
+            { input = nil,
+              result = T.shape({ chain = T.array_of(T.string) }) }
+        )
+        local json = Projections.hub_entry(info)
+        -- result_shape must be a kind-tagged dict, not a string
+        expect(json:find('"result_shape":{"kind":"shape"', 1, true) ~= nil)
+            .to.equal(true)
+        -- Inner structural visibility (arrays, primitives) must be walkable
+        expect(json:find('"kind":"array_of"', 1, true) ~= nil).to.equal(true)
     end)
 
     it("omits input_shape / result_shape when nil", function()

@@ -429,10 +429,21 @@ end
 --- Schema (per pipeline-spec.md §7.4):
 ---   {
 ---     "name": str, "version": str, "category": str, "description": str,
----     "narrative_md": str,       -- full narrative.md (frontmatter included)
----     "input_shape":  Shape|null,
----     "result_shape": str|null   -- human-readable form via shape_type_string
+---     "narrative_md": str,         -- full narrative.md (frontmatter included)
+---     "input_shape":  Shape|null,  -- shape_to_json form (fields + open)
+---     "result_shape": TypeJSON|null -- type_to_json form (kind-tagged)
 ---   }
+---
+--- `TypeJSON` kinds: "primitive" / "array_of" / "map_of" / "one_of" /
+--- "shape" / "discriminated" / "label". Consumers dispatch on `kind`:
+---   label → registry lookup by `name`
+---   shape → structural walk via `shape.fields`
+---   other → kind-specific handling
+---
+--- Role split (hub=machine, narrative=human): hub JSON is the machine
+--- contract consumed by alc_hub_info / LLM tooling / IDE / cross-pkg
+--- type lint. Human-readable shape form lives in docs/narrative/*.md
+--- YAML frontmatter (shape_type_string).
 ---
 --- The bytes are deterministic (keys sorted) so downstream hub_index
 --- caching can content-address the JSON.
@@ -450,7 +461,7 @@ function M.hub_entry(pkg_info)
         entry.input_shape = M.shape_to_json(shp.input)
     end
     if shp.result ~= nil then
-        entry.result_shape = M.shape_type_string(shp.result)
+        entry.result_shape = type_to_json(shp.result)
     end
     return json_encode(entry)
 end
