@@ -234,8 +234,20 @@ describe("alc_shapes.assert behavior", function()
         expect(err:match("ctx: at caller")).to.exist()
     end)
 
-    it("pass-through for nil schema", function()
-        expect(S.assert({ a = 1 }, nil)).to.exist()
+    it("EE7: loud-fails on nil schema (intent violation)", function()
+        local ok, err = pcall(S.assert, { a = 1 }, nil)
+        expect(ok).to.equal(false)
+        expect(err:match("must not be nil")).to.exist()
+    end)
+
+    it("EE7: loud-fails on nil schema even with ctx_hint positional arg", function()
+        local ok, err = pcall(S.assert, { a = 1 }, nil, "some-ctx")
+        expect(ok).to.equal(false)
+        expect(err:match("must not be nil")).to.exist()
+    end)
+
+    it("EE7: S.check(v, nil) still silent-passes (assert-only scope)", function()
+        expect(S.check({ a = 1 }, nil)).to.equal(true)
     end)
 
     it("pass-through for 'any' string", function()
@@ -438,5 +450,24 @@ describe("alc_shapes.is_dev_mode / assert_dev", function()
         local ok = pcall(check_mod.assert_dev, 42, T.string, "h")
         check_mod.is_dev_mode = saved
         expect(ok).to.equal(false)
+    end)
+
+    it("EE7: assert_dev propagates nil loud-fail in dev mode", function()
+        local check_mod = require("alc_shapes.check")
+        local saved = check_mod.is_dev_mode
+        check_mod.is_dev_mode = function() return true end
+        local ok, err = pcall(check_mod.assert_dev, { a = 1 }, nil, "h")
+        check_mod.is_dev_mode = saved
+        expect(ok).to.equal(false)
+        expect(err:match("must not be nil")).to.exist()
+    end)
+
+    it("EE7: assert_dev is still no-op on nil when dev mode is off", function()
+        local check_mod = require("alc_shapes.check")
+        local saved = check_mod.is_dev_mode
+        check_mod.is_dev_mode = function() return false end
+        local v = check_mod.assert_dev({ a = 1 }, nil, "h")
+        check_mod.is_dev_mode = saved
+        expect(type(v)).to.equal("table")
     end)
 end)

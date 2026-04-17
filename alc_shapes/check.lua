@@ -246,17 +246,24 @@ end
 
 --- Assert schema; returns value on pass, throws on fail.
 --- Overloads on schema_or_name:
----   nil          -> no-op pass (value returned)
+---   nil          -> loud-fail (intent violation; use S.check for silent pass)
 ---   "any"        -> no-op pass
 ---   other string -> lookup in registry (default: alc_shapes module).
 ---                   Loud-fail if unknown.
 ---   table        -> direct schema
 --- opts (optional, last position):
 ---   { registry = { name = schema, ... } }
+---
+--- EE7: `assert` means "I intended to validate". Passing `nil` is a
+--- typo signal (e.g. `S.assert(r, S.votd, ...)` where `S.votd` resolves
+--- to nil) and must loud-fail. Use `S.check(v, nil)` if silent pass is
+--- intentional (projection-side guard pattern).
 function M.assert(value, schema_or_name, ctx_hint, opts)
     local schema
     if schema_or_name == nil then
-        return value
+        error("alc_shapes.assert: schema_or_name must not be nil. "
+            .. "Use S.check(v, nil) for silent pass, or pass a schema / "
+            .. "name / \"any\" explicitly.", 2)
     elseif type(schema_or_name) == "string" then
         if schema_or_name == "any" then return value end
         local registry = (opts and opts.registry) or default_registry()

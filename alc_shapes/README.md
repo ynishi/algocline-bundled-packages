@@ -122,10 +122,15 @@ local active = S.is_dev_mode()
 ```lua
 S.assert(r, S.voted, "sc.run")    -- direct schema reference
 S.assert(r, "voted", "sc.run")    -- name lookup in alc_shapes registry
-S.assert(r, nil)                   -- no-op pass
-S.assert(r, "any")                 -- no-op pass
+S.assert(r, "any")                 -- no-op pass (explicit)
 S.assert(r, "typo")               -- error: unknown shape
+S.assert(r, nil)                   -- error: schema_or_name must not be nil
 ```
+
+`assert` means "I intended to validate"; passing `nil` is a typo signal
+(e.g. `S.assert(r, S.votd, ...)` where the typo'd `S.votd` resolves to
+`nil`) and loud-fails. Use `S.check(v, nil)` if silent pass is
+intentional (projection-side guard pattern).
 
 ### Error messages
 
