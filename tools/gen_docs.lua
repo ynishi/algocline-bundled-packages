@@ -18,6 +18,16 @@
 ---   --lint-only    Run lint, skip file generation.
 ---   --hub          Additionally emit hub_entry JSON per pkg at
 ---                  {out_dir}/hub/{pkg}.json (pipeline-spec §7.4).
+---   --context7     Additionally emit {repo_root}/context7.json for
+---                  Context7 ingestion (pipeline-spec §7.6). The repo
+---                  root is the primary target because Context7 reads
+---                  the manifest from the repository root, not from
+---                  the generated docs/ output.
+---   --devin        Additionally emit {repo_root}/.devin/wiki.json for
+---                  DeepWiki ingestion (pipeline-spec §7.6). DeepWiki
+---                  auto-crawls the repository, so the manifest steers
+---                  wiki generation via repo_notes rather than a
+---                  folders filter.
 ---
 --- Defaults: repo_root = ".", out_dir = "{repo_root}/docs"
 
@@ -33,7 +43,8 @@ end
 
 local function parse_argv(argv)
     local opts = {
-        lint = false, strict = false, lint_only = false, hub = false,
+        lint = false, strict = false, lint_only = false,
+        hub = false, context7 = false, devin = false,
     }
     local positional = {}
     for i = 1, #argv do
@@ -48,6 +59,10 @@ local function parse_argv(argv)
             opts.lint      = true
         elseif a == "--hub" then
             opts.hub = true
+        elseif a == "--context7" then
+            opts.context7 = true
+        elseif a == "--devin" then
+            opts.devin = true
         elseif a:sub(1, 2) == "--" then
             io.stderr:write("gen_docs: unknown option '" .. a .. "'\n")
             os.exit(2)
@@ -184,6 +199,19 @@ local function main(argv)
     if not opts.lint_only then
         write_file(out_dir .. "/llms.txt",      Projections.llms_index(infos))
         write_file(out_dir .. "/llms-full.txt", Projections.llms_full(entries))
+        if opts.context7 then
+            local Context7Config = require("tools.docs.context7_config")
+            write_file(repo_root .. "/context7.json",
+                       Projections.context7_config(Context7Config))
+            io.stdout:write("  [ok]   context7.json (repo root)\n")
+        end
+        if opts.devin then
+            local DevinConfig = require("tools.docs.devin_wiki_config")
+            ensure_dir(repo_root .. "/.devin")
+            write_file(repo_root .. "/.devin/wiki.json",
+                       Projections.devin_wiki(DevinConfig))
+            io.stdout:write("  [ok]   .devin/wiki.json (repo root)\n")
+        end
     end
 
     io.stdout:write(string.format(

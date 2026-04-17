@@ -723,6 +723,211 @@ describe("tools.docs.projections.hub_entry", function()
     end)
 end)
 
+describe("tools.docs.projections.context7_config", function()
+    it("emits the fixed $schema and folders regardless of input", function()
+        local json = Projections.context7_config({})
+        expect(json:find(
+            '"$schema":"https://context7.com/schema/context7.json"',
+            1, true) ~= nil).to.equal(true)
+        expect(json:find('"folders":["docs/narrative"]', 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("omits every optional field when not provided", function()
+        local json = Projections.context7_config({})
+        for _, k in ipairs({
+            "projectTitle", "description", "branch", "excludeFolders",
+            "excludeFiles", "rules", "previousVersions", "branchVersions",
+        }) do
+            expect(json:find('"' .. k .. '"', 1, true) == nil).to.equal(true)
+        end
+    end)
+
+    it("preserves all human-curated fields", function()
+        local json = Projections.context7_config({
+            projectTitle     = "algocline",
+            description      = "LLM amp",
+            branch           = "main",
+            excludeFolders   = { "tests", "tools" },
+            excludeFiles     = { "CHANGELOG.md" },
+            rules            = { "r1", "r2" },
+            previousVersions = { { tag = "v0.13.0" } },
+            branchVersions   = { { branch = "legacy" } },
+        })
+        expect(json:find('"projectTitle":"algocline"', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"description":"LLM amp"', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"branch":"main"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"excludeFolders":["tests","tools"]', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"excludeFiles":["CHANGELOG.md"]', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"rules":["r1","r2"]', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"previousVersions":[{"tag":"v0.13.0"}]', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"branchVersions":[{"branch":"legacy"}]', 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("is byte-deterministic across runs", function()
+        local config = {
+            projectTitle = "algocline",
+            description  = "x",
+            rules        = { "b", "a" },
+        }
+        expect(Projections.context7_config(config))
+            .to.equal(Projections.context7_config(config))
+    end)
+
+    it("rejects non-table input", function()
+        local ok = pcall(Projections.context7_config, "not a table")
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects malformed previousVersions entries", function()
+        local ok = pcall(Projections.context7_config, {
+            previousVersions = { { branch = "wrong" } },
+        })
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects empty strings as if unset", function()
+        local json = Projections.context7_config({
+            projectTitle = "",
+            description  = "",
+            branch       = "",
+        })
+        expect(json:find('"projectTitle"', 1, true) == nil).to.equal(true)
+        expect(json:find('"description"', 1, true) == nil).to.equal(true)
+        expect(json:find('"branch"', 1, true) == nil).to.equal(true)
+    end)
+
+    it("tools/docs/context7_config.lua produces valid context7.json", function()
+        package.loaded["tools.docs.context7_config"] = nil
+        local config = require("tools.docs.context7_config")
+        local json = Projections.context7_config(config)
+        -- Smoke: the result is non-empty and contains the fixed fields.
+        expect(type(json) == "string" and #json > 0).to.equal(true)
+        expect(json:find(
+            '"$schema":"https://context7.com/schema/context7.json"',
+            1, true) ~= nil).to.equal(true)
+        expect(json:find('"folders":["docs/narrative"]', 1, true) ~= nil)
+            .to.equal(true)
+        expect(json:find('"projectTitle":"algocline"', 1, true) ~= nil)
+            .to.equal(true)
+    end)
+end)
+
+describe("tools.docs.projections.devin_wiki", function()
+    it("returns '{}' when config is empty", function()
+        local json = Projections.devin_wiki({})
+        expect(json).to.equal("{}")
+    end)
+
+    it("emits repo_notes with content (and optional author)", function()
+        local json = Projections.devin_wiki({
+            repo_notes = {
+                { content = "hello" },
+                { content = "world", author = "me" },
+            },
+        })
+        expect(json:find('"repo_notes":', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"content":"hello"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"author":"me"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"content":"world"', 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("emits pages with title / purpose / parent / page_notes", function()
+        local json = Projections.devin_wiki({
+            pages = {
+                { title = "Arch",   purpose = "overview" },
+                { title = "FE",     purpose = "frontend", parent = "Arch",
+                  page_notes = { { content = "note-1" } } },
+            },
+        })
+        expect(json:find('"title":"Arch"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"purpose":"overview"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"title":"FE"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"parent":"Arch"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"page_notes":', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"content":"note-1"', 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("is byte-deterministic across runs", function()
+        local config = {
+            repo_notes = { { content = "z" }, { content = "a" } },
+            pages      = {
+                { title = "B", purpose = "b" },
+                { title = "A", purpose = "a" },
+            },
+        }
+        expect(Projections.devin_wiki(config))
+            .to.equal(Projections.devin_wiki(config))
+    end)
+
+    it("rejects non-table input", function()
+        expect(pcall(Projections.devin_wiki, "x")).to.equal(false)
+    end)
+
+    it("rejects a repo_note missing content", function()
+        expect(pcall(Projections.devin_wiki, {
+            repo_notes = { { author = "me" } },
+        })).to.equal(false)
+    end)
+
+    it("rejects a repo_note whose content exceeds the 10,000 char cap",
+        function()
+            expect(pcall(Projections.devin_wiki, {
+                repo_notes = { { content = string.rep("x", 10001) } },
+            })).to.equal(false)
+        end)
+
+    it("rejects a page missing title or purpose", function()
+        expect(pcall(Projections.devin_wiki, {
+            pages = { { title = "",  purpose = "p" } },
+        })).to.equal(false)
+        expect(pcall(Projections.devin_wiki, {
+            pages = { { title = "T", purpose = "" } },
+        })).to.equal(false)
+    end)
+
+    it("rejects duplicate page titles", function()
+        expect(pcall(Projections.devin_wiki, {
+            pages = {
+                { title = "X", purpose = "a" },
+                { title = "X", purpose = "b" },
+            },
+        })).to.equal(false)
+    end)
+
+    it("rejects pages over the 30-page cap", function()
+        local pages = {}
+        for i = 1, 31 do
+            pages[i] = { title = "P" .. i, purpose = "p" }
+        end
+        expect(pcall(Projections.devin_wiki, { pages = pages })).to.equal(false)
+    end)
+
+    it("rejects combined notes over 100", function()
+        local notes = {}
+        for i = 1, 101 do notes[i] = { content = "n" } end
+        expect(pcall(Projections.devin_wiki, { repo_notes = notes }))
+            .to.equal(false)
+    end)
+
+    it("tools/docs/devin_wiki_config.lua produces valid .devin/wiki.json",
+        function()
+            package.loaded["tools.docs.devin_wiki_config"] = nil
+            local config = require("tools.docs.devin_wiki_config")
+            local json = Projections.devin_wiki(config)
+            expect(type(json) == "string" and #json > 0).to.equal(true)
+            expect(json:find('"repo_notes":', 1, true) ~= nil).to.equal(true)
+            expect(json:find("docs/narrative", 1, true) ~= nil).to.equal(true)
+            expect(json:find('"pages":', 1, true) == nil).to.equal(true)
+        end)
+end)
+
 describe("tools.docs.projections.llms_full", function()
     it("concatenates entries with frontmatter stripped and pkg markers", function()
         local full = Projections.llms_full({

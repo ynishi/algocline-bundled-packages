@@ -395,6 +395,245 @@ function M.hub_entry(pkg_info)
     return json_encode(entry)
 end
 
+-- ── context7.json (pipeline-spec §7.6) ────────────────────────────────
+--
+-- Public schema: https://context7.com/schema/context7.json
+-- All fields are optional, so we emit only what the human-curated
+-- `context7_config` module provides plus the two deterministic fields
+-- fixed by our pipeline:
+--   * $schema : the canonical Context7 schema URL.
+--   * folders : ["docs/narrative"] — see pipeline-spec §7.6 ("content
+--               is narrative.md and only the narrative/ subfolder is
+--               the Context7 source of truth"). Hardcoded here so that
+--               the config module cannot drift from the pipeline's
+--               output layout.
+--
+-- Output bytes are deterministic (json_encode sorts object keys).
+
+local CONTEXT7_SCHEMA_URL = "https://context7.com/schema/context7.json"
+local CONTEXT7_FOLDERS    = { "docs/narrative" }
+
+--- Copy a list of strings (defensive — the caller's table is not mutated).
+local function copy_str_list(src)
+    local out = {}
+    for i = 1, #src do out[i] = src[i] end
+    return out
+end
+
+--- Copy a list of objects with a single known key (tag or branch).
+--- Only copies the recognised keys so that arbitrary user fields cannot
+--- bleed into context7.json (Context7 validates against the public
+--- schema and rejects unknown keys).
+local function copy_version_list(src, key)
+    local out = {}
+    for i = 1, #src do
+        local v = src[i]
+        if type(v) ~= "table" or type(v[key]) ~= "string" or v[key] == "" then
+            error(string.format(
+                "context7_config: %s[%d] must be a table with a non-empty '%s' field",
+                key == "tag" and "previousVersions" or "branchVersions", i, key), 2)
+        end
+        out[i] = { [key] = v[key] }
+    end
+    return out
+end
+
+--- Build the context7.json body from a human-curated config table.
+---
+--- Config shape (all keys optional):
+---   {
+---     projectTitle     = "string",
+---     description      = "string",
+---     branch           = "string",
+---     excludeFolders   = { "string", ... },
+---     excludeFiles     = { "string", ... },
+---     rules            = { "string", ... },
+---     previousVersions = { { tag = "v1.2.1" }, ... },
+---     branchVersions   = { { branch = "legacy" }, ... },
+---   }
+---
+--- Returns a deterministic JSON string.
+function M.context7_config(config)
+    if type(config) ~= "table" then
+        error("context7_config: expected a table", 2)
+    end
+    local entry = {
+        ["$schema"] = CONTEXT7_SCHEMA_URL,
+        folders     = copy_str_list(CONTEXT7_FOLDERS),
+    }
+    if type(config.projectTitle) == "string" and config.projectTitle ~= "" then
+        entry.projectTitle = config.projectTitle
+    end
+    if type(config.description) == "string" and config.description ~= "" then
+        entry.description = config.description
+    end
+    if type(config.branch) == "string" and config.branch ~= "" then
+        entry.branch = config.branch
+    end
+    if type(config.excludeFolders) == "table" and #config.excludeFolders > 0 then
+        entry.excludeFolders = copy_str_list(config.excludeFolders)
+    end
+    if type(config.excludeFiles) == "table" and #config.excludeFiles > 0 then
+        entry.excludeFiles = copy_str_list(config.excludeFiles)
+    end
+    if type(config.rules) == "table" and #config.rules > 0 then
+        entry.rules = copy_str_list(config.rules)
+    end
+    if type(config.previousVersions) == "table" and #config.previousVersions > 0 then
+        entry.previousVersions = copy_version_list(config.previousVersions, "tag")
+    end
+    if type(config.branchVersions) == "table" and #config.branchVersions > 0 then
+        entry.branchVersions = copy_version_list(config.branchVersions, "branch")
+    end
+    return json_encode(entry)
+end
+
+-- ── .devin/wiki.json (pipeline-spec §7.6) ─────────────────────────────
+--
+-- Public schema (docs.devin.ai/work-with-devin/deepwiki, 2026-04-17):
+--   {
+--     repo_notes: [{content: str <=10000, author?: str}],
+--     pages:      [{title: str, purpose: str, parent?: str,
+--                   page_notes?: [{content: str, author?: str}]}]
+--   }
+--   Limits: <=30 pages (enterprise 80), <=100 total notes.
+--
+-- DeepWiki does NOT support a `folders` field — it auto-crawls the
+-- repository. pipeline-spec §7.6's "folder 明示" is inapplicable here,
+-- so the projection leans on `repo_notes` to tell DeepWiki that
+-- `docs/narrative/` is the authoritative source of truth.
+--
+-- Output bytes are deterministic (json_encode sorts object keys).
+
+local DEVIN_MAX_NOTE_CHARS = 10000
+local DEVIN_MAX_PAGES      = 30
+local DEVIN_MAX_NOTES      = 100
+
+local function validate_note(note, where, i)
+    if type(note) ~= "table" or type(note.content) ~= "string"
+        or note.content == "" then
+        error(string.format(
+            "devin_wiki: %s[%d] must be a table with a non-empty 'content' string",
+            where, i), 2)
+    end
+    if #note.content > DEVIN_MAX_NOTE_CHARS then
+        error(string.format(
+            "devin_wiki: %s[%d].content exceeds %d chars (%d)",
+            where, i, DEVIN_MAX_NOTE_CHARS, #note.content), 2)
+    end
+    if note.author ~= nil and type(note.author) ~= "string" then
+        error(string.format(
+            "devin_wiki: %s[%d].author must be a string when present",
+            where, i), 2)
+    end
+end
+
+local function copy_note(note)
+    local out = { content = note.content }
+    if type(note.author) == "string" and note.author ~= "" then
+        out.author = note.author
+    end
+    return out
+end
+
+local function copy_page(page, i, total_notes_ref)
+    if type(page) ~= "table" or type(page.title) ~= "string"
+        or page.title == "" or type(page.purpose) ~= "string"
+        or page.purpose == "" then
+        error(string.format(
+            "devin_wiki: pages[%d] must be a table with non-empty " ..
+            "'title' and 'purpose' strings", i), 2)
+    end
+    local out = { title = page.title, purpose = page.purpose }
+    if type(page.parent) == "string" and page.parent ~= "" then
+        out.parent = page.parent
+    end
+    if page.page_notes ~= nil then
+        if type(page.page_notes) ~= "table" then
+            error(string.format(
+                "devin_wiki: pages[%d].page_notes must be an array", i), 2)
+        end
+        local notes = {}
+        for j = 1, #page.page_notes do
+            validate_note(page.page_notes[j],
+                "pages[" .. i .. "].page_notes", j)
+            notes[j] = copy_note(page.page_notes[j])
+            total_notes_ref.n = total_notes_ref.n + 1
+        end
+        if #notes > 0 then
+            out.page_notes = notes
+        end
+    end
+    return out
+end
+
+--- Build the .devin/wiki.json body from a human-curated config table.
+---
+--- Config shape (all keys optional):
+---   {
+---     repo_notes = { { content = "...", author? = "..." }, ... },
+---     pages      = { { title = "...", purpose = "...",
+---                      parent? = "...", page_notes? = { ... } }, ... },
+---   }
+---
+--- Returns a deterministic JSON string.
+function M.devin_wiki(config)
+    if type(config) ~= "table" then
+        error("devin_wiki: expected a table", 2)
+    end
+    local entry = {}
+    local total_notes = { n = 0 }
+
+    if config.repo_notes ~= nil then
+        if type(config.repo_notes) ~= "table" then
+            error("devin_wiki: repo_notes must be an array", 2)
+        end
+        local notes = {}
+        for i = 1, #config.repo_notes do
+            validate_note(config.repo_notes[i], "repo_notes", i)
+            notes[i] = copy_note(config.repo_notes[i])
+            total_notes.n = total_notes.n + 1
+        end
+        if #notes > 0 then
+            entry.repo_notes = notes
+        end
+    end
+
+    if config.pages ~= nil then
+        if type(config.pages) ~= "table" then
+            error("devin_wiki: pages must be an array", 2)
+        end
+        if #config.pages > DEVIN_MAX_PAGES then
+            error(string.format(
+                "devin_wiki: pages exceeds max %d (%d provided)",
+                DEVIN_MAX_PAGES, #config.pages), 2)
+        end
+        local pages = {}
+        local seen_titles = {}
+        for i = 1, #config.pages do
+            local p = copy_page(config.pages[i], i, total_notes)
+            if seen_titles[p.title] then
+                error(string.format(
+                    "devin_wiki: pages[%d].title '%s' is duplicated " ..
+                    "(must be unique)", i, p.title), 2)
+            end
+            seen_titles[p.title] = true
+            pages[i] = p
+        end
+        if #pages > 0 then
+            entry.pages = pages
+        end
+    end
+
+    if total_notes.n > DEVIN_MAX_NOTES then
+        error(string.format(
+            "devin_wiki: combined note count %d exceeds max %d",
+            total_notes.n, DEVIN_MAX_NOTES), 2)
+    end
+
+    return json_encode(entry)
+end
+
 -- ── llms.txt / llms-full.txt ──────────────────────────────────────────
 --
 -- Two-layer API per pipeline-spec §3.2:
@@ -577,6 +816,11 @@ M._internal = {
     type_expr_to_json        = type_expr_to_json,
     strip_frontmatter        = strip_frontmatter,
     LLMS_INDEX_DESC_MAX      = LLMS_INDEX_DESC_MAX,
+    CONTEXT7_SCHEMA_URL      = CONTEXT7_SCHEMA_URL,
+    CONTEXT7_FOLDERS         = CONTEXT7_FOLDERS,
+    DEVIN_MAX_NOTE_CHARS     = DEVIN_MAX_NOTE_CHARS,
+    DEVIN_MAX_PAGES          = DEVIN_MAX_PAGES,
+    DEVIN_MAX_NOTES          = DEVIN_MAX_NOTES,
 }
 
 return M
