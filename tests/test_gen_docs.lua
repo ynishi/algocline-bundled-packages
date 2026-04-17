@@ -481,6 +481,150 @@ describe("tools.docs.projections.llms_index", function()
     end)
 end)
 
+describe("tools.docs.projections.json_encode", function()
+    local json_encode = Projections._internal.json_encode
+
+    it("encodes primitives", function()
+        expect(json_encode("a")).to.equal('"a"')
+        expect(json_encode(42)).to.equal("42")
+        expect(json_encode(true)).to.equal("true")
+        expect(json_encode(false)).to.equal("false")
+        expect(json_encode(nil)).to.equal("null")
+    end)
+
+    it("escapes quote / backslash / control chars", function()
+        expect(json_encode('a"b\\c')).to.equal([["a\"b\\c"]])
+        expect(json_encode("a\nb\tc")).to.equal('"a\\nb\\tc"')
+    end)
+
+    it("sorts object keys alphabetically (deterministic output)", function()
+        -- Same input under different insertion orders must hash equal.
+        local a = json_encode({ z = 1, a = 2, m = 3 })
+        local b = json_encode({ a = 2, m = 3, z = 1 })
+        expect(a).to.equal(b)
+        expect(a).to.equal('{"a":2,"m":3,"z":1}')
+    end)
+
+    it("encodes arrays 1..n preserving order", function()
+        expect(json_encode({ "a", "b", "c" })).to.equal('["a","b","c"]')
+    end)
+
+    it("rejects mixed-key tables", function()
+        local threw = pcall(json_encode, { [1] = "a", foo = "b" })
+        expect(threw).to.equal(false)
+    end)
+end)
+
+describe("tools.docs.projections.shape_to_json", function()
+    it("dumps a flat Shape with Field metadata", function()
+        local shape = PI.make_shape({
+            PI.make_field("task", PI.primitive("string"), false, "the task"),
+            PI.make_field("depth", PI.primitive("number"), true, "optional"),
+        }, false)
+        local got = Projections.shape_to_json(shape)
+        expect(got.open).to.equal(false)
+        expect(#got.fields).to.equal(2)
+        expect(got.fields[1].name).to.equal("task")
+        expect(got.fields[1].type.kind).to.equal("primitive")
+        expect(got.fields[1].type.name).to.equal("string")
+        expect(got.fields[1].optional).to.equal(false)
+        expect(got.fields[1].doc).to.equal("the task")
+        expect(got.fields[2].optional).to.equal(true)
+    end)
+
+    it("dumps a nested shape TypeExpr recursively", function()
+        local inner = PI.make_shape({
+            PI.make_field("x", PI.primitive("number"), false, ""),
+        }, false)
+        local shape = PI.make_shape({
+            PI.make_field("nested",
+                { kind = "shape", shape = inner }, false, ""),
+        }, false)
+        local got = Projections.shape_to_json(shape)
+        expect(got.fields[1].type.kind).to.equal("shape")
+        expect(got.fields[1].type.shape.fields[1].name).to.equal("x")
+    end)
+
+    it("dumps array_of / map_of / one_of / label", function()
+        local shape = PI.make_shape({
+            PI.make_field("a", PI.array_of(PI.primitive("string")), false, ""),
+            PI.make_field("m",
+                PI.map_of(PI.primitive("string"), PI.primitive("number")),
+                false, ""),
+            PI.make_field("o", PI.one_of({ "x", "y" }), false, ""),
+            PI.make_field("l", PI.label("pkg.Result"), false, ""),
+        }, false)
+        local got = Projections.shape_to_json(shape)
+        expect(got.fields[1].type.kind).to.equal("array_of")
+        expect(got.fields[1].type.of.name).to.equal("string")
+        expect(got.fields[2].type.kind).to.equal("map_of")
+        expect(got.fields[2].type.key.name).to.equal("string")
+        expect(got.fields[2].type.val.name).to.equal("number")
+        expect(got.fields[3].type.kind).to.equal("one_of")
+        expect(got.fields[3].type.values[1]).to.equal("x")
+        expect(got.fields[4].type.kind).to.equal("label")
+        expect(got.fields[4].type.name).to.equal("pkg.Result")
+    end)
+end)
+
+describe("tools.docs.projections.hub_entry", function()
+    it("emits all required fields per spec §7.4", function()
+        local info = PI.make_pkg_info(
+            { name = "h", version = "1.2.3", category = "cat",
+              description = "d", source_path = "h/init.lua" },
+            { title = "H", summary = "sum", sections = {
+                PI.make_section(2, "Usage", "usage", "body"),
+              } },
+            { input = PI.make_shape({
+                PI.make_field("k", PI.primitive("string"), false, "the k"),
+              }, false),
+              result = PI.label("h.Result") }
+        )
+        local json = Projections.hub_entry(info)
+        -- Structural spot-checks (deterministic key order lets us grep).
+        expect(json:find('"name":"h"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"version":"1.2.3"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"category":"cat"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"description":"d"', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"result_shape":"h.Result"', 1, true) ~= nil)
+            .to.equal(true)
+        -- input_shape is a nested Shape JSON.
+        expect(json:find('"input_shape":', 1, true) ~= nil).to.equal(true)
+        expect(json:find('"kind":"primitive"', 1, true) ~= nil).to.equal(true)
+        -- narrative_md escapes newlines as \n (embedded verbatim string).
+        expect(json:find('"narrative_md":"', 1, true) ~= nil).to.equal(true)
+        expect(json:find("\\n# H", 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("omits input_shape / result_shape when nil", function()
+        local info = PI.make_pkg_info(
+            { name = "m", version = "0", category = "c",
+              description = "d", source_path = "m/init.lua" },
+            { title = "M", summary = "s", sections = {} },
+            { input = nil, result = nil }
+        )
+        local json = Projections.hub_entry(info)
+        expect(json:find('"input_shape"', 1, true) == nil).to.equal(true)
+        expect(json:find('"result_shape"', 1, true) == nil).to.equal(true)
+    end)
+
+    it("is byte-deterministic across runs", function()
+        local info = PI.make_pkg_info(
+            { name = "d", version = "1", category = "c",
+              description = "x", source_path = "d/init.lua" },
+            { title = "D", summary = "s", sections = {} },
+            { input = PI.make_shape({
+                PI.make_field("z", PI.primitive("string"), false, ""),
+                PI.make_field("a", PI.primitive("number"), false, ""),
+              }, false),
+              result = nil }
+        )
+        local j1 = Projections.hub_entry(info)
+        local j2 = Projections.hub_entry(info)
+        expect(j1).to.equal(j2)
+    end)
+end)
+
 describe("tools.docs.projections.llms_full", function()
     it("concatenates entries with frontmatter stripped and pkg markers", function()
         local full = Projections.llms_full({

@@ -16,6 +16,8 @@
 ---   --strict       Treat lint errors as build failures (exit 2 when any
 ---                  pkg reports an error-level violation).
 ---   --lint-only    Run lint, skip file generation.
+---   --hub          Additionally emit hub_entry JSON per pkg at
+---                  {out_dir}/hub/{pkg}.json (pipeline-spec §7.4).
 ---
 --- Defaults: repo_root = ".", out_dir = "{repo_root}/docs"
 
@@ -30,7 +32,9 @@ end
 -- ── argv parsing ──────────────────────────────────────────────────────
 
 local function parse_argv(argv)
-    local opts = { lint = false, strict = false, lint_only = false }
+    local opts = {
+        lint = false, strict = false, lint_only = false, hub = false,
+    }
     local positional = {}
     for i = 1, #argv do
         local a = argv[i]
@@ -42,6 +46,8 @@ local function parse_argv(argv)
         elseif a == "--lint-only" then
             opts.lint_only = true
             opts.lint      = true
+        elseif a == "--hub" then
+            opts.hub = true
         elseif a:sub(1, 2) == "--" then
             io.stderr:write("gen_docs: unknown option '" .. a .. "'\n")
             os.exit(2)
@@ -117,6 +123,9 @@ local function main(argv)
     if not opts.lint_only then
         ensure_dir(out_dir)
         ensure_dir(out_dir .. "/narrative")
+        if opts.hub then
+            ensure_dir(out_dir .. "/hub")
+        end
     end
 
     local infos         = {}
@@ -135,6 +144,11 @@ local function main(argv)
             local md   = Projections.narrative_md(info)
             if not opts.lint_only then
                 write_file(string.format("%s/narrative/%s.md", out_dir, p.name), md)
+                if opts.hub then
+                    write_file(
+                        string.format("%s/hub/%s.json", out_dir, p.name),
+                        Projections.hub_entry(info))
+                end
             end
             infos[#infos + 1]   = info
             entries[#entries + 1] = { name = p.name, narrative_md = md }
