@@ -1,0 +1,1324 @@
+# algocline — full narrative index
+
+> Concatenation of every package narrative. Intended for bulk AI context injection; for selective access see `llms.txt`.
+
+<!-- ── ab_mcts.md ── -->
+
+
+# ab_mcts — Adaptive Branching Monte Carlo Tree Search
+
+> Extends standard MCTS by dynamically deciding at each node whether to explore wider (generate new candidates) or deeper (refine existing ones). Uses Thompson Sampling with Beta posteriors instead of UCB1, enabling principled exploration-exploitation balance that adapts to problem structure.
+
+---
+
+<!-- ── ab_select.md ── -->
+
+
+# ab_select — Adaptive Branching Selection (multi-fidelity Thompson sampling)
+
+> Selects the best candidate from a pool using staged evaluators of increasing cost. Thompson Sampling decides which candidate receives the next, more expensive evaluation, allocating expensive evaluations only to candidates whose Beta posterior suggests they are promising.
+
+---
+
+<!-- ── abm.md ── -->
+
+
+# abm — Agent-Based Model framework for algocline
+
+> Two-layer architecture:   Frame layer: Agent/Model/Scheduler — define and run simulations   Analysis layer: MC/Sweep/Stats — aggregate and analyze results
+
+---
+
+<!-- ── aco.md ── -->
+
+
+# aco — Ant Colony Optimization for discrete path search
+
+> Implements the Ant System (Dorigo 1996) with convergence guarantees from Gutjahr 2000 (GBAS). Provides both a pure-computation engine and an LLM-integrated run(ctx) for workflow/path optimization.
+
+---
+
+<!-- ── ambig.md ── -->
+
+
+# Ambig — underspecification detection and clarification pipeline
+
+> Three-stage pipeline: detect ambiguity in the input, generate targeted clarification questions for underspecified elements, then integrate responses to produce a fully-specified task.
+
+---
+
+<!-- ── analogical.md ── -->
+
+
+# Analogical — reasoning by self-generated analogies
+
+> Instead of solving directly, generates relevant analogous problems, solves them, extracts transferable patterns, then applies to the original.
+
+---
+
+<!-- ── anti_cascade.md ── -->
+
+
+# anti_cascade — Pipeline error cascade amplification detection
+
+> Detects when small errors compound through multi-step pipelines by independently re-deriving conclusions from original inputs at each checkpoint, then comparing with the pipeline's accumulated output. Flags steps where drift exceeds threshold.
+
+---
+
+<!-- ── bft.md ── -->
+
+
+# bft — Byzantine Fault Tolerance impossibility bounds
+
+> Pure-computation utility for BFT quorum thresholds and validation. No LLM calls; used as a governance primitive by higher-level packages (e.g. pbft, dissent, anti_cascade).
+
+---
+
+<!-- ── bisect.md ── -->
+
+
+# bisect — Binary search for reasoning errors
+
+> Instead of verifying every step of a reasoning chain (O(n)), bisects the chain to locate the first error in O(log n) steps. Once found, regenerates only the erroneous step and continues.
+
+---
+
+<!-- ── blind_spot.md ── -->
+
+
+# blind_spot — Self-Correction Blind Spot bypass
+
+> LLMs cannot correct errors in their own outputs but can successfully correct identical errors when presented as coming from external sources. This package exploits that asymmetry: generate an answer, then re-present it as a "colleague's draft" for the same LLM to review and correct.
+
+---
+
+<!-- ── boids_abm.md ── -->
+
+
+# boids_abm — Boids Flocking Model
+
+> N agents (boids) in 2D continuous space follow three simple rules:   1. Separation: steer away from nearby boids to avoid crowding   2. Alignment: steer towards the average heading of nearby boids   3. Cohesion: steer towards the average position of nearby boids
+
+---
+
+<!-- ── bot.md ── -->
+
+
+# bot — Buffer of Thoughts: template-based meta-reasoning
+
+> Identifies the problem type, retrieves an appropriate thought template (structured reasoning pattern), instantiates it for the specific problem, then verifies the result. Efficient because it leverages pre-defined reasoning patterns rather than discovering them from scratch each time.
+
+---
+
+<!-- ── calibrate.md ── -->
+
+
+# Calibrate — confidence-gated adaptive reasoning
+
+> Asks LLM to solve a task and self-assess confidence. If confidence is below threshold, escalates to a heavier strategy (ensemble, panel, or custom fallback).
+
+---
+
+<!-- ── cascade.md ── -->
+
+
+# cascade — Multi-level difficulty routing with confidence gating
+
+> Routes problems through escalating complexity levels. Starts with the simplest (cheapest) approach; if confidence is below threshold, escalates to a more sophisticated strategy. Minimizes compute for easy problems while ensuring quality for hard ones.
+
+---
+
+<!-- ── claim_trace.md ── -->
+
+
+# claim_trace — Span-level evidence attribution for LLM outputs
+
+> For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike factscore (which only verifies correctness), claim_trace provides provenance: which part of the source supports each claim, enabling transparent attribution.
+
+---
+
+<!-- ── coa.md ── -->
+
+
+# coa — Chain-of-Abstraction reasoning
+
+> Generates reasoning chains with abstract placeholders instead of concrete facts, then grounds them via parallel knowledge lookups. Decouples the reasoning structure from specific knowledge, enabling parallel tool calls and cleaner reasoning chains.
+
+---
+
+<!-- ── cod.md ── -->
+
+
+# CoD — Chain-of-Density iterative compression
+
+> Iteratively rewrites text to increase information density while maintaining length. Each round adds missing entities/details and removes filler, producing progressively denser output.
+
+---
+
+<!-- ── coevolve.md ── -->
+
+
+# coevolve — Challenger-Solver Co-evolution
+
+> Two LLM roles evolve together: Challenger generates problems at the edge of Solver's ability, Solver attempts to solve them. As Solver improves, Challenger generates harder problems. This adversarial co-evolution automatically expands the exploration space — unlike cooperative methods (panel, rstar) that work within a fixed problem scope.
+
+---
+
+<!-- ── compute_alloc.md ── -->
+
+
+# compute_alloc — Compute-Optimal Test-Time Scaling Allocation
+
+> Meta-strategy that dynamically selects the optimal reasoning method and budget allocation based on problem difficulty. Implements the key finding from Snell et al. (ICLR 2025): "scaling test-time compute optimally can be more effective than scaling model parameters."
+
+---
+
+<!-- ── condorcet.md ── -->
+
+
+# condorcet — Condorcet Jury Theorem probability calculator
+
+> Pure-computation utility for majority-vote probability under independent voters. Detects Anti-Jury conditions (p < 0.5), estimates required group size for target accuracy, and measures inter-agent correlation to verify the independence assumption.
+
+---
+
+<!-- ── contrastive.md ── -->
+
+
+# Contrastive — learn from correct AND incorrect reasoning
+
+> Generates both a correct reasoning path and a plausible-but-wrong path, then contrasts them to strengthen the final answer. The only strategy that explicitly models failure modes.
+
+---
+
+<!-- ── cost_pareto.md ── -->
+
+
+# cost_pareto — Multi-objective Pareto dominance computation
+
+> Pure-computation utility for comparing candidates on multiple objectives (accuracy, cost, diversity, latency, etc.) using Pareto dominance and frontier extraction.
+
+---
+
+<!-- ── cot.md ── -->
+
+
+# CoT — iterative chain-of-thought reasoning
+
+> Builds a reasoning chain step by step, then synthesizes the chain into a single coherent conclusion.
+
+## Contents
+
+- [Usage](#usage)
+- [Behavior](#behavior)
+- [Parameters](#parameters)
+
+## Usage {#usage}
+
+```lua
+local cot = require("cot")
+return cot.run({ task = "Why is the sky blue?", depth = 3 })
+```
+
+## Behavior {#behavior}
+
+For each step `i` in `1..depth`, the LLM is asked for the next key
+insight conditional on all prior insights. After the last step, a
+final synthesis prompt collapses the chain into `result.conclusion`.
+
+Each `alc.llm` call is capped at 200 tokens for the chain steps and
+500 tokens for the synthesis.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.depth` | number | optional | Number of reasoning steps (default: 3) |
+| `ctx.task` | string | **required** | The question or task to reason about |
+
+---
+
+<!-- ── counterfactual_verify.md ── -->
+
+
+# counterfactual_verify — Causal faithfulness verification via counterfactual simulation
+
+> Tests whether a reasoning chain is genuinely faithful to its inputs by checking: "If the input changed, would the conclusion change accordingly?" Unlike cove (factual correctness) or verify_first (reverse verification), this detects pattern-matching and memorization by testing causal dependence between premises and conclusions.
+
+---
+
+<!-- ── cove.md ── -->
+
+
+# CoVe — Chain-of-Verification: draft-verify-revise cycle
+
+> Reduces hallucination by: draft → generate verification questions → answer them independently → produce verified final response.
+
+---
+
+<!-- ── critic.md ── -->
+
+
+# critic — Rubric-based structured evaluation and targeted revision
+
+> Unlike reflect (freeform self-critique), critic evaluates on predefined rubric dimensions (accuracy, logic, completeness, etc.), assigns per- dimension scores, generates targeted feedback, and revises only the weakest areas. Produces a structured quality profile.
+
+---
+
+<!-- ── cs_pruner.md ── -->
+
+
+# cs_pruner — Confidence-Sequence Partial-Data Pruner
+
+> Given N candidate answers and a D-dimensional rubric, this package evaluates (candidate × dimension) pairs incrementally and KILLS candidates whose anytime-valid upper confidence bound drops below the best surviving candidate's lower confidence bound.
+
+## Contents
+
+  - [Operating regime — READ FIRST](#operating-regime-read-first)
+  - [Theoretical foundations](#theoretical-foundations)
+
+### Operating regime — READ FIRST {#operating-regime-read-first}
+
+Empirical-Bernstein Confidence Sequences are designed for sample
+sizes in the **hundreds to thousands** (Howard et al. 2021 tune their
+experiments at t=500). At small N×D scale (N≈6, D≈20) the closed-form
+variants here CANNOT separate even strong candidates due to a
+variance-independent floor term in the radius:
+
+  radius_floor(t) ≈ c·k₂·log(ζ/(α·log^s η)) / t
+                  ≈ 0.43 at t=20 with N=6, δ=0.05
+
+This means a mean-gap of < 0.86 (on a [0,1] scale) is mathematically
+impossible to detect at t=20 with the polynomial-stitched variant.
+See workspace/cs_pruner_root_cause.md for the full derivation and
+workspace/cs_pruner_firing_run{1,2}.md for empirical confirmation.
+
+Practical guidance:
+  * **Small scale (N×D ≤ 200, D ≤ 30):** Set layer2_halving=true and
+    rely on Successive Halving as the primary kill mechanism. CS acts
+    only as a safety net that almost never fires.
+  * **Medium scale (N≤10, D∈[30,100]):** Try cs_variant="betting" —
+    the predictable plug-in EB CS (Waudby-Smith & Ramdas 2024) is
+    measurably tighter than the stitched variant in this region.
+  * **Large scale (D≥100):** polynomial_stitched is appropriate;
+    CS-driven kills become realistic.
+
+### Theoretical foundations {#theoretical-foundations}
+
+Three CS variants are bundled:
+
+  "polynomial_stitched"  Howard, Ramdas, McAuliffe, Sekhon 2021,
+                         Theorem 1 eq.(10). Closed-form, robust,
+                         requires t in the hundreds to fire.
+  "hoeffding"            Canonical sub-Gaussian stitched form
+                         (Howard 2021 eq.(10) with c=0), using
+                         worst-case variance σ²=c²/4. Strictly
+                         looser baseline.
+  "betting"              Predictable plug-in empirical-Bernstein CS
+                         from Waudby-Smith & Ramdas (JRSSB 2024,
+                         arXiv:2010.09686, Theorem 2 eq.(13)-(15)).
+                         Uses regularized predictable mean
+                         μ̂_t = (1/2+ΣX)/(t+1) and α = δ/N (the
+                         Thm2 bound is already two-sided).
+  "kl"                   Kaufmann-Cappé style KL-LUCB bounds.
+
+Why confidence sequences rather than fixed-n CIs:
+  The pruner judges "kill or keep" on-the-fly while rubric scores
+  arrive one dimension at a time. A confidence sequence is
+  time-uniform — it remains valid at every stopping time without
+  pre-committing to a horizon — so early-stop without corrupting
+  the error guarantee.
+
+Why closed-form variants only: zero external dependencies. The full
+hedged-capital betting CS (W-S&R Algorithm 1) is tighter still but
+requires 1D root finding to invert the wealth process; the
+predictable plug-in form sacrifices ~10-20% width for closed form.
+
+Key difference from ab_select / gumbel_search / listwise_rank:
+  ab_select      — NO mid-flight kill. Thompson sampling starves
+                   low-posterior candidates implicitly. Explicitly
+                   avoids kill because fixed credible-bound thresholds
+                   are depth-dependent.
+  gumbel_search  — Sequential Halving: "kill bottom half at fixed
+                   checkpoints". Batch, not anytime.
+  listwise_rank  — post-hoc full ranking, no early stop.
+  cs_pruner      — anytime-valid per-candidate kill via empirical
+                   Bernstein CS. Respects statistical guarantees on
+                   the kill probability uniformly over time.
+
+Algorithm:
+  1. Generate N candidates.
+  2. Round-robin over D rubric dimensions. For each dimension k:
+     for each alive candidate i, ask the judge to evaluate
+     candidate i on dimension k and receive score x ∈ [0, 1].
+     Update candidate i's CS. After each update, recompute
+     best_lcb and kill any candidate whose ucb < best_lcb.
+  3. Return ranking of alive candidates by empirical mean.
+
+Usage:
+  local cs_pruner = require("cs_pruner")
+  return cs_pruner.run(ctx)
+
+Parameters (all Strategic / Injectable):
+  ctx.task (required)              Problem statement
+  ctx.n_candidates (default 6)     Number of candidates
+  ctx.rubric (default 20-dim)      List of {name, criterion} dimensions
+  ctx.delta (default 0.05)         Overall error probability upper bound
+  ctx.cs_variant                   "polynomial_stitched" | "hoeffding"
+                                   | "betting" | "kl"
+                                   (default "polynomial_stitched")
+                                   See "Operating regime" above.
+  ctx.betting_lambda_max           Betting λ truncation (default 0.5,
+                                   WSR 2024 §B "reasonable default 1/2 or 3/4").
+  ctx.betting_prior_var            Betting σ̂² prior (default 0.25 = 1/4,
+                                   worst-case variance on [0,1]).
+  ctx.score_domain                 { min, max } (default { 0, 1 })
+  ctx.stitching_s (default 1.4)    Howard 2021 eq.(10) exponent
+  ctx.stitching_eta (default 2.0)  Howard 2021 eq.(10) epoch ratio
+  ctx.bootstrap_m (default 1.0)    Howard 2021 eq.(10) bootstrap time
+  ctx.aggregation (default         Only "scalarize" is supported.
+                  "scalarize")     Any other value is rejected at run time.
+  ctx.weights (default nil)        Per-dimension weights, nil = uniform
+  ctx.eval_order                   "round_robin" | "sequential" |
+                                   function(state) -> (cand_i, dim_k)
+                                   (default "round_robin")
+  ctx.layer2_halving               true | false (default false)
+  ctx.halving_checkpoints          list of n values (default {5, 10, 15})
+  ctx.halving_keep_ratio (0.5)     Fraction kept at each halving
+  ctx.halving_min_gap (0)          Gap guard. A candidate in the bottom
+                                   slice is PROTECTED (not killed) if its
+                                   mean is within min_gap of the median
+                                   of alive candidates. Mitigates the
+                                   noise-driven false-kill failure mode at
+                                   low n. Recommended: 0.1-0.2 on a [0,1]
+                                   scale. See workspace/cs_pruner_firing_run2.md.
+  ctx.on_kill                      function(candidate_index, state)
+  ctx.on_survive                   function(candidate_index, state)
+  ctx.gen_tokens (default 400)     Max tokens per candidate generation
+  ctx.min_n_before_kill            Warmup minimum (default 3 for
+                                   stitched/hoeffding/betting, 5 for
+                                   cs_variant="kl"). KL bounds can
+                                   fire spuriously at n≤4 with binary
+                                   PASS/FAIL scores.
+
+Based on:
+  Howard, Ramdas, McAuliffe, Sekhon (2021)
+    "Time-uniform, nonparametric, nonasymptotic confidence sequences"
+    Annals of Statistics 49(2):1055-1080. arXiv:1810.08240
+  Waudby-Smith & Ramdas (2024)
+    "Estimating means of bounded random variables by betting"
+    JRSS-B 86(1):1-27. arXiv:2010.09686 (Theorem 2, predictable
+    plug-in empirical-Bernstein CS)
+
+---
+
+<!-- ── cumulative.md ── -->
+
+
+# Cumulative — propose-verify-accumulate reasoning
+
+> Three roles (proposer, verifier, reporter) collaborate in a loop. The proposer generates new propositions, the verifier checks them, and verified propositions accumulate as established facts for the next round.
+
+---
+
+<!-- ── decompose.md ── -->
+
+
+# Decompose — task decomposition and parallel sub-task execution
+
+> Breaks a complex task into sub-tasks via LLM, executes each in parallel, then merges results into a unified answer.
+
+---
+
+<!-- ── deliberate.md ── -->
+
+
+# deliberate — structured multi-phase deliberation for complex decisions
+
+> Combinator package: orchestrates step_back, meta_prompt, triad, calibrate, rank to perform principled decision-making.
+
+---
+
+<!-- ── dissent.md ── -->
+
+
+# dissent — Consensus inertia prevention via forced adversarial challenge
+
+> Before finalizing any multi-agent consensus, injects a dedicated adversarial agent that challenges the emerging agreement. Evaluates the dissent's validity and produces a revised consensus only when the challenge has merit. Prevents premature lock-in of incorrect conclusions.
+
+---
+
+<!-- ── distill.md ── -->
+
+
+# Distill — MapReduce summarization and extraction
+
+> Splits large text into chunks, processes each in parallel, then reduces into a unified result.
+
+---
+
+<!-- ── diverse.md ── -->
+
+
+# DiVERSe — diverse reasoning paths with step-level verification
+
+> Generates multiple diverse reasoning paths, then verifies each path at the step level (not just the final answer). Selects the path with the highest step-level verification score.
+
+---
+
+<!-- ── dmad.md ── -->
+
+
+# dmad — Dialectical reasoning (thesis → antithesis → synthesis)
+
+> Applies the Hegelian dialectic to LLM reasoning: first generates a thesis (initial position), then constructs the strongest possible antithesis (opposing position), and finally produces a synthesis that integrates valid points from both sides.
+
+---
+
+<!-- ── ensemble_div.md ── -->
+
+
+# ensemble_div — Ambiguity Decomposition (Krogh-Vedelsby 1995)
+
+> Pure-computation utility for ensemble diversity measurement. Implements the fundamental identity: E = E_bar - A_bar
+
+---
+
+<!-- ── epidemic_abm.md ── -->
+
+
+# epidemic_abm — SIR Agent-Based Epidemic Model
+
+> N agents transition between Susceptible → Infected → Recovered states. Each step, infected agents probabilistically transmit to susceptible contacts, and recover with probability γ.
+
+---
+
+<!-- ── eval_guard.md ── -->
+
+
+# eval_guard — Evaluation safety gates (N2 + N3 + N4 Red Lines)
+
+> Pure-computation gate checks for evaluation safety in multi-agent systems. Each gate returns (passed, reason) and can be used independently or combined via check_all().
+
+---
+
+<!-- ── evogame_abm.md ── -->
+
+
+# evogame_abm — Evolutionary Game Theory ABM
+
+> N agents with strategies play iterated games (Prisoner's Dilemma by default). Each generation: random pairing → payoff calculation → selection → mutation. Emergent phenomena: cooperation/defection equilibria, cyclic dominance, strategy invasion dynamics.
+
+---
+
+<!-- ── f_race.md ── -->
+
+
+# f_race — Friedman Race Partial-Data Pruner
+
+> Given N candidate answers and a D-dimensional rubric, this package evaluates (candidate × dimension) pairs in BLOCK order (one rubric dimension at a time across all alive candidates), maintains a rank matrix, and ELIMINATES candidates whose mean rank is significantly worse than the best survivor by a Friedman + Nemenyi post-hoc test.
+
+## Contents
+
+  - [Why F-Race for this scale](#why-f-race-for-this-scale)
+  - [Detection power — read this before choosing the rubric type](#detection-power-read-this-before-choosing-the-rubric-type)
+  - [Empirical validation (N=6, D=20, min_blocks=5, δ=0.05, binary rubric)](#empirical-validation-n-6-d-20-min-blocks-5-0-05-binary-rubric)
+  - [Theoretical foundations](#theoretical-foundations)
+  - [Kill rate limit (important)](#kill-rate-limit-important)
+  - [Post-hoc multiplicity and sequential testing](#post-hoc-multiplicity-and-sequential-testing)
+
+### Why F-Race for this scale {#why-f-race-for-this-scale}
+
+At the operating point of this codebase (N≈6 candidates, D≈20 rubric
+dimensions), Empirical-Bernstein Confidence Sequences (cs_pruner)
+cannot fire: their variance-independent floor radius_floor(t=20) ≈
+0.43 makes a kill mathematically impossible for any mean-gap < 0.86.
+See workspace/cs_pruner_root_cause.md for the derivation.
+
+F-Race operates on RANKS, not raw scores. The Friedman χ² statistic
+
+    Q = (12 / (B·N(N+1))) · Σ_j R_j²  -  3·B·(N+1)
+
+with B = blocks observed and R_j = rank-sum of cand j, lets the
+Nemenyi post-hoc reject a pairwise difference iff
+
+    |R_i - R_j| > (q_{∞,N,α}/√2) · √(B·N(N+1)/6)
+
+where q_{∞,N,α} is the Studentized range quantile (Tukey). For N=6,
+α=0.05 the constant is q/√2 ≈ 2.850 (NOT the normal z=1.96 — see
+the implementation note in nemenyi_critical_diff for the history).
+
+### Detection power — read this before choosing the rubric type {#detection-power-read-this-before-choosing-the-rubric-type}
+
+The detection power depends critically on whether scores are CONTINUOUS
+or BINARY (PASS/FAIL). Both regimes are analyzed below for N=6, δ=0.05
+using the correct Studentized-range constant c = q_{∞,6,0.05}/√2 = 2.850.
+
+#### A. Continuous scores in [0, 1] (Likert ≥ 5 levels recommended)
+
+Under a normal-approximation model the required block count to detect
+a true mean-gap Δ between two candidates scales as
+
+    B_continuous(Δ)  ~  c² · (N(N+1)/6) · σ_block² / Δ²
+
+where σ_block² is the per-block variance of the pairwise rank gap
+(depends on the rubric distribution; ≤ N²/12 ≈ 3 in the worst case).
+This is a rough envelope only — exact values depend on the score
+distribution and should be measured empirically per task.
+
+#### B. Binary PASS/FAIL scores
+
+With binary scores in each block the pairwise rank gap is exactly 3
+when one PASSes and the other FAILs, and 0 otherwise:
+
+    E[R_i - R_j | one block]  =  3 · (p_i - p_j)  =  3·Δ
+    Var[R_i - R_j | one block]  ≤  9
+
+where Δ = p_i - p_j is the true PASS-rate gap. The Nemenyi post-hoc
+requires Σ_blocks (R_i - R_j) > c · √(B·N(N+1)/6) = c·√(7B) with
+c = 2.850 at N=6, δ=0.05:
+
+    3·B·Δ  >  2.850 · √(7B)
+    ⇒  B  >  (2.514 / Δ)²  ≈  6.32 / Δ²
+
+    Δ        Required B
+    0.7      13     ← detectable within D=20
+    0.5      26     ← NOT detectable at D=20
+    0.4      40     ← NOT detectable at D=20
+    0.3      71     ← NOT detectable at D=20
+
+**PASS/FAIL rubrics at N=6 can only resolve PASS-rate gaps Δ ≥ 0.7
+within the default D=20 dimensions.** Smaller gaps require more
+dimensions, a finer-grained rubric, or fewer candidates.
+
+#### Recommendation
+
+For the small-N×D regime targeted by this package, use a Likert rubric
+(3 or 5 levels). This package exposes `f_race.LIKERT5_RUBRIC` as a
+ready-to-use 5-level template. Pass it via `ctx.rubric` to enable
+finer discrimination at the cost of a slightly more complex evaluator
+prompt.
+
+The PASS/FAIL `DEFAULT_RUBRIC` is retained for backwards compatibility
+and for cases where the score gap is large (Δ ≥ 0.4).
+
+### Empirical validation (N=6, D=20, min_blocks=5, δ=0.05, binary rubric) {#empirical-validation-n-6-d-20-min-blocks-5-0-05-binary-rubric}
+
+50 trials × 6 gap scenarios with a deterministic Bernoulli mock judge
+(candidates drawn as Bernoulli(p_i) per block):
+
+    Δ      Fire rate   Avg kills   First kill    Avg evals   Saving
+    0.8    100%        2.58        block  7.7     96.4       19.7%
+    0.7    100%        2.02        block  8.4    102.6       14.5%
+    0.5     84%        1.10        block 13.2    113.1        5.8%
+    0.3     22%        0.24        block 13.9    118.6        1.2%
+    0.1      6%        0.06        block 17.7    119.9        0.1%
+    0.0      0%        0.00        —             120.0        0.0%
+
+Δ=0 produced ZERO spurious kills across 50 trials, consistent with
+δ=0.05 Type I control under repeated testing. Observed first-kill
+blocks are EARLIER than the expected-value lower bound
+B_min ≈ 6.32/Δ² because the bound ignores variance-driven upside
+fluctuations — treat B_min as a pessimistic floor, not a point
+prediction. At Δ=0.5 the bound says B=26 > D=20 (nominally
+"undetectable") yet 84% of trials still fire thanks to variance.
+
+The package complements cs_pruner: use cs_pruner.layer2 (Successive
+Halving) for coarse drops, and f_race when fine discrimination is
+needed at the small-N×D scale.
+
+### Theoretical foundations {#theoretical-foundations}
+
+  Friedman, M. (1937) "The use of ranks to avoid the assumption of
+    normality implicit in the analysis of variance," J. Am. Stat.
+    Assoc. 32(200): 675–701.
+  Birattari, Stützle, Paquete, Varrentrapp (2002) "A racing algorithm
+    for configuring metaheuristics," GECCO, §3 — original F-Race.
+  Nemenyi, P. B. (1963) "Distribution-free Multiple Comparisons,"
+    PhD thesis, Princeton University — post-hoc pairwise comparison
+    after Friedman (normal-approximation z form used here).
+  Demšar, J. (2006) "Statistical Comparisons of Classifiers over
+    Multiple Data Sets," JMLR 7:1–30 — modern reference for the
+    Friedman + Nemenyi pipeline as implemented here.
+
+Algorithm:
+  1. Generate N candidates.
+  2. For each rubric dimension k = 1..D (= one block):
+       a. Query the judge in parallel for every alive candidate's
+          score on dimension k. Score ∈ [0, 1] (PASS/FAIL or numeric).
+       b. Rank the alive candidates within this block (average ranks
+          on ties; lower-is-worse, so highest score gets rank N_alive).
+       c. Append the rank vector to the history.
+       d. If B >= min_blocks_before_race, compute Friedman Q. If
+          Q > χ²_{N_alive - 1, 1-δ}, eliminate every candidate whose
+          rank-sum is more than the Nemenyi critical difference below
+          the best.
+  3. Return ranking by mean rank (alive first, then eliminated).
+
+Usage:
+  local f_race = require("f_race")
+  return f_race.run(ctx)
+
+### Kill rate limit (important) {#kill-rate-limit-important}
+
+Each elimination event resets `rank_history` (because the alive set
+changes and the Friedman statistic must be computed over a uniform
+set of candidates). After a reset the algorithm must re-accumulate
+`min_blocks_before_race` blocks before the next race check can fire.
+
+⇒ The maximum number of race rounds within D dimensions is roughly
+    ⌊D / min_blocks_before_race⌋.
+
+With the defaults (D=20, min_blocks_before_race=5) this caps the
+algorithm at **at most 4 elimination rounds**. If you need more
+aggressive pruning, lower `min_blocks_before_race` (at the cost of
+less stable Friedman estimates) or increase D.
+
+### Post-hoc multiplicity and sequential testing {#post-hoc-multiplicity-and-sequential-testing}
+
+The Nemenyi critical difference already absorbs the pairwise FWER
+via the Studentized range distribution (q_{∞,k,α}/√2), so no extra
+Bonferroni step is needed at a single time point. The Friedman global
+test gates the post-hoc as in Demšar (2006).
+
+However, this implementation applies the test at every block beyond
+`min_blocks_before_race`, which is REPEATED testing of the same null
+and inflates the time-aggregated Type I error above the nominal δ.
+This is NOT corrected by the warmup window and is NOT anytime-valid
+in the formal Howard 2021 sense. The inflation is bounded by the
+number of look-ahead opportunities (≈ ⌊D/min_blocks⌋ + resets), so
+in practice with D=20, min_blocks=5 the effective α is at most a
+small constant multiple of δ. Tighten `delta` (e.g. 0.01) if strict
+δ control is required.
+
+Parameters:
+  ctx.task (required)              Problem statement
+  ctx.n_candidates (default 6)     Number of candidates
+  ctx.rubric (default 20-dim)      List of {name, criterion}
+  ctx.delta (default 0.05)         Significance level for Friedman test.
+                                   Resolved to the largest tabulated α
+                                   that is ≤ delta. Tabulated levels:
+                                   0.05, 0.025, 0.0125, 0.01, 0.005,
+                                   0.0025, 0.001 (conservative rounding).
+  ctx.min_blocks_before_race (5)   Warmup: no elimination before this B
+  ctx.score_domain (default {0,1}) Used only for clipping
+  ctx.gen_tokens (default 400)     Max tokens per candidate generation
+  ctx.on_kill                      function(candidate_index, state)
+  ctx.on_survive                   function(candidate_index, state)
+  ctx.alpha_spending (default false)
+                                   Opt-in sequential testing correction.
+                                   When true, the Friedman test is gated
+                                   to fixed checkpoints spaced
+                                   `min_blocks_before_race` apart, and
+                                   the internal δ is downgraded one
+                                   table step (0.05 → 0.01) whenever
+                                   the per-segment look budget K_max =
+                                   ⌊D/min_blocks⌋ ≥ 2. Coarse Bonferroni-
+                                   via-table-step; recommended whenever
+                                   strict δ control matters.
+
+Comparison with related packages:
+  cs_pruner       — anytime-valid CS, requires t in the hundreds.
+  gumbel_search   — Sequential Halving, batched.
+  listwise_rank   — post-hoc full ranking, no early stop.
+  pairwise_rank   — pairwise tournament, no statistical test.
+  f_race          — block-by-block ranks + Friedman + Nemenyi
+                    post-hoc. Sequential (NOT anytime-valid); see
+                    "Post-hoc multiplicity and sequential testing"
+                    above for the caveat on repeated testing.
+
+---
+
+<!-- ── factscore.md ── -->
+
+
+# FActScore — atomic claim decomposition and per-claim verification
+
+> Extracts atomic claims from text, then independently verifies each claim in parallel. Produces a factual precision score and annotated results.
+
+---
+
+<!-- ── faithful.md ── -->
+
+
+# faithful — Faithful Chain-of-Thought with formal verification
+
+> Translates natural language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
+
+---
+
+<!-- ── falsify.md ── -->
+
+
+# falsify — Sequential Falsification for Hypothesis Exploration
+
+> Explores hypothesis space via Popper's falsificationism: generate hypotheses, attempt to refute each one, prune the refuted, derive new hypotheses from the refutation insights. Unlike verify_first (checks consistency) or cove (verification chain), falsify actively ATTACKS hypotheses and uses refutation failures as evidence of robustness, while refutation successes drive the generation of improved successor hypotheses.
+
+---
+
+<!-- ── got.md ── -->
+
+
+# GoT — Graph of Thoughts reasoning
+
+> Models reasoning as a DAG (Directed Acyclic Graph) enabling operations impossible in tree structures: aggregation of multiple thought paths, self-refinement loops, and hierarchical decomposition with merge.
+
+---
+
+<!-- ── gumbel_search.md ── -->
+
+
+# gumbel_search — Gumbel Top-k + Sequential Halving Tree Search
+
+> Budget-optimal tree search that combines two theoretically grounded techniques: Gumbel Top-k for unbiased candidate sampling without replacement, and Sequential Halving for optimal budget allocation when comparing candidates.
+
+---
+
+<!-- ── hybrid_abm.md ── -->
+
+
+# hybrid_abm — LLM-as-Parameterizer Agent-Based Model strategy
+
+> Hybrid architecture: LLM extracts simulation parameters (Phase A), Pure Lua ABM runs Monte Carlo (Phase B+C), sensitivity sweep (Phase D).
+
+---
+
+<!-- ── intent_belief.md ── -->
+
+
+# Intent Belief — Bayesian intent estimation via hypothesis generation and update
+
+> Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
+
+---
+
+<!-- ── intent_discovery.md ── -->
+
+
+# Intent Discovery — exploratory intent formation through action
+
+> Users often approach tasks without fully-formed goals. This strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration.
+
+---
+
+<!-- ── inverse_u.md ── -->
+
+
+# inverse_u — Inverse-U scaling detection (Chen et al. NeurIPS 2024)
+
+> Pure-computation utility for detecting non-monotonic accuracy scaling when increasing the number of LLM agents/calls.
+
+---
+
+<!-- ── kemeny.md ── -->
+
+
+# kemeny — Kemeny-Young optimal rank aggregation
+
+> Aggregates multiple rankings (total orders) into a single consensus ranking that minimizes the total Kendall tau distance to all input rankings. The Kemeny rule is the UNIQUE aggregation method satisfying Condorcet consistency + neutrality + consistency (Young-Levenglick 1978).
+
+---
+
+<!-- ── least_to_most.md ── -->
+
+
+# Least-to-Most — progressive subproblem decomposition
+
+> Decomposes a complex problem into subproblems ordered from simplest to most complex, then solves each in sequence, using previous solutions as context for the next.
+
+---
+
+<!-- ── lineage.md ── -->
+
+
+# lineage — Pipeline-spanning claim lineage tracking
+
+> Tracks the provenance of claims across multi-step pipelines. Extracts atomic claims from each step's output, traces inter-step dependencies (which claim in step N derived from which claim in step N-1), and detects conflicts and ungrounded claims in the final output.
+
+---
+
+<!-- ── listwise_rank.md ── -->
+
+
+# listwise_rank — Zero-shot Listwise Reranking with Sliding Window
+
+> Ranks N pre-existing candidates by asking the LLM to output a permutation of all candidates in a single call. For N exceeding the context window, a sliding-window strategy progressively reranks overlapping windows from the tail back to the head, merging the partial permutations into a final order.
+
+---
+
+<!-- ── maieutic.md ── -->
+
+
+# Maieutic — recursive explanation tree with logical consistency filtering
+
+> Given a proposition, generates supporting and opposing explanations recursively (depth-limited tree), then checks logical consistency between parent-child pairs to filter contradictions.
+
+---
+
+<!-- ── mbr_select.md ── -->
+
+
+# mbr_select — Minimum Bayes Risk Selection
+
+> Selects the candidate that minimizes expected loss across all other candidates. Instead of picking "the best" directly (which requires an absolute quality oracle), MBR picks the candidate most agreed-upon by all others — the one with minimum expected risk.
+
+---
+
+<!-- ── mcts.md ── -->
+
+
+# MCTS — Monte Carlo Tree Search reasoning
+
+> Applies MCTS to LLM reasoning: selection (UCB1), expansion (generate), simulation (rollout to conclusion), backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
+
+---
+
+<!-- ── meta_prompt.md ── -->
+
+
+# Meta-Prompting — orchestrator dispatches to specialist personas
+
+> A meta-orchestrator analyzes the task, identifies required expertise, then sequentially delegates to specialist personas, collecting and integrating their outputs.
+
+---
+
+<!-- ── moa.md ── -->
+
+
+# moa — Mixture of Agents: layered multi-agent aggregation
+
+> Multiple agents generate responses independently, then a second layer of agents improves upon those responses by referencing all of them. Unlike simple panel (single-round), MoA uses iterative layers where each layer's agents see ALL previous layer outputs, enabling cross- pollination of ideas and progressive refinement.
+
+---
+
+<!-- ── model_first.md ── -->
+
+
+# model_first — Model-First Reasoning
+
+> Separates problem representation from problem solving. First constructs an explicit problem model (entities, state variables, actions with preconditions/effects, and constraints), then reasons within that model.
+
+---
+
+<!-- ── mwu.md ── -->
+
+
+# mwu — Multiplicative Weights Update for adversarial online learning
+
+> Maintains a weight distribution over N agents (experts/arms) and updates weights multiplicatively based on observed losses. Provides optimal O(√(T ln N)) regret bound against ANY adversarial loss sequence — no stochastic assumption required.
+
+---
+
+<!-- ── negation.md ── -->
+
+
+# negation — Adversarial self-test via destruction conditions
+
+> Given an answer, generates "destruction conditions": specific scenarios or facts that, if true, would invalidate the answer. Then attempts to verify whether any destruction condition actually holds. Surviving answers are strengthened; refuted answers are revised.
+
+---
+
+<!-- ── opinion_abm.md ── -->
+
+
+# opinion_abm — Hegselmann-Krause Bounded Confidence Opinion Dynamics
+
+> N agents hold continuous opinion values in [0,1]. Each step, an agent updates its opinion to the average of all agents whose opinions are within ε (bounded confidence threshold).
+
+---
+
+<!-- ── optimize.md ── -->
+
+
+# optimize — Modular parameter optimization orchestrator
+
+> Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in alc.state for incremental optimization across sessions.
+
+---
+
+<!-- ── orch_adaptive.md ── -->
+
+
+# orch_adaptive — Adaptive Depth Orchestration
+
+> Dynamically adjusts phase count, retry budget, and context mode based on task difficulty. Combines with router_daao for pre-classified difficulty, or estimates internally.
+
+---
+
+<!-- ── orch_escalate.md ── -->
+
+
+# orch_escalate — Cascade Escalation Orchestration
+
+> Start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones.
+
+---
+
+<!-- ── orch_fixpipe.md ── -->
+
+
+# orch_fixpipe — Deterministic Fixed Pipeline
+
+> Phases execute in strict order. Gate NG triggers retry up to max_retries. Based on Lobster (OpenClaw) deterministic workflow pattern.
+
+---
+
+<!-- ── orch_gatephase.md ── -->
+
+
+# orch_gatephase — Gate-Phase Orchestration with Pre/Post Hooks
+
+> Each phase has pre-event (context setup) and post-event (gate + checks). Task type determines which phases to skip. Based on Thin Agent / Fat Platform (Praetorian).
+
+---
+
+<!-- ── orch_nver.md ── -->
+
+
+# orch_nver — N-version Programming Orchestration
+
+> Execute N parallel variants, evaluate each, select best. Trades cost for quality. Mitigates 29.6% regression rate (SWE-Bench).
+
+---
+
+<!-- ── p_tts.md ── -->
+
+
+# p_tts — Plan-Test-Then-Solve (constraint-first reasoning)
+
+> Before solving, generates expected properties and test cases the answer must satisfy. Then solves while checking against those constraints. Finally verifies the solution against all generated test cases.
+
+---
+
+<!-- ── pairwise_rank.md ── -->
+
+
+# pairwise_rank — Pairwise Ranking Prompting (PRP)
+
+> Ranks N candidates by asking the LLM "is A or B better?" for pairs and aggregating the wins (Copeland-style score). PRP is the most accurate known LLM-as-judge method when the LLM is small or the task is hard, because it asks the LLM the simplest possible question (a single pairwise preference) at the cost of more LLM calls.
+
+---
+
+<!-- ── panel.md ── -->
+
+
+# Panel — multi-perspective deliberation
+
+> Multiple roles present positions responding to prior arguments, then a moderator synthesizes.
+
+---
+
+<!-- ── pbft.md ── -->
+
+
+# pbft — Practical Byzantine Fault Tolerant consensus via LLM
+
+> Multi-agent 3-phase consensus protocol inspired by PBFT (Castro-Liskov OSDI 1999). Uses the bft package for quorum validation and threshold computation.
+
+---
+
+<!-- ── php.md ── -->
+
+
+# PHP — Progressive-Hint Prompting
+
+> Iteratively re-solves the problem using previous answers as hints. Each round feeds the prior answer back as a "hint", allowing the model to self-correct by building on (or departing from) its previous attempt. Converges when two consecutive answers agree.
+
+---
+
+<!-- ── plan_solve.md ── -->
+
+
+# plan_solve — Plan-and-Solve prompting
+
+> Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full decompose (no parallel subtask dispatch).
+
+---
+
+<!-- ── pre_mortem.md ── -->
+
+
+# pre_mortem — feasibility-gated proposal filtering
+
+> Combinator package: orchestrates factscore, contrastive, calibrate to validate proposals BEFORE output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes/filters proposals with unverified prerequisites.
+
+---
+
+<!-- ── prism.md ── -->
+
+
+# Prism — cognitive-load-aware intent decomposition and logical clarification
+
+> Decomposes complex user intents into structured sub-intents, identifies logical dependencies among them, and generates clarification questions in dependency order to minimize user cognitive load.
+
+---
+
+<!-- ── prompt_breed.md ── -->
+
+
+# prompt_breed — Self-Referential Prompt Evolution
+
+> Evolves a population of task prompts (instructions) using genetic operators, with a unique twist: the mutation operators themselves (mutation prompts) also evolve. This double loop — task-prompt evolution + meta-mutation evolution — enables the system to discover increasingly effective ways to explore prompt space.
+
+---
+
+<!-- ── qdaif.md ── -->
+
+
+# qdaif — Quality-Diversity through AI Feedback
+
+> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by: (1) seeding the archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality and feature placement via LLM, (5) inserting into the archive if superior.
+
+---
+
+<!-- ── rank.md ── -->
+
+
+# Rank — generate candidates and select best via pairwise comparison
+
+> Generates N candidate responses, then uses LLM-as-Judge to perform pairwise tournament selection. Produces a winner with reasoning.
+
+---
+
+<!-- ── recipe_ranking_funnel.md ── -->
+
+
+# recipe_ranking_funnel — Verified 3-stage ranking funnel
+
+> Recipe package: composes listwise_rank and pairwise_rank into a cost-efficient funnel for ranking large candidate sets (N ≥ 20). Applies the information retrieval classic pattern:   Recall (cheap) → Precision (medium) → Final Rank (expensive)
+
+---
+
+<!-- ── recipe_safe_panel.md ── -->
+
+
+# recipe_safe_panel — Verified safe majority-vote panel
+
+> Recipe package: composes condorcet, sc, inverse_u, and calibrate into a safety-gated panel vote. The recipe ensures that majority voting is only applied when the mathematical preconditions are met, and provides early warnings when adding more agents would degrade rather than improve accuracy.
+
+---
+
+<!-- ── reflect.md ── -->
+
+
+# Reflect — self-critique and iterative refinement
+
+> Generate → Critique → Revise loop. The same LLM critiques its own output and refines until convergence or max rounds.
+
+---
+
+<!-- ── reflexion.md ── -->
+
+
+# reflexion — Episodic Memory Self-Improvement
+
+> Iteratively attempts a task, evaluates the result, generates a natural language "reflection" from failures, and stores it in episodic memory. Subsequent attempts reference accumulated reflections to avoid repeating the same mistakes.
+
+---
+
+<!-- ── review_and_investigate.md ── -->
+
+
+# review_and_investigate — deep code review with fact-checking and root-cause analysis
+
+> Combinator package: orchestrates reflect, calibrate, factscore, triad, panel, rank to perform multi-phase investigative code review.
+
+---
+
+<!-- ── robust_qa.md ── -->
+
+
+# robust_qa — Three-phase quality assurance pipeline
+
+> Chains three independent verification strategies into a single pipeline:   Phase 1 (p_tts):    Constraint-first solving — generate constraints BEFORE                        solving, verify solution against specification   Phase 2 (negation): Adversarial stress-test — generate destruction conditions,                        verify if they hold, revise if flaws found   Phase 3 (critic):   Rubric-based evaluation — score per dimension, revise                        weak areas with targeted feedback
+
+---
+
+<!-- ── router_capability.md ── -->
+
+
+# router_capability — Capability-based Registry Router
+
+> Extracts task requirements via LLM, then scores against agent capabilities using Jaccard similarity. Based on Dynamic Agent Registry pattern.
+
+---
+
+<!-- ── router_daao.md ── -->
+
+
+# router_daao — Difficulty-Aware Agent Orchestration Router
+
+> Classifies task difficulty with a single LLM call, then maps to optimal strategy/depth/parameters via deterministic lookup.
+
+---
+
+<!-- ── router_semantic.md ── -->
+
+
+# router_semantic — Semantic Router with LLM Fallback
+
+> Keyword/pattern-based routing with LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
+
+---
+
+<!-- ── rstar.md ── -->
+
+
+# rstar — Mutual reasoning verification via self-play
+
+> Generates two independent reasoning paths, then each path verifies the other. Disagreements trigger a resolution round. Achieves MCTS-level accuracy at a fraction of the cost by replacing tree search with targeted mutual critique.
+
+---
+
+<!-- ── s2a.md ── -->
+
+
+# s2a — System 2 Attention: context denoising before reasoning
+
+> Strips irrelevant, distracting, or misleading information from the input context, then re-answers using only the cleaned context. Dramatically reduces sycophancy and distraction effects.
+
+---
+
+<!-- ── sc.md ── -->
+
+
+# SC — Self-Consistency: independent sampling with majority vote
+
+> Samples multiple reasoning paths for the same problem, then selects the most consistent answer by majority voting.
+
+---
+
+<!-- ── schelling_abm.md ── -->
+
+
+# schelling_abm — Schelling Segregation Model
+
+> Agents of two types on a 2D grid. Each agent has a tolerance threshold: if the fraction of same-type neighbors is below threshold, the agent moves to a random empty cell.
+
+---
+
+<!-- ── scoring_rule.md ── -->
+
+
+# scoring_rule — Proper Scoring Rules for calibration measurement
+
+> Pure-computation utility for evaluating the calibration of probabilistic predictions. A scoring rule S(p, y) is "proper" if reporting one's true belief maximizes expected score, and "strictly proper" if this maximum is unique.
+
+---
+
+<!-- ── setwise_rank.md ── -->
+
+
+# setwise_rank — Setwise Tournament Reranking
+
+> Ranks N candidates by repeatedly asking the LLM "which is the best among these k items?" and advancing winners through tournament rounds. Each comparison spans a SET (size k) rather than a pair, dramatically reducing LLM calls vs pairwise while keeping the LLM task simpler than listwise (it only picks ONE best, not a full permutation).
+
+---
+
+<!-- ── shapley.md ── -->
+
+
+# shapley — Shapley Value computation for agent contribution attribution
+
+> Pure-computation utility for attributing individual agent contributions within a coalition (ensemble/swarm). Implements both exact computation and Monte Carlo permutation sampling approximation.
+
+---
+
+<!-- ── sketch.md ── -->
+
+
+# sketch — Sketch-of-Thought: cognitive-inspired efficient reasoning
+
+> Selects one of three cognitive paradigms based on task characteristics, then generates compressed reasoning using that paradigm's notation. Reduces reasoning tokens by 60-84% while maintaining or improving accuracy.
+
+---
+
+<!-- ── sot.md ── -->
+
+
+# SoT — Skeleton-of-Thought parallel generation
+
+> Generates a structural outline first, then fills each section in parallel via alc.map. Produces structurally coherent long-form output.
+
+---
+
+<!-- ── step_back.md ── -->
+
+
+# Step-Back — abstraction-first reasoning
+
+> Instead of solving directly, first "step back" to identify the underlying principle or concept, then apply that principle to solve the original problem.
+
+---
+
+<!-- ── step_verify.md ── -->
+
+
+# step_verify — Step-Level Verification (PRM-style, LLM-as-Verifier)
+
+> Verifies each intermediate reasoning step independently, identifying exactly where errors occur. Retains only verified-correct steps and re-derives from the last correct point.
+
+---
+
+<!-- ── sugarscape_abm.md ── -->
+
+
+# sugarscape_abm — Sugarscape Agent-Based Model
+
+> Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step, an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero.
+
+---
+
+<!-- ── topo_route.md ── -->
+
+
+# topo_route — Topology-aware meta-router for multi-agent pipelines
+
+> Analyzes task characteristics and recommends the optimal agent topology (linear, star, DAG, mesh, debate) along with concrete package combinations from the algocline bundled collection.
+
+---
+
+<!-- ── tot.md ── -->
+
+
+# ToT — Tree-of-Thought reasoning
+
+> Explores multiple reasoning paths via branching, evaluation, and pruning. Unlike linear CoT, ToT maintains a tree of thought branches and uses beam search to focus on the most promising paths.
+
+---
+
+<!-- ── triad.md ── -->
+
+
+# Triad — adversarial 3-role debate with judge arbitration
+
+> Three distinct roles: Proponent (argues for), Opponent (argues against), Judge (arbitrates). Multiple rounds of attack/defense, then final verdict.
+
+---
+
+<!-- ── ucb.md ── -->
+
+
+# UCB — UCB1 hypothesis space exploration
+
+> Generates multiple hypotheses, scores them with UCB1, refines the best.
+
+---
+
+<!-- ── usc.md ── -->
+
+
+# USC — Universal Self-Consistency
+
+> Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one.
+
+---
+
+<!-- ── verify_first.md ── -->
+
+
+# verify_first — Verification-First prompting
+
+> Provides a candidate answer (trivial, random, or CoT-generated), then instructs the LLM to verify it before generating the real answer. "Reverse reasoning" is cognitively easier than forward generation and reduces logical errors by overcoming egocentric bias.
+
+---

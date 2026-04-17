@@ -1,0 +1,12 @@
+---
+name: qdaif
+version: 0.1.0
+category: exploration
+description: "Quality-Diversity through AI Feedback — MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification. Produces diverse, high-quality solution populations."
+source: qdaif/init.lua
+generated: gen_docs (V0)
+---
+
+# qdaif — Quality-Diversity through AI Feedback
+
+> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by: (1) seeding the archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality and feature placement via LLM, (5) inserting into the archive if superior.
