@@ -289,11 +289,10 @@ function M.build_pkg_info(pkg_name, init_path, source_path)
             -- shape.input). Projection renders it verbatim.
             shape.result = PI.label(meta.result_shape)
         elseif type(meta.result_shape) == "table" and meta.result_shape.kind then
-            -- alc_shapes schema. Peel optional/described wrappers and
-            -- convert to a TypeExpr. String rendering is the projection's
-            -- responsibility (see tools.docs.projections.shape_type_string).
-            local peeled = Shape._internal.peel(meta.result_shape)
-            shape.result = Shape._internal.type_expr_of(peeled)
+            -- alc_shapes schema → TypeExpr. String rendering is the
+            -- projection's responsibility (see tools.docs.projections
+            -- .shape_type_string).
+            shape.result = Shape.convert_type_expr(meta.result_shape)
         else
             error(string.format(
                 "tools.docs.extract: pkg '%s' meta.result_shape must be " ..
