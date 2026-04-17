@@ -1,13 +1,17 @@
 --- Tests for tools.docs.* — Core Entity / Projections / end-to-end golden.
 ---
 --- Coverage:
----   1. tools.docs.pkg_info  — constructor contract
----   2. tools.docs.extract   — docstring + section split + slugify
----   3. tools.docs.shape     — DSL → TypeExpr walker (peel, convert_shape)
----   4. tools.docs.projections — shape_type_string, frontmatter, Parameters
----                              table, narrative_md, llms_index, llms_full
----   5. end-to-end golden    — build_pkg_info("cot") → narrative_md equals
----                             the checked-in expected text
+---   1. tools.docs.pkg_info    — constructor contract (make_section /
+---                               make_pkg_info)
+---   2. tools.docs.extract     — docstring + section split + slugify +
+---                               build_pkg_info result_shape handling
+---   3. tools.docs.projections — shape_type_string, frontmatter,
+---                               Parameters table, narrative_md,
+---                               shape_to_json, hub_entry, llms_index,
+---                               llms_full, context7, devin_wiki
+---   4. tools.docs.lint        — V0 convention gate
+---   5. end-to-end golden      — build_pkg_info("cot") → narrative_md
+---                               equals the checked-in expected text
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
@@ -32,11 +36,12 @@ local REPO = repo_root_from_package_path()
 for _, name in ipairs({
     "tools.docs.pkg_info",
     "tools.docs.extract",
-    "tools.docs.shape",
     "tools.docs.projections",
     "tools.docs.lint",
     "alc_shapes",
     "alc_shapes.t",
+    "alc_shapes.check",
+    "alc_shapes.reflect",
     "cot",
 }) do
     package.loaded[name] = nil
@@ -44,49 +49,33 @@ end
 
 local PI          = require("tools.docs.pkg_info")
 local Extract     = require("tools.docs.extract")
-local Shape       = require("tools.docs.shape")
 local Projections = require("tools.docs.projections")
 local Lint        = require("tools.docs.lint")
 local S           = require("alc_shapes")
 local T           = S.T
 
 -- ─────────────────────────────────────────────────────────────────────
--- 1. pkg_info
+-- 1. pkg_info — constructor contract
 -- ─────────────────────────────────────────────────────────────────────
 
 describe("tools.docs.pkg_info", function()
-    it("primitive() returns { kind='primitive', name=... }", function()
-        local p = PI.primitive("string")
-        expect(p.kind).to.equal("primitive")
-        expect(p.name).to.equal("string")
+    it("make_section stores all four fields verbatim", function()
+        local s = PI.make_section(2, "Heading", "heading", "body")
+        expect(s.level).to.equal(2)
+        expect(s.heading).to.equal("Heading")
+        expect(s.anchor).to.equal("heading")
+        expect(s.body_md).to.equal("body")
     end)
 
-    it("array_of() wraps an element TypeExpr", function()
-        local a = PI.array_of(PI.primitive("number"))
-        expect(a.kind).to.equal("array_of")
-        expect(a.of.kind).to.equal("primitive")
-        expect(a.of.name).to.equal("number")
-    end)
-
-    it("make_field() normalizes optional/doc to safe defaults", function()
-        local f = PI.make_field("x", PI.primitive("string"))
-        expect(f.name).to.equal("x")
-        expect(f.optional).to.equal(false)
-        expect(f.doc).to.equal("")
-    end)
-
-    it("make_shape() normalizes open to boolean", function()
-        local s1 = PI.make_shape({}, nil)
-        local s2 = PI.make_shape({}, true)
-        expect(s1.open).to.equal(false)
-        expect(s2.open).to.equal(true)
-    end)
-
-    it("one_of() copies the values array", function()
-        local src = { "a", "b" }
-        local got = PI.one_of(src)
-        src[1] = "MUTATED"
-        expect(got.values[1]).to.equal("a")
+    it("make_pkg_info stores identity/narrative/shape", function()
+        local id  = { name = "x", version = "1", category = "c",
+                      description = "d", source_path = "x/init.lua" }
+        local nar = { title = "T", summary = "", sections = {} }
+        local shp = { input = nil, result = nil }
+        local info = PI.make_pkg_info(id, nar, shp)
+        expect(info.identity).to.equal(id)
+        expect(info.narrative).to.equal(nar)
+        expect(info.shape).to.equal(shp)
     end)
 end)
 
@@ -208,97 +197,8 @@ describe("tools.docs.extract.extract_docstring", function()
     end)
 end)
 
--- ─────────────────────────────────────────────────────────────────────
--- 3. shape
--- ─────────────────────────────────────────────────────────────────────
-
-describe("tools.docs.shape.convert_shape", function()
-    it("flattens T.shape into Field array sorted by name", function()
-        local schema = T.shape({
-            zeta = T.number,
-            alpha = T.string,
-        })
-        local s = Shape.convert_shape(schema)
-        expect(#s.fields).to.equal(2)
-        expect(s.fields[1].name).to.equal("alpha")
-        expect(s.fields[2].name).to.equal("zeta")
-    end)
-
-    it("peels optional wrapper into Field.optional=true", function()
-        local schema = T.shape({
-            x = T.string:is_optional(),
-        })
-        local s = Shape.convert_shape(schema)
-        expect(s.fields[1].optional).to.equal(true)
-    end)
-
-    it("peels described wrapper into Field.doc", function()
-        local schema = T.shape({
-            x = T.number:describe("desc text"),
-        })
-        local s = Shape.convert_shape(schema)
-        expect(s.fields[1].doc).to.equal("desc text")
-    end)
-
-    it("handles optional + described in either order", function()
-        local schema = T.shape({
-            a = T.string:is_optional():describe("A"),
-            b = T.string:describe("B"):is_optional(),
-        })
-        local s = Shape.convert_shape(schema)
-        expect(s.fields[1].optional).to.equal(true)
-        expect(s.fields[1].doc).to.equal("A")
-        expect(s.fields[2].optional).to.equal(true)
-        expect(s.fields[2].doc).to.equal("B")
-    end)
-
-    it("preserves open flag", function()
-        -- DSL default: open=true. Explicit { open=false } closes.
-        local default_open = Shape.convert_shape(T.shape({ x = T.string }))
-        local closed       = Shape.convert_shape(T.shape({ x = T.string }, { open = false }))
-        expect(default_open.open).to.equal(true)
-        expect(closed.open).to.equal(false)
-    end)
-end)
-
-describe("tools.docs.shape.convert_type_expr", function()
-    it("converts a primitive schema", function()
-        local te = Shape.convert_type_expr(T.string)
-        expect(te.kind).to.equal("primitive")
-        expect(te.name).to.equal("string")
-    end)
-
-    it("peels top-level optional/described wrappers", function()
-        local te1 = Shape.convert_type_expr(T.number:is_optional())
-        expect(te1.kind).to.equal("primitive")
-        expect(te1.name).to.equal("number")
-        local te2 = Shape.convert_type_expr(T.string:describe("d"):is_optional())
-        expect(te2.kind).to.equal("primitive")
-        expect(te2.name).to.equal("string")
-    end)
-
-    it("converts T.shape(...) into a `shape` TypeExpr", function()
-        local te = Shape.convert_type_expr(T.shape({ x = T.string }))
-        expect(te.kind).to.equal("shape")
-        expect(#te.shape.fields).to.equal(1)
-        expect(te.shape.fields[1].name).to.equal("x")
-    end)
-
-    it("converts T.array_of(T.number)", function()
-        local te = Shape.convert_type_expr(T.array_of(T.number))
-        expect(te.kind).to.equal("array_of")
-        expect(te.of.kind).to.equal("primitive")
-        expect(te.of.name).to.equal("number")
-    end)
-
-    it("rejects non-schema input", function()
-        local ok = pcall(Shape.convert_type_expr, { not_a_schema = true })
-        expect(ok).to.equal(false)
-    end)
-end)
-
 describe("tools.docs.extract.build_pkg_info (result_shape)", function()
-    it("wraps a string result_shape as a `label` TypeExpr", function()
+    it("wraps a string result_shape as a T.ref schema", function()
         -- Write a temp pkg with result_shape = "my.Result"
         local dir = os.tmpname()
         os.remove(dir); os.execute("mkdir -p " .. dir .. "/rs_str")
@@ -316,14 +216,14 @@ describe("tools.docs.extract.build_pkg_info (result_shape)", function()
             "rs_str", dir .. "/rs_str/init.lua", "rs_str/init.lua")
         package.path = saved
         os.execute("rm -rf " .. dir)
-        expect(info.shape.result.kind).to.equal("label")
+        expect(info.shape.result.kind).to.equal("ref")
         expect(info.shape.result.name).to.equal("my.Result")
         -- Projection renders it back verbatim.
         expect(Projections.shape_type_string(info.shape.result))
             .to.equal("my.Result")
     end)
 
-    it("converts a T.shape result_shape into a TypeExpr", function()
+    it("passes a T.shape result_shape through as-is", function()
         local dir = os.tmpname()
         os.remove(dir); os.execute("mkdir -p " .. dir .. "/rs_shape")
         local f = io.open(dir .. "/rs_shape/init.lua", "w")
@@ -348,81 +248,117 @@ describe("tools.docs.extract.build_pkg_info (result_shape)", function()
         expect(Projections.shape_type_string(info.shape.result)).to.equal(
             "shape { chain: array of string, conclusion: string }")
     end)
-end)
 
-describe("tools.docs.projections.shape_type_string", function()
-    it("prints primitives by name", function()
-        expect(Projections.shape_type_string(PI.primitive("string")))
-            .to.equal("string")
-    end)
-
-    it("prints array_of as 'array of <elem>'", function()
-        expect(Projections.shape_type_string(
-            PI.array_of(PI.primitive("number"))))
-            .to.equal("array of number")
-    end)
-
-    it("prints map_of with both key and val", function()
-        local t = PI.map_of(PI.primitive("string"), PI.primitive("number"))
-        expect(Projections.shape_type_string(t))
-            .to.equal("map of string to number")
-    end)
-
-    it("prints one_of with quoted string literals", function()
-        local t = PI.one_of({ "a", "b" })
-        expect(Projections.shape_type_string(t)).to.equal('one_of("a", "b")')
-    end)
-
-    it("prints discriminated by its tag", function()
-        local t = PI.discriminated("kind", {})
-        expect(Projections.shape_type_string(t))
-            .to.equal('discriminated by "kind"')
-    end)
-
-    it("prints label TypeExpr verbatim", function()
-        expect(Projections.shape_type_string(PI.label("paneled.Result")))
-            .to.equal("paneled.Result")
-    end)
-
-    it("expands nested shape inline per spec §7.1", function()
-        local nested = PI.shape_ref(PI.make_shape({
-            PI.make_field("task", PI.primitive("string"), false, ""),
-            PI.make_field("score", PI.primitive("number"), false, ""),
-        }, false))
-        expect(Projections.shape_type_string(nested))
-            .to.equal("shape { task: string, score: number }")
-    end)
-
-    it("marks optional fields with '?' in nested shape", function()
-        local nested = PI.shape_ref(PI.make_shape({
-            PI.make_field("name", PI.primitive("string"), false, ""),
-            PI.make_field("note", PI.primitive("string"), true, ""),
-        }, false))
-        expect(Projections.shape_type_string(nested))
-            .to.equal("shape { name: string, note?: string }")
-    end)
-
-    it("expands nested shape via convert_shape (DSL roundtrip)", function()
-        local schema = T.shape({
-            criterion = T.string:describe("criterion text"),
-            name      = T.string,
-        })
-        local field_type = {
-            kind = "shape", shape = Shape.convert_shape(schema),
-        }
-        -- fields are alphabetically sorted: criterion, name
-        expect(Projections.shape_type_string(field_type))
-            .to.equal("shape { criterion: string, name: string }")
-    end)
-
-    it("returns 'shape { }' for empty shape", function()
-        local empty = PI.shape_ref(PI.make_shape({}, false))
-        expect(Projections.shape_type_string(empty)).to.equal("shape { }")
+    it("rejects a non-string, non-schema result_shape", function()
+        local dir = os.tmpname()
+        os.remove(dir); os.execute("mkdir -p " .. dir .. "/rs_bad")
+        local f = io.open(dir .. "/rs_bad/init.lua", "w")
+        f:write('local M = {}\n')
+        f:write('M.meta = { name="rs_bad", version="1", description="d", ')
+        f:write('category="c", result_shape = 42 }\n')
+        f:write('function M.run(c) return c end\nreturn M\n')
+        f:close()
+        local saved = package.path
+        package.path = dir .. "/?.lua;" .. dir .. "/?/init.lua;" .. saved
+        package.loaded["rs_bad"] = nil
+        local ok = pcall(Extract.build_pkg_info,
+            "rs_bad", dir .. "/rs_bad/init.lua", "rs_bad/init.lua")
+        package.path = saved
+        os.execute("rm -rf " .. dir)
+        expect(ok).to.equal(false)
     end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────
--- 4. projections
+-- 3. projections — shape_type_string
+-- ─────────────────────────────────────────────────────────────────────
+
+describe("tools.docs.projections.shape_type_string", function()
+    it("prints primitives by their alc_shapes prim name", function()
+        expect(Projections.shape_type_string(T.string)).to.equal("string")
+        expect(Projections.shape_type_string(T.number)).to.equal("number")
+        expect(Projections.shape_type_string(T.boolean)).to.equal("boolean")
+        expect(Projections.shape_type_string(T.table)).to.equal("table")
+    end)
+
+    it("prints T.any as 'any'", function()
+        expect(Projections.shape_type_string(T.any)).to.equal("any")
+    end)
+
+    it("prints array_of as 'array of <elem>'", function()
+        expect(Projections.shape_type_string(T.array_of(T.number)))
+            .to.equal("array of number")
+    end)
+
+    it("prints map_of with both key and val", function()
+        expect(Projections.shape_type_string(T.map_of(T.string, T.number)))
+            .to.equal("map of string to number")
+    end)
+
+    it("prints one_of with quoted string literals", function()
+        expect(Projections.shape_type_string(T.one_of({ "a", "b" })))
+            .to.equal('one_of("a", "b")')
+    end)
+
+    it("prints discriminated by its tag", function()
+        local d = T.discriminated("kind", {
+            a = T.shape({ kind = T.one_of({ "a" }) }),
+        })
+        expect(Projections.shape_type_string(d))
+            .to.equal('discriminated by "kind"')
+    end)
+
+    it("prints T.ref verbatim by its name", function()
+        expect(Projections.shape_type_string(T.ref("paneled.Result")))
+            .to.equal("paneled.Result")
+    end)
+
+    it("expands nested shape inline with alphabetical field order", function()
+        local nested = T.shape({
+            task  = T.string,
+            score = T.number,
+        })
+        -- alc_shapes fields are map-keyed and `reflect.fields` sorts by
+        -- name: score, task.
+        expect(Projections.shape_type_string(nested))
+            .to.equal("shape { score: number, task: string }")
+    end)
+
+    it("marks optional fields with '?' in nested shape", function()
+        local nested = T.shape({
+            name = T.string,
+            note = T.string:is_optional(),
+        })
+        expect(Projections.shape_type_string(nested))
+            .to.equal("shape { name: string, note?: string }")
+    end)
+
+    it("peels described wrapper transparently when rendering", function()
+        local sch = T.shape({
+            criterion = T.string:describe("criterion text"),
+            name      = T.string,
+        })
+        expect(Projections.shape_type_string(sch))
+            .to.equal("shape { criterion: string, name: string }")
+    end)
+
+    it("peels optional/described at the entry point (top-level)", function()
+        expect(Projections.shape_type_string(T.number:is_optional()))
+            .to.equal("number")
+        expect(Projections.shape_type_string(T.string:describe("d")))
+            .to.equal("string")
+        expect(Projections.shape_type_string(T.string:describe("d"):is_optional()))
+            .to.equal("string")
+    end)
+
+    it("returns 'shape { }' for empty shape", function()
+        expect(Projections.shape_type_string(T.shape({})))
+            .to.equal("shape { }")
+    end)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 4. projections — narrative_md / parameters table / llms / json
 -- ─────────────────────────────────────────────────────────────────────
 
 local function sample_pkg_info()
@@ -434,9 +370,8 @@ local function sample_pkg_info()
               PI.make_section(2, "A", "a", "a-body"),
               PI.make_section(3, "B", "b", "b-body"),
           } },
-        { input = PI.make_shape({
-              PI.make_field("k", PI.primitive("string"), false, "the k"),
-          }, false),
+        { input  = T.shape({ k = T.string:describe("the k") },
+                           { open = false }),
           result = nil }
     )
 end
@@ -458,26 +393,24 @@ describe("tools.docs.projections.narrative_md", function()
     end)
 
     it("renders nested-shape field types inline in Parameters table", function()
-        local nested_shape = PI.make_shape({
-            PI.make_field("name", PI.primitive("string"), false, ""),
-            PI.make_field("criterion", PI.primitive("string"), false, ""),
-        }, false)
         local info = PI.make_pkg_info(
             { name = "z", version = "1", category = "c",
               description = "d", source_path = "z/init.lua" },
             { title = "Z", summary = "s", sections = {} },
-            { input = PI.make_shape({
-                PI.make_field("rubric",
-                    PI.array_of({ kind = "shape", shape = nested_shape }),
-                    true, "rubric dimensions"),
-                PI.make_field("task", PI.primitive("string"), false, "the task"),
-              }, false),
+            { input  = T.shape({
+                  rubric = T.array_of(T.shape({
+                      criterion = T.string,
+                      name      = T.string,
+                  })):is_optional():describe("rubric dimensions"),
+                  task = T.string:describe("the task"),
+              }, { open = false }),
               result = nil }
         )
         local md = Projections.narrative_md(info)
         -- nested shape should be expanded, not collapsed to bare "shape".
+        -- alc_shapes `fields` is a map: inner fields sort alphabetically.
         expect(md:find(
-            "array of shape { name: string, criterion: string }",
+            "array of shape { criterion: string, name: string }",
             1, true) ~= nil).to.equal(true)
     end)
 
@@ -650,54 +583,65 @@ describe("tools.docs.projections.json_encode", function()
 end)
 
 describe("tools.docs.projections.shape_to_json", function()
-    it("dumps a flat Shape with Field metadata", function()
-        local shape = PI.make_shape({
-            PI.make_field("task", PI.primitive("string"), false, "the task"),
-            PI.make_field("depth", PI.primitive("number"), true, "optional"),
-        }, false)
-        local got = Projections.shape_to_json(shape)
+    it("dumps a flat T.shape with Field metadata (sorted)", function()
+        local schema = T.shape({
+            task  = T.string:describe("the task"),
+            depth = T.number:is_optional():describe("optional"),
+        }, { open = false })
+        local got = Projections.shape_to_json(schema)
         expect(got.open).to.equal(false)
         expect(#got.fields).to.equal(2)
-        expect(got.fields[1].name).to.equal("task")
+        -- alphabetical: depth < task
+        expect(got.fields[1].name).to.equal("depth")
+        expect(got.fields[1].optional).to.equal(true)
+        expect(got.fields[1].doc).to.equal("optional")
         expect(got.fields[1].type.kind).to.equal("primitive")
-        expect(got.fields[1].type.name).to.equal("string")
-        expect(got.fields[1].optional).to.equal(false)
-        expect(got.fields[1].doc).to.equal("the task")
-        expect(got.fields[2].optional).to.equal(true)
+        expect(got.fields[1].type.name).to.equal("number")
+        expect(got.fields[2].name).to.equal("task")
+        expect(got.fields[2].optional).to.equal(false)
+        expect(got.fields[2].doc).to.equal("the task")
+        expect(got.fields[2].type.kind).to.equal("primitive")
+        expect(got.fields[2].type.name).to.equal("string")
     end)
 
     it("dumps a nested shape TypeExpr recursively", function()
-        local inner = PI.make_shape({
-            PI.make_field("x", PI.primitive("number"), false, ""),
-        }, false)
-        local shape = PI.make_shape({
-            PI.make_field("nested",
-                { kind = "shape", shape = inner }, false, ""),
-        }, false)
-        local got = Projections.shape_to_json(shape)
+        local schema = T.shape({
+            nested = T.shape({ x = T.number }),
+        }, { open = false })
+        local got = Projections.shape_to_json(schema)
         expect(got.fields[1].type.kind).to.equal("shape")
         expect(got.fields[1].type.shape.fields[1].name).to.equal("x")
     end)
 
-    it("dumps array_of / map_of / one_of / label", function()
-        local shape = PI.make_shape({
-            PI.make_field("a", PI.array_of(PI.primitive("string")), false, ""),
-            PI.make_field("m",
-                PI.map_of(PI.primitive("string"), PI.primitive("number")),
-                false, ""),
-            PI.make_field("o", PI.one_of({ "x", "y" }), false, ""),
-            PI.make_field("l", PI.label("pkg.Result"), false, ""),
-        }, false)
-        local got = Projections.shape_to_json(shape)
+    it("dumps array_of / map_of / one_of / ref (as label)", function()
+        local schema = T.shape({
+            a = T.array_of(T.string),
+            m = T.map_of(T.string, T.number),
+            o = T.one_of({ "x", "y" }),
+            l = T.ref("pkg.Result"),
+        }, { open = false })
+        local got = Projections.shape_to_json(schema)
+        -- alphabetical: a, l, m, o
+        expect(got.fields[1].name).to.equal("a")
         expect(got.fields[1].type.kind).to.equal("array_of")
         expect(got.fields[1].type.of.name).to.equal("string")
-        expect(got.fields[2].type.kind).to.equal("map_of")
-        expect(got.fields[2].type.key.name).to.equal("string")
-        expect(got.fields[2].type.val.name).to.equal("number")
-        expect(got.fields[3].type.kind).to.equal("one_of")
-        expect(got.fields[3].type.values[1]).to.equal("x")
-        expect(got.fields[4].type.kind).to.equal("label")
-        expect(got.fields[4].type.name).to.equal("pkg.Result")
+        expect(got.fields[2].name).to.equal("l")
+        expect(got.fields[2].type.kind).to.equal("label")
+        expect(got.fields[2].type.name).to.equal("pkg.Result")
+        expect(got.fields[3].name).to.equal("m")
+        expect(got.fields[3].type.kind).to.equal("map_of")
+        expect(got.fields[3].type.key.name).to.equal("string")
+        expect(got.fields[3].type.val.name).to.equal("number")
+        expect(got.fields[4].name).to.equal("o")
+        expect(got.fields[4].type.kind).to.equal("one_of")
+        expect(got.fields[4].type.values[1]).to.equal("x")
+    end)
+
+    it("projects T.any as kind=primitive, name='any'", function()
+        local schema = T.shape({ v = T.any })
+        local got = Projections.shape_to_json(schema)
+        expect(got.fields[1].type.kind).to.equal("primitive")
+        expect(got.fields[1].type.name).to.equal("any")
     end)
 end)
 
@@ -709,10 +653,9 @@ describe("tools.docs.projections.hub_entry", function()
             { title = "H", summary = "sum", sections = {
                 PI.make_section(2, "Usage", "usage", "body"),
               } },
-            { input = PI.make_shape({
-                PI.make_field("k", PI.primitive("string"), false, "the k"),
-              }, false),
-              result = PI.label("h.Result") }
+            { input  = T.shape({ k = T.string:describe("the k") },
+                               { open = false }),
+              result = T.ref("h.Result") }
         )
         local json = Projections.hub_entry(info)
         -- Structural spot-checks (deterministic key order lets us grep).
@@ -747,10 +690,10 @@ describe("tools.docs.projections.hub_entry", function()
             { name = "d", version = "1", category = "c",
               description = "x", source_path = "d/init.lua" },
             { title = "D", summary = "s", sections = {} },
-            { input = PI.make_shape({
-                PI.make_field("z", PI.primitive("string"), false, ""),
-                PI.make_field("a", PI.primitive("number"), false, ""),
-              }, false),
+            { input = T.shape({
+                z = T.string,
+                a = T.number,
+              }, { open = false }),
               result = nil }
         )
         local j1 = Projections.hub_entry(info)
@@ -1028,9 +971,7 @@ describe("tools.docs.lint", function()
                 },
             },
             shape = {
-                input = PI.make_shape({
-                    PI.make_field("k", PI.primitive("string"), false, ""),
-                }, false),
+                input  = T.shape({ k = T.string }, { open = false }),
                 result = nil,
             },
         })
@@ -1096,14 +1037,17 @@ describe("end-to-end: build_pkg_info(cot) + narrative_md", function()
         expect(info.narrative.sections[1].heading).to.equal("Usage")
         expect(info.narrative.sections[1].anchor).to.equal("usage")
         expect(info.narrative.sections[2].heading).to.equal("Behavior")
-        -- Shape: 2 fields, sorted (depth, task). depth is optional.
+        -- Shape: alc_shapes schema. Use S.fields to enumerate.
         expect(info.shape.input ~= nil).to.equal(true)
-        expect(#info.shape.input.fields).to.equal(2)
-        expect(info.shape.input.fields[1].name).to.equal("depth")
-        expect(info.shape.input.fields[1].optional).to.equal(true)
-        expect(info.shape.input.fields[2].name).to.equal("task")
-        expect(info.shape.input.fields[2].optional).to.equal(false)
-        -- Result shape is a TypeExpr; the projection renders it per §7.1.
+        expect(info.shape.input.kind).to.equal("shape")
+        local input_fields = S.fields(info.shape.input)
+        expect(#input_fields).to.equal(2)
+        -- alphabetical: depth, task
+        expect(input_fields[1].name).to.equal("depth")
+        expect(input_fields[1].optional).to.equal(true)
+        expect(input_fields[2].name).to.equal("task")
+        expect(input_fields[2].optional).to.equal(false)
+        -- Result shape is an alc_shapes schema; projection renders it per §7.1.
         expect(info.shape.result.kind).to.equal("shape")
         expect(Projections.shape_type_string(info.shape.result)).to.equal(
             "shape { chain: array of string, conclusion: string }")

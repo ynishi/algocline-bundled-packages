@@ -3,11 +3,16 @@
 --- Pure functions. Each projection takes a PkgInfo (or a collection)
 --- and returns the rendered artifact as a string. No I/O.
 ---
---- Rendering variants (future): `shape_type_string` is the default
---- human-readable form for the Parameters table and frontmatter.
---- Alternate variants (LLM-compressed, luacats annotation form,
---- JSON dump for hub_entry) live alongside as separate projections
---- so that the same `TypeExpr` entity can render into any target.
+--- Single-AST doctrine (see alc_shapes/README.md §Core concept):
+--- `PkgInfo.shape.input` / `PkgInfo.shape.result` are alc_shapes
+--- schemas directly. This module reads them via `rawget` (schemas are
+--- persistable plain tables — see alc_shapes/README.md §Persistable)
+--- and projects into the target artifact. Field iteration goes
+--- through `alc_shapes.fields()` which already returns sorted
+--- `{name, type, optional, doc?}` entries with optional/described
+--- wrappers peeled.
+
+local S = require("alc_shapes")
 
 local M = {}
 
@@ -24,41 +29,66 @@ local function escape_yaml_string(s)
     return out
 end
 
--- ── TypeExpr → string projection ──────────────────────────────────────
+--- Peel optional / described wrappers off a schema.
+---
+--- Returns: inner_schema, optional, doc
+local function peel(schema)
+    local optional = false
+    local doc = ""
+    while true do
+        local k = rawget(schema, "kind")
+        if k == "optional" then
+            optional = true
+            schema = rawget(schema, "inner")
+        elseif k == "described" then
+            if doc == "" then doc = rawget(schema, "doc") or "" end
+            schema = rawget(schema, "inner")
+        else
+            break
+        end
+    end
+    return schema, optional, doc
+end
 
---- Pretty-print a TypeExpr in the default human-readable form.
+-- ── alc_shapes schema → string projection ─────────────────────────────
+
+--- Pretty-print an alc_shapes schema in the default human-readable form.
 ---
 --- Examples:
----   { kind="primitive", name="string" }          → "string"
----   { kind="array_of", of={primitive "string"} } → "array of string"
----   { kind="map_of", key=..., val=... }          → "map of <K> to <V>"
----   { kind="shape", shape={fields=...} }         → "shape { f: T, g?: T, ... }"
----   { kind="one_of", values={"a","b"} }          → 'one_of("a","b")'
----   { kind="discriminated", tag="name", ... }    → 'discriminated by "name"'
----   { kind="label", name="paneled.Result" }      → "paneled.Result"
+---   T.string                        → "string"
+---   T.array_of(T.string)            → "array of string"
+---   T.map_of(T.string, T.number)    → "map of string to number"
+---   T.shape({a=T.string})           → "shape { a: string }"
+---   T.one_of({"a","b"})             → 'one_of("a", "b")'
+---   T.discriminated("name", {...})  → 'discriminated by "name"'
+---   T.ref("paneled")                → "paneled"
+---   T.any                           → "any"
 ---
---- Nested `shape` is expanded inline per pipeline-spec §7.1:
----   "shape { task: string, score: number }". Optional fields carry
----   a trailing `?` on the field name.
+--- Nested `shape` is expanded inline per pipeline-spec §7.1. Fields
+--- come from `S.fields()` (alphabetically sorted, wrappers peeled);
+--- optional fields carry a trailing `?` on the field name.
 ---
---- This is the only place that materialises a TypeExpr as a human
---- string. Every caller — Parameters table, frontmatter result_shape,
---- and downstream consumers — goes through this projection, so that
---- shape formatting stays monotonic across surfaces.
-function M.shape_type_string(type_expr)
-    local k = type_expr.kind
-    if k == "primitive" then
-        return type_expr.name
+--- `optional` / `described` wrappers at the entry are peeled
+--- transparently; optional-ness at the entry is NOT expressed here
+--- (it's carried by the enclosing field's `?` suffix instead).
+function M.shape_type_string(schema)
+    local peeled = peel(schema)
+    local k = rawget(peeled, "kind")
+    if k == "prim" then
+        return rawget(peeled, "prim")
+    elseif k == "any" then
+        return "any"
     elseif k == "array_of" then
-        return "array of " .. M.shape_type_string(type_expr.of)
+        return "array of " .. M.shape_type_string(rawget(peeled, "elem"))
     elseif k == "map_of" then
         return string.format("map of %s to %s",
-            M.shape_type_string(type_expr.key),
-            M.shape_type_string(type_expr.val))
+            M.shape_type_string(rawget(peeled, "key")),
+            M.shape_type_string(rawget(peeled, "val")))
     elseif k == "one_of" then
+        local values = rawget(peeled, "values")
         local parts = {}
-        for i = 1, #type_expr.values do
-            local v = type_expr.values[i]
+        for i = 1, #values do
+            local v = values[i]
             if type(v) == "string" then
                 parts[i] = string.format("%q", v)
             else
@@ -67,22 +97,20 @@ function M.shape_type_string(type_expr)
         end
         return "one_of(" .. table.concat(parts, ", ") .. ")"
     elseif k == "shape" then
-        local s = type_expr.shape
-        if not s or not s.fields or #s.fields == 0 then
-            return "shape { }"
-        end
+        local entries = S.fields(peeled)
+        if #entries == 0 then return "shape { }" end
         local parts = {}
-        for i = 1, #s.fields do
-            local f = s.fields[i]
-            local mark = f.optional and "?" or ""
+        for i = 1, #entries do
+            local e = entries[i]
+            local mark = e.optional and "?" or ""
             parts[i] = string.format(
-                "%s%s: %s", f.name, mark, M.shape_type_string(f.type))
+                "%s%s: %s", e.name, mark, M.shape_type_string(e.type))
         end
         return "shape { " .. table.concat(parts, ", ") .. " }"
     elseif k == "discriminated" then
-        return string.format('discriminated by "%s"', type_expr.tag)
-    elseif k == "label" then
-        return type_expr.name
+        return string.format('discriminated by "%s"', rawget(peeled, "tag"))
+    elseif k == "ref" then
+        return rawget(peeled, "name")
     else
         return "?"
     end
@@ -137,21 +165,22 @@ local function build_frontmatter(pkg_info)
     return table.concat(lines, "\n")
 end
 
-local function render_parameters_table(shape_input)
+local function render_parameters_table(input_schema)
     local lines = {
         "## Parameters {#parameters}",
         "",
         "| key | type | required | description |",
         "|---|---|---|---|",
     }
-    for i = 1, #shape_input.fields do
-        local f = shape_input.fields[i]
-        local req = f.optional and "optional" or "**required**"
-        local type_str = M.shape_type_string(f.type)
-        local doc = escape_md_table_cell(f.doc or "")
+    local entries = S.fields(input_schema)
+    for i = 1, #entries do
+        local e = entries[i]
+        local req = e.optional and "optional" or "**required**"
+        local type_str = M.shape_type_string(e.type)
+        local doc = escape_md_table_cell(e.doc or "")
         lines[#lines + 1] = string.format(
             "| `ctx.%s` | %s | %s | %s |",
-            f.name, type_str, req, doc)
+            e.name, type_str, req, doc)
     end
     return table.concat(lines, "\n")
 end
@@ -173,7 +202,6 @@ local function render_toc(sections, has_parameters)
 end
 
 function M.narrative_md(pkg_info)
-    local id = pkg_info.identity
     local nar = pkg_info.narrative
     local shape = pkg_info.shape
     local has_params = shape.input ~= nil
@@ -308,58 +336,90 @@ local function json_encode(v)
     return json_encode_value(v)
 end
 
--- ── TypeExpr / Shape → JSON form ──────────────────────────────────────
+-- ── Schema → JSON form (hub_entry projection) ─────────────────────────
+--
+-- The hub_entry schema exposes field types structurally so consumers
+-- can walk the type tree without re-parsing the human string form.
+-- This is a PROJECTION — not a parallel AST — so we use stable JSON
+-- tag names (`primitive` / `array_of` / `shape` / `label`) that keep
+-- byte-identical output across refactors of the underlying alc_shapes
+-- DSL. Mapping from alc_shapes kinds:
+--   prim          → { kind = "primitive", name = <prim> }
+--   any           → { kind = "primitive", name = "any" }
+--   array_of      → { kind = "array_of", of = <sub> }
+--   map_of        → { kind = "map_of", key, val }
+--   one_of        → { kind = "one_of", values }
+--   shape         → { kind = "shape", shape = <shape_to_json> }
+--   discriminated → { kind = "discriminated", tag, variants }
+--   ref           → { kind = "label", name }
+-- `optional` / `described` wrappers are peeled (optional-ness is
+-- expressed on the enclosing Field, not on the type).
 
---- Convert a TypeExpr to a JSON-ready Lua table.
----
---- The hub_entry schema exposes TypeExpr structurally so that consumers
---- can walk the type tree without re-parsing the human string form.
---- Mirror the internal TypeExpr shape 1:1 — each `kind` becomes a JSON
---- object with its variant-specific fields.
-local function type_expr_to_json(te)
-    local k = te.kind
-    if k == "primitive" then
-        return { kind = "primitive", name = te.name }
+local function type_to_json(schema)
+    local peeled = peel(schema)
+    local k = rawget(peeled, "kind")
+    if k == "prim" then
+        return { kind = "primitive", name = rawget(peeled, "prim") }
+    elseif k == "any" then
+        return { kind = "primitive", name = "any" }
     elseif k == "array_of" then
-        return { kind = "array_of", of = type_expr_to_json(te.of) }
+        return { kind = "array_of", of = type_to_json(rawget(peeled, "elem")) }
     elseif k == "map_of" then
         return {
             kind = "map_of",
-            key  = type_expr_to_json(te.key),
-            val  = type_expr_to_json(te.val),
+            key  = type_to_json(rawget(peeled, "key")),
+            val  = type_to_json(rawget(peeled, "val")),
         }
     elseif k == "one_of" then
+        local src = rawget(peeled, "values")
         local values = {}
-        for i = 1, #te.values do values[i] = te.values[i] end
+        for i = 1, #src do values[i] = src[i] end
         return { kind = "one_of", values = values }
     elseif k == "shape" then
-        return { kind = "shape", shape = M.shape_to_json(te.shape) }
+        return { kind = "shape", shape = M.shape_to_json(peeled) }
     elseif k == "discriminated" then
+        local src_variants = rawget(peeled, "variants")
         local variants = {}
-        for name, shape in pairs(te.variants) do
-            variants[name] = M.shape_to_json(shape)
+        for name, variant_schema in pairs(src_variants) do
+            variants[name] = M.shape_to_json(variant_schema)
         end
-        return { kind = "discriminated", tag = te.tag, variants = variants }
-    elseif k == "label" then
-        return { kind = "label", name = te.name }
+        return {
+            kind = "discriminated",
+            tag = rawget(peeled, "tag"),
+            variants = variants,
+        }
+    elseif k == "ref" then
+        return { kind = "label", name = rawget(peeled, "name") }
     else
-        error("type_expr_to_json: unknown kind '" .. tostring(k) .. "'")
+        error("type_to_json: unknown kind '" .. tostring(k) .. "'")
     end
 end
 
---- Convert a Shape to a JSON-ready Lua table.
-function M.shape_to_json(shape)
+--- Convert an alc_shapes `shape` schema to a JSON-ready Lua table.
+---
+--- Expected input: a schema with kind="shape" (optionally wrapped in
+--- optional/described — those wrappers are peeled).
+function M.shape_to_json(schema)
+    local peeled = peel(schema)
+    if rawget(peeled, "kind") ~= "shape" then
+        error("shape_to_json: expected kind='shape', got '"
+              .. tostring(rawget(peeled, "kind")) .. "'", 2)
+    end
+    local entries = S.fields(peeled)
     local fields = {}
-    for i = 1, #shape.fields do
-        local f = shape.fields[i]
+    for i = 1, #entries do
+        local e = entries[i]
         fields[i] = {
-            name     = f.name,
-            type     = type_expr_to_json(f.type),
-            optional = f.optional and true or false,
-            doc      = f.doc or "",
+            name     = e.name,
+            type     = type_to_json(e.type),
+            optional = e.optional and true or false,
+            doc      = e.doc or "",
         }
     end
-    return { fields = fields, open = shape.open and true or false }
+    return {
+        fields = fields,
+        open   = rawget(peeled, "open") and true or false,
+    }
 end
 
 -- ── hub_entry JSON projection (pipeline-spec §7.4) ────────────────────
@@ -806,6 +866,7 @@ function M.llms_full(entries, opts)
 end
 
 M._internal = {
+    peel                     = peel,
     build_frontmatter        = build_frontmatter,
     render_parameters_table  = render_parameters_table,
     render_toc               = render_toc,
@@ -813,7 +874,7 @@ M._internal = {
     escape_md_table_cell     = escape_md_table_cell,
     yaml_scalar              = yaml_scalar,
     json_encode              = json_encode,
-    type_expr_to_json        = type_expr_to_json,
+    type_to_json             = type_to_json,
     strip_frontmatter        = strip_frontmatter,
     LLMS_INDEX_DESC_MAX      = LLMS_INDEX_DESC_MAX,
     CONTEXT7_SCHEMA_URL      = CONTEXT7_SCHEMA_URL,
