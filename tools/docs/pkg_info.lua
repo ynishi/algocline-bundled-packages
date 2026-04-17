@@ -12,7 +12,7 @@
 --- PkgInfo layout
 ---
 ---   {
----     identity  = { name, version, category, source_path },
+---     identity  = { name, version, category, description, source_path },
 ---     narrative = {
 ---       title   = <string>,       -- docstring 1st line
 ---       summary = <string>,       -- abstract paragraph (joined)

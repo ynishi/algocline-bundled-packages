@@ -275,6 +275,7 @@ M.assert_dev   = check.assert_dev
 M.is_dev_mode  = check.is_dev_mode
 M.fields       = reflect.fields
 M.walk         = reflect.walk
+M.is_schema    = T._internal.is_schema
 
 -- Combinator namespace (so callers can write `S.T.string` without a
 -- separate require).
@@ -291,7 +292,10 @@ M.LuaCats = luacats
 -- schemas; we enforce the same invariant via a load-time loud-fail.
 -- Re-exported functions / combinator namespaces (M.T, M.LuaCats, etc.)
 -- are not shape-kind and therefore never trip this check.
-local RESERVED_SHAPE_NAMES = { "any" }
+local RESERVED_SHAPE_NAMES = {
+    "any", "check", "assert", "assert_dev", "is_dev_mode",
+    "fields", "walk", "is_schema", "T", "LuaCats", "_internal",
+}
 
 local function assert_no_reserved_shapes(mod)
     for i = 1, #RESERVED_SHAPE_NAMES do

@@ -20,6 +20,7 @@
 
 local PI = require("tools.docs.pkg_info")
 local T  = require("alc_shapes.t")
+local is_schema = T._internal.is_schema
 
 local M = {}
 
@@ -253,10 +254,6 @@ function M.load_meta(pkg_name)
 end
 
 -- ── assemble PkgInfo ───────────────────────────────────────────────────
-
-local function is_schema(v)
-    return type(v) == "table" and rawget(v, "kind") ~= nil
-end
 
 --- Build a PkgInfo for one package.
 ---
