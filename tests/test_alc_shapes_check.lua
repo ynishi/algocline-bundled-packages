@@ -337,6 +337,83 @@ describe("alc_shapes.check ref", function()
     end)
 end)
 
+describe("alc_shapes.check opts.registry (Schema-as-Data registry)", function()
+    -- A registry is a plain `{name → schema}` table. Closures NG.
+    local entity_registry = {
+        Identity = T.shape({
+            name    = T.string,
+            version = T.string,
+        }, { open = false }),
+        PkgInfo  = T.shape({
+            identity = T.ref("Identity"),
+        }, { open = false }),
+    }
+
+    it("resolves T.ref against a caller-supplied registry", function()
+        local pi = {
+            identity = { name = "cot", version = "0.1.0" },
+        }
+        local ok = S.check(pi, T.ref("PkgInfo"), { registry = entity_registry })
+        expect(ok).to.equal(true)
+    end)
+
+    it("does not leak the alc_shapes registry into a custom one", function()
+        -- 'voted' lives in alc_shapes default registry; entity_registry
+        -- has no 'voted'. With opts.registry passed, the default must
+        -- NOT be consulted as a fallback (otherwise registries are not
+        -- truly isolated).
+        local ok, reason = S.check({}, T.ref("voted"), { registry = entity_registry })
+        expect(ok).to.equal(false)
+        expect(reason:match("unresolved ref 'voted'")).to.exist()
+    end)
+
+    it("falls back to alc_shapes default when opts is omitted", function()
+        local good = {
+            consensus       = "x",
+            paths           = {},
+            votes           = {},
+            vote_counts     = {},
+            n_sampled       = 1,
+            total_llm_calls = 1,
+        }
+        expect(S.check(good, T.ref("voted"))).to.equal(true)
+    end)
+
+    it("rejects a closure as opts.registry (Schema-as-Data invariant)", function()
+        local closure_registry = function(name) return entity_registry[name] end
+        local ok_call, err = pcall(function()
+            S.check({}, T.ref("PkgInfo"), { registry = closure_registry })
+        end)
+        expect(ok_call).to.equal(false)
+        expect(tostring(err):match("plain table")).to.exist()
+    end)
+
+    it("rejects opts itself if not a table", function()
+        local ok_call, err = pcall(function()
+            S.check({}, T.string, "not a table")
+        end)
+        expect(ok_call).to.equal(false)
+        expect(tostring(err):match("opts must be a table")).to.exist()
+    end)
+
+    it("S.assert string-name lookup honors opts.registry", function()
+        local ok_call, err = pcall(function()
+            S.assert({ identity = { name = "x", version = "0" } },
+                "PkgInfo", "ctx-hint", { registry = entity_registry })
+        end)
+        expect(ok_call).to.equal(true)
+        expect(err).to.equal(nil)
+    end)
+
+    it("S.assert string-name with custom registry loud-fails on unknown", function()
+        local ok_call, err = pcall(function()
+            S.assert({}, "voted", "ctx-hint", { registry = entity_registry })
+        end)
+        expect(ok_call).to.equal(false)
+        expect(tostring(err):match("unknown shape name 'voted'")).to.exist()
+    end)
+end)
+
 describe("alc_shapes.is_dev_mode / assert_dev", function()
     it("is_dev_mode depends on ALC_SHAPE_CHECK env", function()
         local active = (os.getenv("ALC_SHAPE_CHECK") == "1")

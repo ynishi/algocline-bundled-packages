@@ -1,10 +1,19 @@
 --- alc_shapes.check — validator (check / assert / assert_dev / is_dev_mode).
 ---
 --- API:
----   check(value, schema)                -> ok:boolean, reason:string?
----   assert(value, schema_or_name, hint) -> value (or throws)
----   assert_dev(value, ..., hint)        -> value (no-op pass if dev off)
----   is_dev_mode()                       -> boolean
+---   check(value, schema, opts?)                -> ok:boolean, reason:string?
+---   assert(value, schema_or_name, hint, opts?) -> value (or throws)
+---   assert_dev(value, ..., hint, opts?)        -> value (no-op pass if dev off)
+---   is_dev_mode()                              -> boolean
+---
+--- opts (optional, plain table; closures NG — Schema-as-Data 主義):
+---   { registry = { name = schema, ... } }
+---     `T.ref(name)` and string-name `assert` look schemas up in this
+---     plain `{name → schema}` table. When omitted, the alc_shapes
+---     module itself is used as the default registry (it is the
+---     plain-data dictionary built during Schema-as-Data unification).
+---     Multiple registries are merged at the call site (data merge),
+---     not by passing closures here.
 ---
 --- Paths use JSONPath-ish form with 1-based array indices:
 ---   $.field, $[1], $.stages[2].name
@@ -13,6 +22,13 @@
 ---   shape violation at <path>: <detail> (ctx: <hint>)
 
 local M = {}
+
+-- Default registry: the alc_shapes module itself. Resolved lazily to
+-- avoid circular load on init. Returned as plain data; we never invoke
+-- a closure to look up a name.
+local function default_registry()
+    return require("alc_shapes")
+end
 
 -- Primitive type test (separate from schema kind).
 local function lua_type_of(v) return type(v) end
@@ -37,16 +53,16 @@ handlers.prim = function(value, schema, path)
     return true
 end
 
-handlers.optional = function(value, schema, path)
+handlers.optional = function(value, schema, path, ctx)
     if value == nil then return true end
-    return check_node(value, schema.inner, path)
+    return check_node(value, schema.inner, path, ctx)
 end
 
-handlers.described = function(value, schema, path)
-    return check_node(value, schema.inner, path)
+handlers.described = function(value, schema, path, ctx)
+    return check_node(value, schema.inner, path, ctx)
 end
 
-handlers.array_of = function(value, schema, path)
+handlers.array_of = function(value, schema, path, ctx)
     if type(value) ~= "table" then
         return false, string.format(
             "shape violation at %s: expected table (array), got %s",
@@ -56,13 +72,13 @@ handlers.array_of = function(value, schema, path)
     for i = 1, #value do
         local item = value[i]
         local sub_path = path .. "[" .. i .. "]"
-        local ok, reason = check_node(item, schema.elem, sub_path)
+        local ok, reason = check_node(item, schema.elem, sub_path, ctx)
         if not ok then return false, reason end
     end
     return true
 end
 
-handlers.shape = function(value, schema, path)
+handlers.shape = function(value, schema, path, ctx)
     if type(value) ~= "table" then
         return false, string.format(
             "shape violation at %s: expected table, got %s",
@@ -81,7 +97,7 @@ handlers.shape = function(value, schema, path)
         local sub_schema = fields[name]
         local sub_path = (path == "$") and ("$." .. name) or (path .. "." .. name)
         local sub_val = value[name]
-        local ok, reason = check_node(sub_val, sub_schema, sub_path)
+        local ok, reason = check_node(sub_val, sub_schema, sub_path, ctx)
         if not ok then return false, reason end
     end
     -- strict mode: reject extra keys when open=false. Also sorted
@@ -104,7 +120,7 @@ handlers.shape = function(value, schema, path)
     return true
 end
 
-handlers.discriminated = function(value, schema, path)
+handlers.discriminated = function(value, schema, path, ctx)
     if type(value) ~= "table" then
         return false, string.format(
             "shape violation at %s: expected table, got %s",
@@ -128,10 +144,10 @@ handlers.discriminated = function(value, schema, path)
             "shape violation at %s: discriminant '%s' = %q not in [%s]",
             path, tag, tostring(tag_val), table.concat(parts, ", "))
     end
-    return handlers.shape(value, variant, path)
+    return handlers.shape(value, variant, path, ctx)
 end
 
-handlers.map_of = function(value, schema, path)
+handlers.map_of = function(value, schema, path, ctx)
     if type(value) ~= "table" then
         return false, string.format(
             "shape violation at %s: expected table (map), got %s",
@@ -139,29 +155,31 @@ handlers.map_of = function(value, schema, path)
     end
     for k, v in pairs(value) do
         local key_path = path .. "[key=" .. tostring(k) .. "]"
-        local ok, reason = check_node(k, schema.key, key_path)
+        local ok, reason = check_node(k, schema.key, key_path, ctx)
         if not ok then return false, reason end
         local val_path = path .. "[" .. tostring(k) .. "]"
-        ok, reason = check_node(v, schema.val, val_path)
+        ok, reason = check_node(v, schema.val, val_path, ctx)
         if not ok then return false, reason end
     end
     return true
 end
 
-handlers.ref = function(value, schema, path)
+-- ref handler: registry lookup is `rawget(registry_data, name)`. The
+-- registry is a plain `{name → schema}` table passed via ctx. No
+-- closure resolver — Schema-as-Data 主義に従う。
+handlers.ref = function(value, schema, path, ctx)
     local name = schema.name
-    -- Lazy-require to avoid circular load on init.
-    local shapes = require("alc_shapes")
-    local resolved = shapes[name]
+    local registry = ctx.registry
+    local resolved = rawget(registry, name)
     if resolved == nil or type(resolved) ~= "table"
             or rawget(resolved, "kind") == nil then
         return false, string.format(
             "shape violation at %s: unresolved ref '%s'", path, name)
     end
-    return check_node(value, resolved, path)
+    return check_node(value, resolved, path, ctx)
 end
 
-handlers.one_of = function(value, schema, path)
+handlers.one_of = function(value, schema, path, _ctx)
     local vs = schema.values
     for i = 1, #vs do
         if value == vs[i] then return true end
@@ -180,7 +198,7 @@ handlers.one_of = function(value, schema, path)
         path, table.concat(parts, ", "), tostring(value))
 end
 
-check_node = function(value, schema, path)
+check_node = function(value, schema, path, ctx)
     if schema == nil then return true end
     local kind = rawget(schema, "kind")
     if kind == nil then
@@ -190,13 +208,35 @@ check_node = function(value, schema, path)
     if h == nil then
         error("alc_shapes.check: unknown kind '" .. tostring(kind) .. "'", 2)
     end
-    return h(value, schema, path)
+    return h(value, schema, path, ctx)
+end
+
+-- Build the validation ctx from caller-supplied opts. ctx.registry is
+-- always a plain `{name → schema}` table; we never store a closure here.
+local function build_ctx(opts)
+    if opts == nil then
+        return { registry = default_registry() }
+    end
+    if type(opts) ~= "table" then
+        error("alc_shapes.check: opts must be a table or nil (got "
+            .. type(opts) .. ")", 3)
+    end
+    local registry = opts.registry
+    if registry == nil then
+        registry = default_registry()
+    elseif type(registry) ~= "table" then
+        error("alc_shapes.check: opts.registry must be a plain table "
+            .. "of {name = schema} (closures NG); got " .. type(registry), 3)
+    end
+    return { registry = registry }
 end
 
 --- Return (ok, reason). Never throws for normal schema violations.
-function M.check(value, schema)
+--- opts.registry: plain {name → schema} table (default: alc_shapes module).
+function M.check(value, schema, opts)
     if schema == nil then return true end
-    return check_node(value, schema, "$")
+    local ctx = build_ctx(opts)
+    return check_node(value, schema, "$", ctx)
 end
 
 local function compose_msg(reason, ctx_hint)
@@ -208,17 +248,23 @@ end
 --- Overloads on schema_or_name:
 ---   nil          -> no-op pass (value returned)
 ---   "any"        -> no-op pass
----   other string -> lookup in alc_shapes registry (loud fail if unknown)
+---   other string -> lookup in registry (default: alc_shapes module).
+---                   Loud-fail if unknown.
 ---   table        -> direct schema
-function M.assert(value, schema_or_name, ctx_hint)
+--- opts (optional, last position):
+---   { registry = { name = schema, ... } }
+function M.assert(value, schema_or_name, ctx_hint, opts)
     local schema
     if schema_or_name == nil then
         return value
     elseif type(schema_or_name) == "string" then
         if schema_or_name == "any" then return value end
-        -- lazy-require to avoid circular load
-        local shapes = require("alc_shapes")
-        schema = shapes[schema_or_name]
+        local registry = (opts and opts.registry) or default_registry()
+        if type(registry) ~= "table" then
+            error("alc_shapes.assert: opts.registry must be a plain table "
+                .. "of {name = schema} (closures NG); got " .. type(registry), 2)
+        end
+        schema = rawget(registry, schema_or_name)
         if schema == nil or type(schema) ~= "table" or rawget(schema, "kind") == nil then
             error("alc_shapes.assert: unknown shape name '" .. schema_or_name .. "'", 2)
         end
@@ -228,7 +274,7 @@ function M.assert(value, schema_or_name, ctx_hint)
         error("alc_shapes.assert: schema_or_name must be nil, string, or table (got "
             .. type(schema_or_name) .. ")", 2)
     end
-    local ok, reason = M.check(value, schema)
+    local ok, reason = M.check(value, schema, opts)
     if not ok then
         error(compose_msg(reason, ctx_hint), 2)
     end
@@ -236,9 +282,9 @@ function M.assert(value, schema_or_name, ctx_hint)
 end
 
 --- Dev-mode-only assert: no-op pass when ALC_SHAPE_CHECK != "1".
-function M.assert_dev(value, schema_or_name, ctx_hint)
+function M.assert_dev(value, schema_or_name, ctx_hint, opts)
     if not M.is_dev_mode() then return value end
-    return M.assert(value, schema_or_name, ctx_hint)
+    return M.assert(value, schema_or_name, ctx_hint, opts)
 end
 
 function M.is_dev_mode()
@@ -246,9 +292,11 @@ function M.is_dev_mode()
 end
 
 M._internal = {
-    handlers    = handlers,
-    check_node  = check_node,
-    compose_msg = compose_msg,
+    handlers          = handlers,
+    check_node        = check_node,
+    compose_msg       = compose_msg,
+    build_ctx         = build_ctx,
+    default_registry  = default_registry,
 }
 
 return M
