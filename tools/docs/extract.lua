@@ -20,6 +20,8 @@
 
 local PI = require("tools.docs.pkg_info")
 local T  = require("alc_shapes.t")
+local S  = require("alc_shapes")
+local EntitySchemas = require("tools.docs.entity_schemas")
 local is_schema = T._internal.is_schema
 
 local M = {}
@@ -309,7 +311,11 @@ function M.build_pkg_info(pkg_name, init_path, source_path)
         end
     end
 
-    return PI.make_pkg_info(identity, narrative, shape)
+    local pi = PI.make_pkg_info(identity, narrative, shape)
+    -- Dev-mode conformance check. Gated by ALC_SHAPE_CHECK=1 so production
+    -- extract loops pay nothing. On fail raises with pkg_name as ctx hint.
+    S.assert_dev(pi, "PkgInfo", pkg_name, { registry = EntitySchemas })
+    return pi
 end
 
 M._internal = {
