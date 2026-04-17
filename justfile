@@ -39,10 +39,10 @@ e2e-all:
     fi
     echo "=== All E2Es passed ==="
 
-# Run Pure-Lua structure tests via mlua-probe.
-# [group('allow-agent')]
-test:
-    mlua-probe test tests/
+# Pure-Lua structure tests run via the `lua-debugger` MCP server
+# (binary: mlua-probe-mcp). See README §Testing for the canonical
+# `mcp__lua-debugger__test_launch` invocation. There is no `just test`
+# recipe — the upstream mlua-probe ships only the MCP server, not a CLI.
 
 # List installed/linked algocline packages.
 # [group('allow-agent')]

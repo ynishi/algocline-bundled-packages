@@ -9,9 +9,13 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
--- Dual-mode header (see tests/test_alc_shapes_t.lua for rationale).
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- Run modes:
+--   (a) CLI: `just test` → `mlua-probe test tests/` from worktree cwd;
+--       default package.path `./?.lua` finds the worktree copy.
+--   (b) MCP: `mcp__lua-debugger__test_launch(search_paths=[REPO])`;
+--       the harness prepends REPO to package.path.
+-- Neither relies on PWD: under the MCP server PWD may be the parent
+-- repo (not the worktree), which would shadow the worktree's copy.
 
 package.loaded["alc_shapes"]         = nil
 package.loaded["alc_shapes.t"]       = nil
