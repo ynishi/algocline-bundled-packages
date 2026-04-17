@@ -11,8 +11,6 @@
 ---
 --- Error message:
 ---   shape violation at <path>: <detail> (ctx: <hint>)
----
---- See workspace/tasks/shape-convention/design.md §公開関数, §エラーメッセージ.
 
 local M = {}
 
@@ -75,7 +73,6 @@ handlers.shape = function(value, schema, path)
     -- violating field across runs. Lua `pairs` order is unspecified;
     -- tableshape / Zod / Joi all leave this to implementation but we
     -- require reproducibility for CI + conformance tests.
-    -- See workspace/tasks/shape-convention/design.md §P0 修正メモ Q1.
     local names = {}
     for name in pairs(fields) do names[#names + 1] = name end
     table.sort(names)

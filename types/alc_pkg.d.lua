@@ -35,5 +35,5 @@
 ---@field version string SemVer string (e.g. "0.1.0")
 ---@field description string One-line summary
 ---@field category string Category tag (e.g. "reasoning", "exploration")
----@field result_shape? string Declared shape name (lookup key in alc_shapes). See workspace/tasks/shape-convention/design.md
+---@field result_shape? string Declared shape name (lookup key in alc_shapes)
 

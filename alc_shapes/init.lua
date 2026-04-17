@@ -18,7 +18,7 @@
 --- multiple entry points (e.g. calibrate.run vs calibrate.assess)
 --- declare the primary shape in meta and document secondary shapes
 --- in docstrings. A future `meta.shapes("key")` accessor is a
---- possible extension — tracked in design.md §将来検討.
+--- possible extension.
 
 local T = require("alc_shapes.t")
 local check = require("alc_shapes.check")
@@ -291,7 +291,6 @@ M.LuaCats = luacats
 -- schemas; we enforce the same invariant via a load-time loud-fail.
 -- Re-exported functions / combinator namespaces (M.T, M.LuaCats, etc.)
 -- are not shape-kind and therefore never trip this check.
--- See workspace/tasks/shape-convention/design.md §P0 修正メモ Q3.
 local RESERVED_SHAPE_NAMES = { "any" }
 
 local function assert_no_reserved_shapes(mod)

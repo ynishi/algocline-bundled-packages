@@ -26,7 +26,6 @@ At the operating point of this codebase (N≈6 candidates, D≈20 rubric
 dimensions), Empirical-Bernstein Confidence Sequences (cs_pruner)
 cannot fire: their variance-independent floor radius_floor(t=20) ≈
 0.43 makes a kill mathematically impossible for any mean-gap < 0.86.
-See workspace/cs_pruner_root_cause.md for the derivation.
 
 F-Race operates on RANKS, not raw scores. The Friedman χ² statistic
 

@@ -12,7 +12,6 @@
 --- dimensions), Empirical-Bernstein Confidence Sequences (cs_pruner)
 --- cannot fire: their variance-independent floor radius_floor(t=20) ≈
 --- 0.43 makes a kill mathematically impossible for any mean-gap < 0.86.
---- See workspace/cs_pruner_root_cause.md for the derivation.
 ---
 --- F-Race operates on RANKS, not raw scores. The Friedman χ² statistic
 ---
@@ -240,8 +239,6 @@ M.meta = {
 -- Cross-checked against Demšar (2006) JMLR 7 Table 5 and standard
 -- χ² critical tables: agreement ≤ 0.001 in the Nemenyi column and
 -- ≤ 0.005 in the χ² column for all (k, df, α) tabulated below.
--- To regenerate, run:
---   python3 workspace/tasks/f_race-strict-review/regen_tables.py
 
 local CHI2_05 = {
     [1]=3.841, [2]=5.991, [3]=7.815, [4]=9.488,

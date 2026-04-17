@@ -29,8 +29,6 @@ variance-independent floor term in the radius:
 
 This means a mean-gap of < 0.86 (on a [0,1] scale) is mathematically
 impossible to detect at t=20 with the polynomial-stitched variant.
-See workspace/cs_pruner_root_cause.md for the full derivation and
-workspace/cs_pruner_firing_run{1,2}.md for empirical confirmation.
 
 Practical guidance:
   * **Small scale (N×D ≤ 200, D ≤ 30):** Set layer2_halving=true and
@@ -130,7 +128,7 @@ Parameters (all Strategic / Injectable):
                                    of alive candidates. Mitigates the
                                    noise-driven false-kill failure mode at
                                    low n. Recommended: 0.1-0.2 on a [0,1]
-                                   scale. See workspace/cs_pruner_firing_run2.md.
+                                   scale.
   ctx.on_kill                      function(candidate_index, state)
   ctx.on_survive                   function(candidate_index, state)
   ctx.gen_tokens (default 400)     Max tokens per candidate generation

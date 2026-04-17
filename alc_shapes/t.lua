@@ -11,8 +11,7 @@
 ---   * Combinators return new tables; schemas are never mutated
 ---     in place.
 ---
---- See alc_shapes/README.md §Core concept and
---- workspace/tasks/shape-convention/design.md §Shape の内部構造.
+--- See alc_shapes/README.md §Core concept.
 
 local M = {}
 

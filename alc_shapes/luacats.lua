@@ -2,8 +2,6 @@
 ---
 --- class_for(class_name, shape_schema)       -> LuaCATS class text
 --- gen(shapes_table, class_prefix?)          -> full d.lua contents
----
---- See workspace/tasks/shape-convention/design.md §型マッピング.
 
 local reflect = require("alc_shapes.reflect")
 
@@ -53,7 +51,6 @@ local function type_of(node, class_prefix)
         -- Zod distinguishes z.string().array() vs z.string().optional().array()
         -- the same way; silently flattening to T[] would lose the nil admission.
         -- `described` wrappers are transparent (doc-only).
-        -- See workspace/tasks/shape-convention/design.md §P0 修正メモ Q2.
         local elem = rawget(node, "elem")
         local had_optional = false
         while true do
