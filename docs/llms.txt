@@ -1,0 +1,186 @@
+# algocline
+
+> LLM amplification engine. Pure Lua strategies executed via `alc.run(ctx)`; this index lists every installed strategy package with a one-liner and a link to its full narrative.
+
+## adversarial
+
+- [triad](narrative/triad.md): Adversarial 3-role debate — proponent/opponent/judge with multi-round argumentation
+
+## aggregation
+
+- [condorcet](narrative/condorcet.md): Condorcet Jury Theorem — majority-vote probability, Anti-Jury detection, optimal panel sizing, and independence verification for multi-agent voting systems (Condorcet 1785, Dietrich-List 2008).
+- [ensemble_div](narrative/ensemble_div.md): Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity E = Ē − Ā for ensemble diversity measurement. Quantifies how much agent disagreement reduces ensemble error (Krogh-Vedelsby NeurIPS 1995...
+- [kemeny](narrative/kemeny.md): Kemeny-Young rank aggregation — axiomatically unique consensus ranking that minimizes total Kendall tau distance. Merges multiple agent rankings into optimal consensus with Condorcet consistency ...
+- [pbft](narrative/pbft.md): PBFT-inspired 3-phase LLM consensus — propose, validate, commit with BFT quorum guarantees (Castro-Liskov 1999)
+- [sc](narrative/sc.md): Independent multi-path sampling with majority vote aggregation
+- [usc](narrative/usc.md): Universal Self-Consistency — LLM-based consistency selection across free-form responses. Extends SC to open-ended tasks where majority vote is inapplicable.
+
+## attribution
+
+- [claim_trace](narrative/claim_trace.md): Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance
+- [shapley](narrative/shapley.md): Shapley Value — axiomatically unique agent contribution attribution via exact O(2^n) computation or Monte Carlo permutation sampling. Identifies essential, redundant, and harmful agents in multi-...
+
+## combinator
+
+- [deliberate](narrative/deliberate.md): Structured deliberation — abstract principles, expert consultation, debate, ranked decision
+- [pre_mortem](narrative/pre_mortem.md): Feasibility-gated proposal filtering — prerequisite verification before rating
+- [review_and_investigate](narrative/review_and_investigate.md): Deep code review with investigation — detect, verify, explore, diagnose, research, prescribe
+
+## correction
+
+- [blind_spot](narrative/blind_spot.md): Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction
+
+## debugging
+
+- [bisect](narrative/bisect.md): Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point
+
+## evaluation
+
+- [critic](narrative/critic.md): Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas
+- [scoring_rule](narrative/scoring_rule.md): Proper Scoring Rules — Brier, logarithmic, spherical scores + ECE calibration measurement for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy (Brier 1...
+
+## exploration
+
+- [aco](narrative/aco.md): Ant Colony Optimization — discrete path search with pheromone-based learning (Dorigo 1996, Gutjahr 2000 convergence)
+- [coevolve](narrative/coevolve.md): Challenger-Solver Co-evolution — adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion.
+- [falsify](narrative/falsify.md): Sequential Falsification — Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight.
+- [prompt_breed](narrative/prompt_breed.md): Self-Referential Prompt Evolution — evolves task prompts via genetic operators with meta-mutation (the mutation operators themselves evolve). Double evolutionary loop.
+- [qdaif](narrative/qdaif.md): Quality-Diversity through AI Feedback — MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification. Produces diverse, high-quality solution populations.
+
+## extraction
+
+- [distill](narrative/distill.md): MapReduce summarization — parallel chunk processing with unified reduction
+
+## generation
+
+- [sot](narrative/sot.md): Skeleton-of-Thought — outline-first parallel section generation
+
+## governance
+
+- [anti_cascade](narrative/anti_cascade.md): Pipeline error cascade detection — independently re-derives from original inputs at each step and compares with pipeline output to detect error amplification. Generalizes Cascade Amplification co...
+- [bft](narrative/bft.md): Byzantine Fault Tolerance bounds — quorum thresholds and impossibility validation for multi-agent governance. Computes minimum panel sizes and fault tolerance limits (Lamport-Shostak-Pease 1982, ...
+- [dissent](narrative/dissent.md): Consensus inertia prevention — forces adversarial challenge before finalizing multi-agent agreement. Prevents groupthink lock-in. Generalizes the Consensus Inertia countermeasure from 'From Spark...
+- [lineage](narrative/lineage.md): Pipeline-spanning claim lineage tracking — extracts claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Generalizes the lineage graph governance layer from '...
+
+## intent
+
+- [ambig](narrative/ambig.md): Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs
+- [intent_belief](narrative/intent_belief.md): Bayesian intent estimation — hypothesis generation with iterative belief updates via diagnostic questions
+- [intent_discovery](narrative/intent_discovery.md): Exploratory intent formation — discover user goals through structured option presentation and iterative narrowing
+- [prism](narrative/prism.md): Cognitive-load-aware intent decomposition — logical dependency ordering for minimal-friction clarification
+
+## meta
+
+- [calibrate](narrative/calibrate.md): Confidence-gated reasoning — fast path when confident, escalation when not
+
+## optimization
+
+- [cod](narrative/cod.md): Chain-of-Density — iterative information densification with fidelity preservation
+- [optimize](narrative/optimize.md): Modular parameter optimization orchestrator. Composes pluggable search strategies (UCB1, OPRO, EA, greedy), evaluators (evalframe, custom, LLM judge), and stopping criteria (variance, patience, thr...
+
+## orchestration
+
+- [compute_alloc](narrative/compute_alloc.md): Compute-optimal test-time scaling — dynamically selects reasoning method (parallel/sequential/hybrid) and budget allocation based on problem difficulty. Uses existing packages as components.
+- [orch_adaptive](narrative/orch_adaptive.md): Adaptive depth orchestration based on task difficulty. Dynamically adjusts phase count, retry budget, and context mode. Combines with router_daao for pre-classified difficulty, or estimates interna...
+- [orch_escalate](narrative/orch_escalate.md): Cascade escalation: start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones. Based on Cascade Escalation (...
+- [orch_fixpipe](narrative/orch_fixpipe.md): Deterministic fixed pipeline with gate/retry. Phases execute in strict order. Gate NG triggers retry up to max_retries. Based on Lobster (OpenClaw) deterministic workflow pattern.
+- [orch_gatephase](narrative/orch_gatephase.md): Phase orchestration with pre/post hooks and skip rules. Each phase has pre-event (context setup) and post-event (gate + checks). Task type determines which phases to skip. Based on Thin Agent / Fat...
+- [orch_nver](narrative/orch_nver.md): N-version programming: execute N parallel variants, evaluate each, select best. Trades cost for quality. Based on N-version approach from Agentic SE Roadmap (arxiv 2509.06216). Mitigates 29.6% regr...
+
+## pipeline
+
+- [robust_qa](narrative/robust_qa.md): Three-phase QA pipeline — constraint-first solving, adversarial stress-test, rubric evaluation
+
+## planning
+
+- [decompose](narrative/decompose.md): Task decomposition — LLM-driven split, parallel execution, merge
+- [p_tts](narrative/p_tts.md): Plan-Test-Then-Solve — generate constraints before solving, verify solution against specification
+
+## preprocessing
+
+- [s2a](narrative/s2a.md): System 2 Attention — strip irrelevant context before reasoning to reduce distraction and sycophancy
+
+## reasoning
+
+- [ab_mcts](narrative/ab_mcts.md): Adaptive Branching MCTS — Thompson Sampling with dynamic wider/deeper decisions. GEN node mechanism for principled branching. Consistently outperforms standard MCTS and repeated sampling.
+- [analogical](narrative/analogical.md): Analogical prompting — self-generate analogies, extract patterns, apply to original
+- [bot](narrative/bot.md): Buffer of Thoughts — identify problem type, apply thought template, verify
+- [coa](narrative/coa.md): Chain-of-Abstraction — reason with abstract placeholders, then ground via parallel knowledge resolution. Decouples reasoning structure from concrete facts.
+- [contrastive](narrative/contrastive.md): Contrastive CoT — generate correct and incorrect reasoning, learn from contrast
+- [cot](narrative/cot.md): Iterative chain-of-thought — cumulative reasoning steps, then synthesis
+- [cumulative](narrative/cumulative.md): Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation
+- [diverse](narrative/diverse.md): DiVERSe — diverse reasoning paths with step-level verification and selection
+- [dmad](narrative/dmad.md): Dialectical reasoning — thesis, antithesis, and synthesis for deeper analysis
+- [faithful](narrative/faithful.md): Faithful CoT — formalize reasoning into code/logic for verification, then answer
+- [got](narrative/got.md): Graph of Thoughts — DAG-structured reasoning with aggregation, refinement, and multi-path synthesis. Enables thought merging impossible in tree-based approaches (ToT).
+- [gumbel_search](narrative/gumbel_search.md): Budget-optimal tree search — Sequential Halving for optimal budget allocation + Gumbel Top-k for unbiased sampling. Provably minimizes simple regret under fixed evaluation budget.
+- [least_to_most](narrative/least_to_most.md): Least-to-Most — decompose into ordered subproblems, solve simplest first, build up
+- [maieutic](narrative/maieutic.md): Maieutic prompting — recursive explanation tree with logical consistency verification
+- [mcts](narrative/mcts.md): Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning
+- [meta_prompt](narrative/meta_prompt.md): Meta-Prompting — orchestrator identifies and dispatches to specialist personas
+- [model_first](narrative/model_first.md): Model-First Reasoning — construct explicit problem model (entities, states, actions, constraints) before solving. Reduces constraint violations in planning and scheduling tasks.
+- [php](narrative/php.md): Progressive-Hint Prompting — iterative re-solving with prior answers as hints
+- [plan_solve](narrative/plan_solve.md): Plan-and-Solve — devise an explicit plan, then execute step by step
+- [rstar](narrative/rstar.md): Mutual reasoning verification — two paths cross-verify each other for efficient accuracy
+- [sketch](narrative/sketch.md): Sketch-of-Thought — cognitive-inspired efficient reasoning. Routes to Conceptual Chaining, Chunked Symbolism, or Expert Lexicons based on task type. 60-84% token reduction vs standard CoT.
+- [step_back](narrative/step_back.md): Step-Back prompting — abstract the principle first, then solve from principles
+- [tot](narrative/tot.md): Tree-of-Thought — branching reasoning with evaluation and pruning
+- [verify_first](narrative/verify_first.md): Verification-First prompting — verify a candidate answer before generating, reducing logical errors via reverse reasoning
+
+## recipe
+
+- [recipe_ranking_funnel](narrative/recipe_ranking_funnel.md): Verified 3-stage ranking funnel — listwise screening, multi-axis scoring, pairwise final rank. -87% calls vs naive pairwise on N=8 (verified). Encodes known failure modes as caveats.
+- [recipe_safe_panel](narrative/recipe_safe_panel.md): Verified safe majority-vote panel — Condorcet-sized, Anti-Jury gated, inverse-U monitored, confidence-calibrated. Composes condorcet + sc + inverse_u + calibrate with known failure mode awareness.
+
+## refinement
+
+- [reflect](narrative/reflect.md): Self-critique loop — generate, critique, revise until convergence
+- [reflexion](narrative/reflexion.md): Episodic memory self-improvement — learns from failed attempts via verbal reinforcement. Each new attempt references accumulated reflections on past failures. reflect polishes; reflexion learns.
+
+## routing
+
+- [cascade](narrative/cascade.md): Multi-level difficulty routing — escalate from fast to deep only when confidence is low
+- [router_capability](narrative/router_capability.md): Capability-based routing using agent registry metadata matching. Extracts task requirements via LLM, then scores against agent capabilities using Jaccard similarity. Based on Dynamic Agent Registry...
+- [router_daao](narrative/router_daao.md): Difficulty-aware task routing based on DAAO (arxiv 2509.11079). Classifies task difficulty with a single LLM call, then maps to optimal strategy/depth/parameters via deterministic lookup.
+- [router_semantic](narrative/router_semantic.md): Keyword/pattern-based routing with LLM fallback. Zero LLM calls for clear matches, one call for ambiguous cases. Based on Semantic Router pattern (Microsoft Multi-Agent Reference Architecture).
+- [topo_route](narrative/topo_route.md): Topology-aware meta-router — analyzes task characteristics and recommends optimal agent topology (linear/star/DAG/mesh/debate) with concrete package mappings. Generalizes Topological Sensitivity ...
+
+## selection
+
+- [ab_select](narrative/ab_select.md): Adaptive Branching Selection — multi-fidelity Thompson sampling over a fixed candidate pool. Allocates expensive evaluators only to promising candidates. Unique multi-fidelity axis vs other selec...
+- [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance — frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs (Kapoor et al. 'AI Agents That Ma...
+- [cs_pruner](narrative/cs_pruner.md): Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill using empirical-Bernstein CS (Howard et al. 2021). Evaluates candidates across a multi-dimensional rubric and kills each on...
+- [f_race](narrative/f_race.md): Friedman race partial-data pruner. Block-wise ranking of candidates over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman + Nemenyi post-h...
+- [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking — RankGPT-style permutation generation in 1 LLM call. Resolves the calibration problem of pointwise scoring. Sliding window for large N.
+- [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection — picks the candidate with highest expected agreement across all others. Bayes-optimal selection without bracket luck or position bias.
+- [moa](narrative/moa.md): Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement
+- [mwu](narrative/mwu.md): Multiplicative Weights Update — adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions (Littlesto...
+- [pairwise_rank](narrative/pairwise_rank.md): Pairwise Ranking Prompting (PRP) — pairwise LLM-as-judge comparison with bidirectional position-bias cancellation. Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the calibration problem.
+- [rank](narrative/rank.md): Tournament selection — generate candidates, pairwise LLM-as-Judge ranking
+- [setwise_rank](narrative/setwise_rank.md): Setwise tournament reranking — LLM picks the best from small sets and winners advance. Mid-cost/mid-accuracy sweet spot between listwise and pairwise. Resolves calibration issue.
+- [ucb](narrative/ucb.md): UCB1 hypothesis space exploration — generate, score, select, refine
+
+## simulation
+
+- [abm](narrative/abm.md): Agent-Based Model framework — Agent/Model/Scheduler + Monte Carlo runner + sensitivity sweep. LLM-amplified simulation for structural reasoning.
+- [boids_abm](narrative/boids_abm.md): Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization. Based on Reynolds (1987).
+- [epidemic_abm](narrative/epidemic_abm.md): SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0. Emergent epidemic curves, herd immunity thresholds, and stochastic extinction.
+- [evogame_abm](narrative/evogame_abm.md): Evolutionary Game Theory ABM — iterated games with selection and mutation. Prisoner's Dilemma, Hawk-Dove, or custom payoff matrices. Based on Axelrod (1984).
+- [hybrid_abm](narrative/hybrid_abm.md): LLM-as-Parameterizer ABM — LLM extracts sim parameters, Pure Lua ABM runs Monte Carlo simulation + sensitivity sweep. Based on FCLAgent (arXiv:2510.12189) hybrid architecture.
+- [opinion_abm](narrative/opinion_abm.md): Hegselmann-Krause Bounded Confidence opinion dynamics — agents update opinions by averaging nearby opinions within threshold ε. Emergent consensus, polarization, or fragmentation.
+- [schelling_abm](narrative/schelling_abm.md): Schelling Segregation model — agents on a 2D grid relocate when local same-type fraction falls below tolerance threshold. Mild preferences produce strong emergent segregation.
+- [sugarscape_abm](narrative/sugarscape_abm.md): Sugarscape model — agents forage on a sugar landscape, emergent wealth inequality, Pareto-like distributions, and carrying capacity. Based on Epstein & Axtell (1996).
+
+## synthesis
+
+- [panel](narrative/panel.md): Multi-perspective deliberation — distinct roles engage, moderator synthesizes
+
+## validation
+
+- [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual faithfulness verification — tests whether reasoning causally depends on inputs by simulating condition changes. Detects pattern-matching and unfaithful CoT.
+- [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
+- [eval_guard](narrative/eval_guard.md): Evaluation safety gates for multi-agent systems — self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight che...
+- [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring
+- [inverse_u](narrative/inverse_u.md): Inverse-U scaling detection — detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling (Chen et al. NeurIPS 2024, Theorem 2).
+- [negation](narrative/negation.md): Adversarial self-test — generate destruction conditions and verify answer survival
+- [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.
