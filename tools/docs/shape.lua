@@ -106,6 +106,23 @@ function M.convert_shape(schema)
     return PI.make_shape(fields, schema.open and true or false)
 end
 
+--- Convert any alc_shapes schema to a PkgInfo TypeExpr.
+---
+--- Unlike `convert_shape` (which only accepts `kind="shape"`), this
+--- accepts any combinator kind — including wrapped forms (`optional` /
+--- `described`) which are peeled at the top level. Used by
+--- `extract.build_pkg_info` for `meta.result_shape` when the author
+--- passes an alc_shapes schema instead of a string label.
+---
+--- Errors if `schema` is not a recognised combinator.
+function M.convert_type_expr(schema)
+    if not is_schema(schema) then
+        error("tools.docs.shape: convert_type_expr expects a schema", 2)
+    end
+    local peeled = peel(schema)
+    return type_expr_of(peeled)
+end
+
 M._internal = {
     is_schema    = is_schema,
     peel         = peel,
