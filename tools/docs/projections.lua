@@ -396,8 +396,78 @@ function M.hub_entry(pkg_info)
 end
 
 -- ── llms.txt / llms-full.txt ──────────────────────────────────────────
+--
+-- Two-layer API per pipeline-spec §3.2:
+--   * `llms_index_line(p)`  — one pkg → one bullet line (per-pkg primitive)
+--   * `llms_full_chunk(p, narrative_md?)` — one pkg → one concat chunk
+--   * `llms_index(pkg_infos)`  — aggregate the above into llms.txt
+--   * `llms_full(pkg_infos)`   — aggregate the above into llms-full.txt
+--
+-- The aggregators compose the per-pkg primitives, so an external
+-- consumer can either take the whole file or drop individual lines /
+-- chunks into a custom layout without re-implementing the formatting.
 
---- Build the llms.txt index from a list of PkgInfo.
+local LLMS_INDEX_DESC_MAX = 200
+
+--- Build one bullet line for `llms.txt` from a single PkgInfo.
+---
+--- Shape: `- [{name}](narrative/{name}.md): {description}`
+---
+--- Description is truncated at {LLMS_INDEX_DESC_MAX} chars (trailing
+--- "...") so a pathological pkg cannot bloat the index. The path prefix
+--- can be overridden via `opts.href_prefix` (default `"narrative/"`) for
+--- consumers that nest the narratives in a different folder.
+function M.llms_index_line(pkg_info, opts)
+    opts = opts or {}
+    local prefix = opts.href_prefix or "narrative/"
+    local name = pkg_info.identity.name
+    local desc = pkg_info.identity.description or ""
+    if #desc > LLMS_INDEX_DESC_MAX then
+        desc = desc:sub(1, LLMS_INDEX_DESC_MAX - 3) .. "..."
+    end
+    return string.format("- [%s](%s%s.md): %s", name, prefix, name, desc)
+end
+
+--- Strip the YAML frontmatter block from a narrative.md body.
+---
+--- Safe no-op when the body has no frontmatter.
+local function strip_frontmatter(narrative_md)
+    if narrative_md:sub(1, 4) ~= "---\n" then
+        return narrative_md
+    end
+    local _, close_idx = narrative_md:find("\n---\n", 5, true)
+    if not close_idx then
+        return narrative_md
+    end
+    return narrative_md:sub(close_idx + 1)
+end
+
+--- Build the per-pkg concat chunk for `llms-full.txt` from a PkgInfo.
+---
+--- Shape:
+---   <!-- ── {name}.md ── -->
+---
+---   {narrative.md body, frontmatter stripped, trimmed}
+---
+---   ---
+---
+--- `narrative_md` is accepted as an optional second argument so the
+--- caller can pass a pre-computed Markdown body (avoiding a re-render
+--- when iterating many pkgs). When omitted, `narrative_md(pkg_info)`
+--- is invoked. Both paths are pure — no I/O.
+function M.llms_full_chunk(pkg_info, narrative_md)
+    local body = narrative_md or M.narrative_md(pkg_info)
+    body = strip_frontmatter(body)
+    body = body:gsub("%s+$", "")
+    return string.format("<!-- ── %s.md ── -->\n\n%s\n\n---",
+        pkg_info.identity.name, body)
+end
+
+--- Build the full llms.txt index from a list of PkgInfo.
+---
+--- Composes `llms_index_line` per pkg, grouping by category (sorted
+--- alphabetically; missing category → "uncategorized"). Pkgs within a
+--- category are emitted in name order.
 function M.llms_index(pkg_infos, opts)
     opts = opts or {}
     local header = opts.header or "# algocline"
@@ -408,11 +478,10 @@ function M.llms_index(pkg_infos, opts)
 
     local lines = { header, "", "> " .. tagline, "" }
 
-    -- group by category
     local by_category = {}
-    local categories = {}
+    local categories  = {}
     for i = 1, #pkg_infos do
-        local p = pkg_infos[i]
+        local p   = pkg_infos[i]
         local cat = p.identity.category
         if cat == nil or cat == "" then cat = "uncategorized" end
         if not by_category[cat] then
@@ -424,31 +493,36 @@ function M.llms_index(pkg_infos, opts)
     end
     table.sort(categories)
 
+    local line_opts = { href_prefix = opts.href_prefix }
     for _, cat in ipairs(categories) do
         lines[#lines + 1] = "## " .. cat
         lines[#lines + 1] = ""
         local bucket = by_category[cat]
-        table.sort(bucket, function(a, b) return a.identity.name < b.identity.name end)
+        table.sort(bucket, function(a, b)
+            return a.identity.name < b.identity.name
+        end)
         for _, p in ipairs(bucket) do
-            local desc = p.identity.description or ""
-            if #desc > 200 then desc = desc:sub(1, 197) .. "..." end
-            lines[#lines + 1] = string.format(
-                "- [%s](narrative/%s.md): %s",
-                p.identity.name, p.identity.name, desc)
+            lines[#lines + 1] = M.llms_index_line(p, line_opts)
         end
         lines[#lines + 1] = ""
     end
 
-    -- Trim trailing blank lines, add single final newline.
     while #lines > 0 and lines[#lines] == "" do
         lines[#lines] = nil
     end
     return table.concat(lines, "\n") .. "\n"
 end
 
---- Concat all narrative.md bodies (frontmatter-free) into llms-full.txt.
+--- Concatenate all narrative.md bodies into the llms-full.txt file.
 ---
---- Input: list of { name = "...", narrative_md = "..." }
+--- `entries` is a list of either:
+---   (a) PkgInfo, or
+---   (b) { name = "...", narrative_md = "...", pkg_info = PkgInfo? }
+---
+--- Form (b) is backward-compatible with callers that pre-render
+--- narratives (e.g. `gen_docs.lua` avoids a second render pass by
+--- passing the cached Markdown body). Form (a) lets a fresh caller
+--- pass PkgInfo directly; the aggregator renders as needed.
 function M.llms_full(entries, opts)
     opts = opts or {}
     local header = opts.header or "# algocline — full narrative index"
@@ -458,25 +532,31 @@ function M.llms_full(entries, opts)
 
     local lines = { header, "", "> " .. tagline, "" }
 
-    -- stable order by pkg name
-    table.sort(entries, function(a, b) return a.name < b.name end)
+    local normalized = {}
     for i = 1, #entries do
         local e = entries[i]
-        lines[#lines + 1] = string.format("<!-- ── %s.md ── -->", e.name)
-        lines[#lines + 1] = ""
-        -- strip frontmatter block
-        local body = e.narrative_md
-        if body:sub(1, 4) == "---\n" then
-            local _, close_idx = body:find("\n---\n", 5, true)
-            if close_idx then
-                body = body:sub(close_idx + 1)
-            end
+        if e.identity ~= nil then
+            -- PkgInfo form
+            normalized[i] = { name = e.identity.name, pkg_info = e }
+        else
+            normalized[i] = {
+                name         = e.name,
+                narrative_md = e.narrative_md,
+                pkg_info     = e.pkg_info,
+            }
         end
-        -- trim trailing newlines for concatenation
-        body = body:gsub("%s+$", "")
-        lines[#lines + 1] = body
-        lines[#lines + 1] = ""
-        lines[#lines + 1] = "---"
+    end
+    table.sort(normalized, function(a, b) return a.name < b.name end)
+
+    for i = 1, #normalized do
+        local e = normalized[i]
+        local info = e.pkg_info
+        if info == nil then
+            -- Legacy form: narrative_md-only entry. Synthesise a minimal
+            -- PkgInfo with just the identity the chunk renderer needs.
+            info = { identity = { name = e.name } }
+        end
+        lines[#lines + 1] = M.llms_full_chunk(info, e.narrative_md)
         lines[#lines + 1] = ""
     end
 
@@ -495,6 +575,8 @@ M._internal = {
     yaml_scalar              = yaml_scalar,
     json_encode              = json_encode,
     type_expr_to_json        = type_expr_to_json,
+    strip_frontmatter        = strip_frontmatter,
+    LLMS_INDEX_DESC_MAX      = LLMS_INDEX_DESC_MAX,
 }
 
 return M

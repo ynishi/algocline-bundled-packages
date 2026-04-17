@@ -458,8 +458,95 @@ describe("tools.docs.projections.narrative_md", function()
     end)
 end)
 
+describe("tools.docs.projections.llms_index_line", function()
+    it("renders `- [name](narrative/name.md): description`", function()
+        local info = PI.make_pkg_info(
+            { name = "p", version = "1", category = "c",
+              description = "a short description",
+              source_path = "p/init.lua" },
+            { title = "T", summary = "", sections = {} },
+            { input = nil, result = nil })
+        expect(Projections.llms_index_line(info))
+            .to.equal("- [p](narrative/p.md): a short description")
+    end)
+
+    it("truncates descriptions longer than the max length", function()
+        local max  = Projections._internal.LLMS_INDEX_DESC_MAX
+        local long = string.rep("x", max + 50)
+        local info = PI.make_pkg_info(
+            { name = "p", version = "", category = "c",
+              description = long, source_path = "p/init.lua" },
+            { title = "T", summary = "", sections = {} },
+            { input = nil, result = nil })
+        local line = Projections.llms_index_line(info)
+        -- tail must be "..." (truncation marker)
+        expect(line:sub(-3)).to.equal("...")
+        -- total desc segment is exactly max chars
+        local _, colon_idx = line:find(": ", 1, true)
+        local desc = line:sub(colon_idx + 1)
+        expect(#desc).to.equal(max)
+    end)
+
+    it("honors href_prefix override", function()
+        local info = PI.make_pkg_info(
+            { name = "p", version = "", category = "c",
+              description = "d", source_path = "p/init.lua" },
+            { title = "T", summary = "", sections = {} },
+            { input = nil, result = nil })
+        expect(Projections.llms_index_line(info, { href_prefix = "pkg/" }))
+            .to.equal("- [p](pkg/p.md): d")
+    end)
+end)
+
+describe("tools.docs.projections.llms_full_chunk", function()
+    it("wraps narrative_md body with the pkg marker and --- separator", function()
+        local info = PI.make_pkg_info(
+            { name = "q", version = "", category = "c",
+              description = "d", source_path = "q/init.lua" },
+            { title = "Q", summary = "s", sections = {} },
+            { input = nil, result = nil })
+        local md = "---\nname: q\n---\n\n# Q\n\n> s\n"
+        local chunk = Projections.llms_full_chunk(info, md)
+        expect(chunk:find("<!-- ── q.md ── -->", 1, true) ~= nil).to.equal(true)
+        expect(chunk:find("# Q", 1, true) ~= nil).to.equal(true)
+        -- frontmatter gone
+        expect(chunk:find("name: q", 1, true) == nil).to.equal(true)
+        -- ends with separator (no trailing newline — aggregator owns spacing)
+        expect(chunk:sub(-3)).to.equal("---")
+    end)
+
+    it("renders narrative_md from PkgInfo when body omitted", function()
+        local info = PI.make_pkg_info(
+            { name = "r", version = "0", category = "c",
+              description = "d", source_path = "r/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = nil })
+        local chunk = Projections.llms_full_chunk(info)
+        expect(chunk:find("<!-- ── r.md ── -->", 1, true) ~= nil).to.equal(true)
+        expect(chunk:find("# R", 1, true) ~= nil).to.equal(true)
+    end)
+end)
+
+describe("tools.docs.projections.strip_frontmatter", function()
+    local strip = Projections._internal.strip_frontmatter
+
+    it("removes a leading --- / --- block", function()
+        expect(strip("---\nname: a\n---\n\n# A\n"))
+            .to.equal("\n# A\n")
+    end)
+
+    it("is a no-op when no frontmatter", function()
+        expect(strip("# A\n\n> s\n")).to.equal("# A\n\n> s\n")
+    end)
+
+    it("is a no-op when the closing fence is missing", function()
+        local malformed = "---\nname: a\n# A\n"
+        expect(strip(malformed)).to.equal(malformed)
+    end)
+end)
+
 describe("tools.docs.projections.llms_index", function()
-    it("groups pkg by category alphabetically", function()
+    it("groups pkg by category alphabetically via llms_index_line", function()
         local infos = {
             PI.make_pkg_info(
                 { name = "p1", version = "", category = "zeta",
@@ -478,6 +565,17 @@ describe("tools.docs.projections.llms_index", function()
         expect(a ~= nil and z ~= nil).to.equal(true)
         expect(a < z).to.equal(true)
         expect(idx:find("- [p2](narrative/p2.md): d2", 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("accepts PkgInfo directly in llms_full (sans pre-render)", function()
+        local info = PI.make_pkg_info(
+            { name = "p", version = "", category = "c",
+              description = "d", source_path = "p/init.lua" },
+            { title = "P", summary = "s", sections = {} },
+            { input = nil, result = nil })
+        local full = Projections.llms_full({ info })
+        expect(full:find("<!-- ── p.md ── -->", 1, true) ~= nil).to.equal(true)
+        expect(full:find("# P", 1, true) ~= nil).to.equal(true)
     end)
 end)
 
