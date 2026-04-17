@@ -174,7 +174,7 @@ M.meta = {
         })):is_optional():describe("Rubric dimensions"),
         delta        = T.number:is_optional():describe("Significance level (default 0.05)"),
     }, { open = true }),
-    result_shape = "...",
+    result_shape = T.shape({ --[[ elided; see §12 for accepted forms ]] }),
 }
 ```
 
@@ -319,7 +319,10 @@ M.meta = {
         task  = T.string:describe("The question or task to reason about"),
         depth = T.number:is_optional():describe("Number of reasoning steps (default: 3)"),
     }),
-    result_shape = "shape",
+    result_shape = T.shape({
+        chain      = T.array_of(T.string):describe("Ordered insights, one per reasoning step"),
+        conclusion = T.string:describe("Synthesized final answer"),
+    }),
 }
 
 ---@param ctx AlcCtx
