@@ -222,7 +222,7 @@ every tier; see the matrix below.
 
 | Tier | Runner | Purpose | Location |
 |---|---|---|---|
-| Unit tests (mocked `_G.alc`) | `mlua-probe` / `just test` | Stage transitions, index mapping, API contracts, cost accounting | `tests/test_recipe_*.lua` |
+| Unit tests (mocked `_G.alc`) | `lua-debugger` MCP (`mlua-probe-mcp`) | Stage transitions, index mapping, API contracts, cost accounting | `tests/test_recipe_*.lua` |
 | E2E (single-case, live LLM) | `agent-block` / `just e2e <name>` | ReAct-loop + MCP + real LLM on one prompt, with custom graders | `scripts/e2e/<recipe>.lua` |
 | Scenario eval (multi-case pass_rate) | `alc_eval` via `agent-block` | pass@1 over an installed scenario (e.g. `math_basic`) | `scripts/e2e/<recipe>_eval.lua` |
 
@@ -467,11 +467,16 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 
 ## Testing
 
-Tests live under `tests/` and use the `lust` (mlua-lspec) framework
-(`describe` / `it` / `expect`). The packages are pure Lua, so any Lua 5.4
-runtime that injects a `lust` global can run them, but the recommended
-runner is **[mlua-probe-mcp](https://crates.io/crates/mlua-probe-mcp)**,
-which ships with the framework pre-loaded.
+Tests live under `tests/` and use the [`lust`](https://github.com/bjornbytes/lust)
+test framework (`describe` / `it` / `expect`). algocline itself is an MCP server,
+and the canonical test runner is also an MCP server: the upstream binary
+**[mlua-probe-mcp](https://crates.io/crates/mlua-probe-mcp)**, registered in
+this repo's `.mcp.json` under the local alias `lua-debugger`. It ships with
+`lust` pre-loaded as a global.
+
+> The upstream `mlua-probe` workspace publishes only `mlua-probe-core` and
+> `mlua-probe-mcp` — there is **no `mlua-probe` CLI**. All test invocations
+> go through the MCP server.
 
 Install:
 
@@ -479,27 +484,36 @@ Install:
 cargo install mlua-probe-mcp
 ```
 
-### Running tests via mlua-probe
+### Running tests via the lua-debugger MCP
 
-mlua-probe is exposed as the `lua-debugger` MCP server in `.mcp.json`. From
-Claude Code (or any MCP client), invoke `test_launch` against a test file:
+From Claude Code, the Claude Code SDK, `claude -p`, or any other MCP client
+that has loaded this repo's `.mcp.json`, invoke `test_launch` against a test
+file:
 
 ```
 mcp__lua-debugger__test_launch(
-  code_file   = "tests/test_ranking_packages.lua",
+  code_file    = "tests/test_ranking_packages.lua",
   search_paths = ["."]   # repo root, so pkg/?.lua and pkg/?/init.lua resolve
 )
 ```
 
+The tool name follows Claude Code's `mcp__<local-alias>__<tool>` convention,
+so `lua-debugger` (the alias in `.mcp.json`) becomes `mcp__lua-debugger__*`.
 Returns structured JSON: `{ passed, failed, total, tests: [{ suite, name, passed, error }] }`.
 
-### Running tests via the mlua-probe CLI
+### Running tests locally (optional, opt-in)
 
-If you have `mlua-probe` installed locally:
+The tests use only upstream `lust` core API (`describe / it / expect / after`,
+`to.equal`, `to.exist`) — no mlua-lspec-specific extensions are required.
+If you want to run a single test file outside Claude / MCP, drop
+[`bjornbytes/lust`](https://github.com/bjornbytes/lust)'s `lust.lua` somewhere
+on your `LUA_PATH`, then from the repo root:
 
 ```bash
-mlua-probe test tests/test_ranking_packages.lua --search-path .
+LUA_PATH="./?.lua;./?/init.lua;$LUA_PATH" lua5.4 tests/test_ranking_packages.lua
 ```
+
+(Lust is GitHub-only; not on Luarocks. The repo does **not** vendor it.)
 
 ### Adding a new test file
 
@@ -508,9 +522,11 @@ mlua-probe test tests/test_ranking_packages.lua --search-path .
 
    ```lua
    local describe, it, expect = lust.describe, lust.it, lust.expect
-   local REPO = os.getenv("PWD") or "."
-   package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
    ```
+
+   `package.path` is set by the MCP harness via `search_paths=[REPO]`, so
+   the test file itself does not need to manipulate it. (For local opt-in
+   execution, set `LUA_PATH` yourself — see above.)
 
 3. Reset `package.loaded` between suites if you mock `_G.alc`:
 

@@ -2,15 +2,15 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
--- Dual-mode header: works via both
---   (a) `mlua-probe test tests/` CLI            — PWD fallback below
---   (b) `mcp__lua-debugger__test_launch(search_paths=[REPO])` — MCP prepend
--- Both paths (a) and (b) end up prepending the worktree to package.path,
--- so the worktree copy wins over any installed same-named package.
--- Direct `lua tests/*.lua` is NOT supported — `lust` global is only
--- injected by mlua-probe (CLI or MCP).
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- Run via the `lua-debugger` MCP server (binary: mlua-probe-mcp),
+-- which injects `lust` as a global and prepends `search_paths` to
+-- package.path:
+--   mcp__lua-debugger__test_launch(
+--     code_file    = "tests/test_alc_shapes_reflect.lua",
+--     search_paths = ["."],
+--   )
+-- Local opt-in (optional): with bjornbytes/lust on your LUA_PATH,
+-- run `lua5.4 tests/test_alc_shapes_reflect.lua` from the repo root.
 
 package.loaded["alc_shapes"]         = nil
 package.loaded["alc_shapes.t"]       = nil
