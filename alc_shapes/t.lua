@@ -39,6 +39,18 @@ M.boolean = setmetatable({ kind = "prim", prim = "boolean" }, schema_mt)
 M.table   = setmetatable({ kind = "prim", prim = "table" },   schema_mt)
 M.any     = setmetatable({ kind = "any" },                    schema_mt)
 
+--- T.shape(fields, opts) — named key set.
+---
+--- Layer contract:
+---   Runtime shapes (ctx.result etc.):  open = true (default)
+---   Entity shapes (boundary contract): open = false (explicit)
+---
+--- The default is deliberately open to preserve the pass-through
+--- culture of ctx.result: packages chain outputs through ctx and may
+--- attach trace / metrics / debug keys without invalidating downstream
+--- consumers. Entity layer (see tools/docs/entity_schemas.lua) opts
+--- into strict mode because its fields are the boundary contract
+--- itself, and extra keys signal drift.
 function M.shape(fields, opts)
     if type(fields) ~= "table" then
         error("alc_shapes.t: shape expects fields table as first argument", 2)

@@ -36,7 +36,7 @@ This is why combinators return new tables (never mutate) and why reflection uses
 
 ## Design principles
 
-- **Open tables**: extra fields are always allowed (`open = true` default). The pass-through culture is preserved.
+- **Layer contract (Runtime vs Entity)**: `T.shape` defaults to `open = true`. Runtime shapes (`ctx.result` etc.) stay open to preserve the pass-through culture — packages chain outputs through ctx and may attach trace / metrics / debug keys without invalidating downstream consumers. Entity shapes (boundary contracts, e.g. `tools/docs/entity_schemas.lua`) opt into strict mode (`open = false`) because their fields *are* the contract itself, and extra keys signal drift. The asymmetric default matches the layer semantics: Runtime = pass-through, Entity = closed.
 - **Existence checking**: validates that declared keys exist with the right primitive type. Does not normalize values or enforce strict typing on nested table contents beyond what the schema declares.
 - **SSoT**: `alc_shapes/init.lua` is the single source of truth. `types/alc_shapes.d.lua` is auto-generated via `just gen-shapes` — hand-editing is prohibited.
 
