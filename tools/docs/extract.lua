@@ -12,9 +12,14 @@
 ---
 --- Heuristic-free. V0 convention violations are detected separately
 --- by `tools.docs.lint`; this module reports the literal structure.
+---
+--- Single-AST doctrine: `meta.input_shape` / `meta.result_shape` are
+--- alc_shapes schemas and flow through unchanged. A string
+--- `meta.result_shape` is wrapped as `T.ref(name)` so every downstream
+--- consumer sees a uniform kind-tagged schema.
 
 local PI = require("tools.docs.pkg_info")
-local Shape = require("tools.docs.shape")
+local T  = require("alc_shapes.t")
 
 local M = {}
 
@@ -249,6 +254,10 @@ end
 
 -- ── assemble PkgInfo ───────────────────────────────────────────────────
 
+local function is_schema(v)
+    return type(v) == "table" and rawget(v, "kind") ~= nil
+end
+
 --- Build a PkgInfo for one package.
 ---
 --- Args:
@@ -280,19 +289,21 @@ function M.build_pkg_info(pkg_name, init_path, source_path)
         result = nil,
     }
     if meta.input_shape ~= nil then
-        shape.input = Shape.convert_shape(meta.input_shape)
+        if not is_schema(meta.input_shape) then
+            error(string.format(
+                "tools.docs.extract: pkg '%s' meta.input_shape must be an " ..
+                "alc_shapes schema", pkg_name), 2)
+        end
+        shape.input = meta.input_shape
     end
     if meta.result_shape ~= nil then
         if type(meta.result_shape) == "string" then
-            -- Named result type — wrap as an opaque `label` TypeExpr so
-            -- downstream code always sees a uniform TypeExpr (mirrors
-            -- shape.input). Projection renders it verbatim.
-            shape.result = PI.label(meta.result_shape)
-        elseif type(meta.result_shape) == "table" and meta.result_shape.kind then
-            -- alc_shapes schema → TypeExpr. String rendering is the
-            -- projection's responsibility (see tools.docs.projections
-            -- .shape_type_string).
-            shape.result = Shape.convert_type_expr(meta.result_shape)
+            -- Named result type — wrap as `T.ref` so downstream sees a
+            -- uniform kind-tagged schema (Malli `[:ref :name]` analogue).
+            -- Projection renders it verbatim as the name.
+            shape.result = T.ref(meta.result_shape)
+        elseif is_schema(meta.result_shape) then
+            shape.result = meta.result_shape
         else
             error(string.format(
                 "tools.docs.extract: pkg '%s' meta.result_shape must be " ..
@@ -308,6 +319,7 @@ M._internal = {
     read_file     = read_file,
     split_lines   = split_lines,
     alloc_anchor  = alloc_anchor,
+    is_schema     = is_schema,
 }
 
 return M
