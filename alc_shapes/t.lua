@@ -1,13 +1,18 @@
 --- alc_shapes.t — DSL combinators and schema internal structure.
 ---
---- Schemas are plain Lua tables with a `kind` field. All internal
---- fields (`kind`, `prim`, `inner`, `elem`, `values`, `fields`, `open`,
---- `doc`) are readable via `rawget` without traversing metatables.
---- Metatables carry only combinator sugar (`:is_optional()`,
---- `:describe(doc)`). Combinators return new tables — schemas are
---- never mutated in place.
+--- Schema-as-Data contract (after Malli TypeSchemaAsData):
+---   * Every schema is a plain Lua table whose state is held in
+---     `rawget`-readable fields: `kind`, `prim`, `inner`, `elem`,
+---     `values`, `fields`, `open`, `doc`, `name`, `key`, `val`,
+---     `variants`, `tag`.
+---   * Metatables carry combinator sugar only (`:is_optional()`,
+---     `:describe(doc)`). Stripping the metatable must not change
+---     validation behaviour — this is what makes schemas persistable.
+---   * Combinators return new tables; schemas are never mutated
+---     in place.
 ---
---- See workspace/tasks/shape-convention/design.md §Shape の内部構造.
+--- See alc_shapes/README.md §Core concept and
+--- workspace/tasks/shape-convention/design.md §Shape の内部構造.
 
 local M = {}
 
@@ -119,6 +124,13 @@ function M.discriminated(tag, variants)
         error("alc_shapes.t: discriminated expects at least one variant", 2)
     end
     return setmetatable({ kind = "discriminated", tag = tag, variants = variants }, schema_mt)
+end
+
+function M.ref(name)
+    if type(name) ~= "string" or name == "" then
+        error("alc_shapes.t: ref expects non-empty string name", 2)
+    end
+    return setmetatable({ kind = "ref", name = name }, schema_mt)
 end
 
 function M.map_of(key, val)

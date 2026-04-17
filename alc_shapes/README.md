@@ -8,6 +8,32 @@ local ok, reason = S.check(value, S.voted)     -- silent check
 local x = S.assert(value, "voted", "caller")   -- loud fail
 ```
 
+## Core concept — Schema-as-Data
+
+alc_shapes is modelled after **Malli (Clojure)**'s [TypeSchemaAsData][malli] doctrine:
+
+> "Schemas are just data. They can be serialized, persisted, transformed, and inspected with the same tools you use for any other data structure. There is no separate AST, no opaque compiled form — the schema *is* the representation."
+
+[malli]: https://github.com/metosin/malli#schema-as-data
+
+This shapes three invariants that the entire system depends on.
+
+### 1. Single AST (no parallel representations)
+
+There is exactly **one** schema representation: the kind-tagged plain table. Downstream consumers (validator, reflector, codegen, documentation projector) read `rawget(schema, "kind")` and dispatch; they never normalise, denormalise, or convert into a second AST.
+
+Parallel representations (e.g. "TypeExpr for docs, Schema for runtime") are explicitly prohibited. If a consumer needs a derived form, it must be a pure projection of the schema — never a mirrored structure that can drift.
+
+### 2. Persistable by construction
+
+Because schemas are plain tables with all state in `rawget`-readable fields, they are **serialisable without loss**: JSON-encode → decode → still fully functional against `check` / `fields` / `walk`. Metatables carry combinator sugar only (`:is_optional()`, `:describe(doc)`); stripping the metatable must never change validation behaviour.
+
+This is why combinators return new tables (never mutate) and why reflection uses `rawget` exclusively.
+
+### 3. Reflectable
+
+`kind` is the universal discriminator. `reflect.fields` and `reflect.walk` traverse by reading `kind` and the kind-specific field names (`inner`, `elem`, `fields`, `variants`, `key`, `val`, `values`). Every consumer in the system uses the same dispatch.
+
 ## Design principles
 
 - **Open tables**: extra fields are always allowed (`open = true` default). The pass-through culture is preserved.
@@ -34,6 +60,7 @@ T.array_of(elem)                     -- homogeneous array
 T.one_of(values)                     -- literal enum (string/number/boolean)
 T.map_of(key, val)                   -- key/value typed map
 T.discriminated(tag, variants)       -- tag-dispatched union
+T.ref(name)                          -- named reference into alc_shapes registry
 
 -- Wrappers (return new schema, never mutate)
 schema:is_optional()                 -- nil-permitted wrapper
@@ -70,6 +97,7 @@ Every schema node is a plain table with `kind` readable via `rawget`. Metatables
 | `shape` | `fields`, `open` | Named key set; `open=true` allows extra keys |
 | `map_of` | `key`, `val` | Key/value typed map (like tableshape `types.map_of` / Zod `z.record()`) |
 | `discriminated` | `tag`, `variants` | Tag-dispatched union; `variants` is `{ [tag_value] = shape_schema }` |
+| `ref` | `name` | Named reference into the `alc_shapes` registry (Malli `[:ref :name]` analogue). Resolved lazily so registry cycles and forward references work. |
 
 ## Validator API
 
@@ -147,6 +175,7 @@ just verify-shapes   # CI drift check (diff against committed file)
 | `one_of({"a","b"})` | `"a"\|"b"` |
 | `map_of(K, V)` | `table<K, V>` |
 | `discriminated` | `table` |
+| `ref(name)` | `<class_prefix>PascalCase(name)` (e.g. `ref("voted")` → `AlcResultVoted`) |
 | `optional(T)` | field name gets `?` suffix |
 | `described(T, doc)` | doc appended as `@...` suffix |
 

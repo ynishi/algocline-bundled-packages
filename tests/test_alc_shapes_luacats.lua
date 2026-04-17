@@ -177,4 +177,22 @@ describe("alc_shapes.LuaCats.gen", function()
         expect(ok).to.equal(true)
         expect(out:match("AlcResultVoted")).to.exist()
     end)
+
+    it("renders ref(name) as <prefix><PascalCase(name)>", function()
+        local shapes = {
+            voted    = T.shape({ a = T.string }),
+            wrapper  = T.shape({ inner = T.ref("voted") }),
+        }
+        local out = S.LuaCats.gen(shapes, "AlcResult")
+        expect(out:match("---@field inner AlcResultVoted")).to.exist()
+    end)
+
+    it("honours class_prefix for ref resolution", function()
+        local shapes = {
+            voted   = T.shape({ a = T.string }),
+            wrapper = T.shape({ inner = T.ref("voted") }),
+        }
+        local out = S.LuaCats.gen(shapes, "MyPkg")
+        expect(out:match("---@field inner MyPkgVoted")).to.exist()
+    end)
 end)
