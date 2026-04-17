@@ -218,6 +218,183 @@ function M.narrative_md(pkg_info)
     return table.concat(parts, "\n") .. "\n"
 end
 
+-- ── JSON encoder (minimal, pure Lua) ──────────────────────────────────
+--
+-- Only types produced by our PkgInfo entity are supported:
+--   string / number / boolean / nil / table (as array or object).
+-- An empty table serialises as `{}` (object) per spec §7.4 — PkgInfo
+-- never produces empty arrays at the hub_entry boundary.
+--
+-- Output is deterministic: object keys are sorted alphabetically so
+-- the hub_entry bytes are stable across runs (necessary for hub_index
+-- caching / content-addressed storage).
+
+local JSON_ESCAPES = {
+    ['"']  = '\\"',  ['\\'] = '\\\\', ['\b'] = '\\b', ['\f'] = '\\f',
+    ['\n'] = '\\n',  ['\r'] = '\\r',  ['\t'] = '\\t',
+}
+
+local function json_escape_string(s)
+    local out = s:gsub('[%z\1-\31\\"]', function(c)
+        return JSON_ESCAPES[c] or string.format('\\u%04x', c:byte())
+    end)
+    return '"' .. out .. '"'
+end
+
+local function is_array(t)
+    local n = 0
+    for k, _ in pairs(t) do
+        if type(k) ~= "number" then return false end
+        n = n + 1
+    end
+    for i = 1, n do
+        if t[i] == nil then return false end
+    end
+    return n > 0, n
+end
+
+local json_encode_value  -- forward
+
+local function json_encode_array(t, n)
+    local parts = {}
+    for i = 1, n do
+        parts[i] = json_encode_value(t[i])
+    end
+    return "[" .. table.concat(parts, ",") .. "]"
+end
+
+local function json_encode_object(t)
+    local keys = {}
+    for k, _ in pairs(t) do
+        if type(k) ~= "string" then
+            error("json_encode: object key must be a string, got " .. type(k))
+        end
+        keys[#keys + 1] = k
+    end
+    table.sort(keys)
+    local parts = {}
+    for i = 1, #keys do
+        local k = keys[i]
+        parts[i] = json_escape_string(k) .. ":" .. json_encode_value(t[k])
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+function json_encode_value(v)
+    local ty = type(v)
+    if v == nil then
+        return "null"
+    elseif ty == "string" then
+        return json_escape_string(v)
+    elseif ty == "number" then
+        if v ~= v or v == math.huge or v == -math.huge then
+            error("json_encode: non-finite number is not JSON-representable")
+        end
+        return tostring(v)
+    elseif ty == "boolean" then
+        return v and "true" or "false"
+    elseif ty == "table" then
+        local arr, n = is_array(v)
+        if arr then
+            return json_encode_array(v, n)
+        end
+        return json_encode_object(v)
+    else
+        error("json_encode: unsupported type '" .. ty .. "'")
+    end
+end
+
+local function json_encode(v)
+    return json_encode_value(v)
+end
+
+-- ── TypeExpr / Shape → JSON form ──────────────────────────────────────
+
+--- Convert a TypeExpr to a JSON-ready Lua table.
+---
+--- The hub_entry schema exposes TypeExpr structurally so that consumers
+--- can walk the type tree without re-parsing the human string form.
+--- Mirror the internal TypeExpr shape 1:1 — each `kind` becomes a JSON
+--- object with its variant-specific fields.
+local function type_expr_to_json(te)
+    local k = te.kind
+    if k == "primitive" then
+        return { kind = "primitive", name = te.name }
+    elseif k == "array_of" then
+        return { kind = "array_of", of = type_expr_to_json(te.of) }
+    elseif k == "map_of" then
+        return {
+            kind = "map_of",
+            key  = type_expr_to_json(te.key),
+            val  = type_expr_to_json(te.val),
+        }
+    elseif k == "one_of" then
+        local values = {}
+        for i = 1, #te.values do values[i] = te.values[i] end
+        return { kind = "one_of", values = values }
+    elseif k == "shape" then
+        return { kind = "shape", shape = M.shape_to_json(te.shape) }
+    elseif k == "discriminated" then
+        local variants = {}
+        for name, shape in pairs(te.variants) do
+            variants[name] = M.shape_to_json(shape)
+        end
+        return { kind = "discriminated", tag = te.tag, variants = variants }
+    elseif k == "label" then
+        return { kind = "label", name = te.name }
+    else
+        error("type_expr_to_json: unknown kind '" .. tostring(k) .. "'")
+    end
+end
+
+--- Convert a Shape to a JSON-ready Lua table.
+function M.shape_to_json(shape)
+    local fields = {}
+    for i = 1, #shape.fields do
+        local f = shape.fields[i]
+        fields[i] = {
+            name     = f.name,
+            type     = type_expr_to_json(f.type),
+            optional = f.optional and true or false,
+            doc      = f.doc or "",
+        }
+    end
+    return { fields = fields, open = shape.open and true or false }
+end
+
+-- ── hub_entry JSON projection (pipeline-spec §7.4) ────────────────────
+
+--- Build the hub_entry JSON for one PkgInfo.
+---
+--- Schema (per pipeline-spec.md §7.4):
+---   {
+---     "name": str, "version": str, "category": str, "description": str,
+---     "narrative_md": str,       -- full narrative.md (frontmatter included)
+---     "input_shape":  Shape|null,
+---     "result_shape": str|null   -- human-readable form via shape_type_string
+---   }
+---
+--- The bytes are deterministic (keys sorted) so downstream hub_index
+--- caching can content-address the JSON.
+function M.hub_entry(pkg_info)
+    local id  = pkg_info.identity
+    local shp = pkg_info.shape
+    local entry = {
+        name         = id.name,
+        version      = id.version or "",
+        category     = id.category or "",
+        description  = id.description or "",
+        narrative_md = M.narrative_md(pkg_info),
+    }
+    if shp.input ~= nil then
+        entry.input_shape = M.shape_to_json(shp.input)
+    end
+    if shp.result ~= nil then
+        entry.result_shape = M.shape_type_string(shp.result)
+    end
+    return json_encode(entry)
+end
+
 -- ── llms.txt / llms-full.txt ──────────────────────────────────────────
 
 --- Build the llms.txt index from a list of PkgInfo.
@@ -316,6 +493,8 @@ M._internal = {
     escape_yaml_string       = escape_yaml_string,
     escape_md_table_cell     = escape_md_table_cell,
     yaml_scalar              = yaml_scalar,
+    json_encode              = json_encode,
+    type_expr_to_json        = type_expr_to_json,
 }
 
 return M

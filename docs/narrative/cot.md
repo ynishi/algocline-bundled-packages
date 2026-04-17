@@ -2,7 +2,7 @@
 name: cot
 version: 0.1.0
 category: reasoning
-result_shape: shape
+result_shape: "shape { chain: array of string, conclusion: string }"
 description: "Iterative chain-of-thought — cumulative reasoning steps, then synthesis"
 source: cot/init.lua
 generated: gen_docs (V0)
