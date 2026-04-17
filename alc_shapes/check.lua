@@ -151,6 +151,19 @@ handlers.map_of = function(value, schema, path)
     return true
 end
 
+handlers.ref = function(value, schema, path)
+    local name = schema.name
+    -- Lazy-require to avoid circular load on init.
+    local shapes = require("alc_shapes")
+    local resolved = shapes[name]
+    if resolved == nil or type(resolved) ~= "table"
+            or rawget(resolved, "kind") == nil then
+        return false, string.format(
+            "shape violation at %s: unresolved ref '%s'", path, name)
+    end
+    return check_node(value, resolved, path)
+end
+
 handlers.one_of = function(value, schema, path)
     local vs = schema.values
     for i = 1, #vs do

@@ -299,6 +299,44 @@ describe("alc_shapes reserved-name guard (Q3)", function()
     end)
 end)
 
+describe("alc_shapes.check ref", function()
+    it("resolves ref against the alc_shapes registry", function()
+        local r = T.ref("voted")
+        local good = {
+            consensus       = "majority answer",
+            paths           = {},
+            votes           = {},
+            vote_counts     = {},
+            n_sampled       = 3,
+            total_llm_calls = 3,
+        }
+        expect(S.check(good, r)).to.equal(true)
+    end)
+
+    it("fails with ref path intact when the target shape rejects", function()
+        local r = T.ref("voted")
+        local bad = {
+            consensus       = 42,  -- wrong type
+            paths           = {},
+            votes           = {},
+            vote_counts     = {},
+            n_sampled       = 3,
+            total_llm_calls = 3,
+        }
+        local ok, reason = S.check(bad, r)
+        expect(ok).to.equal(false)
+        expect(reason:match("consensus")).to.exist()
+    end)
+
+    it("fails with 'unresolved ref' when name is not in the registry", function()
+        local r = T.ref("does_not_exist_xyz")
+        local ok, reason = S.check({}, r)
+        expect(ok).to.equal(false)
+        expect(reason:match("unresolved ref")).to.exist()
+        expect(reason:match("does_not_exist_xyz")).to.exist()
+    end)
+end)
+
 describe("alc_shapes.is_dev_mode / assert_dev", function()
     it("is_dev_mode depends on ALC_SHAPE_CHECK env", function()
         local active = (os.getenv("ALC_SHAPE_CHECK") == "1")

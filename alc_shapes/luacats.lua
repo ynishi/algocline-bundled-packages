@@ -33,16 +33,19 @@ end
 --- Map a schema node to its LuaCATS type string.
 --- `named_shapes` is a set of inline-shape references that should render
 --- as bare `table` (named shapes are only emitted at the top level).
-local function type_of(node)
+--- `class_prefix` is threaded through so `ref(name)` resolves to the
+--- correct class identifier.
+local function type_of(node, class_prefix)
+    class_prefix = class_prefix or "AlcResult"
     local kind = rawget(node, "kind")
     if kind == "prim" then
         return node.prim
     elseif kind == "any" then
         return "any"
     elseif kind == "optional" then
-        return type_of(rawget(node, "inner"))
+        return type_of(rawget(node, "inner"), class_prefix)
     elseif kind == "described" then
-        return type_of(rawget(node, "inner"))
+        return type_of(rawget(node, "inner"), class_prefix)
     elseif kind == "array_of" then
         -- Preserve inner-optional semantics:
         --   array_of(T)            -> T[]
@@ -64,7 +67,7 @@ local function type_of(node)
                 break
             end
         end
-        local inner_type = type_of(elem)
+        local inner_type = type_of(elem, class_prefix)
         if had_optional then
             return "(" .. inner_type .. "|nil)[]"
         end
@@ -72,12 +75,15 @@ local function type_of(node)
     elseif kind == "discriminated" then
         return "table"
     elseif kind == "map_of" then
-        local k = type_of(rawget(node, "key"))
-        local v = type_of(rawget(node, "val"))
+        local k = type_of(rawget(node, "key"), class_prefix)
+        local v = type_of(rawget(node, "val"), class_prefix)
         return "table<" .. k .. ", " .. v .. ">"
     elseif kind == "shape" then
         -- inline nested shape renders as `table` (no anonymous class emitted).
         return "table"
+    elseif kind == "ref" then
+        -- ref renders as the target named class (PascalCase of the ref name).
+        return class_prefix .. pascal_case(rawget(node, "name"))
     elseif kind == "one_of" then
         local vs = rawget(node, "values")
         local parts = {}
@@ -96,19 +102,22 @@ local function type_of(node)
 end
 
 --- Render a single class block for a shape schema.
-function M.class_for(class_name, schema)
+--- `class_prefix` is used to resolve `ref(name)` occurrences inside the
+--- schema; defaults to "AlcResult" to match `gen()`.
+function M.class_for(class_name, schema, class_prefix)
     if type(class_name) ~= "string" or class_name == "" then
         error("alc_shapes.luacats.class_for: class_name must be non-empty string", 2)
     end
     if type(schema) ~= "table" or rawget(schema, "kind") ~= "shape" then
         error("alc_shapes.luacats.class_for: schema must be kind='shape'", 2)
     end
+    class_prefix = class_prefix or "AlcResult"
     local lines = { "---@class " .. class_name }
     local entries = reflect.fields(schema)
     for i = 1, #entries do
         local e = entries[i]
         local suffix = e.optional and "?" or ""
-        local ty = type_of(e.type)
+        local ty = type_of(e.type, class_prefix)
         local line = string.format("---@field %s%s %s", e.name, suffix, ty)
         if e.doc then
             line = line .. " @" .. e.doc
@@ -142,7 +151,7 @@ function M.gen(shapes_table, class_prefix)
         local name = names[i]
         local class_name = class_prefix .. pascal_case(name)
         out[#out + 1] = ""
-        out[#out + 1] = M.class_for(class_name, shapes_table[name]):gsub("\n$", "")
+        out[#out + 1] = M.class_for(class_name, shapes_table[name], class_prefix):gsub("\n$", "")
     end
 
     return table.concat(out, "\n") .. "\n"

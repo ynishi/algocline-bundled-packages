@@ -90,6 +90,7 @@ function M.walk(schema, visitor)
         elseif kind == "optional" or kind == "described" then
             visit(rawget(node, "inner"))
         end
+        -- `ref` / `prim` / `any` / `one_of` are leaves: no descent.
     end
     visit(schema)
 end
