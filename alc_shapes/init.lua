@@ -12,8 +12,7 @@
 --- valid. Metatables carry combinator sugar only; `rawget` is the
 --- universal reader. Parallel representations (e.g. a separate "TypeExpr"
 --- AST) are prohibited: downstream consumers must project, not mirror.
---- See README.md §Core concept and workspace/tasks/shape-convention/
---- design.md.
+--- See README.md §Core concept.
 ---
 --- NOTE: meta.result_shape is a single string today. Packages with
 --- multiple entry points (e.g. calibrate.run vs calibrate.assess)

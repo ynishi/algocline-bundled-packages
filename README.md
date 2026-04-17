@@ -618,8 +618,9 @@ tokens, final answer) and per-grader pass/fail. stdout also prints a summary:
 
 ### Notes
 
-- E2E runs are **non-deterministic** (live LLM) and **billable**. Prefer unit
-  tests (`just test`) for tight loops; run E2E on meaningful changes only.
+- E2E runs are **non-deterministic** (live LLM) and **billable**. Prefer the
+  pure-Lua structure tests (`mcp__lua-debugger__test_launch`, see §Testing)
+  for tight loops; run E2E on meaningful changes only.
 - agent-block spawns the `alc` MCP server as a child process, so `alc` must be
   on `PATH` and the current working directory must contain `alc.toml` (the
   repo root already does).

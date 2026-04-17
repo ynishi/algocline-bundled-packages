@@ -231,7 +231,7 @@ function M.run(ctx) … end
 GitHub-style link:
 
 ```lua
---- See [workspace/foo.md](workspace/foo.md) for the derivation.
+--- See [the README](../README.md) for the derivation.
 ```
 
 裸 URL は禁止 (References section 内の citation のみ許可)。

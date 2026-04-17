@@ -9,13 +9,15 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
--- Run modes:
---   (a) CLI: `just test` → `mlua-probe test tests/` from worktree cwd;
---       default package.path `./?.lua` finds the worktree copy.
---   (b) MCP: `mcp__lua-debugger__test_launch(search_paths=[REPO])`;
---       the harness prepends REPO to package.path.
--- Neither relies on PWD: under the MCP server PWD may be the parent
--- repo (not the worktree), which would shadow the worktree's copy.
+-- Run via the `lua-debugger` MCP server (binary: mlua-probe-mcp),
+-- which injects `lust` as a global and prepends `search_paths` to
+-- package.path:
+--   mcp__lua-debugger__test_launch(
+--     code_file    = "tests/test_alc_shapes_persist.lua",
+--     search_paths = ["."],
+--   )
+-- Local opt-in (optional): with bjornbytes/lust on your LUA_PATH,
+-- run `lua5.4 tests/test_alc_shapes_persist.lua` from the repo root.
 
 package.loaded["alc_shapes"]         = nil
 package.loaded["alc_shapes.t"]       = nil
