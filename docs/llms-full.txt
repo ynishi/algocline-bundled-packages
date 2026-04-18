@@ -18,6 +18,24 @@
 
 > Selects the best candidate from a pool using staged evaluators of increasing cost. Thompson Sampling decides which candidate receives the next, more expensive evaluation, allocating expensive evaluations only to candidates whose Beta posterior suggests they are promising.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alpha_prior` | number | optional | Beta prior α (default: 1.0) |
+| `ctx.beta_prior` | number | optional | Beta prior β (default: 1.0) |
+| `ctx.budget` | number | optional | Total fidelity-cost budget (default: 18) |
+| `ctx.fidelities` | array of shape { cost: number, max_tokens: number, name: string, prompt: string } | optional | Override the evaluator ladder (default: 3-level quick/detail/thorough) |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate generation (default: 400) |
+| `ctx.n` | number | optional | Number of initial candidates (default: 6) |
+| `ctx.score_hi` | number | optional | Maximum raw score for normalization (default: 10) |
+| `ctx.seed` | number | optional | PRNG seed for Thompson sampling (default: 1) |
+| `ctx.task` | string | **required** | The problem to generate and select an answer for |
+
 ---
 
 <!-- ── abm.md ── -->
@@ -45,6 +63,19 @@
 
 > Three-stage pipeline: detect ambiguity in the input, generate targeted clarification questions for underspecified elements, then integrate responses to produce a fully-specified task.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.clarify_tokens` | number | optional | Max tokens for clarification phase (default 400) |
+| `ctx.detect_tokens` | number | optional | Max tokens for detection phase (default 500) |
+| `ctx.integrate_tokens` | number | optional | Max tokens for integration phase (default 500) |
+| `ctx.task` | string | **required** | Task or request to analyze (required) |
+
 ---
 
 <!-- ── analogical.md ── -->
@@ -54,6 +85,18 @@
 
 > Instead of solving directly, generates relevant analogous problems, solves them, extracts transferable patterns, then applies to the original.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.domain_hint` | string | optional | Optional domain to draw analogies from |
+| `ctx.n_analogies` | number | optional | Number of analogies to generate (default: 3) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── anti_cascade.md ── -->
@@ -62,6 +105,21 @@
 # anti_cascade — Pipeline error cascade amplification detection
 
 > Detects when small errors compound through multi-step pipelines by independently re-deriving conclusions from original inputs at each checkpoint, then comparing with the pipeline's accumulated output. Flags steps where drift exceeds threshold.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.compare_tokens` | number | optional | Max tokens per pipeline-vs-independent comparison (default 400) |
+| `ctx.drift_threshold` | number | optional | Drift score threshold at which a step is flagged (default 0.4) |
+| `ctx.rederive_tokens` | number | optional | Max tokens per independent re-derivation (default 500) |
+| `ctx.steps` | array of shape { instruction?: string, name: string, output: string } | **required** | Ordered pipeline step outputs; at least 1 entry (required) |
+| `ctx.summary_tokens` | number | optional | Max tokens for the final summary analysis (default 500) |
+| `ctx.task` | string | **required** | Original task/input that the pipeline was given (required) |
 
 ---
 
@@ -81,6 +139,19 @@
 
 > Instead of verifying every step of a reasoning chain (O(n)), bisects the chain to locate the first error in O(log n) steps. Once found, regenerates only the erroneous step and continues.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens for chain generation (default: 800) |
+| `ctx.max_repairs` | number | optional | Maximum number of bisect→repair cycles (default: 2) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.verify_tokens` | number | optional | Max tokens per verification (default: 200) |
+
 ---
 
 <!-- ── blind_spot.md ── -->
@@ -89,6 +160,20 @@
 # blind_spot — Self-Correction Blind Spot bypass
 
 > LLMs cannot correct errors in their own outputs but can successfully correct identical errors when presented as coming from external sources. This package exploits that asymmetry: generate an answer, then re-present it as a "colleague's draft" for the same LLM to review and correct.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.correct_tokens` | number | optional | Max tokens per correction / reflection (default: 800) |
+| `ctx.gen_tokens` | number | optional | Max tokens for initial generation (default: 600) |
+| `ctx.rounds` | number | optional | Externalize→correct rounds (default: 1) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.wait` | boolean | optional | Enable 'Wait' reflection trigger (default: true) |
 
 ---
 
@@ -99,6 +184,26 @@
 
 > N agents (boids) in 2D continuous space follow three simple rules:   1. Separation: steer away from nearby boids to avoid crowding   2. Alignment: steer towards the average heading of nearby boids   3. Cohesion: steer towards the average position of nearby boids
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alignment_weight` | number | optional |  |
+| `ctx.cohesion_weight` | number | optional |  |
+| `ctx.max_force` | number | optional |  |
+| `ctx.max_speed` | number | optional |  |
+| `ctx.n_boids` | number | optional |  |
+| `ctx.perception_radius` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.separation_weight` | number | optional |  |
+| `ctx.steps` | number | optional |  |
+| `ctx.task` | string | optional |  |
+| `ctx.world_size` | number | optional |  |
+
 ---
 
 <!-- ── bot.md ── -->
@@ -107,6 +212,18 @@
 # bot — Buffer of Thoughts: template-based meta-reasoning
 
 > Identifies the problem type, retrieves an appropriate thought template (structured reasoning pattern), instantiates it for the specific problem, then verifies the result. Efficient because it leverages pre-defined reasoning patterns rather than discovering them from scratch each time.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per instantiate / verify step (default 500) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
+| `ctx.templates` | map of string to shape { name: string, pattern: string } | optional | Custom template_key → {name, pattern} map; defaults to built-in TEMPLATES |
 
 ---
 
@@ -126,6 +243,20 @@
 
 > Routes problems through escalating complexity levels. Starts with the simplest (cheapest) approach; if confidence is below threshold, escalates to a more sophisticated strategy. Minimizes compute for easy problems while ensuring quality for hard ones.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per generation call (default 400) |
+| `ctx.max_level` | number | optional | Maximum cascade level to attempt (default 3) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
+| `ctx.threshold` | number | optional | Confidence threshold at which the cascade stops early (default 0.8) |
+| `ctx.verify_tokens` | number | optional | Max tokens per verification call (default 300) |
+
 ---
 
 <!-- ── claim_trace.md ── -->
@@ -134,6 +265,21 @@
 # claim_trace — Span-level evidence attribution for LLM outputs
 
 > For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike factscore (which only verifies correctness), claim_trace provides provenance: which part of the source supports each claim, enabling transparent attribution.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.answer` | string | optional | Pre-supplied answer to attribute (auto-generated if nil) |
+| `ctx.extract_tokens` | number | optional | Max tokens for claim extraction (default: 500) |
+| `ctx.gen_tokens` | number | optional | Max tokens for answer generation (default: 600) |
+| `ctx.sources` | any | **required** | Source text(s): single string or array of strings |
+| `ctx.task` | string | **required** | The original question/task |
+| `ctx.trace_tokens` | number | optional | Max tokens per claim attribution (default: 300) |
 
 ---
 
@@ -144,6 +290,20 @@
 
 > Generates reasoning chains with abstract placeholders instead of concrete facts, then grounds them via parallel knowledge lookups. Decouples the reasoning structure from specific knowledge, enabling parallel tool calls and cleaner reasoning chains.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens for the abstract chain and final answer (default 600) |
+| `ctx.ground_tokens` | number | optional | Max tokens per grounding call (default 300) |
+| `ctx.max_depth` | number | optional | Max dependency-resolution depth (default 3) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
+| `ctx.tools` | map of string to string | optional | tool_name → description; defaults to a single 'knowledge' tool |
+
 ---
 
 <!-- ── cod.md ── -->
@@ -152,6 +312,19 @@
 # CoD — Chain-of-Density iterative compression
 
 > Iteratively rewrites text to increase information density while maintaining length. Each round adds missing entities/details and removes filler, producing progressively denser output.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per round (default: 400) |
+| `ctx.rounds` | number | optional | Number of densification rounds (default: 3) |
+| `ctx.target_length` | number | optional | Approximate target length in words (default: auto ~1/3 of input) |
+| `ctx.text` | string | **required** | Source text to compress (uses ctx.text, not ctx.task) |
 
 ---
 
@@ -162,6 +335,21 @@
 
 > Two LLM roles evolve together: Challenger generates problems at the edge of Solver's ability, Solver attempts to solve them. As Solver improves, Challenger generates harder problems. This adversarial co-evolution automatically expands the exploration space — unlike cooperative methods (panel, rstar) that work within a fixed problem scope.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.difficulty_target` | number | optional | Target success rate for calibration (default 0.5) |
+| `ctx.problems_per_round` | number | optional | Problems Challenger generates per round (default 3) |
+| `ctx.rounds` | number | optional | Co-evolution rounds (default 4) |
+| `ctx.seed_problems` | array of string | optional | Initial problem set; if nil, LLM generates problems_per_round seeds |
+| `ctx.solver_tokens` | number | optional | Max tokens for Solver responses (default 400) |
+| `ctx.task` | string | **required** | The domain / problem to explore (required) |
+
 ---
 
 <!-- ── compute_alloc.md ── -->
@@ -170,6 +358,19 @@
 # compute_alloc — Compute-Optimal Test-Time Scaling Allocation
 
 > Meta-strategy that dynamically selects the optimal reasoning method and budget allocation based on problem difficulty. Implements the key finding from Snell et al. (ICLR 2025): "scaling test-time compute optimally can be more effective than scaling model parameters."
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.budget` | string | optional | Budget hint: 'low' \| 'medium' \| 'high' (default: 'medium') |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 400) |
+| `ctx.strategies` | table | optional | Custom difficulty→strategy map (overrides DEFAULT_STRATEGIES) |
+| `ctx.task` | string | **required** | The problem to solve |
 
 ---
 
@@ -188,6 +389,17 @@
 # Contrastive — learn from correct AND incorrect reasoning
 
 > Generates both a correct reasoning path and a plausible-but-wrong path, then contrasts them to strengthen the final answer. The only strategy that explicitly models failure modes.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n_contrasts` | number | optional | Number of contrast pairs (default: 2) |
+| `ctx.task` | string | **required** | The problem to solve |
 
 ---
 
@@ -245,6 +457,19 @@ Each `alc.llm` call is capped at 200 tokens for the chain steps and
 
 > Tests whether a reasoning chain is genuinely faithful to its inputs by checking: "If the input changed, would the conclusion change accordingly?" Unlike cove (factual correctness) or verify_first (reverse verification), this detects pattern-matching and memorization by testing causal dependence between premises and conclusions.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.cf_tokens` | number | optional | Max tokens for counterfactual generation (default: 400) |
+| `ctx.gen_tokens` | number | optional | Max tokens for solving (default: 600) |
+| `ctx.n_counterfactuals` | number | optional | Number of counterfactual variants (default: 2) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── cove.md ── -->
@@ -254,6 +479,17 @@ Each `alc.llm` call is capped at 200 tokens for the chain steps and
 
 > Reduces hallucination by: draft → generate verification questions → answer them independently → produce verified final response.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n_questions` | number | optional | Number of verification questions (default: 3) |
+| `ctx.task` | string | **required** | The question/task to answer |
+
 ---
 
 <!-- ── critic.md ── -->
@@ -262,6 +498,23 @@ Each `alc.llm` call is capped at 200 tokens for the chain steps and
 # critic — Rubric-based structured evaluation and targeted revision
 
 > Unlike reflect (freeform self-critique), critic evaluates on predefined rubric dimensions (accuracy, logic, completeness, etc.), assigns per- dimension scores, generates targeted feedback, and revises only the weakest areas. Produces a structured quality profile.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.answer` | string | optional | Pre-supplied answer to evaluate (default: nil → auto-generate) |
+| `ctx.eval_tokens` | number | optional | Max tokens per dimension evaluation (default: 200) |
+| `ctx.gen_tokens` | number | optional | Max tokens for initial generation (default: 600) |
+| `ctx.max_revisions` | number | optional | Max revision rounds (default: 2) |
+| `ctx.revise_tokens` | number | optional | Max tokens for revision (default: 600) |
+| `ctx.rubric` | any | optional | List of dimensions — either string names or {name, description} tables |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.threshold` | number | optional | Minimum acceptable per-dimension score (default: 7) |
 
 ---
 
@@ -276,6 +529,7 @@ Each `alc.llm` call is capped at 200 tokens for the chain steps and
 
   - [Operating regime — READ FIRST](#operating-regime-read-first)
   - [Theoretical foundations](#theoretical-foundations)
+- [Parameters](#parameters)
 
 ### Operating regime — READ FIRST {#operating-regime-read-first}
 
@@ -408,6 +662,30 @@ Based on:
     JRSS-B 86(1):1-27. arXiv:2010.09686 (Theorem 2, predictable
     plug-in empirical-Bernstein CS)
 
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.aggregation` | string | optional | Only "scalarize" supported in v0.1 |
+| `ctx.betting_lambda_max` | number | optional | Betting λ truncation (default: 0.5) |
+| `ctx.betting_prior_var` | number | optional | Betting σ̂² prior (default: 0.25) |
+| `ctx.bootstrap_m` | number | optional | Howard 2021 eq.(10) bootstrap time (default: 1.0) |
+| `ctx.cs_variant` | string | optional | "polynomial_stitched" \| "hoeffding" \| "betting" \| "kl" (default: polynomial_stitched) |
+| `ctx.delta` | number | optional | Overall error probability (default: 0.05) |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate generation (default: 400) |
+| `ctx.halving_checkpoints` | array of number | optional | Checkpoint n-values for layer-2 halving (default: {5,10,15}) |
+| `ctx.halving_keep_ratio` | number | optional | Fraction kept at each halving (default: 0.5) |
+| `ctx.halving_min_gap` | number | optional | Gap guard around the median (default: 0) |
+| `ctx.layer2_halving` | boolean | optional | Enable Successive Halving as primary kill mechanism (default: false) |
+| `ctx.min_n_before_kill` | number | optional | Warmup minimum before kills are considered |
+| `ctx.n_candidates` | number | optional | Number of candidates (default: 6) |
+| `ctx.rubric` | array of shape { criterion: string, name: string } | optional | Rubric dimensions (default: 20-dim binary) |
+| `ctx.score_domain` | shape { max: number, min: number } | optional | Score range (default: {min=0,max=1}) |
+| `ctx.stitching_eta` | number | optional | Howard 2021 eq.(10) epoch ratio (default: 2.0) |
+| `ctx.stitching_s` | number | optional | Howard 2021 eq.(10) exponent (default: 1.4) |
+| `ctx.task` | string | **required** | Problem statement |
+| `ctx.weights` | array of number | optional | Per-dimension weights (default: uniform) |
+
 ---
 
 <!-- ── cumulative.md ── -->
@@ -416,6 +694,18 @@ Based on:
 # Cumulative — propose-verify-accumulate reasoning
 
 > Three roles (proposer, verifier, reporter) collaborate in a loop. The proposer generates new propositions, the verifier checks them, and verified propositions accumulate as established facts for the next round.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_rounds` | number | optional | Max propose-verify cycles (default: 4) |
+| `ctx.propositions_per_round` | number | optional | Propositions generated per round (default: 2) |
+| `ctx.task` | string | **required** | The problem to solve |
 
 ---
 
@@ -426,6 +716,19 @@ Based on:
 
 > Breaks a complex task into sub-tasks via LLM, executes each in parallel, then merges results into a unified answer.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_subtasks` | number | optional | Maximum sub-tasks to generate (default: 5) |
+| `ctx.merge_tokens` | number | optional | Max tokens for final merge (default: 600) |
+| `ctx.subtask_tokens` | number | optional | Max tokens per sub-task (default: 400) |
+| `ctx.task` | string | **required** | The complex task to decompose |
+
 ---
 
 <!-- ── deliberate.md ── -->
@@ -434,6 +737,20 @@ Based on:
 # deliberate — structured multi-phase deliberation for complex decisions
 
 > Combinator package: orchestrates step_back, meta_prompt, triad, calibrate, rank to perform principled decision-making.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.confidence_threshold` | number | optional | Calibrate threshold (default: 0.7) |
+| `ctx.debate_rounds` | number | optional | Triad debate rounds per option (default: 2) |
+| `ctx.max_options` | number | optional | Max options to consider (default: 4) |
+| `ctx.options` | array of any | optional | Pre-defined options (auto-generated if absent); each opaque {name?, description?, strengths?, risks?} |
+| `ctx.task` | string | **required** | The decision question |
 
 ---
 
@@ -444,6 +761,20 @@ Based on:
 
 > Before finalizing any multi-agent consensus, injects a dedicated adversarial agent that challenges the emerging agreement. Evaluates the dissent's validity and produces a revised consensus only when the challenge has merit. Prevents premature lock-in of incorrect conclusions.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.consensus` | string | **required** | The consensus text to challenge (REQUIRED) |
+| `ctx.gen_tokens` | number | optional | Max tokens per generation (default: 500) |
+| `ctx.merit_threshold` | number | optional | Score threshold for revision (default: 0.6) |
+| `ctx.perspectives` | array of any | optional | Individual agent outputs that formed consensus; elements are either strings or {name?, output? \| text?} tables |
+| `ctx.task` | string | **required** | Original task description |
+
 ---
 
 <!-- ── distill.md ── -->
@@ -452,6 +783,21 @@ Based on:
 # Distill — MapReduce summarization and extraction
 
 > Splits large text into chunks, processes each in parallel, then reduces into a unified result.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.chunk_overlap` | number | optional | Overlap lines between chunks (default 5) |
+| `ctx.chunk_size` | number | optional | Lines per chunk passed to alc.chunk (default 100) |
+| `ctx.goal` | string | optional | What to extract/summarize (default 'Summarize the key points') |
+| `ctx.map_tokens` | number | optional | Max tokens per map call (default 300) |
+| `ctx.reduce_tokens` | number | optional | Max tokens for the final reduce call (default 600) |
+| `ctx.text` | string | **required** | Source text to process (required) |
 
 ---
 
@@ -462,6 +808,17 @@ Based on:
 
 > Generates multiple diverse reasoning paths, then verifies each path at the step level (not just the final answer). Selects the path with the highest step-level verification score.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n_paths` | number | optional | Number of diverse reasoning paths (default: 3) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── dmad.md ── -->
@@ -470,6 +827,19 @@ Based on:
 # dmad — Dialectical reasoning (thesis → antithesis → synthesis)
 
 > Applies the Hegelian dialectic to LLM reasoning: first generates a thesis (initial position), then constructs the strongest possible antithesis (opposing position), and finally produces a synthesis that integrates valid points from both sides.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per thesis/antithesis/rebuttal (default 500) |
+| `ctx.rounds` | number | optional | Number of thesis–antithesis exchange rounds (default 1) |
+| `ctx.synth_tokens` | number | optional | Max tokens for the final synthesis (default 600) |
+| `ctx.task` | string | **required** | Task or question to analyze (required) |
 
 ---
 
@@ -489,6 +859,23 @@ Based on:
 
 > N agents transition between Susceptible → Infected → Recovered states. Each step, infected agents probabilistically transmit to susceptible contacts, and recover with probability γ.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.beta` | number | optional |  |
+| `ctx.contacts_per_step` | number | optional |  |
+| `ctx.gamma` | number | optional |  |
+| `ctx.initial_infected` | number | optional |  |
+| `ctx.n_agents` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.steps` | number | optional |  |
+| `ctx.task` | string | optional |  |
+
 ---
 
 <!-- ── eval_guard.md ── -->
@@ -507,6 +894,23 @@ Based on:
 
 > N agents with strategies play iterated games (Prisoner's Dilemma by default). Each generation: random pairing → payoff calculation → selection → mutation. Emergent phenomena: cooperation/defection equilibria, cyclic dominance, strategy invasion dynamics.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.generations` | number | optional |  |
+| `ctx.mutation_rate` | number | optional |  |
+| `ctx.n_agents` | number | optional |  |
+| `ctx.payoff_matrix` | table | optional |  |
+| `ctx.rounds_per_gen` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.strategies` | array of string | optional |  |
+| `ctx.task` | string | optional |  |
+
 ---
 
 <!-- ── f_race.md ── -->
@@ -524,6 +928,7 @@ Based on:
   - [Theoretical foundations](#theoretical-foundations)
   - [Kill rate limit (important)](#kill-rate-limit-important)
   - [Post-hoc multiplicity and sequential testing](#post-hoc-multiplicity-and-sequential-testing)
+- [Parameters](#parameters)
 
 ### Why F-Race for this scale {#why-f-race-for-this-scale}
 
@@ -724,6 +1129,20 @@ Comparison with related packages:
                     "Post-hoc multiplicity and sequential testing"
                     above for the caveat on repeated testing.
 
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alpha_spending` | boolean | optional | Bonferroni sequential correction (default: false) |
+| `ctx.delta` | number | optional | Significance level (default: 0.05); resolved to largest tabulated α ≤ delta |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate generation (default: 400) |
+| `ctx.min_blocks_before_race` | number | optional | Warmup block count before elimination (default: 5) |
+| `ctx.n_candidates` | number | optional | Number of candidates (default: 6) |
+| `ctx.rubric` | array of shape { criterion: string, name: string } | optional | Rubric dimensions (default: 20-dim binary) |
+| `ctx.rubric_type` | string | optional | "binary" \| "likert5" (default: "binary") |
+| `ctx.score_domain` | shape { max: number, min: number } | optional | Score range for clipping (default: {min=0,max=1}) |
+| `ctx.task` | string | **required** | Problem statement |
+
 ---
 
 <!-- ── factscore.md ── -->
@@ -732,6 +1151,19 @@ Comparison with related packages:
 # FActScore — atomic claim decomposition and per-claim verification
 
 > Extracts atomic claims from text, then independently verifies each claim in parallel. Produces a factual precision score and annotated results.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.context` | string | optional | Optional reference context for verification |
+| `ctx.extract_tokens` | number | optional | Max tokens for claim extraction (default: 500) |
+| `ctx.text` | string | **required** | The text to fact-check |
+| `ctx.verify_tokens` | number | optional | Max tokens per claim verification (default: 200) |
 
 ---
 
@@ -742,6 +1174,18 @@ Comparison with related packages:
 
 > Translates natural language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.format` | string | optional | Formal representation type: code / logic / auto (default: auto) |
+| `ctx.gen_tokens` | number | optional | Max tokens per step (default: 500) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── falsify.md ── -->
@@ -750,6 +1194,20 @@ Comparison with related packages:
 # falsify — Sequential Falsification for Hypothesis Exploration
 
 > Explores hypothesis space via Popper's falsificationism: generate hypotheses, attempt to refute each one, prune the refuted, derive new hypotheses from the refutation insights. Unlike verify_first (checks consistency) or cove (verification chain), falsify actively ATTACKS hypotheses and uses refutation failures as evidence of robustness, while refutation successes drive the generation of improved successor hypotheses.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.derive_on_refute` | boolean | optional | Generate successor hypotheses from refuted ones (default: true) |
+| `ctx.initial_hypotheses` | number | optional | Seed hypothesis count (default: 4) |
+| `ctx.max_hypotheses` | number | optional | Upper bound on active hypotheses (default: 12) |
+| `ctx.max_rounds` | number | optional | Maximum falsification rounds (default: 3) |
+| `ctx.task` | string | **required** | The problem or question to investigate |
 
 ---
 
@@ -760,6 +1218,22 @@ Comparison with related packages:
 
 > Models reasoning as a DAG (Directed Acyclic Graph) enabling operations impossible in tree structures: aggregation of multiple thought paths, self-refinement loops, and hierarchical decomposition with merge.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.agg_tokens` | number | optional | Max tokens for Aggregate / final synthesis (default: 500) |
+| `ctx.gen_tokens` | number | optional | Max tokens for Generate step (default: 300) |
+| `ctx.k_generate` | number | optional | Branches per Generate (default: 3) |
+| `ctx.keep_best` | number | optional | Nodes to keep after KeepBest pruning (default: 2) |
+| `ctx.max_refine` | number | optional | Max refinement rounds on kept thoughts (default: 2) |
+| `ctx.refine_tokens` | number | optional | Max tokens for Refine step (default: 400) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── gumbel_search.md ── -->
@@ -768,6 +1242,19 @@ Comparison with related packages:
 # gumbel_search — Gumbel Top-k + Sequential Halving Tree Search
 
 > Budget-optimal tree search that combines two theoretically grounded techniques: Gumbel Top-k for unbiased candidate sampling without replacement, and Sequential Halving for optimal budget allocation when comparing candidates.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.eval_tokens` | number | optional | Max tokens for evaluation (default: 100) |
+| `ctx.gen_tokens` | number | optional | Max tokens for generation (default: 400) |
+| `ctx.initial_candidates` | number | optional | Number of initial candidates (default: 8) |
+| `ctx.task` | string | **required** | The problem to solve |
 
 ---
 
@@ -787,6 +1274,22 @@ Comparison with related packages:
 
 > Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.confidence_threshold` | number | optional | Stop when top hypothesis exceeds this (default 0.7) |
+| `ctx.diagnose_tokens` | number | optional | Max tokens per diagnostic question (default 400) |
+| `ctx.max_rounds` | number | optional | Maximum belief update rounds (default 3) |
+| `ctx.n_hypotheses` | number | optional | Number of intent hypotheses to generate (default 5) |
+| `ctx.prior_tokens` | number | optional | Max tokens for prior generation (default 600) |
+| `ctx.task` | string | **required** | Initial user request (required) |
+| `ctx.update_tokens` | number | optional | Max tokens per belief update (default 500) |
+
 ---
 
 <!-- ── intent_discovery.md ── -->
@@ -795,6 +1298,20 @@ Comparison with related packages:
 # Intent Discovery — exploratory intent formation through action
 
 > Users often approach tasks without fully-formed goals. This strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.concretize_tokens` | number | optional | Max tokens for concretization (default 500) |
+| `ctx.max_rounds` | number | optional | Maximum exploration rounds (default 3) |
+| `ctx.n_options` | number | optional | Number of options to present per round (default 3) |
+| `ctx.surface_tokens` | number | optional | Max tokens for option generation (default 600) |
+| `ctx.task` | string | **required** | Initial (possibly vague) user request (required) |
 
 ---
 
@@ -823,6 +1340,17 @@ Comparison with related packages:
 
 > Decomposes a complex problem into subproblems ordered from simplest to most complex, then solves each in sequence, using previous solutions as context for the next.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_subproblems` | number | optional | Maximum number of subproblems (default: 5) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── lineage.md ── -->
@@ -831,6 +1359,20 @@ Comparison with related packages:
 # lineage — Pipeline-spanning claim lineage tracking
 
 > Tracks the provenance of claims across multi-step pipelines. Extracts atomic claims from each step's output, traces inter-step dependencies (which claim in step N derived from which claim in step N-1), and detects conflicts and ungrounded claims in the final output.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.extract_tokens` | number | optional | Max tokens per claim extraction (default 600) |
+| `ctx.steps` | array of shape { name: string, output: string } | **required** | Ordered step outputs; at least 2 entries (required) |
+| `ctx.summary_tokens` | number | optional | Max tokens for conflict/integrity summary (default 600) |
+| `ctx.task` | string | **required** | Original task description passed to trace/summary prompts (required) |
+| `ctx.trace_tokens` | number | optional | Max tokens per dependency trace (default 500) |
 
 ---
 
@@ -850,6 +1392,19 @@ Comparison with related packages:
 
 > Given a proposition, generates supporting and opposing explanations recursively (depth-limited tree), then checks logical consistency between parent-child pairs to filter contradictions.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.consistency_tokens` | number | optional | Max tokens per consistency check (default: 100) |
+| `ctx.gen_tokens` | number | optional | Max tokens per explanation (default: 300) |
+| `ctx.max_depth` | number | optional | Tree depth (default: 2) |
+| `ctx.proposition` | string | **required** | The claim to analyze |
+
 ---
 
 <!-- ── mbr_select.md ── -->
@@ -858,6 +1413,20 @@ Comparison with related packages:
 # mbr_select — Minimum Bayes Risk Selection
 
 > Selects the candidate that minimizes expected loss across all other candidates. Instead of picking "the best" directly (which requires an absolute quality oracle), MBR picks the candidate most agreed-upon by all others — the one with minimum expected risk.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.criteria` | string | optional | Similarity criteria (default: substantive agreement) |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate (default: 400) |
+| `ctx.n` | number | optional | Number of candidates to generate (default: 5) |
+| `ctx.sim_tokens` | number | optional | Max tokens per similarity judgment (default: 80) |
+| `ctx.task` | string | **required** | The task to generate candidates for |
 
 ---
 
@@ -877,6 +1446,17 @@ Comparison with related packages:
 
 > A meta-orchestrator analyzes the task, identifies required expertise, then sequentially delegates to specialist personas, collecting and integrating their outputs.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_experts` | number | optional | Maximum number of expert consultations (default: 4) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── moa.md ── -->
@@ -886,6 +1466,20 @@ Comparison with related packages:
 
 > Multiple agents generate responses independently, then a second layer of agents improves upon those responses by referencing all of them. Unlike simple panel (single-round), MoA uses iterative layers where each layer's agents see ALL previous layer outputs, enabling cross- pollination of ideas and progressive refinement.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.agg_tokens` | number | optional | Max tokens for final aggregation (default: 500) |
+| `ctx.gen_tokens` | number | optional | Max tokens per agent response (default: 400) |
+| `ctx.n_agents` | number | optional | Agents per layer (default: 3, capped to #PERSONAS=5) |
+| `ctx.n_layers` | number | optional | Number of improvement layers (default: 2) |
+| `ctx.task` | string | **required** | Task description |
+
 ---
 
 <!-- ── model_first.md ── -->
@@ -894,6 +1488,20 @@ Comparison with related packages:
 # model_first — Model-First Reasoning
 
 > Separates problem representation from problem solving. First constructs an explicit problem model (entities, state variables, actions with preconditions/effects, and constraints), then reasons within that model.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.extract` | boolean | optional | Extract concise final answer (default true) |
+| `ctx.model_tokens` | number | optional | Max tokens for model construction (default 500) |
+| `ctx.solve_tokens` | number | optional | Max tokens for solve/verify/repair steps (default 600) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
+| `ctx.verify` | boolean | optional | Run constraint-verification + repair step (default true) |
 
 ---
 
@@ -913,6 +1521,21 @@ Comparison with related packages:
 
 > Given an answer, generates "destruction conditions": specific scenarios or facts that, if true, would invalidate the answer. Then attempts to verify whether any destruction condition actually holds. Surviving answers are strengthened; refuted answers are revised.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.answer` | string | optional | Pre-supplied answer to test (auto-generated if nil) |
+| `ctx.gen_tokens` | number | optional | Max tokens for generation / condition listing (default: 600) |
+| `ctx.max_conditions` | number | optional | Max destruction conditions to generate (default: 5) |
+| `ctx.revise_tokens` | number | optional | Max tokens for revision (default: 600) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.verify_tokens` | number | optional | Max tokens per condition verification (default: 200) |
+
 ---
 
 <!-- ── opinion_abm.md ── -->
@@ -921,6 +1544,21 @@ Comparison with related packages:
 # opinion_abm — Hegselmann-Krause Bounded Confidence Opinion Dynamics
 
 > N agents hold continuous opinion values in [0,1]. Each step, an agent updates its opinion to the average of all agents whose opinions are within ε (bounded confidence threshold).
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.epsilon` | number | optional |  |
+| `ctx.initial_distribution` | string | optional |  |
+| `ctx.n_agents` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.steps` | number | optional |  |
+| `ctx.task` | string | optional |  |
 
 ---
 
@@ -931,6 +1569,30 @@ Comparison with related packages:
 
 > Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in alc.state for incremental optimization across sessions.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.auto_card` | boolean | optional | Emit a Card on completion (default: false) |
+| `ctx.card_pkg` | string | optional | Card pkg.name override (default: 'optimize_{target}') |
+| `ctx.defaults` | table | optional | Base parameter defaults merged with arm params |
+| `ctx.eval_fn` | any | optional | Custom evaluation function (only for evaluator='custom') |
+| `ctx.evaluator` | any | optional | Evaluator — name string or config table (default: 'evalframe') |
+| `ctx.name` | string | optional | Run name used as state key suffix (default: ctx.target) |
+| `ctx.rounds` | number | optional | Max optimization rounds (default: 20) |
+| `ctx.scenario` | any | **required** | Eval scenario — inline table or scenario name string |
+| `ctx.scenario_name` | string | optional | Explicit scenario name for the emitted Card |
+| `ctx.search` | any | optional | Search strategy — name string or config table (default: 'ucb') |
+| `ctx.space` | table | **required** | Parameter search space (map of param_name → def {type, min, max, step, values}) |
+| `ctx.stop` | any | optional | Stopping criterion — name string or config table (default: 'variance') |
+| `ctx.stop_config` | table | optional | Extra config for stopping criterion |
+| `ctx.strategy_opts` | table | optional | Extra opts passed through to the target strategy |
+| `ctx.target` | string | **required** | Strategy package name to optimize (e.g., 'biz_kernel') |
+
 ---
 
 <!-- ── orch_adaptive.md ── -->
@@ -939,6 +1601,20 @@ Comparison with related packages:
 # orch_adaptive — Adaptive Depth Orchestration
 
 > Dynamically adjusts phase count, retry budget, and context mode based on task difficulty. Combines with router_daao for pre-classified difficulty, or estimates internally.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.depth_config` | any | optional | Custom difficulty→config mapping (opaque) |
+| `ctx.difficulty` | string | optional | Pre-classified difficulty (simple\|medium\|complex) |
+| `ctx.on_fail` | string | optional | "error" \| "partial" (default: "error") |
+| `ctx.phases` | array of any | **required** | Phase definitions (superset; trimmed by difficulty) |
+| `ctx.task` | string | **required** | Task description |
 
 ---
 
@@ -949,6 +1625,18 @@ Comparison with related packages:
 
 > Start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.levels` | array of any | optional | Custom escalation chain [{name, prompt_template\|multi_phase, threshold, ...}] |
+| `ctx.on_fail` | string | optional | "error" \| "partial" (default: "partial") |
+| `ctx.task` | string | **required** | Task description |
+
 ---
 
 <!-- ── orch_fixpipe.md ── -->
@@ -957,6 +1645,20 @@ Comparison with related packages:
 # orch_fixpipe — Deterministic Fixed Pipeline
 
 > Phases execute in strict order. Gate NG triggers retry up to max_retries. Based on Lobster (OpenClaw) deterministic workflow pattern.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.context_mode` | string | optional | "summary" \| "full" (default: "summary") |
+| `ctx.max_retries` | number | optional | Gate NG retry limit (default: 3) |
+| `ctx.on_fail` | string | optional | "error" \| "partial" (default: "error") |
+| `ctx.phases` | array of any | **required** | Phase definitions (opaque user-supplied records) |
+| `ctx.task` | string | **required** | Task description |
 
 ---
 
@@ -967,6 +1669,21 @@ Comparison with related packages:
 
 > Each phase has pre-event (context setup) and post-event (gate + checks). Task type determines which phases to skip. Based on Thin Agent / Fat Platform (Praetorian).
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_retries` | number | optional | Gate NG retry limit (default: 3) |
+| `ctx.on_fail` | string | optional | "error" \| "partial" (default: "error") |
+| `ctx.phases` | array of any | **required** | Phase definitions [{name, prompt, gate, checks, ...}, ...] |
+| `ctx.skip_rules` | any | optional | Custom skip rules table (opaque) |
+| `ctx.task` | string | **required** | Task description |
+| `ctx.task_type` | string | optional | Pre-classified type (bugfix\|typo\|refactor\|feature\|test) |
+
 ---
 
 <!-- ── orch_nver.md ── -->
@@ -975,6 +1692,19 @@ Comparison with related packages:
 # orch_nver — N-version Programming Orchestration
 
 > Execute N parallel variants, evaluate each, select best. Trades cost for quality. Mitigates 29.6% regression rate (SWE-Bench).
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n` | number | optional | Number of parallel variants (default: 3) |
+| `ctx.phases` | array of any | optional | Phase definitions for each variant's pipeline |
+| `ctx.selection` | string | optional | "score" \| "vote" (default: "score") |
+| `ctx.task` | string | **required** | Task description |
 
 ---
 
@@ -1012,6 +1742,24 @@ Comparison with related packages:
 
 > Multi-agent 3-phase consensus protocol inspired by PBFT (Castro-Liskov OSDI 1999). Uses the bft package for quorum validation and threshold computation.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.f` | number | optional | Assumed Byzantine faults (default: 0) |
+| `ctx.gen_system` | string | optional | Custom system prompt for proposal phase |
+| `ctx.gen_tokens` | number | optional | Max tokens per proposal (default: 400) |
+| `ctx.n_agents` | number | optional | Number of agents (default: 3, must satisfy n >= 3f+1) |
+| `ctx.synth_system` | string | optional | Custom system prompt for synthesis phase |
+| `ctx.synth_tokens` | number | optional | Max tokens for synthesis (default: 500) |
+| `ctx.task` | string | **required** | The problem to solve |
+| `ctx.vote_system` | string | optional | Custom system prompt for voting phase |
+| `ctx.vote_tokens` | number | optional | Max tokens per vote (default: 200) |
+
 ---
 
 <!-- ── php.md ── -->
@@ -1020,6 +1768,17 @@ Comparison with related packages:
 # PHP — Progressive-Hint Prompting
 
 > Iteratively re-solves the problem using previous answers as hints. Each round feeds the prior answer back as a "hint", allowing the model to self-correct by building on (or departing from) its previous attempt. Converges when two consecutive answers agree.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_rounds` | number | optional | Maximum hint-retry cycles (default: 4) |
+| `ctx.task` | string | **required** | The problem to solve |
 
 ---
 
@@ -1030,6 +1789,19 @@ Comparison with related packages:
 
 > Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full decompose (no parallel subtask dispatch).
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.extract` | boolean | optional | Extract concise final answer (default: true) |
+| `ctx.plan_tokens` | number | optional | Max tokens for plan generation (default: 300) |
+| `ctx.solve_tokens` | number | optional | Max tokens for execution (default: 500) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── pre_mortem.md ── -->
@@ -1038,6 +1810,22 @@ Comparison with related packages:
 # pre_mortem — feasibility-gated proposal filtering
 
 > Combinator package: orchestrates factscore, contrastive, calibrate to validate proposals BEFORE output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes/filters proposals with unverified prerequisites.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.context` | string | optional | Additional verification context (e.g., known constraints) |
+| `ctx.extract_tokens` | number | optional | Max tokens for prereq extraction (default: 500) |
+| `ctx.n_contrasts` | number | optional | Contrastive pairs per proposal (default: 1) |
+| `ctx.proposals` | any | **required** | Array of proposal strings or a single block to decompose |
+| `ctx.task` | string | **required** | Original task/question addressed by the proposals |
+| `ctx.threshold` | number | optional | Calibrate confidence threshold (default: 0.6) |
+| `ctx.verify_tokens` | number | optional | Max tokens per prereq verification (default: 200) |
 
 ---
 
@@ -1048,6 +1836,19 @@ Comparison with related packages:
 
 > Decomposes complex user intents into structured sub-intents, identifies logical dependencies among them, and generates clarification questions in dependency order to minimize user cognitive load.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.clarify_tokens` | number | optional | Max tokens per clarification phase (default 400) |
+| `ctx.decompose_tokens` | number | optional | Max tokens for decomposition phase (default 600) |
+| `ctx.max_sub_intents` | number | optional | Maximum sub-intents to extract (default 8) |
+| `ctx.task` | string | **required** | Task or request to analyze (required) |
+
 ---
 
 <!-- ── prompt_breed.md ── -->
@@ -1056,6 +1857,22 @@ Comparison with related packages:
 # prompt_breed — Self-Referential Prompt Evolution
 
 > Evolves a population of task prompts (instructions) using genetic operators, with a unique twist: the mutation operators themselves (mutation prompts) also evolve. This double loop — task-prompt evolution + meta-mutation evolution — enables the system to discover increasingly effective ways to explore prompt space.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.crossover_rate` | number | optional | Probability of crossover vs mutation for offspring (default 0.3) |
+| `ctx.evaluator` | string | **required** | Evaluation criteria/prompt used by evaluate_prompt (required) |
+| `ctx.generations` | number | optional | Number of evolution generations (default 8) |
+| `ctx.hyper_mutation_rate` | number | optional | Per-mutation-prompt probability of meta-mutation (default 0.15) |
+| `ctx.mutation_pool` | number | optional | Number of mutation meta-prompts (default 3) |
+| `ctx.population_size` | number | optional | Number of task prompts in the population (default 6) |
+| `ctx.task` | string | **required** | Task domain description used in all prompts (required) |
 
 ---
 
@@ -1102,6 +1919,21 @@ Comparison with related packages:
 
 > Generate → Critique → Revise loop. The same LLM critiques its own output and refines until convergence or max rounds.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.critique_tokens` | number | optional | Max tokens for critique (default: 300) |
+| `ctx.gen_tokens` | number | optional | Max tokens for generation (default: 500) |
+| `ctx.initial_draft` | string | optional | Pre-generated draft to refine (skips initial LLM generation) |
+| `ctx.max_rounds` | number | optional | Maximum critique-revise cycles (default: 3) |
+| `ctx.stop_when` | string | optional | Stop condition: 'no_major_issues' or 'no_issues' (default: 'no_major_issues') |
+| `ctx.task` | string | **required** | The task to perform |
+
 ---
 
 <!-- ── reflexion.md ── -->
@@ -1110,6 +1942,21 @@ Comparison with related packages:
 # reflexion — Episodic Memory Self-Improvement
 
 > Iteratively attempts a task, evaluates the result, generates a natural language "reflection" from failures, and stores it in episodic memory. Subsequent attempts reference accumulated reflections to avoid repeating the same mistakes.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.evaluator` | string | optional | Custom evaluation prompt |
+| `ctx.gen_tokens` | number | optional | Max tokens per attempt (default: 500) |
+| `ctx.max_trials` | number | optional | Maximum number of attempts (default: 3) |
+| `ctx.reflect_tokens` | number | optional | Max tokens per reflection (default: 300) |
+| `ctx.success_threshold` | number | optional | Score threshold to accept, 1-10 scale (default: 8) |
+| `ctx.task` | string | **required** | The task to solve |
 
 ---
 
@@ -1120,6 +1967,20 @@ Comparison with related packages:
 
 > Combinator package: orchestrates reflect, calibrate, factscore, triad, panel, rank to perform multi-phase investigative code review.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.code` | string | **required** | Source code or diff to review (required) |
+| `ctx.context` | string | optional | Free-text design context used in Phase 1/1.5/2/4 |
+| `ctx.deep_threshold` | number | optional | Confidence threshold below which the diagnose phase escalates to triad (default 0.6) |
+| `ctx.max_fixes` | number | optional | Max fix candidates per theme (default 3) |
+| `ctx.policy` | shape { priorities?: array of string, severity_weights?: map of string to number } | optional | Review policy (default: correctness > non_breaking > safety > testability > maintainability) |
+
 ---
 
 <!-- ── robust_qa.md ── -->
@@ -1128,6 +1989,24 @@ Comparison with related packages:
 # robust_qa — Three-phase quality assurance pipeline
 
 > Chains three independent verification strategies into a single pipeline:   Phase 1 (p_tts):    Constraint-first solving — generate constraints BEFORE                        solving, verify solution against specification   Phase 2 (negation): Adversarial stress-test — generate destruction conditions,                        verify if they hold, revise if flaws found   Phase 3 (critic):   Rubric-based evaluation — score per dimension, revise                        weak areas with targeted feedback
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Shared generation token budget (default: 600) |
+| `ctx.max_conditions` | number | optional | Phase 2 (negation): max destruction conditions (default: 4) |
+| `ctx.max_constraints` | number | optional | Phase 1 (p_tts): max constraints (default: 5) |
+| `ctx.max_repairs` | number | optional | Phase 1 (p_tts): max repair attempts (default: 1) |
+| `ctx.max_revisions` | number | optional | Phase 3 (critic): max revision rounds (default: 1) |
+| `ctx.plan_tokens` | number | optional | Phase 1 (p_tts): planning token budget (default: 400) |
+| `ctx.rubric` | any | optional | Phase 3 (critic): rubric dimension list (passed through) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.threshold` | number | optional | Phase 3 (critic): min acceptable per-dimension score (default: 7) |
 
 ---
 
@@ -1138,6 +2017,18 @@ Comparison with related packages:
 
 > Extracts task requirements via LLM, then scores against agent capabilities using Jaccard similarity. Based on Dynamic Agent Registry pattern.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_results` | number | optional | Number of top matches to return in alternatives (default 3) |
+| `ctx.registry` | array of shape { capabilities: array of string, cost: number, description: string, name: string } | optional | Agent registry; defaults to DEFAULT_REGISTRY |
+| `ctx.task` | string | **required** | Task description (required) |
+
 ---
 
 <!-- ── router_daao.md ── -->
@@ -1147,6 +2038,18 @@ Comparison with related packages:
 
 > Classifies task difficulty with a single LLM call, then maps to optimal strategy/depth/parameters via deterministic lookup.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.candidates` | any | optional | Candidate strategies — string[] or {name=string}[] mix accepted |
+| `ctx.profiles` | map of string to shape { confidence?: number, context_mode: string, depth: number, fallback_confidence?: number, max_retries: number, recommended_strategies: array of string, skip_phases: array of string } | optional | Custom difficulty→profile mapping; defaults to DEFAULT_PROFILES |
+| `ctx.task` | string | **required** | Task description (required) |
+
 ---
 
 <!-- ── router_semantic.md ── -->
@@ -1155,6 +2058,18 @@ Comparison with related packages:
 # router_semantic — Semantic Router with LLM Fallback
 
 > Keyword/pattern-based routing with LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.rules` | array of shape { description: string, keywords: array of string, name: string } | optional | Routing rules; defaults to DEFAULT_RULES |
+| `ctx.task` | string | **required** | Task description (required) |
+| `ctx.threshold` | number | optional | Minimum keyword score to skip LLM (default 0.3) |
 
 ---
 
@@ -1174,6 +2089,18 @@ Comparison with related packages:
 
 > Strips irrelevant, distracting, or misleading information from the input context, then re-answers using only the cleaned context. Dramatically reduces sycophancy and distraction effects.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.context` | string | optional | Full (potentially noisy) context to denoise; empty/absent => task itself is reformulated |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 500) |
+| `ctx.task` | string | **required** | The question or task to answer |
+
 ---
 
 <!-- ── sc.md ── -->
@@ -1191,6 +2118,22 @@ Comparison with related packages:
 # schelling_abm — Schelling Segregation Model
 
 > Agents of two types on a 2D grid. Each agent has a tolerance threshold: if the fraction of same-type neighbors is below threshold, the agent moves to a random empty cell.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.density` | number | optional |  |
+| `ctx.grid_size` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.steps` | number | optional |  |
+| `ctx.task` | string | optional |  |
+| `ctx.threshold` | number | optional |  |
+| `ctx.type_ratio` | number | optional |  |
 
 ---
 
@@ -1210,6 +2153,20 @@ Comparison with related packages:
 
 > Ranks N candidates by repeatedly asking the LLM "which is the best among these k items?" and advancing winners through tournament rounds. Each comparison spans a SET (size k) rather than a pair, dramatically reducing LLM calls vs pairwise while keeping the LLM task simpler than listwise (it only picks ONE best, not a full permutation).
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.candidates` | array of string | **required** | Candidate texts to rank (>= 2) |
+| `ctx.gen_tokens` | number | optional | Max tokens per pick response (default: 20) |
+| `ctx.set_size` | number | optional | Tournament group size (default: 4) |
+| `ctx.task` | string | **required** | Ranking criterion |
+| `ctx.top_k` | number | optional | How many to keep (default: N = full ranked list) |
+
 ---
 
 <!-- ── shapley.md ── -->
@@ -1228,6 +2185,19 @@ Comparison with related packages:
 
 > Selects one of three cognitive paradigms based on task characteristics, then generates compressed reasoning using that paradigm's notation. Reduces reasoning tokens by 60-84% while maintaining or improving accuracy.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_tokens` | number | optional | Max tokens for reasoning (default: 200) |
+| `ctx.paradigm` | string | optional | Force paradigm name (conceptual_chaining / chunked_symbolism / expert_lexicons); nil => auto-route |
+| `ctx.routing_threshold` | number | optional | Keyword confidence threshold for LLM fallback (default: 0.4) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── sot.md ── -->
@@ -1236,6 +2206,19 @@ Comparison with related packages:
 # SoT — Skeleton-of-Thought parallel generation
 
 > Generates a structural outline first, then fills each section in parallel via alc.map. Produces structurally coherent long-form output.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_sections` | number | optional | Maximum outline sections (default: 6) |
+| `ctx.section_tokens` | number | optional | Max tokens per section fill (default: 400) |
+| `ctx.skeleton_tokens` | number | optional | Max tokens for skeleton generation (default: 300) |
+| `ctx.task` | string | **required** | The task requiring long-form output |
 
 ---
 
@@ -1246,6 +2229,18 @@ Comparison with related packages:
 
 > Instead of solving directly, first "step back" to identify the underlying principle or concept, then apply that principle to solve the original problem.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.abstraction_levels` | number | optional | Number of abstraction rounds (default: 1) |
+| `ctx.domain_hint` | string | optional | Optional domain hint to guide abstraction |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── step_verify.md ── -->
@@ -1254,6 +2249,19 @@ Comparison with related packages:
 # step_verify — Step-Level Verification (PRM-style, LLM-as-Verifier)
 
 > Verifies each intermediate reasoning step independently, identifying exactly where errors occur. Retains only verified-correct steps and re-derives from the last correct point.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens for generation (default: 500) |
+| `ctx.max_repair_rounds` | number | optional | Max re-derivation rounds (default: 2) |
+| `ctx.task` | string | **required** | The problem to solve |
+| `ctx.verify_tokens` | number | optional | Max tokens per step verification (default: 200) |
 
 ---
 
@@ -1264,6 +2272,25 @@ Comparison with related packages:
 
 > Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step, an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.grid_size` | number | optional |  |
+| `ctx.initial_wealth_range` | array of number | optional |  |
+| `ctx.max_sugar` | number | optional |  |
+| `ctx.metabolism_range` | array of number | optional |  |
+| `ctx.n_agents` | number | optional |  |
+| `ctx.regrow_rate` | number | optional |  |
+| `ctx.runs` | number | optional |  |
+| `ctx.steps` | number | optional |  |
+| `ctx.task` | string | optional |  |
+| `ctx.vision_range` | array of number | optional |  |
+
 ---
 
 <!-- ── topo_route.md ── -->
@@ -1272,6 +2299,18 @@ Comparison with related packages:
 # topo_route — Topology-aware meta-router for multi-agent pipelines
 
 > Analyzes task characteristics and recommends the optimal agent topology (linear, star, DAG, mesh, debate) along with concrete package combinations from the algocline bundled collection.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.analysis_tokens` | number | optional | Max tokens for the analysis LLM call (default 600) |
+| `ctx.available_packages` | any | optional | Override default package registry (reserved; not currently consumed) |
+| `ctx.task` | string | **required** | Task description to route (required) |
 
 ---
 
@@ -1282,6 +2321,19 @@ Comparison with related packages:
 
 > Explores multiple reasoning paths via branching, evaluation, and pruning. Unlike linear CoT, ToT maintains a tree of thought branches and uses beam search to focus on the most promising paths.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.beam_width` | number | optional | Branches kept after pruning (default: 2) |
+| `ctx.breadth` | number | optional | Thoughts generated per beam node (default: 3) |
+| `ctx.depth` | number | optional | Maximum tree depth (default: 3) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── triad.md ── -->
@@ -1290,6 +2342,19 @@ Comparison with related packages:
 # Triad — adversarial 3-role debate with judge arbitration
 
 > Three distinct roles: Proponent (argues for), Opponent (argues against), Judge (arbitrates). Multiple rounds of attack/defense, then final verdict.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per argument (default: 400) |
+| `ctx.judge_tokens` | number | optional | Max tokens for final verdict (default: 500) |
+| `ctx.rounds` | number | optional | Number of debate rounds after opening (default: 3) |
+| `ctx.task` | string | **required** | The question or claim to debate |
 
 ---
 
@@ -1300,6 +2365,18 @@ Comparison with related packages:
 
 > Generates multiple hypotheses, scores them with UCB1, refines the best.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n` | number | optional | Number of hypotheses to generate (default: 3) |
+| `ctx.rounds` | number | optional | Number of evaluate+refine rounds (default: 2) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── usc.md ── -->
@@ -1309,6 +2386,19 @@ Comparison with related packages:
 
 > Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate (default: 400) |
+| `ctx.n` | number | optional | Number of candidate responses to sample (default: 5) |
+| `ctx.select_tokens` | number | optional | Max tokens for selection response (default: 500) |
+| `ctx.task` | string | **required** | The problem/question to solve |
+
 ---
 
 <!-- ── verify_first.md ── -->
@@ -1317,5 +2407,20 @@ Comparison with related packages:
 # verify_first — Verification-First prompting
 
 > Provides a candidate answer (trivial, random, or CoT-generated), then instructs the LLM to verify it before generating the real answer. "Reverse reasoning" is cognitively easier than forward generation and reduces logical errors by overcoming egocentric bias.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.candidate` | string | optional | Pre-supplied candidate answer (default: nil => auto-generate) |
+| `ctx.gen_tokens` | number | optional | Max tokens for candidate generation (default: 600) |
+| `ctx.iterations` | number | optional | Number of Iter-VF rounds (default: 1) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.trivial` | boolean | optional | Use trivial candidate '1' instead of CoT (default: false) |
+| `ctx.verify_tokens` | number | optional | Max tokens per verification round (default: 800) |
 
 ---

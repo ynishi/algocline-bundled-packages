@@ -2,6 +2,7 @@
 name: cs_pruner
 version: 0.1.0
 category: selection
+result_shape: "shape { alive_count: number, alpha_per_side: number, best: string, best_index: number, best_score: number, candidates: array of string, cs_variant: string, delta: number, evaluations: number, kill_events: array of shape { candidate: number, mean: number, n: number }, n_candidates: number, n_dimensions: number, protect_events: array of shape { candidate: number, mean: number, n: number }, ranking: array of shape { alive: boolean, index: number, lcb: number, mean: number, n: number, radius: number, ucb: number, v_hat: number }, rounds: array of shape { candidate: number, dimension: number, dimension_name: string, iteration: number, mean_after: number, n_after: number, score: number, v_hat_after: number }, total_llm_calls: number }"
 description: "Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill using empirical-Bernstein CS (Howard et al. 2021). Evaluates candidates across a multi-dimensional rubric and kills each one as soon as its upper confidence bound drops below the best survivor's lower bound. Strategic/Injectable — every parameter is overridable."
 source: cs_pruner/init.lua
 generated: gen_docs (V0)
@@ -15,6 +16,7 @@ generated: gen_docs (V0)
 
   - [Operating regime — READ FIRST](#operating-regime-read-first)
   - [Theoretical foundations](#theoretical-foundations)
+- [Parameters](#parameters)
 
 ### Operating regime — READ FIRST {#operating-regime-read-first}
 
@@ -146,3 +148,27 @@ Based on:
     "Estimating means of bounded random variables by betting"
     JRSS-B 86(1):1-27. arXiv:2010.09686 (Theorem 2, predictable
     plug-in empirical-Bernstein CS)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.aggregation` | string | optional | Only "scalarize" supported in v0.1 |
+| `ctx.betting_lambda_max` | number | optional | Betting λ truncation (default: 0.5) |
+| `ctx.betting_prior_var` | number | optional | Betting σ̂² prior (default: 0.25) |
+| `ctx.bootstrap_m` | number | optional | Howard 2021 eq.(10) bootstrap time (default: 1.0) |
+| `ctx.cs_variant` | string | optional | "polynomial_stitched" \| "hoeffding" \| "betting" \| "kl" (default: polynomial_stitched) |
+| `ctx.delta` | number | optional | Overall error probability (default: 0.05) |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate generation (default: 400) |
+| `ctx.halving_checkpoints` | array of number | optional | Checkpoint n-values for layer-2 halving (default: {5,10,15}) |
+| `ctx.halving_keep_ratio` | number | optional | Fraction kept at each halving (default: 0.5) |
+| `ctx.halving_min_gap` | number | optional | Gap guard around the median (default: 0) |
+| `ctx.layer2_halving` | boolean | optional | Enable Successive Halving as primary kill mechanism (default: false) |
+| `ctx.min_n_before_kill` | number | optional | Warmup minimum before kills are considered |
+| `ctx.n_candidates` | number | optional | Number of candidates (default: 6) |
+| `ctx.rubric` | array of shape { criterion: string, name: string } | optional | Rubric dimensions (default: 20-dim binary) |
+| `ctx.score_domain` | shape { max: number, min: number } | optional | Score range (default: {min=0,max=1}) |
+| `ctx.stitching_eta` | number | optional | Howard 2021 eq.(10) epoch ratio (default: 2.0) |
+| `ctx.stitching_s` | number | optional | Howard 2021 eq.(10) exponent (default: 1.4) |
+| `ctx.task` | string | **required** | Problem statement |
+| `ctx.weights` | array of number | optional | Per-dimension weights (default: uniform) |

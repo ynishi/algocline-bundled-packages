@@ -2,6 +2,7 @@
 name: f_race
 version: 0.1.0
 category: selection
+result_shape: "shape { alive_count: number, alpha_spending: boolean, best: string, best_index: number, best_score: number, candidates: array of string, delta: number, effective_delta: number, evaluations: number, kill_events: array of shape { best_candidate: number, best_rank_sum: number, block: number, blocks_used: number, candidate: number, chi2_critical: number, crit_diff: number, mean: number, n: number, q: number, rank_sum: number }, n_candidates: number, n_dimensions: number, ranking: array of shape { alive: boolean, index: number, mean: number, mean_rank?: number, n: number }, rounds: array of shape { candidate: number, dimension: number, dimension_name: string, iteration: number, n_after: number, score: number }, total_llm_calls: number }"
 description: "Friedman race partial-data pruner. Block-wise ranking of candidates over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman + Nemenyi post-hoc test. Designed for small N (≤10) × D (≤30) where Empirical-Bernstein CS cannot fire."
 source: f_race/init.lua
 generated: gen_docs (V0)
@@ -19,6 +20,7 @@ generated: gen_docs (V0)
   - [Theoretical foundations](#theoretical-foundations)
   - [Kill rate limit (important)](#kill-rate-limit-important)
   - [Post-hoc multiplicity and sequential testing](#post-hoc-multiplicity-and-sequential-testing)
+- [Parameters](#parameters)
 
 ### Why F-Race for this scale {#why-f-race-for-this-scale}
 
@@ -218,3 +220,17 @@ Comparison with related packages:
                     post-hoc. Sequential (NOT anytime-valid); see
                     "Post-hoc multiplicity and sequential testing"
                     above for the caveat on repeated testing.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alpha_spending` | boolean | optional | Bonferroni sequential correction (default: false) |
+| `ctx.delta` | number | optional | Significance level (default: 0.05); resolved to largest tabulated α ≤ delta |
+| `ctx.gen_tokens` | number | optional | Max tokens per candidate generation (default: 400) |
+| `ctx.min_blocks_before_race` | number | optional | Warmup block count before elimination (default: 5) |
+| `ctx.n_candidates` | number | optional | Number of candidates (default: 6) |
+| `ctx.rubric` | array of shape { criterion: string, name: string } | optional | Rubric dimensions (default: 20-dim binary) |
+| `ctx.rubric_type` | string | optional | "binary" \| "likert5" (default: "binary") |
+| `ctx.score_domain` | shape { max: number, min: number } | optional | Score range for clipping (default: {min=0,max=1}) |
+| `ctx.task` | string | **required** | Problem statement |
