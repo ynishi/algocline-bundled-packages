@@ -63,51 +63,56 @@ M.meta = {
 }
 
 ---@type AlcSpec
+local PREDS   = "Per-agent predictions V^a"
+local TARGET  = "Ground-truth target t"
+local WEIGHTS = "Per-agent weights (default: uniform)"
 M.spec = {
     entries = {
         ensemble = {
             args   = {
-                T.array_of(T.number),
-                T.array_of(T.number):is_optional(),
+                T.array_of(T.number):describe(PREDS),
+                T.array_of(T.number):is_optional():describe(WEIGHTS),
             },
-            result = T.number,
+            result = T.number:describe("Weighted ensemble prediction V = Sum w_a V^a"),
         },
         ambiguity = {
             args   = {
-                T.array_of(T.number),
-                T.array_of(T.number):is_optional(),
+                T.array_of(T.number):describe(PREDS),
+                T.array_of(T.number):is_optional():describe(WEIGHTS),
             },
-            result = T.number,
+            result = T.number:describe("Ambiguity A_bar = Sum w_a (V^a - V)^2"),
         },
         avg_error = {
             args   = {
-                T.array_of(T.number),
-                T.number,
-                T.array_of(T.number):is_optional(),
+                T.array_of(T.number):describe(PREDS),
+                T.number:describe(TARGET),
+                T.array_of(T.number):is_optional():describe(WEIGHTS),
             },
-            result = T.number,
+            result = T.number:describe(
+                "Weighted avg individual error E_bar = Sum w_a (V^a - t)^2"),
         },
         ensemble_error = {
             args   = {
-                T.array_of(T.number),
-                T.number,
-                T.array_of(T.number):is_optional(),
+                T.array_of(T.number):describe(PREDS),
+                T.number:describe(TARGET),
+                T.array_of(T.number):is_optional():describe(WEIGHTS),
             },
-            result = T.number,
+            result = T.number:describe("Ensemble squared error E = (V - t)^2"),
         },
         decompose = {
             args   = {
-                T.array_of(T.number),
-                T.number,
-                T.array_of(T.number):is_optional(),
+                T.array_of(T.number):describe(PREDS),
+                T.number:describe(TARGET),
+                T.array_of(T.number):is_optional():describe(WEIGHTS),
             },
             result = T.shape({
-                E              = T.number,
-                E_bar          = T.number,
-                A_bar          = T.number,
-                V              = T.number,
-                identity_holds = T.boolean,
-                identity_error = T.number,
+                E              = T.number:describe("Ensemble squared error"),
+                E_bar          = T.number:describe("Weighted avg individual error"),
+                A_bar          = T.number:describe("Ambiguity (diversity)"),
+                V              = T.number:describe("Ensemble prediction"),
+                identity_holds = T.boolean:describe(
+                    "Whether E = E_bar - A_bar within tolerance"),
+                identity_error = T.number:describe("|E - (E_bar - A_bar)|"),
             }),
         },
     },

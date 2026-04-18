@@ -62,30 +62,45 @@ M.meta = {
 M.spec = {
     entries = {
         prob_majority = {
-            args   = { T.number, T.number },
-            result = T.number,
+            args   = {
+                T.number:describe("Number of voters n (odd for strict majority)"),
+                T.number:describe("Individual accuracy p in [0,1]"),
+            },
+            result = T.number:describe("P(majority correct) under independence"),
         },
         is_anti_jury = {
-            args   = { T.number },
-            result = T.boolean,
+            args   = { T.number:describe("Individual accuracy p") },
+            result = T.boolean:describe("True when p < 0.5 (group worsens with more voters)"),
         },
         optimal_n = {
             -- Returns (n_min | nil, prob_at_n | nil). When p <= 0.5 the
             -- target is unreachable and both returns are nil — hence
             -- :is_optional() on the first-return shape.
-            args   = { T.number, T.number:is_optional(), T.number:is_optional() },
-            result = T.number:is_optional(),
+            args   = {
+                T.number:describe("Individual accuracy p (> 0.5 required)"),
+                T.number:is_optional():describe("Target majority probability (default 0.95)"),
+                T.number:is_optional():describe("Max n to search (default 999)"),
+            },
+            result = T.number:is_optional():describe(
+                "Minimum odd n meeting target; nil when p <= 0.5 or unreachable"),
         },
         correlation = {
             -- Returns (matrix, avg_corr). matrix is a nested
             -- array_of(array_of(number)); Option A' preserves the 2nd value.
-            args   = { T.array_of(T.array_of(T.number)) },
-            result = T.array_of(T.array_of(T.number)),
+            args   = {
+                T.array_of(T.array_of(T.number)):describe(
+                    "Voter output vectors (rows = voters, cols = trials)"),
+            },
+            result = T.array_of(T.array_of(T.number)):describe(
+                "Pairwise Pearson correlation matrix"),
         },
         estimate_p = {
             -- Returns (p_hat, ci_half); accepts boolean or 0/1 values.
-            args   = { T.array_of(T.any) },
-            result = T.number,
+            args   = {
+                T.array_of(T.any):describe(
+                    "Binary outcomes (boolean true/false or 0/1 numbers)"),
+            },
+            result = T.number:describe("Point estimate p_hat"),
         },
     },
 }

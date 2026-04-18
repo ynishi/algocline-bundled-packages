@@ -56,45 +56,50 @@ M.meta = {
 }
 
 ---@type AlcSpec
+-- Args across entries follow the (n, f) pattern: total nodes and
+-- faulty (Byzantine) node count. Per-entry :describe() restates this
+-- so projection outputs do not elide the argument semantics.
+local N_DESC = "Total number of nodes"
+local F_DESC = "Number of faulty (Byzantine) nodes"
 M.spec = {
     entries = {
         validate = {
-            args   = { T.number, T.number },
-            result = T.boolean,
+            args   = { T.number:describe(N_DESC), T.number:describe(F_DESC) },
+            result = T.boolean:describe("Whether n >= 3f+1 (oral-message agreement possible)"),
         },
         threshold = {
-            args   = { T.number, T.number },
-            result = T.number,
+            args   = { T.number:describe(N_DESC), T.number:describe(F_DESC) },
+            result = T.number:describe("Quorum size (2f+1) under oral-message bound"),
         },
         max_faults = {
-            args   = { T.number },
-            result = T.number,
+            args   = { T.number:describe(N_DESC) },
+            result = T.number:describe("Maximum f tolerable under oral-message bound"),
         },
         validate_signed = {
-            args   = { T.number, T.number },
-            result = T.boolean,
+            args   = { T.number:describe(N_DESC), T.number:describe(F_DESC) },
+            result = T.boolean:describe("Whether n >= f+2 (signed-message agreement possible)"),
         },
         signed_threshold = {
-            args   = { T.number, T.number },
-            result = T.number,
+            args   = { T.number:describe(N_DESC), T.number:describe(F_DESC) },
+            result = T.number:describe("Quorum size (f+1) under signed-message bound"),
         },
         max_faults_signed = {
-            args   = { T.number },
-            result = T.number,
+            args   = { T.number:describe(N_DESC) },
+            result = T.number:describe("Maximum f tolerable under signed-message bound"),
         },
         summary = {
-            args   = { T.number, T.number },
+            args   = { T.number:describe(N_DESC), T.number:describe(F_DESC) },
             result = T.shape({
-                n             = T.number,
-                f             = T.number,
-                oral_ok       = T.boolean,
-                oral_reason   = T.string,
-                oral_quorum   = T.number:is_optional(),
-                signed_ok     = T.boolean,
-                signed_reason = T.string,
-                signed_quorum = T.number:is_optional(),
-                max_f_oral    = T.number,
-                max_f_signed  = T.number,
+                n             = T.number:describe("Total node count (input echo)"),
+                f             = T.number:describe("Faulty node count (input echo)"),
+                oral_ok       = T.boolean:describe("Whether oral-message bound (n >= 3f+1) is satisfied"),
+                oral_reason   = T.string:describe("Human-readable reason for oral_ok"),
+                oral_quorum   = T.number:is_optional():describe("2f+1 quorum size when oral_ok; nil otherwise"),
+                signed_ok     = T.boolean:describe("Whether signed-message bound (n >= f+2) is satisfied"),
+                signed_reason = T.string:describe("Human-readable reason for signed_ok"),
+                signed_quorum = T.number:is_optional():describe("f+1 quorum size when signed_ok; nil otherwise"),
+                max_f_oral    = T.number:describe("Max tolerable f under oral-message bound"),
+                max_f_signed  = T.number:describe("Max tolerable f under signed-message bound"),
             }),
         },
     },

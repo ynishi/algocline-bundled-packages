@@ -78,52 +78,64 @@ M.meta = {
 }
 
 ---@type AlcSpec
+local RANKINGS_IN = "N rankings (each a total order over m candidates)"
 M.spec = {
     entries = {
         kendall_tau = {
-            args   = { T.array_of(T.any), T.array_of(T.any) },
-            result = T.number,
+            args   = {
+                T.array_of(T.any):describe("Ranking sigma (total order over candidates)"),
+                T.array_of(T.any):describe("Ranking tau to compare against sigma"),
+            },
+            result = T.number:describe(
+                "Kendall tau distance (count of pairwise disagreements)"),
         },
         exact = {
-            args = { T.array_of(T.array_of(T.any)) },
+            args = { T.array_of(T.array_of(T.any)):describe(RANKINGS_IN) },
             result = T.shape({
-                ranking         = T.array_of(T.any),
-                total_distance  = T.number,
-                is_unique       = T.boolean,
-                ties            = T.array_of(T.array_of(T.any)),
-                method          = T.string,
-                candidates      = T.number,
-                rankings_count  = T.number,
+                ranking         = T.array_of(T.any):describe(
+                    "Kemeny-optimal consensus ranking"),
+                total_distance  = T.number:describe(
+                    "Sum d_KT(sigma*, sigma_k) (minimized)"),
+                is_unique       = T.boolean:describe(
+                    "Whether the solution is unique (no tied optima)"),
+                ties            = T.array_of(T.array_of(T.any)):describe(
+                    "Alternative optimal rankings when tied"),
+                method          = T.string:describe("'exact' (full enumeration)"),
+                candidates      = T.number:describe("Number of candidates m"),
+                rankings_count  = T.number:describe("Number of input rankings N"),
             }),
         },
         borda = {
-            args = { T.array_of(T.array_of(T.any)) },
+            args = { T.array_of(T.array_of(T.any)):describe(RANKINGS_IN) },
             result = T.shape({
-                ranking         = T.array_of(T.any),
-                -- scores is candidate→number map (opaque)
-                scores          = T.table,
-                total_distance  = T.number,
-                ties            = T.array_of(T.any),
-                method          = T.string,
-                candidates      = T.number,
-                rankings_count  = T.number,
+                ranking         = T.array_of(T.any):describe(
+                    "Borda-count approximate consensus ranking"),
+                scores          = T.table:describe(
+                    "candidate -> Borda score (opaque map)"),
+                total_distance  = T.number:describe(
+                    "Sum d_KT(sigma_borda, sigma_k)"),
+                ties            = T.array_of(T.any):describe(
+                    "Candidates with tied Borda scores"),
+                method          = T.string:describe(
+                    "'borda' (2-approximation, O(N*m))"),
+                candidates      = T.number:describe("Number of candidates m"),
+                rankings_count  = T.number:describe("Number of input rankings N"),
             }),
         },
-        -- Returns exact-shape OR borda-shape depending on candidate count.
-        -- Keep the result opaque (T.table) to accommodate both variants.
         aggregate = {
-            args   = { T.array_of(T.array_of(T.any)) },
-            result = T.table,
+            args   = { T.array_of(T.array_of(T.any)):describe(RANKINGS_IN) },
+            result = T.table:describe(
+                "Exact shape when m <= 8, borda shape otherwise"),
         },
-        -- Matrix is a nested map-of-maps; keep opaque.
         pairwise = {
-            args   = { T.array_of(T.array_of(T.any)) },
-            result = T.table,
+            args   = { T.array_of(T.array_of(T.any)):describe(RANKINGS_IN) },
+            result = T.table:describe(
+                "Pairwise preference map (i -> j -> count of rankings preferring i)"),
         },
-        -- Returns a candidate (any) or nil when no Condorcet winner exists.
         condorcet_winner = {
-            args   = { T.array_of(T.array_of(T.any)) },
-            result = T.any:is_optional(),
+            args   = { T.array_of(T.array_of(T.any)):describe(RANKINGS_IN) },
+            result = T.any:is_optional():describe(
+                "Candidate beating all others pairwise, or nil when none exists"),
         },
     },
 }

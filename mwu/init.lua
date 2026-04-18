@@ -89,32 +89,45 @@ M.meta = {
 M.spec = {
     entries = {
         new = {
-            args   = { T.table },
-            result = T.table,  -- opaque Updater instance
+            args   = {
+                T.table:describe("Constructor opts (n required, eta?, T?)"),
+            },
+            result = T.table:describe(
+                "Opaque Updater instance (obj:update / obj:distribution)"),
         },
         solve = {
             args   = {
-                T.array_of(T.array_of(T.number)),  -- loss_matrix[t][i]
-                T.table:is_optional(),              -- opts
+                T.array_of(T.array_of(T.number)):describe(
+                    "Loss matrix loss[t][i] over T rounds x n agents"),
+                T.table:is_optional():describe("Opts (eta?)"),
             },
             result = T.shape({
-                final_weights       = T.array_of(T.number),
-                regret              = T.number,
-                regret_bound        = T.number,
-                regret_within_bound = T.boolean,
-                cumulative_loss     = T.number,
-                best_agent          = T.number,
-                best_agent_loss     = T.number,
-                -- weight_history: per-round {round, weights}; kept opaque
-                weight_history      = T.array_of(T.any),
-                n                   = T.number,
-                T                   = T.number,
-                eta                 = T.number,
+                final_weights       = T.array_of(T.number):describe(
+                    "Final normalized distribution p_i(T)"),
+                regret              = T.number:describe(
+                    "Actual regret vs. best fixed agent in hindsight"),
+                regret_bound        = T.number:describe(
+                    "Theoretical bound 2*sqrt(T ln N)"),
+                regret_within_bound = T.boolean:describe(
+                    "regret <= regret_bound"),
+                cumulative_loss     = T.number:describe(
+                    "Algorithm's cumulative loss Sum_t p(t)*loss(t)"),
+                best_agent          = T.number:describe(
+                    "1-based index of best fixed agent in hindsight"),
+                best_agent_loss     = T.number:describe(
+                    "Cumulative loss of the best fixed agent"),
+                weight_history      = T.array_of(T.any):describe(
+                    "Per-round {round, weights} snapshots"),
+                n                   = T.number:describe("Number of agents"),
+                T                   = T.number:describe("Number of rounds"),
+                eta                 = T.number:describe("Learning rate used"),
             }),
         },
         accuracy_to_loss = {
-            args   = { T.array_of(T.number) },
-            result = T.array_of(T.number),
+            args   = {
+                T.array_of(T.number):describe("Accuracy values in [0,1]"),
+            },
+            result = T.array_of(T.number):describe("Loss = 1 - accuracy"),
         },
     },
 }

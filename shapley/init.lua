@@ -76,47 +76,62 @@ M.meta = {
 }
 
 ---@type AlcSpec
+local AGENTS_DESC = "Agent identifiers (string or number; mixed types OK)"
+local VFN_DESC    = "Coalition value function v(S) -> number"
 M.spec = {
     entries = {
         exact = {
-            -- agents: list of identifiers (string or number); v_fn: function.
-            -- Using T.any for the agent element so mixed id types work.
-            args   = { T.array_of(T.any), T.any },
+            args   = {
+                T.array_of(T.any):describe(AGENTS_DESC),
+                T.any:describe(VFN_DESC),
+            },
             result = T.shape({
-                -- values is a map (agent_id -> number), not an array;
-                -- kept opaque as T.table.
-                values           = T.table,
-                efficiency_check = T.boolean,
-                efficiency_error = T.number,
-                v_N              = T.number,
-                v_empty          = T.number,
-                n                = T.number,
-                evaluations      = T.number,
+                values           = T.table:describe(
+                    "agent_id -> Shapley value phi_i (opaque map)"),
+                efficiency_check = T.boolean:describe(
+                    "Sum phi_i ~= v(N) - v(empty) within tolerance"),
+                efficiency_error = T.number:describe(
+                    "|Sum phi_i - (v(N) - v(empty))|"),
+                v_N              = T.number:describe("Value of the grand coalition"),
+                v_empty          = T.number:describe("Value of the empty coalition"),
+                n                = T.number:describe("Number of agents"),
+                evaluations      = T.number:describe("Count of v_fn calls"),
             }),
         },
         montecarlo = {
-            args   = { T.array_of(T.any), T.any, T.table:is_optional() },
+            args   = {
+                T.array_of(T.any):describe(AGENTS_DESC),
+                T.any:describe(VFN_DESC),
+                T.table:is_optional():describe("Opts (samples?, seed?)"),
+            },
             result = T.shape({
-                values           = T.table,
-                std              = T.table,
-                ci95             = T.table,
-                samples          = T.number,
-                efficiency_check = T.boolean,
-                efficiency_error = T.number,
-                v_N              = T.number,
-                v_empty          = T.number,
-                n                = T.number,
+                values           = T.table:describe(
+                    "agent_id -> estimated phi_i"),
+                std              = T.table:describe(
+                    "agent_id -> empirical standard deviation"),
+                ci95             = T.table:describe(
+                    "agent_id -> 95% CI half-width"),
+                samples          = T.number:describe("Permutation samples drawn"),
+                efficiency_check = T.boolean:describe(
+                    "Sum phi_i ~= v(N) - v(empty) within tolerance"),
+                efficiency_error = T.number:describe(
+                    "|Sum phi_i - (v(N) - v(empty))|"),
+                v_N              = T.number:describe("Value of the grand coalition"),
+                v_empty          = T.number:describe("Value of the empty coalition"),
+                n                = T.number:describe("Number of agents"),
             }),
         },
         accuracy_coalition = {
-            -- Returns (v_fn, agents). First return is a function closure;
-            -- use T.any for both. Option A' preserves the 2nd value.
             args   = {
-                T.table,                           -- agent_outputs
-                T.array_of(T.any),                 -- ground_truth (0/1 or bool)
-                T.array_of(T.any):is_optional(),   -- agents (when outputs is a map)
+                T.table:describe(
+                    "Agent outputs (list or id->array_of(y))"),
+                T.array_of(T.any):describe(
+                    "Ground truth (0/1 numbers or boolean)"),
+                T.array_of(T.any):is_optional():describe(
+                    "Agent ids (required when outputs is a map)"),
             },
-            result = T.any,
+            result = T.any:describe(
+                "Coalition v_fn closure (consumed by exact / montecarlo)"),
         },
     },
 }

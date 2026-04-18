@@ -75,63 +75,69 @@ M.meta = {
 }
 
 ---@type AlcSpec
+local P_DESC     = "Forecast probability p in [0,1]"
+local Y_DESC     = "Outcome y (number 0/1 or boolean)"
+local PS_ARRAY   = "Forecast probabilities"
+local YS_ARRAY   = "Outcomes (0/1 or boolean)"
+local RULE_OPTS  = "Opts table (rule='brier'|'log'|'spherical')"
 M.spec = {
     entries = {
-        -- y accepts number (0/1) or boolean; T.any preserves that.
         brier = {
-            args   = { T.number, T.any },
-            result = T.number,
+            args   = { T.number:describe(P_DESC), T.any:describe(Y_DESC) },
+            result = T.number:describe("Brier score -(p - y)^2"),
         },
-        -- Returns (score, was_clamped). Option A' preserves the 2nd value.
         log_score = {
-            args   = { T.number, T.any },
-            result = T.number,
+            args   = { T.number:describe(P_DESC), T.any:describe(Y_DESC) },
+            result = T.number:describe(
+                "Log score y*ln(p) + (1-y)*ln(1-p) (clamped against EPS)"),
         },
         spherical = {
-            args   = { T.number, T.any },
-            result = T.number,
+            args   = { T.number:describe(P_DESC), T.any:describe(Y_DESC) },
+            result = T.number:describe(
+                "Spherical score [py + (1-p)(1-y)] / sqrt(p^2 + (1-p)^2)"),
         },
         evaluate = {
             args = {
-                T.array_of(T.number),
-                T.array_of(T.any),
-                T.table:is_optional(),
+                T.array_of(T.number):describe(PS_ARRAY),
+                T.array_of(T.any):describe(YS_ARRAY),
+                T.table:is_optional():describe(RULE_OPTS),
             },
-            -- clamped_count is only set for rule="log"; leave as opaque
-            -- table to keep the shape flexible across rules.
             result = T.shape({
-                mean_score     = T.number,
-                scores         = T.array_of(T.number),
-                n              = T.number,
-                rule           = T.string,
-                clamped_count  = T.number:is_optional(),
+                mean_score     = T.number:describe("Mean of per-sample scores"),
+                scores         = T.array_of(T.number):describe("Per-sample scores"),
+                n              = T.number:describe("Sample count"),
+                rule           = T.string:describe("Rule name used"),
+                clamped_count  = T.number:is_optional():describe(
+                    "Log-rule clamp count (nil for other rules)"),
             }),
         },
         calibration = {
             args = {
-                T.array_of(T.number),
-                T.array_of(T.any),
-                T.table:is_optional(),
+                T.array_of(T.number):describe(PS_ARRAY),
+                T.array_of(T.any):describe(YS_ARRAY),
+                T.table:is_optional():describe("Opts table (n_bins?, rule?)"),
             },
             result = T.shape({
-                ece            = T.number,
-                bins           = T.array_of(T.table),
-                overconfident  = T.boolean,
-                underconfident = T.boolean,
-                n              = T.number,
-                n_bins         = T.number,
+                ece            = T.number:describe("Expected Calibration Error"),
+                bins           = T.array_of(T.table):describe(
+                    "Per-bin {p_mean, y_mean, count, gap}"),
+                overconfident  = T.boolean:describe("p_mean > y_mean overall"),
+                underconfident = T.boolean:describe("p_mean < y_mean overall"),
+                n              = T.number:describe("Sample count"),
+                n_bins         = T.number:describe("Number of bins"),
             }),
         },
         compare = {
             args = {
-                T.array_of(T.table),
-                T.table:is_optional(),
+                T.array_of(T.table):describe(
+                    "Scored entries; each {name, preds, outcomes}"),
+                T.table:is_optional():describe("Opts table (rule?)"),
             },
             result = T.shape({
-                ranking = T.array_of(T.string),
-                -- scores is a name→number map (opaque)
-                scores  = T.table,
-                best    = T.string,
+                ranking = T.array_of(T.string):describe(
+                    "Entry names ordered by mean score descending"),
+                scores  = T.table:describe("name -> mean score (opaque map)"),
+                best    = T.string:describe("Top-ranked entry name"),
             }),
         },
     },

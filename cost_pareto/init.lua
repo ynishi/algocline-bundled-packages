@@ -62,24 +62,41 @@ M.meta = {
 }
 
 ---@type AlcSpec
+local CAND_A = "Candidate A (objective_name -> numeric value)"
+local CAND_B = "Candidate B (objective_name -> numeric value)"
+local KEYS   = "Objective keys to compare (default: all numeric keys)"
 M.spec = {
     entries = {
         dominates = {
-            -- a, b are numeric-valued candidate tables; keys is optional.
-            args   = { T.table, T.table, T.array_of(T.string):is_optional() },
-            result = T.boolean,
+            args   = {
+                T.table:describe(CAND_A),
+                T.table:describe(CAND_B),
+                T.array_of(T.string):is_optional():describe(KEYS),
+            },
+            result = T.boolean:describe("True iff A Pareto-dominates B"),
         },
         frontier = {
-            args   = { T.array_of(T.table), T.array_of(T.string):is_optional() },
-            result = T.array_of(T.table),
+            args   = {
+                T.array_of(T.table):describe("Candidate pool"),
+                T.array_of(T.string):is_optional():describe(KEYS),
+            },
+            result = T.array_of(T.table):describe("Non-dominated (Pareto-optimal) subset"),
         },
         is_dominated = {
-            args   = { T.table, T.table, T.array_of(T.string):is_optional() },
-            result = T.boolean,
+            args   = {
+                T.table:describe(CAND_A),
+                T.table:describe(CAND_B),
+                T.array_of(T.string):is_optional():describe(KEYS),
+            },
+            result = T.boolean:describe("True iff A is dominated by B"),
         },
         layers = {
-            args   = { T.array_of(T.table), T.array_of(T.string):is_optional() },
-            result = T.array_of(T.array_of(T.table)),
+            args   = {
+                T.array_of(T.table):describe("Candidate pool"),
+                T.array_of(T.string):is_optional():describe(KEYS),
+            },
+            result = T.array_of(T.array_of(T.table)):describe(
+                "Successive Pareto frontiers (layer 1 = topmost)"),
         },
     },
 }

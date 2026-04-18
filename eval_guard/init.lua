@@ -71,34 +71,46 @@ M.meta = {
 M.spec = {
     entries = {
         self_critique = {
-            -- opts is a loose options table; shape-light T.table keeps it open.
-            args   = { T.table },
-            result = T.boolean,
+            args   = {
+                T.table:describe(
+                    "Options (uses_self_critique, has_external_grader, ...)"),
+            },
+            result = T.boolean:describe(
+                "True when N2 gate passes (no intrinsic self-critique or has grader)"),
         },
         baseline = {
-            args   = { T.table },
-            result = T.boolean,
+            args   = {
+                T.table:describe(
+                    "Options (has_sc_baseline, same_budget, ...)"),
+            },
+            result = T.boolean:describe(
+                "True when N3 gate passes (SC baseline with same budget)"),
         },
         contamination = {
-            args   = { T.table },
-            result = T.boolean,
+            args   = {
+                T.table:describe(
+                    "Options (benchmark, decontaminated, ...)"),
+            },
+            result = T.boolean:describe(
+                "True when N4 gate passes (contamination-aware)"),
         },
         check_all = {
-            args   = { T.table },
+            args   = { T.table:describe("Combined options for all gates") },
             result = T.shape({
-                passed     = T.boolean,
+                passed     = T.boolean:describe("True iff all individual gates pass"),
                 violations = T.array_of(T.shape({
-                    gate   = T.string,
-                    reason = T.string,
-                })),
+                    gate   = T.string:describe(
+                        "'self_critique' | 'baseline' | 'contamination'"),
+                    reason = T.string:describe("Failure reason"),
+                })):describe("Failed gates (empty when passed)"),
                 details    = T.array_of(T.shape({
-                    gate   = T.string,
-                    passed = T.boolean,
-                    reason = T.string,
-                })),
-                n_passed   = T.number,
-                n_failed   = T.number,
-                n_total    = T.number,
+                    gate   = T.string:describe("Gate name"),
+                    passed = T.boolean:describe("Per-gate pass/fail"),
+                    reason = T.string:describe("Per-gate reason"),
+                })):describe("Per-gate detail (all gates, pass or fail)"),
+                n_passed   = T.number:describe("Count of passed gates"),
+                n_failed   = T.number:describe("Count of failed gates"),
+                n_total    = T.number:describe("Total gates evaluated"),
             }),
         },
     },
