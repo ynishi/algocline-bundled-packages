@@ -78,6 +78,8 @@
 ---     judgements only need a short verdict (e.g. "A>B"), so this
 ---     defaults to 20 — lower than gen_tokens on purpose. (default: 20)
 
+local SR = require("alc_shapes").spec_resolver
+
 local M = {}
 
 ---@type AlcMeta
@@ -322,7 +324,7 @@ function M.run(ctx)
         ))
 
         local pairwise_rank = require("pairwise_rank")
-        local pr = pairwise_rank.run({
+        local pr = SR.run(pairwise_rank, {
             task = task,
             candidates = candidates,
             method = "allpair",
@@ -448,7 +450,7 @@ function M.run(ctx)
     ))
 
     local listwise_rank = require("listwise_rank")
-    local s1 = listwise_rank.run({
+    local s1 = SR.run(listwise_rank, {
         task = task,
         candidates = candidates,
         top_k = top_k1,
@@ -596,7 +598,7 @@ function M.run(ctx)
     ))
 
     local pairwise_rank = require("pairwise_rank")
-    local s3 = pairwise_rank.run({
+    local s3 = SR.run(pairwise_rank, {
         task = task,
         candidates = survivors_1,
         method = "allpair",

@@ -101,13 +101,23 @@ function M.run(pkg, ctx, entry_name)
         check.assert_dev(ctx, entry.input, ctx_hint .. ":input")
     end
 
-    local result = fn(ctx)
+    local returned = fn(ctx)
 
+    -- AlcCtx 規約: pkg は ctx を返し、実際の result 形は ctx.result に入る。
+    -- 最小限の柔軟性として、returned が table 以外、または .result が nil
+    -- なら returned そのものを検査対象にする (shape を直接返す external pkg
+    -- を許容するフォールバック)。bundled 9 pkg はすべて前者。
     if entry and entry.result then
-        check.assert_dev(result, entry.result, ctx_hint .. ":result")
+        local actual
+        if type(returned) == "table" and returned.result ~= nil then
+            actual = returned.result
+        else
+            actual = returned
+        end
+        check.assert_dev(actual, entry.result, ctx_hint .. ":result")
     end
 
-    return result
+    return returned
 end
 
 function M.is_passthrough(pkg, shape_name)

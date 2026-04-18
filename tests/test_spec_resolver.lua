@@ -17,6 +17,25 @@ local T  = S.T
 -- Prefer inline constructions over file fixtures: each test carries its
 -- own contract, so a reader sees input+expected in one place.
 
+-- AlcCtx 規約: M.run(ctx) は ctx を返し、実 result は ctx.result に入れる。
+-- fixture もこの規約に揃える。
+
+local function voted_fixture()
+    return {
+        consensus   = "X",
+        answer      = "X",
+        answer_norm = "x",
+        paths = {
+            { reasoning = "a", answer = "X" },
+            { reasoning = "b", answer = "X" },
+        },
+        votes = { "x", "x" },
+        vote_counts = { x = 2 },
+        n_sampled = 2,
+        total_llm_calls = 2,
+    }
+end
+
 local function make_typed_pkg()
     return {
         meta = { name = "typed_fix", version = "0.0.0" },
@@ -28,20 +47,9 @@ local function make_typed_pkg()
                 },
             },
         },
-        run = function(_)
-            return {
-                consensus   = "X",
-                answer      = "X",
-                answer_norm = "x",
-                paths = {
-                    { reasoning = "a", answer = "X" },
-                    { reasoning = "b", answer = "X" },
-                },
-                votes = { "x", "x" },
-                vote_counts = { x = 2 },
-                n_sampled = 2,
-                total_llm_calls = 2,
-            }
+        run = function(ctx)
+            ctx.result = voted_fixture()
+            return ctx
         end,
     }
 end
@@ -49,7 +57,10 @@ end
 local function make_opaque_pkg()
     return {
         meta = { name = "opaque_fix" },
-        run  = function(_) return { whatever = "I do my own thing" } end,
+        run  = function(ctx)
+            ctx.result = { whatever = "I do my own thing" }
+            return ctx
+        end,
     }
 end
 
@@ -66,7 +77,7 @@ local function make_filter_pkg()
         },
         run = function(ctx)
             local v = ctx.voted
-            return {
+            ctx.result = {
                 consensus = v.consensus,
                 answer = v.answer,
                 answer_norm = v.answer_norm,
@@ -76,6 +87,7 @@ local function make_filter_pkg()
                 n_sampled = 1,
                 total_llm_calls = v.total_llm_calls,
             }
+            return ctx
         end,
     }
 end
@@ -146,17 +158,17 @@ end)
 -- ── run ────────────────────────────────────────────────────────────────
 
 describe("spec_resolver.run: unified invocation", function()
-    it("typed pkg returns result of M.run (post-check may fire in dev mode)", function()
+    it("typed pkg returns ctx with result set (post-check may fire in dev mode)", function()
         local pkg = make_typed_pkg()
-        local result = SR.run(pkg, { task = "test" })
-        expect(result.consensus).to.equal("X")
-        expect(result.n_sampled).to.equal(2)
+        local returned = SR.run(pkg, { task = "test" })
+        expect(returned.result.consensus).to.equal("X")
+        expect(returned.result.n_sampled).to.equal(2)
     end)
 
-    it("opaque pkg passes ctx straight through", function()
+    it("opaque pkg returns ctx.result straight through", function()
         local pkg = make_opaque_pkg()
-        local result = SR.run(pkg, { any = "thing" })
-        expect(result.whatever).to.equal("I do my own thing")
+        local returned = SR.run(pkg, { any = "thing" })
+        expect(returned.result.whatever).to.equal("I do my own thing")
     end)
 
     it("missing entry function is a loud error", function()
@@ -167,17 +179,22 @@ describe("spec_resolver.run: unified invocation", function()
     end)
 
     it("opaque pkg skips assert_dev even in dev mode", function()
-        -- Broken result (does not match any shape) is fine because resolver
-        -- has no schema to check against.
+        -- Broken result is fine because resolver has no schema to check.
         local pkg = make_opaque_pkg()
-        pkg.run = function() return { anything = 1 } end
+        pkg.run = function(ctx)
+            ctx.result = { anything = 1 }
+            return ctx
+        end
         local ok = pcall(SR.run, pkg, {})
         expect(ok).to.equal(true)
     end)
 
     it("typed pkg with broken result: dev-off passes, dev-on throws", function()
         local pkg = make_typed_pkg()
-        pkg.run = function(_) return { wrong_shape = true } end
+        pkg.run = function(ctx)
+            ctx.result = { wrong_shape = true }
+            return ctx
+        end
         if not S.is_dev_mode() then
             local ok = pcall(SR.run, pkg, { task = "t" })
             expect(ok).to.equal(true)
@@ -186,6 +203,32 @@ describe("spec_resolver.run: unified invocation", function()
         local ok, err = pcall(SR.run, pkg, { task = "t" })
         expect(ok).to.equal(false)
         expect(err).to.exist()
+    end)
+end)
+
+-- ── AlcCtx convention ────────────────────────────────────────────────
+
+describe("spec_resolver.run: AlcCtx post-check against returned.result", function()
+    it("when returned is a ctx table, resolver checks returned.result", function()
+        -- typed_fix declares result = T.ref("voted"). Returning ctx with
+        -- ctx.result set to a valid voted shape must pass post-check even
+        -- when ctx itself carries random extra fields (task, scratch, etc).
+        local pkg = make_typed_pkg()
+        local returned = SR.run(pkg, { task = "t", scratch = { a = 1 } })
+        expect(returned.result.consensus).to.equal("X")
+        expect(returned.scratch.a).to.equal(1)  -- ctx preserved
+    end)
+
+    it("when pkg returns shape directly (no .result), resolver checks returned", function()
+        -- External pkg that does not follow AlcCtx convention: returns the
+        -- shape directly. Resolver falls back to checking returned verbatim.
+        local pkg = {
+            meta = { name = "direct_return" },
+            spec = { entries = { run = { result = T.ref("voted") } } },
+            run  = function(_) return voted_fixture() end,
+        }
+        local returned = SR.run(pkg, {})
+        expect(returned.consensus).to.equal("X")
     end)
 end)
 
@@ -228,13 +271,13 @@ end)
 describe("typed / opaque mixed pipeline", function()
     it("typed → opaque → typed chain runs end-to-end", function()
         local r1 = SR.run(make_typed_pkg(), { task = "start" })
-        expect(r1.consensus).to.equal("X")
+        expect(r1.result.consensus).to.equal("X")
 
         local r2 = SR.run(make_opaque_pkg(), { prev = r1 })
-        expect(r2.whatever).to.exist()
+        expect(r2.result.whatever).to.exist()
 
         local r3 = SR.run(make_typed_pkg(), { task = "end" })
-        expect(r3.consensus).to.equal("X")
+        expect(r3.result.consensus).to.equal("X")
     end)
 end)
 
