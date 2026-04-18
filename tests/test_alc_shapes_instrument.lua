@@ -736,6 +736,25 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- reflect the three dispatch paths. topo_route's dimensions map
     -- uses T.map_of(T.string, T.string) because the parser emits
     -- only the axes that appear in the raw LLM output.
+    -- Phase 7-b (category="intent") pkgs: prism / ambig /
+    -- intent_belief / intent_discovery. All four follow a
+    -- detect → clarify-via-alc.specify → integrate pipeline. Two
+    -- control-flow properties shape the declarations:
+    --   (1) Branch-dependent keys. prism and ambig return extra
+    --       fields (user_response, clarifications) only when
+    --       was_underspecified=true / verdict="underspecified";
+    --       those fields are `:is_optional()`.
+    --   (2) Error path. intent_belief's hypothesis parsing can
+    --       fail and return { error, raw } instead of the full
+    --       Bayesian trace. All success-path fields plus error /
+    --       raw are therefore `:is_optional()`; the shape behaves
+    --       as a flat union of the two paths.
+    -- intent_discovery is single-path but uses array_of(...) for
+    -- intent_hierarchy which is keyed by round in the impl
+    -- (round_idx → entry) — sequential 1..rounds so array_of
+    -- remains correct. Inner parser outputs (sub_intents, elements,
+    -- options, hypotheses) get named shapes with :describe() on
+    -- every field for caller discoverability.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -762,6 +781,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "opinion_abm", "schelling_abm", "sugarscape_abm",
         "coevolve",
         "router_capability", "router_daao", "router_semantic", "topo_route",
+        "prism", "ambig", "intent_belief", "intent_discovery",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

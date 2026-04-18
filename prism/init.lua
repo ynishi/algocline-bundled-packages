@@ -22,6 +22,9 @@
 --- ctx.decompose_tokens: Max tokens for decomposition (default: 600)
 --- ctx.clarify_tokens: Max tokens per clarification phase (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -30,6 +33,49 @@ M.meta = {
     version = "0.1.0",
     description = "Cognitive-load-aware intent decomposition — logical dependency ordering for minimal-friction clarification",
     category = "intent",
+}
+
+local sub_intent_shape = T.shape({
+    text   = T.string:describe("Sub-intent text (bracket tag [SPECIFIED]/[UNDERSPECIFIED] stripped)"),
+    status = T.one_of({ "specified", "underspecified" })
+        :describe("Specification status derived from the bracket tag"),
+})
+
+local dependency_shape = T.shape({
+    from = T.number:describe("Sub-intent index that depends on another (1-based)"),
+    to   = T.number:describe("Sub-intent index that must be clarified first (1-based)"),
+})
+
+local clarification_shape = T.shape({
+    sub_intent_index = T.number:describe("Index into result.sub_intents (1-based)"),
+    sub_intent       = T.string:describe("Sub-intent text carried along for consumer convenience"),
+    question         = T.string:describe("Generated clarification question for this sub-intent"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task             = T.string:describe("Task or request to analyze (required)"),
+                max_sub_intents  = T.number:is_optional():describe("Maximum sub-intents to extract (default 8)"),
+                decompose_tokens = T.number:is_optional():describe("Max tokens for decomposition phase (default 600)"),
+                clarify_tokens   = T.number:is_optional():describe("Max tokens per clarification phase (default 400)"),
+            }),
+            result = T.shape({
+                sub_intents        = T.array_of(sub_intent_shape)
+                    :describe("All extracted sub-intents in natural parse order"),
+                dependencies       = T.array_of(dependency_shape)
+                    :describe("Empty when task was fully specified or no dependencies detected"),
+                clarifications     = T.array_of(clarification_shape)
+                    :describe("Empty when task was fully specified; otherwise one entry per underspecified sub-intent"),
+                specified_task     = T.string:describe("Fully-specified task (equals input task when was_underspecified=false)"),
+                was_underspecified = T.boolean:describe("Whether any sub-intent required clarification"),
+                user_response      = T.string:is_optional()
+                    :describe("Raw alc.specify response; present only when was_underspecified=true"),
+            }),
+        },
+    },
 }
 
 --- Parse a numbered list from LLM output.
@@ -294,5 +340,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

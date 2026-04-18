@@ -28,6 +28,9 @@
 --- ctx.diagnose_tokens: Max tokens for diagnostic question (default: 400)
 --- ctx.update_tokens: Max tokens for belief update (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,58 @@ M.meta = {
     version = "0.1.0",
     description = "Bayesian intent estimation — hypothesis generation with iterative belief updates via diagnostic questions",
     category = "intent",
+}
+
+local ranked_hypothesis_shape = T.shape({
+    id          = T.number:describe("Hypothesis index in the original parse order (1-based)"),
+    description = T.string:describe("Hypothesis text"),
+    belief      = T.number:describe("Posterior probability after the last update round (0-1)"),
+})
+
+local update_log_entry_shape = T.shape({
+    round       = T.number:describe("Round index (1-based)"),
+    question    = T.string:describe("Diagnostic question asked this round"),
+    answer      = T.string:describe("User's answer via alc.specify"),
+    prior       = T.array_of(T.number):describe("Belief distribution before this round"),
+    likelihoods = T.array_of(T.number):describe("Per-hypothesis likelihood from this round's evidence"),
+    posterior   = T.array_of(T.number):describe("Belief distribution after Bayesian update"),
+    entropy     = T.number:describe("Shannon entropy of posterior in bits"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                 = T.string:describe("Initial user request (required)"),
+                n_hypotheses         = T.number:is_optional():describe("Number of intent hypotheses to generate (default 5)"),
+                max_rounds           = T.number:is_optional():describe("Maximum belief update rounds (default 3)"),
+                confidence_threshold = T.number:is_optional():describe("Stop when top hypothesis exceeds this (default 0.7)"),
+                prior_tokens         = T.number:is_optional():describe("Max tokens for prior generation (default 600)"),
+                diagnose_tokens      = T.number:is_optional():describe("Max tokens per diagnostic question (default 400)"),
+                update_tokens        = T.number:is_optional():describe("Max tokens per belief update (default 500)"),
+            }),
+            -- Result has two disjoint shapes:
+            --   success path (normal): full Bayesian trace
+            --   error path  (hypothesis parsing failed): { error, raw } only
+            -- All fields are optional to accommodate both.
+            result = T.shape({
+                original_task     = T.string:is_optional():describe("Echo of input task (success path)"),
+                specified_task    = T.string:is_optional():describe("LLM-rewritten task aligned to MAP hypothesis (success path)"),
+                map_hypothesis    = T.string:is_optional():describe("Description of maximum-a-posteriori hypothesis (success path)"),
+                map_confidence    = T.number:is_optional():describe("Posterior probability of MAP hypothesis (success path)"),
+                ranked_hypotheses = T.array_of(ranked_hypothesis_shape):is_optional()
+                    :describe("All hypotheses sorted by posterior desc (success path)"),
+                rounds            = T.number:is_optional():describe("Number of update rounds actually executed (success path)"),
+                update_log        = T.array_of(update_log_entry_shape):is_optional()
+                    :describe("Per-round Bayesian update trace (success path)"),
+                final_entropy     = T.number:is_optional():describe("Shannon entropy of final posterior (success path)"),
+                converged         = T.boolean:is_optional():describe("Whether MAP exceeded confidence_threshold before max_rounds (success path)"),
+                error             = T.string:is_optional():describe("Set only on prior-parse failure; success path omits this"),
+                raw               = T.string:is_optional():describe("Raw prior LLM output; present only on error path"),
+            }),
+        },
+    },
 }
 
 --- Parse hypotheses from LLM output.
@@ -328,5 +383,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

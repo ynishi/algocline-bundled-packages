@@ -28,6 +28,9 @@
 --- ctx.surface_tokens: Max tokens for option generation (default: 600)
 --- ctx.concretize_tokens: Max tokens for concretization (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,50 @@ M.meta = {
     version = "0.1.0",
     description = "Exploratory intent formation — discover user goals through structured option presentation and iterative narrowing",
     category = "intent",
+}
+
+local option_shape = T.shape({
+    label       = T.string:describe("Option label parsed from the LLM output (e.g., 'A', 'B', or numeric)"),
+    title       = T.string:describe("Short title for the option"),
+    description = T.string:describe("Option description (empty string when the LLM emitted title without a dash-separated description)"),
+})
+
+local exploration_entry_shape = T.shape({
+    round         = T.number:describe("Round index (1-based)"),
+    options       = T.array_of(option_shape):describe("Options presented this round"),
+    key_dimension = T.string:describe("The fundamental choice these options represent (empty if not emitted)"),
+    preference    = T.string:describe("User's preference captured via alc.specify"),
+})
+
+local hierarchy_entry_shape = T.shape({
+    resolved      = T.string:describe("RESOLVED block from the concretize LLM output"),
+    remaining     = T.string:describe("REMAINING block from the concretize LLM output"),
+    understanding = T.string:describe("Updated understanding of intent after this round"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:describe("Initial (possibly vague) user request (required)"),
+                max_rounds        = T.number:is_optional():describe("Maximum exploration rounds (default 3)"),
+                n_options         = T.number:is_optional():describe("Number of options to present per round (default 3)"),
+                surface_tokens    = T.number:is_optional():describe("Max tokens for option generation (default 600)"),
+                concretize_tokens = T.number:is_optional():describe("Max tokens for concretization (default 500)"),
+            }),
+            result = T.shape({
+                original_task     = T.string:describe("Echo of input task"),
+                specified_task    = T.string:describe("Current understanding after final round"),
+                rounds            = T.number:describe("Number of exploration rounds actually executed"),
+                exploration_log   = T.array_of(exploration_entry_shape)
+                    :describe("Per-round record of options, key_dimension, and user preference"),
+                intent_hierarchy  = T.array_of(hierarchy_entry_shape)
+                    :describe("Per-round resolved/remaining/understanding trace (round-indexed, 1-based)"),
+                converged         = T.boolean:describe("Whether exploration ended early via CONVERGENCE:YES or empty remaining"),
+            }),
+        },
+    },
 }
 
 --- Parse structured options from LLM output.
@@ -212,5 +259,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

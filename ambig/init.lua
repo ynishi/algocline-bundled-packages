@@ -24,6 +24,9 @@
 --- ctx.clarify_tokens: Max tokens for clarification phase (default: 400)
 --- ctx.integrate_tokens: Max tokens for integration phase (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -32,6 +35,47 @@ M.meta = {
     version = "0.1.0",
     description = "Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs",
     category = "intent",
+}
+
+local element_shape = T.shape({
+    name        = T.string:describe("Element identifier parsed from the LLM detection output"),
+    description = T.string:describe("Element description with [STATUS] suffix stripped"),
+    status      = T.one_of({ "specified", "underspecified" })
+        :describe("Specification status derived from the bracket tag"),
+})
+
+local clarification_shape = T.shape({
+    element     = T.string:describe("Element name carried from result.elements for consumer convenience"),
+    description = T.string:describe("Element description"),
+    question    = T.string:describe("Generated clarification question; empty string when the LLM emitted fewer questions than elements"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task             = T.string:describe("Task or request to analyze (required)"),
+                detect_tokens    = T.number:is_optional():describe("Max tokens for detection phase (default 500)"),
+                clarify_tokens   = T.number:is_optional():describe("Max tokens for clarification phase (default 400)"),
+                integrate_tokens = T.number:is_optional():describe("Max tokens for integration phase (default 500)"),
+            }),
+            result = T.shape({
+                verdict            = T.one_of({ "specified", "underspecified" })
+                    :describe("Overall verdict derived from the VERDICT: line"),
+                elements           = T.array_of(element_shape)
+                    :describe("All parsed elements including the specified ones"),
+                questions          = T.array_of(T.string)
+                    :describe("Clarification questions; empty when verdict='specified'"),
+                clarifications     = T.array_of(clarification_shape):is_optional()
+                    :describe("One entry per underspecified element; absent when verdict='specified'"),
+                user_response      = T.string:is_optional()
+                    :describe("Raw alc.specify response; absent when verdict='specified'"),
+                specified_task     = T.string:describe("Fully-specified task (equals input task when was_underspecified=false)"),
+                was_underspecified = T.boolean:describe("Whether the clarify/integrate phases ran"),
+            }),
+        },
+    },
 }
 
 --- Parse structured elements from detection output.
@@ -221,5 +265,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M
