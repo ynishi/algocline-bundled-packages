@@ -48,9 +48,9 @@ M.spec = {
                     score = T.number,
                 })):describe("All surviving beams, rank-ordered by score"),
                 tree_stats     = T.shape({
-                    depth      = T.number,
-                    breadth    = T.number,
-                    beam_width = T.number,
+                    depth      = T.number:describe("Search depth used"),
+                    breadth    = T.number:describe("Thoughts generated per node"),
+                    beam_width = T.number:describe("Beam width (branches kept after pruning)"),
                 }):describe("Configuration echo for traceability"),
             }),
         },

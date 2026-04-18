@@ -63,29 +63,34 @@ M.spec = {
     entries = {
         detect = {
             args   = {
-                T.array_of(T.number),
-                T.table:is_optional(),
+                T.array_of(T.number):describe("Accuracy series indexed by N (N=1 at index 1)"),
+                T.table:is_optional():describe("Options (flat_epsilon: number)"),
             },
             result = T.shape({
-                peak_idx          = T.number,
-                peak_n            = T.number,
-                peak_acc          = T.number,
-                is_declining      = T.boolean,
-                consecutive_drops = T.number,
-                trend             = T.string,
+                peak_idx          = T.number:describe("1-based index of peak accuracy point"),
+                peak_n            = T.number:describe("Group size N at peak (= peak_idx)"),
+                peak_acc          = T.number:describe("Accuracy value at peak"),
+                is_declining      = T.boolean:describe("Whether current tail shows 2+ consecutive drops"),
+                consecutive_drops = T.number:describe("Consecutive accuracy drops observed after peak"),
+                trend             = T.string:describe("'monotone_up' | 'inverse_u' | 'monotone_down' | 'flat' | 'noisy' | 'insufficient'"),
             }),
         },
         should_stop = {
             args   = {
-                T.array_of(T.number),
-                T.number:is_optional(),
-                T.table:is_optional(),
+                T.array_of(T.number):describe("Accuracy series indexed by N"),
+                T.number:is_optional():describe("Consecutive drops to trigger stop (default: 2)"),
+                T.table:is_optional():describe("Options passed through to detect()"),
             },
-            result = T.boolean,
+            result = T.boolean:describe("True when detect() observed min_drops or more consecutive drops"),
         },
         chen_condition = {
-            args   = { T.number, T.number, T.number, T.number },
-            result = T.boolean,
+            args   = {
+                T.number:describe("p1 — accuracy on easy subset"),
+                T.number:describe("p2 — accuracy on hard subset"),
+                T.number:describe("alpha — fraction of hard queries (0..1)"),
+                T.number:describe("t — number of agents/voters"),
+            },
+            result = T.boolean:describe("True when Chen Theorem 2 conditions (p1+p2>1 AND alpha<1-1/t) both hold"),
         },
     },
 }

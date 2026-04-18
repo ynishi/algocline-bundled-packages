@@ -37,7 +37,7 @@ M.spec = {
                     rank       = T.number,
                     hypothesis = T.string,
                     avg_score  = T.number,
-                    pulls      = T.number,
+                    pulls      = T.number:describe("Number of UCB pulls allocated"),
                 })):describe("Full ranking sorted by average score descending"),
             }),
         },

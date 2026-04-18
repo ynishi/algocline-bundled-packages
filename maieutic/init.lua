@@ -44,13 +44,13 @@ M.spec = {
                 synthesis   = T.string:describe("Final LLM synthesis grounded on consistent evidence"),
                 tree        = T.any:describe("Recursive explanation tree (unvalidated in V0 due to self-referencing shape)"),
                 evidence    = T.shape({
-                    support = T.array_of(T.string),
-                    oppose  = T.array_of(T.string),
+                    support = T.array_of(T.string):describe("Consistent supporting sub-claims"),
+                    oppose  = T.array_of(T.string):describe("Consistent opposing sub-claims"),
                 }):describe("Propositions that passed consistency check, grouped by stance"),
                 consistency = T.shape({
-                    consistent    = T.number,
-                    contradictory = T.number,
-                    independent   = T.number,
+                    consistent    = T.number:describe("Count of consistent parent→child pairs"),
+                    contradictory = T.number:describe("Count of contradictory parent→child pairs"),
+                    independent   = T.number:describe("Count of independent/irrelevant parent→child pairs"),
                 }):describe("Status histogram across the whole tree"),
             }),
         },

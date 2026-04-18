@@ -66,7 +66,7 @@ M.spec = {
                 best_mbr_score    = T.number:describe("Expected similarity score (0-1) of the winner"),
                 ranking           = T.array_of(T.shape({
                     index     = T.number,
-                    mbr_score = T.number,
+                    mbr_score = T.number:describe("Minimum-Bayes-Risk score against the candidate pool"),
                 })):describe("All candidates sorted by MBR score descending"),
                 candidates        = T.array_of(T.string):describe("All generated candidate texts"),
                 similarity_matrix = T.array_of(T.array_of(T.number)):describe("Symmetric N×N pairwise similarity matrix (values in [0, 1])"),

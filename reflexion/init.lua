@@ -72,8 +72,8 @@ M.spec = {
                 trials          = T.array_of(T.shape({
                     trial      = T.number,
                     attempt    = T.string,
-                    score      = T.number,
-                    passed     = T.boolean,
+                    score      = T.number:describe("Grader score for this attempt (1-10 scale)"),
+                    passed     = T.boolean:describe("Whether this trial reached success_threshold"),
                     feedback   = T.string,
                     reflection = T.string:is_optional(),
                 })):describe("Ordered trial records with score, feedback, and optional reflection"),
