@@ -45,10 +45,18 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. initial_distribution is a string
--- (uniform/bimodal/clustered) — pkg internally gates by DISTRIBUTIONS
--- table, so T.string is sufficient (bad values fall back to uniform
--- rather than erroring, so shape cannot be stricter).
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers. `distribution` in the internal params hash
+-- is always a string (ctx.initial_distribution → DISTRIBUTIONS key;
+-- bad values fall back to "uniform" rather than erroring, so shape
+-- cannot be stricter at the input layer).
+local params_shape = T.shape({
+    n_agents     = T.number,
+    epsilon      = T.number,
+    steps        = T.number,
+    distribution = T.string,
+})
+
 M.spec = {
     entries = {
         run = {
@@ -61,9 +69,12 @@ M.spec = {
                 initial_distribution = T.string:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = { "clusters", "variance" },
+                    booleans = { "converged", "consensus", "polarized" },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },

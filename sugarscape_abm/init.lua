@@ -47,10 +47,22 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. metabolism_range / vision_range /
--- initial_wealth_range are {lo, hi} number pairs; accepted as opaque
--- tables here since T.array_of(T.number) + length constraint is not
--- expressible in the current DSL. Result sub-tables stay opaque.
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers. metabolism_range / vision_range /
+-- initial_wealth_range are {lo, hi} number pairs — declared as
+-- T.array_of(T.number) (length-2 invariant is enforced at runtime
+-- by the rand_int lookups in run_single, not at the shape layer).
+local params_shape = T.shape({
+    grid_size            = T.number,
+    n_agents             = T.number,
+    max_sugar            = T.number,
+    regrow_rate          = T.number,
+    metabolism_range     = T.array_of(T.number),
+    vision_range         = T.array_of(T.number),
+    initial_wealth_range = T.array_of(T.number),
+    steps                = T.number,
+})
+
 M.spec = {
     entries = {
         run = {
@@ -60,16 +72,19 @@ M.spec = {
                 n_agents             = T.number:is_optional(),
                 max_sugar            = T.number:is_optional(),
                 regrow_rate          = T.number:is_optional(),
-                metabolism_range     = T.table:is_optional(),
-                vision_range         = T.table:is_optional(),
-                initial_wealth_range = T.table:is_optional(),
+                metabolism_range     = T.array_of(T.number):is_optional(),
+                vision_range         = T.array_of(T.number):is_optional(),
+                initial_wealth_range = T.array_of(T.number):is_optional(),
                 steps                = T.number:is_optional(),
                 runs                 = T.number:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = { "survival_rate", "gini", "mean_wealth" },
+                    booleans = { "high_inequality", "population_collapsed" },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },

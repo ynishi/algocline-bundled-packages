@@ -44,9 +44,18 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. params/simulation/sensitivity
--- sub-tables stay opaque (SIR state arrays and snapshots are
--- pkg-private).
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers (suffix convention SSOT lives in abm/mc.lua
+-- and abm/sweep.lua).
+local params_shape = T.shape({
+    n_agents          = T.number,
+    initial_infected  = T.number,
+    beta              = T.number,
+    gamma             = T.number,
+    contacts_per_step = T.number,
+    steps             = T.number,
+})
+
 M.spec = {
     entries = {
         run = {
@@ -61,9 +70,19 @@ M.spec = {
                 runs              = T.number:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = {
+                        "attack_rate",
+                        "peak_fraction",
+                        "epidemic_duration",
+                    },
+                    booleans = {
+                        "epidemic_occurred",
+                        "herd_immunity_reached",
+                    },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },

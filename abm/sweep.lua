@@ -92,4 +92,27 @@ function M.run(opts)
     return sweep_at_factor(base, names, eval_fn, tiers[#tiers])
 end
 
+--- Build the result T.shape produced by `M.run`.
+---
+--- The row shape is fixed by `sweep_at_factor` above (the single
+--- source of truth for sweep row keys lives together with this
+--- helper). Length is variable (= count of numeric positive
+--- `param_names`) so this is an `array_of` with no size bound.
+---
+--- @return table Schema (T.array_of(T.shape))
+function M.shape()
+    local S = require("alc_shapes")
+    local T = S.T
+    return T.array_of(T.shape({
+        param         = T.string,
+        base_value    = T.number,
+        low_value     = T.number,
+        high_value    = T.number,
+        score_at_low  = T.number,
+        score_at_high = T.number,
+        delta         = T.number,
+        factor        = T.number,
+    }))
+end
+
 return M

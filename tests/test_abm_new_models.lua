@@ -4,9 +4,10 @@
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
 -- ─── Test Helpers ──────────────────────────────────────────
-
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- Per README §"Adding a new test file": `package.path` is set by the MCP
+-- harness via `search_paths=[REPO]`. Do NOT prepend os.getenv("PWD") here
+-- — in worktree context PWD points at the parent repo, which silently
+-- shadows the worktree's code and produces false-green pass reports.
 
 local PKG_NAMES = {
     "abm", "abm.frame.agent", "abm.frame.model",

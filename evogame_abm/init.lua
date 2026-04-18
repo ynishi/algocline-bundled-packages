@@ -40,8 +40,20 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. payoff_matrix and strategies are
--- accepted as opaque tables; result sub-tables stay opaque.
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers. payoff_matrix (CC/CD/DC/DD → {a,b} pairs)
+-- is internally fixed-form but accepted from ctx as an opaque table
+-- so user-supplied matrices with arbitrary numeric entries pass.
+-- strategies is optional (nil → default cycle through STRATEGY_NAMES).
+local params_shape = T.shape({
+    n_agents       = T.number,
+    generations    = T.number,
+    rounds_per_gen = T.number,
+    mutation_rate  = T.number,
+    payoff_matrix  = T.table,
+    strategies     = T.array_of(T.string):is_optional(),
+})
+
 M.spec = {
     entries = {
         run = {
@@ -56,9 +68,16 @@ M.spec = {
                 runs           = T.number:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = {
+                        "cooperation_rate",
+                        "dominant_fraction",
+                        "n_strategies_surviving",
+                    },
+                    booleans = { "tft_survived" },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },

@@ -87,6 +87,56 @@ function M.run(opts)
     return agg
 end
 
+--- Build the result T.shape produced by `M.run` for a given extract
+--- classification.
+---
+--- Callers declare which extract keys are numeric vs boolean (the
+--- author of each ABM pkg knows this from their own `run_single`
+--- return type). This function expands each key using the single
+--- source of truth for suffix convention that lives together with
+--- `M.run` above:
+---   number key `K` → K_median / K_p25 / K_p75 / K_mean / K_std
+---   bool   key `K` → K_rate / K_ci{lower,upper} / K_count
+--- `runs` is always present. When `with_classify = true`, the
+--- `equilibrium` key becomes part of the contract (opaque table,
+--- since classify_fn is caller-defined).
+---
+--- @param spec table
+---   numbers?: string[]          — extract keys that resolve to numbers
+---   booleans?: string[]         — extract keys that resolve to booleans
+---   with_classify?: boolean     — include `equilibrium` in the shape
+--- @return table Schema (T.shape, open)
+function M.shape(spec)
+    local S = require("alc_shapes")
+    local T = S.T
+    spec = spec or {}
+
+    local fields = { runs = T.number }
+
+    for _, key in ipairs(spec.numbers or {}) do
+        fields[key .. "_median"] = T.number
+        fields[key .. "_p25"]    = T.number
+        fields[key .. "_p75"]    = T.number
+        fields[key .. "_mean"]   = T.number
+        fields[key .. "_std"]    = T.number
+    end
+
+    for _, key in ipairs(spec.booleans or {}) do
+        fields[key .. "_rate"]  = T.number
+        fields[key .. "_ci"]    = T.shape({
+            lower = T.number,
+            upper = T.number,
+        })
+        fields[key .. "_count"] = T.number
+    end
+
+    if spec.with_classify then
+        fields.equilibrium = T.table  -- caller-defined payload
+    end
+
+    return T.shape(fields)  -- open=true default (tolerates future additions)
+end
+
 --- Run Monte Carlo with Model-based API.
 --- Creates a fresh model per run, sets seed, runs N steps, extracts.
 ---

@@ -4,9 +4,10 @@
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
 -- ─── Test Helpers ──────────────────────────────────────────
-
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- Per README §"Adding a new test file": `package.path` is set by the MCP
+-- harness via `search_paths=[REPO]`. Do NOT prepend os.getenv("PWD") here
+-- — in worktree context PWD points at the parent repo, which silently
+-- shadows the worktree's code and produces false-green pass reports.
 
 local PKG_NAMES = {
     "abm", "abm.frame.agent", "abm.frame.model",
@@ -622,6 +623,118 @@ describe("abm.sweep", function()
         -- Returns last tier results with zero deltas
         expect(#results > 0).to.equal(true)
         expect(results[1].delta).to.equal(0)
+    end)
+end)
+
+-- ================================================================
+-- abm.mc.shape / abm.sweep.shape helpers (Phase 6-a-fix-1)
+-- ================================================================
+-- These helpers are the SSOT for the suffix convention applied by
+-- abm.mc.run (num key K → K_{median,p25,p75,mean,std}; bool key K →
+-- K_rate, K_ci, K_count). Pkgs that re-export this shape declared
+-- the suffixes by hand before the helper existed — a DRY violation
+-- that silently drifted. These tests pin the helper contract so
+-- future additions (e.g. a new stat field) only need to touch
+-- abm/mc.lua and the helper, not every ABM pkg.
+describe("abm.mc.shape", function()
+    lust.after(reset)
+
+    it("emits 5-suffix fields per number key", function()
+        mock_alc()
+        local mc = require("abm.mc")
+        local S = require("alc_shapes")
+        local shape = mc.shape({ numbers = { "gini" } })
+
+        expect(shape.kind).to.equal("shape")
+        expect(shape.fields.gini_median.prim).to.equal("number")
+        expect(shape.fields.gini_p25.prim).to.equal("number")
+        expect(shape.fields.gini_p75.prim).to.equal("number")
+        expect(shape.fields.gini_mean.prim).to.equal("number")
+        expect(shape.fields.gini_std.prim).to.equal("number")
+        -- runs is always present
+        expect(shape.fields.runs.prim).to.equal("number")
+    end)
+
+    it("emits rate/ci/count fields per boolean key", function()
+        mock_alc()
+        local mc = require("abm.mc")
+        local shape = mc.shape({ booleans = { "converged" } })
+
+        expect(shape.fields.converged_rate.prim).to.equal("number")
+        expect(shape.fields.converged_count.prim).to.equal("number")
+        -- CI is a nested shape with lower/upper
+        expect(shape.fields.converged_ci.kind).to.equal("shape")
+        expect(shape.fields.converged_ci.fields.lower.prim).to.equal("number")
+        expect(shape.fields.converged_ci.fields.upper.prim).to.equal("number")
+    end)
+
+    it("validates a real abm.mc.run output", function()
+        mock_alc()
+        local mc = require("abm.mc")
+        local S = require("alc_shapes")
+
+        local agg = mc.run({
+            sim_fn = function(seed) return { foo = 0.5, ok = true } end,
+            runs = 5,
+            extract = { "foo", "ok" },
+        })
+        local shape = mc.shape({ numbers = { "foo" }, booleans = { "ok" } })
+        local ok, reason = S.check(agg, shape)
+        expect(ok).to.equal(true)
+        if not ok then
+            -- Surface the reason when assertion fails so the test
+            -- output helps diagnose which field drifted.
+            error("shape check failed: " .. tostring(reason))
+        end
+    end)
+
+    it("accepts empty spec (runs-only shape)", function()
+        mock_alc()
+        local mc = require("abm.mc")
+        local shape = mc.shape({})
+        expect(shape.kind).to.equal("shape")
+        expect(shape.fields.runs.prim).to.equal("number")
+    end)
+end)
+
+describe("abm.sweep.shape", function()
+    lust.after(reset)
+
+    it("returns array_of shape matching sweep.run row layout", function()
+        mock_alc()
+        local sweep = require("abm.sweep")
+        local S = require("alc_shapes")
+        local shape = sweep.shape()
+
+        expect(shape.kind).to.equal("array_of")
+        expect(shape.elem.kind).to.equal("shape")
+        local f = shape.elem.fields
+        expect(f.param.prim).to.equal("string")
+        expect(f.base_value.prim).to.equal("number")
+        expect(f.low_value.prim).to.equal("number")
+        expect(f.high_value.prim).to.equal("number")
+        expect(f.score_at_low.prim).to.equal("number")
+        expect(f.score_at_high.prim).to.equal("number")
+        expect(f.delta.prim).to.equal("number")
+        expect(f.factor.prim).to.equal("number")
+    end)
+
+    it("validates a real abm.sweep.run output", function()
+        mock_alc()
+        local sweep = require("abm.sweep")
+        local S = require("alc_shapes")
+
+        local results = sweep.run({
+            base_params = { threshold = 0.5 },
+            param_names = { "threshold" },
+            eval_fn = function(p) return p.threshold > 0.6 and 0.0 or 1.0 end,
+        })
+        local shape = sweep.shape()
+        local ok, reason = S.check(results, shape)
+        expect(ok).to.equal(true)
+        if not ok then
+            error("shape check failed: " .. tostring(reason))
+        end
     end)
 end)
 

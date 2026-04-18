@@ -46,12 +46,23 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. Input accepts optional task +
--- numeric hyperparameters; T.shape default open=true absorbs any
--- additional fields. Result keeps the 3-section structure
--- (params / simulation / sensitivity) but leaves each sub-table
--- opaque — the inner agents/grid/history structures are pkg-private
--- and should not be shape-locked at this layer.
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers (suffix convention SSOT lives in abm/mc.lua
+-- and abm/sweep.lua). params is the post-defaults hash used internally
+-- by M.run — all fields are required numbers after the defaults are
+-- applied at runtime.
+local params_shape = T.shape({
+    n_boids            = T.number,
+    steps              = T.number,
+    separation_weight  = T.number,
+    alignment_weight   = T.number,
+    cohesion_weight    = T.number,
+    perception_radius  = T.number,
+    max_speed          = T.number,
+    max_force          = T.number,
+    world_size         = T.number,
+})
+
 M.spec = {
     entries = {
         run = {
@@ -69,9 +80,16 @@ M.spec = {
                 runs                = T.number:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = {
+                        "avg_nearest_distance",
+                        "alignment_score",
+                        "clusters",
+                    },
+                    booleans = { "cohesive_flock", "scattered" },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },

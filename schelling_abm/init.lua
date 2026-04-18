@@ -43,8 +43,16 @@ M.meta = {
 }
 
 ---@type AlcSpec
--- Phase 6-a: ABM MC-sweep pattern. 2D grid is pkg-private; result
--- sub-tables stay opaque.
+-- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
+-- abm.sweep.shape helpers.
+local params_shape = T.shape({
+    grid_size  = T.number,
+    threshold  = T.number,
+    density    = T.number,
+    type_ratio = T.number,
+    steps      = T.number,
+})
+
 M.spec = {
     entries = {
         run = {
@@ -58,9 +66,17 @@ M.spec = {
                 runs       = T.number:is_optional(),
             }),
             result = T.shape({
-                params      = T.table,
-                simulation  = T.table,
-                sensitivity = T.table,
+                params      = params_shape,
+                simulation  = abm.mc.shape({
+                    numbers  = {
+                        "final_segregation",
+                        "segregation_increase",
+                        "steps_to_converge",
+                        "unhappy_fraction",
+                    },
+                    booleans = { "converged", "high_segregation" },
+                }),
+                sensitivity = abm.sweep.shape(),
             }),
         },
     },
