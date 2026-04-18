@@ -15,6 +15,9 @@
 --- ctx.section_tokens: Max tokens per section fill (default: 400)
 --- ctx.skeleton_tokens: Max tokens for skeleton generation (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -23,6 +26,26 @@ M.meta = {
     version = "0.1.0",
     description = "Skeleton-of-Thought — outline-first parallel section generation",
     category = "generation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("The task requiring long-form output"),
+                max_sections    = T.number:is_optional():describe("Maximum outline sections (default: 6)"),
+                section_tokens  = T.number:is_optional():describe("Max tokens per section fill (default: 400)"),
+                skeleton_tokens = T.number:is_optional():describe("Max tokens for skeleton generation (default: 300)"),
+            }),
+            result = T.shape({
+                output        = T.string:describe("Final assembled long-form output (## headings + filled sections)"),
+                skeleton      = T.array_of(T.string):describe("Parsed section titles from skeleton (fallback: single-element = original task)"),
+                sections      = T.array_of(T.string):describe("Per-section LLM fills in the same order as skeleton"),
+                section_count = T.number:describe("Count of sections parsed and filled"),
+            }),
+        },
+    },
 }
 
 --- Parse skeleton output into section list.
@@ -118,5 +141,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
