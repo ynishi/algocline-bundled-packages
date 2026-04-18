@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **alc_shapes LuaCATS codegen** (`types/alc_shapes.d.lua`): Nested
+  `T.shape(...)` fields are now inline-expanded as LuaLS table type
+  literals (`{ field: type, ... }` / `{ ... }[]`) instead of being
+  collapsed to bare `table` / `table[]`. 11 of 13 previously-opaque
+  `table`-typed fields across 9 registered shapes (`voted.paths`,
+  `paneled.arguments`, `tournament.matches`, ranking `ranked_item`
+  variants, funnel `warnings`, …) are now walkable for IDE
+  completion and typo detection. Field order is alphabetical and
+  optional fields carry the `?` suffix inside inline literals.
+  `T.discriminated` is still rendered as `table` (union codegen
+  deferred). Class names and field names are unchanged, so consumer
+  annotations (`---@type AlcResultVoted`) remain valid — this is a
+  strict strengthening of the existing annotations, not a break.
 - **BREAKING** (`docs/hub/*.json` wire): `result_shape` is now a
   kind-tagged JSON object (`type_to_json` form) instead of a
   human-readable string. Consumers must switch from string match

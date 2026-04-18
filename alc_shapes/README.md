@@ -176,10 +176,11 @@ just verify-shapes   # CI drift check (diff against committed file)
 | `any` | `any` |
 | `array_of(T)` | `T[]` |
 | `array_of(optional(T))` | `(T\|nil)[]` |
-| `shape` (inline) | `table` |
+| `shape` (inline, nested) | `{ field: type, ... }` (empty shape → `table`) |
+| `array_of(shape(...))` | `{ field: type, ... }[]` |
 | `one_of({"a","b"})` | `"a"\|"b"` |
 | `map_of(K, V)` | `table<K, V>` |
-| `discriminated` | `table` |
+| `discriminated` | `table` (union codegen deferred) |
 | `ref(name)` | `<class_prefix>PascalCase(name)` (e.g. `ref("voted")` → `AlcResultVoted`) |
 | `optional(T)` | field name gets `?` suffix |
 | `described(T, doc)` | doc appended as `@...` suffix |

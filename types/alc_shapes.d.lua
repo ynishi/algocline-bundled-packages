@@ -21,36 +21,36 @@
 ---@field funnel_shape number[] @Candidate counts per stage [N, s1_out, s2_out]
 ---@field naive_baseline_calls number @Hypothetical full-pairwise call count
 ---@field naive_baseline_kind string @Baseline method identifier
----@field ranking table[] @Final ranking
+---@field ranking { original_index: number, pairwise_score: number, rank: number, text: string }[] @Final ranking
 ---@field savings_percent? number @LLM call savings vs baseline (nil on bypass)
 ---@field stages table[] @Per-stage detail (discriminated by name)
 ---@field total_llm_calls number
----@field warnings table[] @Diagnostic warnings
+---@field warnings { code: string, data: table, message: string, severity: "warn"|"critical" }[] @Diagnostic warnings
 
 ---@class AlcResultListwiseRanked
 ---@field best string @Top-ranked text
 ---@field best_index number @Top-ranked original index (1-based)
----@field killed table[] @Eliminated candidates
+---@field killed { index: number, rank: number, text: string }[] @Eliminated candidates
 ---@field n_candidates number
----@field ranked table[] @Full ranking
----@field top_k table[] @Top-k subset
+---@field ranked { index: number, rank: number, text: string }[] @Full ranking
+---@field top_k { index: number, rank: number, text: string }[] @Top-k subset
 ---@field total_llm_calls number
 
 ---@class AlcResultPairwiseRanked
 ---@field best string @Top-ranked text
 ---@field best_index number @Top-ranked original index (1-based)
 ---@field both_tie_pairs number @Pairs that tied in both directions
----@field killed table[] @Eliminated candidates
+---@field killed { index: number, rank: number, score: number, text: string }[] @Eliminated candidates
 ---@field method "allpair"|"sorting" @Comparison strategy
 ---@field n_candidates number
 ---@field position_bias_splits number @Position-bias correction splits
----@field ranked table[] @Full ranking with scores
+---@field ranked { index: number, rank: number, score: number, text: string }[] @Full ranking with scores
 ---@field score_semantics "copeland"|"rank_inverse" @Score interpretation
----@field top_k table[] @Top-k subset
+---@field top_k { index: number, rank: number, score: number, text: string }[] @Top-k subset
 ---@field total_llm_calls number
 
 ---@class AlcResultPaneled
----@field arguments table[] @Per-role position statements
+---@field arguments { role: string, text: string }[] @Per-role position statements
 ---@field synthesis string @Moderator synthesis
 
 ---@class AlcResultSafePaneled
@@ -76,7 +76,7 @@
 ---@field best string @Winner text
 ---@field best_index number @Winner original index (1-based)
 ---@field candidates string[] @Input candidate texts
----@field matches table[] @Pairwise match log
+---@field matches { a: number, b: number, reason: string, winner: number }[] @Pairwise match log
 ---@field total_wins number @Winner's win count
 
 ---@class AlcResultVoted
@@ -84,7 +84,7 @@
 ---@field answer_norm? string @Normalized vote key
 ---@field consensus string @LLM-synthesized majority summary
 ---@field n_sampled number @Number of sampled paths
----@field paths table[] @Per-path reasoning + extracted answer
+---@field paths { answer: string, reasoning: string }[] @Per-path reasoning + extracted answer
 ---@field total_llm_calls number
 ---@field vote_counts table<string, number> @{ [norm] = count } tally
 ---@field votes string[] @Normalized vote per path, 1-indexed

@@ -104,10 +104,68 @@ describe("alc_shapes.LuaCats.class_for", function()
         expect(out:match("---@field stages table%[%]")).to.exist()
     end)
 
-    it("maps inline nested shape to bare table", function()
+    it("inline-expands nested shape as LuaLS table literal", function()
         local sch = T.shape({ inner = T.shape({ x = T.string }) })
         local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field inner { x: string }")).to.exist()
+    end)
+
+    it("inline-expands nested shape with alphabetical field order", function()
+        local sch = T.shape({
+            inner = T.shape({
+                zulu  = T.string,
+                alpha = T.number,
+            }),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field inner { alpha: number, zulu: string }")).to.exist()
+    end)
+
+    it("marks optional fields in inline shape with ?", function()
+        local sch = T.shape({
+            inner = T.shape({
+                required_f = T.string,
+                optional_f = T.number:is_optional(),
+            }),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field inner { optional_f%?: number, required_f: string }")).to.exist()
+    end)
+
+    it("renders array_of(shape(...)) as inline table array `{ ... }[]`", function()
+        local sch = T.shape({
+            paths = T.array_of(T.shape({
+                answer    = T.string:is_optional(),
+                reasoning = T.string,
+            })),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field paths { answer%?: string, reasoning: string }%[%]")).to.exist()
+    end)
+
+    it("nests array inside inline shape: { xs: string[] }", function()
+        local sch = T.shape({
+            inner = T.shape({ xs = T.array_of(T.string) }),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match("---@field inner { xs: string%[%] }")).to.exist()
+    end)
+
+    it("renders empty inline shape as bare `table` (no empty braces)", function()
+        local sch = T.shape({ inner = T.shape({}) })
+        local out = S.LuaCats.class_for("C", sch)
         expect(out:match("---@field inner table")).to.exist()
+        expect(out:match("---@field inner { }")).to_not.exist()
+    end)
+
+    it("peels described wrapper inside inline shape", function()
+        local sch = T.shape({
+            inner = T.shape({ x = T.string:describe("inner doc") }),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        -- inner-field describe() text is intentionally dropped (LuaLS inline
+        -- table literal syntax does not support per-field doc suffixes).
+        expect(out:match("---@field inner { x: string }")).to.exist()
     end)
 
     it("appends described doc as @ suffix on the line", function()

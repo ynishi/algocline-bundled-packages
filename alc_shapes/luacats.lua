@@ -28,12 +28,38 @@ local function pascal_case(name)
     return table.concat(out)
 end
 
+--- Forward declaration: inline_shape_type and type_of are mutually recursive
+--- (array_of(shape(...)) threads array -> shape -> inline expansion -> type_of
+--- on each field).
+local type_of
+
+--- Render a nested shape as an inline LuaLS table type literal, e.g.
+---     { answer?: string, reasoning: string }
+--- Field order is alphabetical (via reflect.fields). Empty shapes render
+--- as bare `table` since `{ }` has no meaningful LuaLS interpretation.
+---
+--- Top-level shapes are NOT rendered this way — `class_for`/`gen` emit
+--- them as `---@class` blocks. This helper is invoked only from the
+--- `kind == "shape"` branch of `type_of`, which fires only for nested
+--- shapes reached via `array_of` / shape-field / map_of value etc.
+local function inline_shape_type(node, class_prefix)
+    local entries = reflect.fields(node)
+    if #entries == 0 then return "table" end
+    local parts = {}
+    for i = 1, #entries do
+        local e = entries[i]
+        local suffix = e.optional and "?" or ""
+        parts[i] = string.format("%s%s: %s", e.name, suffix, type_of(e.type, class_prefix))
+    end
+    return "{ " .. table.concat(parts, ", ") .. " }"
+end
+
 --- Map a schema node to its LuaCATS type string.
---- `named_shapes` is a set of inline-shape references that should render
---- as bare `table` (named shapes are only emitted at the top level).
 --- `class_prefix` is threaded through so `ref(name)` resolves to the
---- correct class identifier.
-local function type_of(node, class_prefix)
+--- correct class identifier. Nested shapes are inline-expanded as
+--- `{ field: type, ... }` via `inline_shape_type`; `discriminated` is
+--- still collapsed to `table` (union codegen deferred).
+type_of = function(node, class_prefix)
     class_prefix = class_prefix or "AlcResult"
     local kind = rawget(node, "kind")
     if kind == "prim" then
@@ -76,8 +102,10 @@ local function type_of(node, class_prefix)
         local v = type_of(rawget(node, "val"), class_prefix)
         return "table<" .. k .. ", " .. v .. ">"
     elseif kind == "shape" then
-        -- inline nested shape renders as `table` (no anonymous class emitted).
-        return "table"
+        -- Nested shape: inline-expand to a LuaLS table type literal so
+        -- IDE completion / typo detection survive for walkable fields
+        -- like `voted.paths[i].answer`.
+        return inline_shape_type(node, class_prefix)
     elseif kind == "ref" then
         -- ref renders as the target named class (PascalCase of the ref name).
         return class_prefix .. pascal_case(rawget(node, "name"))
@@ -155,8 +183,9 @@ function M.gen(shapes_table, class_prefix)
 end
 
 M._internal = {
-    pascal_case = pascal_case,
-    type_of     = type_of,
+    pascal_case       = pascal_case,
+    type_of           = type_of,
+    inline_shape_type = inline_shape_type,
 }
 
 return M
