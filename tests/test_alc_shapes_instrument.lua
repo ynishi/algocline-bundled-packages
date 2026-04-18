@@ -454,6 +454,11 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- per-hypothesis `history` refutation trace; step_verify has per-round
     -- `steps` array + optional `error_at`; counterfactual_verify carries
     -- `faithful` boolean + `mismatches` subset array.
+    -- Phase 4-c (category="attribution"/"correction"/"validation") pkgs:
+    -- claim_trace / blind_spot / negation. claim_trace uses T.any for
+    -- sources (string-or-array) with optional `source_index` /
+    -- `sources_count`. blind_spot has multi-role history array. negation's
+    -- `initial_answer` is optional (omitted on empty-conditions short-circuit).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -470,6 +475,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "compute_alloc", "optimize", "bisect",
         "critic", "cove", "factscore",
         "falsify", "step_verify", "counterfactual_verify",
+        "claim_trace", "blind_spot", "negation",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

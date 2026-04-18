@@ -28,6 +28,9 @@
 --- ctx.trace_tokens: Max tokens per claim attribution (default: 300)
 --- ctx.gen_tokens: Max tokens for answer generation (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,40 @@ M.meta = {
     version = "0.1.0",
     description = "Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance",
     category = "attribution",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("The original question/task"),
+                answer         = T.string:is_optional():describe("Pre-supplied answer to attribute (auto-generated if nil)"),
+                sources        = T.any:describe("Source text(s): single string or array of strings"),
+                extract_tokens = T.number:is_optional():describe("Max tokens for claim extraction (default: 500)"),
+                trace_tokens   = T.number:is_optional():describe("Max tokens per claim attribution (default: 300)"),
+                gen_tokens     = T.number:is_optional():describe("Max tokens for answer generation (default: 600)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Answer whose claims were traced (auto-generated or passed in)"),
+                claims            = T.array_of(T.shape({
+                    claim        = T.string:describe("Atomic claim text"),
+                    status       = T.string:describe("'supported' | 'partial' | 'unsupported'"),
+                    span         = T.string:describe("Quoted supporting span (empty when unsupported)"),
+                    source_index = T.number:is_optional():describe("1-based source document index (nil for single source)"),
+                    reasoning    = T.string:describe("Attribution reasoning text"),
+                    raw          = T.string:describe("Raw attributor output"),
+                })):describe("Per-claim attribution records (empty when no claims extracted)"),
+                attribution_score = T.number:describe("(supported + 0.5*partial) / total; 1.0 when no claims"),
+                coverage          = T.number:describe("(supported + partial) / total; 1.0 when no claims"),
+                supported         = T.number:describe("Count of SUPPORTED claims"),
+                partial           = T.number:describe("Count of PARTIAL claims"),
+                unsupported       = T.number:describe("Count of UNSUPPORTED claims"),
+                total             = T.number:describe("Total extracted claims"),
+                sources_count     = T.number:is_optional():describe("Number of source documents (omitted on empty-claims short-circuit)"),
+            }),
+        },
+    },
 }
 
 --- Parse numbered claims from extraction output.
@@ -271,5 +308,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

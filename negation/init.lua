@@ -28,6 +28,9 @@
 --- ctx.verify_tokens: Max tokens per condition verification (default: 200)
 --- ctx.revise_tokens: Max tokens for revision (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,37 @@ M.meta = {
     version = "0.1.0",
     description = "Adversarial self-test — generate destruction conditions and verify answer survival",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("The task/question to solve"),
+                answer         = T.string:is_optional():describe("Pre-supplied answer to test (auto-generated if nil)"),
+                max_conditions = T.number:is_optional():describe("Max destruction conditions to generate (default: 5)"),
+                gen_tokens     = T.number:is_optional():describe("Max tokens for generation / condition listing (default: 600)"),
+                verify_tokens  = T.number:is_optional():describe("Max tokens per condition verification (default: 200)"),
+                revise_tokens  = T.number:is_optional():describe("Max tokens for revision (default: 600)"),
+            }),
+            result = T.shape({
+                answer         = T.string:describe("Final answer (original when survived, revised when conditions held)"),
+                initial_answer = T.string:is_optional():describe("Answer tested this round (omitted when no conditions parsed)"),
+                survived       = T.boolean:describe("Whether every destruction condition was refuted (holding==0)"),
+                conditions     = T.array_of(T.shape({
+                    condition = T.string:describe("Destruction condition text"),
+                    verdict   = T.string:describe("'holds' | 'refuted'"),
+                    reasoning = T.string:describe("Fact-checker reasoning"),
+                    raw       = T.string:describe("Raw verification output"),
+                })):describe("Per-condition verification records (empty when no conditions parsed)"),
+                holding        = T.number:describe("Count of conditions judged to HOLD"),
+                refuted        = T.number:describe("Count of conditions judged REFUTED"),
+                total          = T.number:describe("Total conditions evaluated (= #conditions)"),
+                revised        = T.boolean:describe("Whether revision round ran (holding > 0)"),
+            }),
+        },
+    },
 }
 
 --- Parse numbered conditions from LLM output.
@@ -266,5 +300,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

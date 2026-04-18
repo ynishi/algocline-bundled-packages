@@ -29,6 +29,9 @@
 --- ctx.gen_tokens: Max tokens for generation (default: 600)
 --- ctx.correct_tokens: Max tokens for correction (default: 800)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -37,6 +40,33 @@ M.meta = {
     version = "0.1.0",
     description = "Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction",
     category = "correction",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("The task/question to solve"),
+                rounds         = T.number:is_optional():describe("Externalize→correct rounds (default: 1)"),
+                wait           = T.boolean:is_optional():describe("Enable 'Wait' reflection trigger (default: true)"),
+                gen_tokens     = T.number:is_optional():describe("Max tokens for initial generation (default: 600)"),
+                correct_tokens = T.number:is_optional():describe("Max tokens per correction / reflection (default: 800)"),
+            }),
+            result = T.shape({
+                answer               = T.string:describe("Final answer after externalize→correct (+ Wait)"),
+                initial_answer       = T.string:describe("Initial answer before any correction rounds"),
+                corrections_detected = T.number:describe("Count of rounds whose output matched error/correction keywords"),
+                rounds               = T.number:describe("Number of externalize→correct rounds executed"),
+                wait_applied         = T.boolean:describe("Whether 'Wait' reflection round ran"),
+                history              = T.array_of(T.shape({
+                    round = T.number:describe("0-based round index (0=initial, N+1=wait_reflection)"),
+                    role  = T.string:describe("'initial' | 'correction' | 'wait_reflection'"),
+                    text  = T.string:describe("Output text of this round"),
+                })):describe("Per-round trace including initial draft, corrections, and optional wait reflection"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -161,5 +191,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
