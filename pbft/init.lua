@@ -32,6 +32,9 @@
 
 local bft = require("bft")
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -41,6 +44,57 @@ M.meta = {
     description = "PBFT-inspired 3-phase LLM consensus — propose, validate, "
         .. "commit with BFT quorum guarantees (Castro-Liskov 1999)",
     category = "aggregation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("The problem to solve"),
+                n_agents     = T.number:is_optional()
+                    :describe("Number of agents (default: 3, must satisfy n >= 3f+1)"),
+                f            = T.number:is_optional()
+                    :describe("Assumed Byzantine faults (default: 0)"),
+                gen_tokens   = T.number:is_optional()
+                    :describe("Max tokens per proposal (default: 400)"),
+                vote_tokens  = T.number:is_optional()
+                    :describe("Max tokens per vote (default: 200)"),
+                synth_tokens = T.number:is_optional()
+                    :describe("Max tokens for synthesis (default: 500)"),
+                gen_system   = T.string:is_optional()
+                    :describe("Custom system prompt for proposal phase"),
+                vote_system  = T.string:is_optional()
+                    :describe("Custom system prompt for voting phase"),
+                synth_system = T.string:is_optional()
+                    :describe("Custom system prompt for synthesis phase"),
+            }),
+            result = T.shape({
+                answer            = T.string
+                    :describe("Committed answer (winning proposal or synthesized)"),
+                commit_method     = T.string
+                    :describe("\"quorum\" (2f+1 agreement) | \"synthesis\" (no consensus)"),
+                quorum_met        = T.boolean
+                    :describe("True iff winner_votes >= quorum_required"),
+                quorum_required   = T.number:describe("BFT threshold = n - f"),
+                n_agents          = T.number:describe("Number of agents actually used"),
+                f_assumed         = T.number:describe("Byzantine-fault budget passed to bft"),
+                bft_valid         = T.boolean
+                    :describe("True when bft.validate(n, f) passed (always true if we reach here)"),
+                votes             = T.array_of(T.number)
+                    :describe("Per-agent vote (proposal index); falls back to own index on parse failure"),
+                vote_distribution = T.array_of(T.shape({
+                    proposal = T.number:describe("Proposal index"),
+                    votes    = T.number:describe("Votes received"),
+                })):describe("Vote counts sorted desc by votes"),
+                winner_proposal   = T.number
+                    :describe("Proposal index with plurality (arbitrary tie-break order)"),
+                winner_votes      = T.number:describe("Vote count for winner_proposal"),
+                proposals         = T.array_of(T.string)
+                    :describe("Raw proposals from Phase 1 (always preserved per N2 Red Line)"),
+            }),
+        },
+    },
 }
 
 --- Count occurrences of each vote and find the majority.
@@ -191,5 +245,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

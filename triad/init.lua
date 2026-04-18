@@ -15,6 +15,9 @@
 --- ctx.gen_tokens: Max tokens per argument (default: 400)
 --- ctx.judge_tokens: Max tokens for final verdict (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -23,6 +26,35 @@ M.meta = {
     version = "0.1.0",
     description = "Adversarial 3-role debate — proponent/opponent/judge with multi-round argumentation",
     category = "adversarial",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("The question or claim to debate"),
+                rounds       = T.number:is_optional()
+                    :describe("Number of debate rounds after opening (default: 3)"),
+                gen_tokens   = T.number:is_optional()
+                    :describe("Max tokens per argument (default: 400)"),
+                judge_tokens = T.number:is_optional()
+                    :describe("Max tokens for final verdict (default: 500)"),
+            }),
+            result = T.shape({
+                verdict      = T.string:describe("Full verdict text from the judge"),
+                winner       = T.string
+                    :describe("Parsed winner token (\"proponent\"|\"opponent\"|\"draw\"|\"unknown\")"),
+                transcript   = T.array_of(T.shape({
+                    round     = T.number
+                        :describe("Round index (0 = opening, 1..N = rebuttal rounds)"),
+                    proponent = T.string:describe("Proponent's argument this round"),
+                    opponent  = T.string:describe("Opponent's argument this round"),
+                })):describe("Full debate transcript including opening"),
+                total_rounds = T.number:describe("Number of rebuttal rounds (excludes opening)"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -151,5 +183,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

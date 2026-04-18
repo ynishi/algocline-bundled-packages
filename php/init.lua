@@ -14,6 +14,9 @@
 --- ctx.task (required): The problem to solve
 --- ctx.max_rounds: Maximum hint-retry cycles (default: 4)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -22,6 +25,32 @@ M.meta = {
     version = "0.1.0",
     description = "Progressive-Hint Prompting — iterative re-solving with prior answers as hints",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The problem to solve"),
+                max_rounds = T.number:is_optional()
+                    :describe("Maximum hint-retry cycles (default: 4)"),
+            }),
+            result = T.shape({
+                answer       = T.string:describe("Final answer at convergence (or last round)"),
+                conclusion   = T.string:describe("Extracted core conclusion of the final answer"),
+                rounds       = T.array_of(T.shape({
+                    round      = T.number:describe("Round index (1-based)"),
+                    answer     = T.string:describe("Full answer produced this round"),
+                    conclusion = T.string:describe("Core conclusion extracted from this round's answer"),
+                    hint_used  = T.boolean:describe("Whether previous rounds were fed back as hints (false for round 1)"),
+                })):describe("Per-round execution record"),
+                total_rounds = T.number:describe("Total rounds actually executed"),
+                converged    = T.boolean
+                    :describe("True iff the last two rounds' conclusions match"),
+            }),
+        },
+    },
 }
 
 --- Extract the core conclusion from an answer for convergence comparison.
@@ -138,5 +167,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

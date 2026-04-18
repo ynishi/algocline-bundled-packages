@@ -614,6 +614,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- best_reasoning, vote-branch exposes variants; all such fields are
     -- `:is_optional()`. moa has a nested array_of(array_of(T.string)) for
     -- layer_outputs [layer_idx][agent_idx].
+    -- Phase 5-c (category="reasoning"/"adversarial"/"aggregation") pkgs:
+    -- php / triad / pbft. php has per-round record (round, answer,
+    -- conclusion, hint_used). triad's transcript mixes opening (round=0)
+    -- and rebuttal rounds in one array. pbft has vote_distribution as
+    -- array_of({proposal, votes}) + raw proposals preserved per N2
+    -- Red Line (initial answer preservation).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -634,6 +640,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "pre_mortem", "contrastive", "robust_qa",
         "orch_fixpipe", "orch_adaptive", "orch_gatephase",
         "orch_escalate", "orch_nver", "moa",
+        "php", "triad", "pbft",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil
