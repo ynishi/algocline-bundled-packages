@@ -20,6 +20,10 @@
 --- Packages with multiple entry points (e.g. calibrate.run vs
 --- calibrate.assess) add further `M.spec.entries.{name}` blocks.
 --- Packages without `M.spec` are treated as opaque by spec_resolver.
+--- Producers self-decorate at module tail with `M.run = S.instrument(
+--- M, "run")`; the wrapper reads `M.spec.entries.<entry>.{input,
+--- result}` and asserts on each call when `ALC_SHAPE_CHECK=1`.
+--- See README.md §Producer usage and §Producer-wrap vs caller-wrap.
 
 local T = require("alc_shapes.t")
 local check = require("alc_shapes.check")

@@ -185,12 +185,39 @@ just verify-shapes   # CI drift check (diff against committed file)
 | `optional(T)` | field name gets `?` suffix |
 | `described(T, doc)` | doc appended as `@...` suffix |
 
+## Package I/O contract — `M.spec.entries`
+
+Bundled packages declare their input / result contract in `M.spec.entries.<entry_name>`:
+
+```lua
+M.spec = {
+    entries = {
+        run = {
+            input  = T.shape({ task = T.string }, { open = true }),
+            result = T.ref("voted"),   -- or "voted" (coerced to T.ref)
+        },
+        -- Additional entries (e.g. calibrate.assess) go here with the same shape.
+    },
+    -- Optional composability hints (see spec_resolver.lua header):
+    --   compose = { passthrough = "voted" | { ... } }
+    --   exports = { "new_shape_name", ... }
+}
+```
+
+- Each `input` / `result` field accepts either a string (looked up as
+  `T.ref(name)` in the `alc_shapes` registry) or an inline schema.
+- Packages **without** `M.spec` are treated as `kind = "opaque"` by
+  `spec_resolver` — they still run, but no shape checking is applied.
+- `M.meta` stays purely descriptive (name / version / category /
+  description); the shape contract lives on `M.spec`, not `M.meta`.
+
 ## Producer usage
 
-Declare `result_shape` in package meta, optionally add `assert_dev` for self-defense:
+Declare shapes in `M.spec.entries` and self-decorate with `S.instrument` at the module tail. The wrapper reads `M.spec.entries[entry_name].{input, result}` via `spec_resolver`, gates on `ALC_SHAPE_CHECK=1`, and fires `check.assert` on pre/post payloads.
 
 ```lua
 local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 M.meta = {
@@ -198,28 +225,87 @@ M.meta = {
     version = "0.2.0",
     description = "...",
     category = "aggregation",
-    result_shape = "voted",
+}
+M.spec = {
+    entries = {
+        run = {
+            input  = T.shape({ task = T.string }, { open = true }),
+            result = T.ref("voted"),
+        },
+    },
 }
 
 function M.run(ctx)
     -- ... build ctx.result ...
-    S.assert_dev(ctx.result, "voted", "sc.run")
     return ctx
 end
+
+-- Malli-style self-decoration at module tail.
+-- Every caller (direct `sc.run(ctx)`, `SR.run(pkg, ctx)` via
+-- spec_resolver, or recipe ingredient) inherits the dev-mode check.
+M.run = S.instrument(M, "run")
 
 return M
 ```
 
+Multi-entry modules (e.g. `calibrate.run` + `calibrate.assess`) wrap each entry independently:
+
+```lua
+M.assess = S.instrument(M, "assess")
+M.run    = S.instrument(M, "run")
+```
+
+Nested dispatch (`M.run` calling `M.assess(ctx)` internally) goes through the wrapped version — Lua table lookup is resolved at call time, so the inner call fires its own check. Intentional: catches a bad intermediate before it leaks into the outer result.
+
+An optional third argument lets callers override an entry that is not declared in `M.spec` (rare; used mostly in tests / scaffolding):
+
+```lua
+M.custom = S.instrument(M, "custom", {
+    input  = T.shape({ task = T.string }, { open = true }),
+    result = "voted",
+})
+```
+
 ## Consumer usage
 
-Assert at package boundaries:
+Direct calls need **no explicit check** — the producer's `S.instrument`
+wrapper runs the post-check on `ctx.result` for free:
+
+```lua
+local sc = require("sc")
+local sc_result = sc.run({ task = task, n = 7 })
+-- ctx.result already validated by sc's own wrapper in dev mode.
+```
+
+For consumers that want to route through a generic dispatcher (e.g. routing layers that handle both typed and opaque packages uniformly), use `spec_resolver.run`:
+
+```lua
+local S  = require("alc_shapes")
+local SR = S.spec_resolver
+local result_ctx = SR.run(sc, { task = task, n = 7 })
+-- Same post-check as instrument for typed pkgs; silent no-op for opaque pkgs.
+```
+
+Manual boundary asserts are still available for ad-hoc validation of external data:
 
 ```lua
 local S = require("alc_shapes")
-local sc = require("sc")
-local sc_result = sc.run({ task = task, n = 7 })
-S.assert(sc_result.result, S.voted, "recipe_safe_panel input")
+S.assert(external_blob, "voted", "my_consumer")  -- loud fail on shape violation
 ```
+
+### Producer-wrap vs caller-wrap
+
+Both forms coexist:
+
+- **Producer-wrap** (`S.instrument`, preferred for bundled pkgs) —
+  the package self-decorates once; every caller inherits the check.
+  Single source of truth is the producer.
+- **Caller-wrap** (`SR.run(pkg, ctx)`) — the dispatcher performs
+  the check on behalf of the caller. Useful when you do not trust
+  the producer to self-validate, or when iterating over a mix of
+  typed and opaque packages.
+
+See `alc_shapes/instrument.lua` and `alc_shapes/spec_resolver.lua` headers for the precedent references (Malli `mi/instrument!`, Zod v4 `z.function({...}).implement(fn)`, tRPC procedure builder).
 
 ## Registered shapes
 
@@ -239,12 +325,14 @@ S.assert(sc_result.result, S.voted, "recipe_safe_panel input")
 
 ```
 alc_shapes/
-  init.lua        # SSoT — shape dictionary + public API re-export
-  t.lua           # DSL combinators
-  check.lua       # Validator (check / assert / assert_dev)
-  reflect.lua     # Reflection (fields / walk)
-  luacats.lua     # LuaCATS codegen
-  README.md       # This file
+  init.lua           # SSoT — shape dictionary + public API re-export
+  t.lua              # DSL combinators
+  check.lua          # Validator (check / assert / assert_dev / is_dev_mode)
+  reflect.lua        # Reflection (fields / walk)
+  luacats.lua        # LuaCATS codegen
+  spec_resolver.lua  # M.spec normalization + caller-wrap run()
+  instrument.lua     # Malli-style producer-wrap self-decoration
+  README.md          # This file
 
 types/
   alc_shapes.d.lua  # Auto-generated LuaCATS (hand-edit prohibited)
@@ -257,5 +345,8 @@ tests/
   test_alc_shapes_check.lua       # Validator tests
   test_alc_shapes_luacats.lua     # Codegen tests
   test_alc_shapes_reflect.lua     # Reflection tests
+  test_alc_shapes_persist.lua     # Schema-as-Data persistence (metatable-strip) tests
+  test_alc_shapes_instrument.lua  # Producer-wrap instrument tests
+  test_spec_resolver.lua          # M.spec normalization + SR.run tests
   test_shapes_conformance.lua     # Cross-package conformance tests
 ```

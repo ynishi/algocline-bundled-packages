@@ -248,16 +248,30 @@ Gaps:
 
 ## Result Shape Convention
 
-Packages declare the shape of their `ctx.result` via `meta.result_shape`, validated at runtime by **[alc_shapes](alc_shapes/)**. This ensures consumers can rely on documented fields without tight coupling.
+Packages declare their I/O contract under `M.spec.entries.<entry_name>.{input, result}`, validated at runtime by **[alc_shapes](alc_shapes/)**. Producers self-decorate with `S.instrument(M, "run")` at the module tail; every caller inherits the dev-mode check without writing any assert of their own.
 
 ```lua
-local S = require("alc_shapes")
-S.assert(result, "voted", "my_consumer")  -- loud fail if shape violated
+-- Producer (bundled pkg)
+M.spec = {
+    entries = {
+        run = { input = T.shape({ task = T.string }, { open = true }),
+                result = T.ref("voted") },
+    },
+}
+M.run = require("alc_shapes").instrument(M, "run")
+
+-- Consumer
+local sc_result = require("sc").run({ task = "...", n = 7 })
+-- ctx.result is already shape-checked in dev mode — no manual assert needed.
 ```
 
-9 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), and discriminated unions (`T.discriminated`).
+Manual `S.assert(value, "voted", hint)` is still available for ad-hoc
+validation of external data. Dev-mode checks activate under
+`ALC_SHAPE_CHECK=1`.
 
-See [alc_shapes/README.md](alc_shapes/README.md) for the full API reference (combinators, validator, reflection, codegen).
+9 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), discriminated unions (`T.discriminated`), and named references (`T.ref`).
+
+See [alc_shapes/README.md](alc_shapes/README.md) for the full API reference (combinators, validator, `M.spec.entries`, instrument, spec_resolver, reflection, codegen).
 
 ## Usage
 
@@ -314,6 +328,9 @@ A directory with an `init.lua` at its root constitutes one package.
 
 ```lua
 -- init.lua
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 M.meta = {
@@ -321,19 +338,31 @@ M.meta = {
     version = "0.1.0",
     description = "My custom strategy",
     category = "reasoning",
-    result_shape = "my_shape",  -- optional: register in alc_shapes/init.lua
+}
+
+-- Optional: declare the I/O contract for dev-mode shape checking.
+-- `input` / `result` accept either a string (registry lookup) or
+-- an inline schema. Packages without M.spec still run — they are
+-- treated as opaque by spec_resolver (no type checking).
+M.spec = {
+    entries = {
+        run = {
+            input  = T.shape({ task = T.string }, { open = true }),
+            result = "my_shape",  -- register in alc_shapes/init.lua first
+        },
+    },
 }
 
 function M.run(ctx)
     local task = ctx.task or error("ctx.task is required")
     -- Implement using alc.llm(), alc.map(), etc.
     ctx.result = { answer = "..." }
-
-    -- Optional: self-defense assert (runs only when ALC_SHAPE_CHECK=1)
-    local S = require("alc_shapes")
-    S.assert_dev(ctx.result, "my_shape", "my-strategy.run")
     return ctx
 end
+
+-- Malli-style self-decoration: the wrapper asserts ret.result against
+-- M.spec.entries.run.result when ALC_SHAPE_CHECK=1. No-op when dev is off.
+M.run = S.instrument(M, "run")
 
 return M
 ```
