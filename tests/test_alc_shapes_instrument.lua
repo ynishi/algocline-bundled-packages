@@ -295,6 +295,142 @@ describe("alc_shapes.instrument: spec override", function()
     end)
 end)
 
+-- ── Direct-args mode (library-style pkgs) ───────────────────────────
+
+describe("alc_shapes.instrument: direct-args mode", function()
+    local function lib_pkg()
+        -- bft-style: pure function `fn(n, f) -> number`.
+        return {
+            meta = { name = "libpkg" },
+            spec = {
+                entries = {
+                    threshold = {
+                        args   = { T.number, T.number },
+                        result = T.number,
+                    },
+                },
+            },
+            threshold = function(n, f)
+                return n - f
+            end,
+        }
+    end
+
+    it("validates positional args and raw return", function()
+        local mod = lib_pkg()
+        mod.threshold = S.instrument(mod, "threshold")
+        expect(mod.threshold(5, 1)).to.equal(4)
+    end)
+
+    it("throws in dev mode when an arg has the wrong type", function()
+        if not in_dev() then return end
+        local mod = lib_pkg()
+        mod.threshold = S.instrument(mod, "threshold")
+        local ok, err = pcall(mod.threshold, 5, "oops")
+        expect(ok).to.equal(false)
+        expect(err:match("libpkg%.threshold:arg2")).to.exist()
+    end)
+
+    it("throws in dev mode when raw return violates result", function()
+        if not in_dev() then return end
+        local mod = lib_pkg()
+        mod.threshold = function(n, f) return "not-a-number" end
+        mod.threshold = S.instrument(mod, "threshold")
+        local ok, err = pcall(mod.threshold, 5, 1)
+        expect(ok).to.equal(false)
+        expect(err:match("libpkg%.threshold")).to.exist()
+    end)
+
+    it("skips nil slots in args (per-arg opt-out)", function()
+        if not in_dev() then return end
+        -- Second slot is nil → opaque options table is NOT validated.
+        local mod = {
+            meta = { name = "opaque_opts" },
+            spec = {
+                entries = {
+                    run = {
+                        args   = { T.number, nil },
+                        result = T.number,
+                    },
+                },
+            },
+            run = function(n, opts) return n + (opts.bias or 0) end,
+        }
+        mod.run = S.instrument(mod, "run")
+        expect(mod.run(10, { bias = 3 })).to.equal(13)
+    end)
+
+    it("accepts optional trailing args (T.x:is_optional())", function()
+        local mod = {
+            meta = { name = "opt_tail" },
+            spec = {
+                entries = {
+                    run = {
+                        args   = { T.number, T.number:is_optional() },
+                        result = T.number,
+                    },
+                },
+            },
+            run = function(n, bias) return n + (bias or 0) end,
+        }
+        mod.run = S.instrument(mod, "run")
+        expect(mod.run(10)).to.equal(10)
+        expect(mod.run(10, 5)).to.equal(15)
+    end)
+
+    it("string shape names in args are coerced to T.ref", function()
+        -- Result-side string coercion is already tested elsewhere; this
+        -- test covers the args[i] string path through coerce_args_list.
+        local mod = {
+            meta = { name = "argstr" },
+            spec = {
+                entries = {
+                    run = {
+                        args   = { "voted" },  -- 1st arg must match "voted"
+                        result = T.string,
+                    },
+                },
+            },
+            run = function(v) return v.consensus end,
+        }
+        mod.run = S.instrument(mod, "run")
+        expect(mod.run(voted_fixture())).to.equal("X")
+    end)
+
+    it("rejects concurrent input + args at spec-resolve time", function()
+        local mod = {
+            meta = { name = "conflict" },
+            spec = {
+                entries = {
+                    run = {
+                        input  = T.shape({ task = T.string }, { open = true }),
+                        args   = { T.number },
+                        result = T.number,
+                    },
+                },
+            },
+            run = function(_) return 0 end,
+        }
+        local ok, err = pcall(S.instrument, mod, "run")
+        expect(ok).to.equal(false)
+        expect(err:match("mutually exclusive")).to.exist()
+    end)
+
+    it("rejects concurrent input + args via override spec", function()
+        local mod = {
+            meta = { name = "conflict_override" },
+            run  = function(_) return 0 end,
+        }
+        local ok, err = pcall(S.instrument, mod, "run", {
+            input  = T.shape({}, { open = true }),
+            args   = { T.number },
+            result = T.number,
+        })
+        expect(ok).to.equal(false)
+        expect(err:match("mutually exclusive")).to.exist()
+    end)
+end)
+
 -- ── Dev-mode gating ──────────────────────────────────────────────────
 
 describe("alc_shapes.instrument: dev-mode gating", function()

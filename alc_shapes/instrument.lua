@@ -52,9 +52,13 @@
 ---
 --- ## Alc-specific adaptation
 ---
---- The `ctx`-threading convention (every entry takes a single `ctx`
---- table, writes `ctx.result = {...}`, returns `ctx`) defines where the
---- shapes live:
+--- Two entry paradigms coexist. The declaration shape decides which
+--- wrapper path runs.
+---
+--- ### (1) ctx-threading (default; `spec.entries.{e}.input`)
+---
+--- Every entry takes a single `ctx` table, writes `ctx.result = {...}`,
+--- returns `ctx`. Applies to 90%+ of bundled pkgs.
 ---
 --- - **Input** assertion targets the first positional argument (`ctx`).
 ---   Reads `M.spec.entries[entry_name].input` (string registry key or
@@ -62,7 +66,31 @@
 --- - **Result** assertion targets `ret.result` (ctx-threading), falling
 ---   back to `ret` itself when the function does not return a table with
 ---   `.result` set. Reads `M.spec.entries[entry_name].result`.
---- - **Hint** is `"<meta.name>.<entry_name>"`, e.g. `"calibrate.assess"`.
+---
+--- ### (2) direct-args (library-style; `spec.entries.{e}.args`)
+---
+--- Pure library-style pkgs (e.g. `bft.threshold(n, f) -> number`,
+--- `kemeny.aggregate(rankings) -> ranking`) take positional args and
+--- return a raw value. `args` is an **array of shapes** aligned to the
+--- function's positional parameters; the wrapper checks each `args[i]`
+--- against the caller-supplied i-th argument.
+---
+--- - **Input** assertion: for each `args[i]` (non-nil slot), asserts the
+---   caller's i-th argument. Slots may be `nil` to skip validation at
+---   that position (useful for opaque options tables).
+--- - **Result** assertion targets the **raw return value** (not
+---   `ret.result`) — library functions return scalars / tables directly.
+--- - **Optional args** use `T.x:is_optional()` at the corresponding slot;
+---   the check handler accepts nil for optional schemas at top level.
+---
+--- `input` and `args` are mutually exclusive per entry. `spec_resolver`
+--- raises at declaration time when both are set, so the wrapper body
+--- only needs to branch on one side.
+---
+--- ### Shared
+---
+--- - **Hint** is `"<meta.name>.<entry_name>"`, e.g. `"calibrate.assess"`
+---   or `"bft.threshold"`. Arg-position hints append `":arg<i>"`.
 --- - **Gating** is `ALC_SHAPE_CHECK=1` (existing dev-mode env var). When
 ---   off, the wrapper only pays one `os.getenv` per call.
 ---
@@ -74,15 +102,24 @@
 --- `M.spec` (e.g. temporary test scaffolding):
 ---
 --- ```lua
+--- -- ctx-threading override:
 --- M.custom = S.instrument(M, "custom", {
 ---     input  = T.shape({ task = T.string }, { open = true }),
 ---     result = "voted",
+--- })
+---
+--- -- direct-args override:
+--- M.threshold = S.instrument(M, "threshold", {
+---     args   = { T.number, T.number },
+---     result = T.number,
 --- })
 --- ```
 ---
 --- `spec` takes precedence over `M.spec.entries[entry_name].*` when both
 --- are given. This matches Zod's `.implement({ input, output })` which
 --- lets the caller override the schemas declared on the factory.
+--- Specifying `input` and `args` together (either via the spec override
+--- or via `M.spec.entries.{e}.*`) is rejected at load time.
 
 local check = require("alc_shapes.check")
 local spec_resolver = require("alc_shapes.spec_resolver")
@@ -132,14 +169,55 @@ function M.instrument(mod, entry_name, spec)
     end
 
     -- Pull declared shapes from M.spec via spec_resolver (string keys
-    -- are coerced to T.ref here, matching the rest of the toolchain).
+    -- are coerced to T.ref here; `args` list slots are coerced the same
+    -- way, matching the rest of the toolchain).
     local resolved = spec_resolver.resolve(mod)
     local entry = resolved.entries[entry_name] or {}
 
     local input_shape  = (spec and spec.input)  or entry.input
     local result_shape = (spec and spec.result) or entry.result
+    local args_shapes  = (spec and spec.args)   or entry.args
+
+    -- Mutual exclusion is already enforced by spec_resolver for the
+    -- M.spec-declared form. Re-check here for the override form, where
+    -- both fields can arrive through the `spec` argument directly.
+    if args_shapes ~= nil and input_shape ~= nil then
+        error(string.format(
+            "alc_shapes.instrument: entry %q declares both `input` "
+                .. "(ctx-threading) and `args` (direct-args); these modes "
+                .. "are mutually exclusive",
+            entry_name), 2)
+    end
+
     local hint = meta.name .. "." .. entry_name
 
+    if args_shapes ~= nil then
+        -- Direct-args mode: library-style pkg (pure function).
+        -- Validate each positional arg against args_shapes[i]; validate
+        -- the raw return value against result_shape.
+        local n = #args_shapes
+        return function(...)
+            local dev = check.is_dev_mode()
+            if dev and n > 0 then
+                for i = 1, n do
+                    local sh = args_shapes[i]
+                    if sh ~= nil then
+                        check.assert(
+                            (select(i, ...)),
+                            sh,
+                            hint .. ":arg" .. i)
+                    end
+                end
+            end
+            local ret = orig(...)
+            if dev and result_shape ~= nil then
+                check.assert(ret, result_shape, hint)
+            end
+            return ret
+        end
+    end
+
+    -- ctx-threading mode (default, unchanged).
     return function(ctx, ...)
         local dev = check.is_dev_mode()
         if dev and input_shape ~= nil then
