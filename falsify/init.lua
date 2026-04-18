@@ -33,6 +33,9 @@
 --- ctx.derive_on_refute: Generate successors from refuted hypotheses (default: true)
 --- ctx.max_hypotheses: Upper bound on active hypotheses (default: 12)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -43,6 +46,58 @@ M.meta = {
         .. "via active refutation, pruning, and successor derivation. "
         .. "Expands search space through refutation-driven insight.",
     category = "exploration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task               = T.string:describe("The problem or question to investigate"),
+                initial_hypotheses = T.number:is_optional():describe("Seed hypothesis count (default: 4)"),
+                max_rounds         = T.number:is_optional():describe("Maximum falsification rounds (default: 3)"),
+                derive_on_refute   = T.boolean:is_optional():describe("Generate successor hypotheses from refuted ones (default: true)"),
+                max_hypotheses     = T.number:is_optional():describe("Upper bound on active hypotheses (default: 12)"),
+            }),
+            result = T.shape({
+                answer         = T.string:describe("Synthesized final answer from surviving hypotheses (or post-all-refuted fallback)"),
+                survivors      = T.array_of(T.shape({
+                    id                  = T.number:describe("Hypothesis id (monotonic across rounds)"),
+                    text                = T.string:describe("Hypothesis statement"),
+                    status              = T.string:describe("'survived' for entries in this list"),
+                    confidence          = T.number:describe("Current confidence score"),
+                    refutation_attempts = T.number:describe("Total refutation attempts against this hypothesis"),
+                    derived_from        = T.number:is_optional():describe("Parent hypothesis id (nil for initial seeds)"),
+                    history             = T.array_of(T.shape({
+                        round      = T.number:describe("Round index"),
+                        refutation = T.string:describe("Attempted refutation text"),
+                        verdict    = T.string:describe("'refuted' | 'weakened' | 'survived'"),
+                    })):describe("Per-round refutation trace for this hypothesis"),
+                })):describe("Hypotheses that survived all refutation rounds"),
+                all_hypotheses = T.array_of(T.shape({
+                    id                  = T.number:describe("Hypothesis id"),
+                    text                = T.string:describe("Hypothesis statement"),
+                    status              = T.string:describe("'survived' | 'refuted'"),
+                    confidence          = T.number:describe("Final confidence score"),
+                    refutation_attempts = T.number:describe("Total refutation attempts against this hypothesis"),
+                    derived_from        = T.number:is_optional():describe("Parent hypothesis id (nil for initial seeds)"),
+                    history             = T.array_of(T.shape({
+                        round      = T.number:describe("Round index"),
+                        refutation = T.string:describe("Attempted refutation text"),
+                        verdict    = T.string:describe("'refuted' | 'weakened' | 'survived'"),
+                    })):describe("Per-round refutation trace"),
+                })):describe("All hypotheses (initial + derived), survivors and refuted alike"),
+                stats          = T.shape({
+                    initial_count    = T.number:describe("Number of seed hypotheses actually generated"),
+                    total_generated  = T.number:describe("Total hypotheses ever created (initial + derived)"),
+                    total_refuted    = T.number:describe("Hypotheses pruned as refuted"),
+                    total_survived   = T.number:describe("= #survivors"),
+                    total_derived    = T.number:describe("Successor hypotheses generated during rounds"),
+                    rounds           = T.number:describe("Falsification rounds actually executed"),
+                }):describe("Aggregate falsification statistics"),
+            }),
+        },
+    },
 }
 
 --- Generate initial hypotheses.
@@ -371,5 +426,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

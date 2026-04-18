@@ -33,6 +33,9 @@
 --- ctx.gen_tokens: Max tokens for generation (default: 500)
 --- ctx.verify_tokens: Max tokens per verification (default: 200)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -43,6 +46,37 @@ M.meta = {
         .. "that scores each reasoning step independently. Identifies the first "
         .. "point of failure and re-derives from the last correct step.",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:describe("The problem to solve"),
+                max_repair_rounds = T.number:is_optional():describe("Max re-derivation rounds (default: 2)"),
+                gen_tokens        = T.number:is_optional():describe("Max tokens for generation (default: 500)"),
+                verify_tokens     = T.number:is_optional():describe("Max tokens per step verification (default: 200)"),
+            }),
+            result = T.shape({
+                answer         = T.string:describe("Final synthesized answer from verified reasoning"),
+                verified_steps = T.array_of(T.string):describe("Ordered list of verified-correct reasoning steps"),
+                total_verified = T.number:describe("Count of verified steps (= #verified_steps)"),
+                rounds         = T.array_of(T.shape({
+                    round          = T.number:describe("0-based round index"),
+                    steps          = T.array_of(T.shape({
+                        step        = T.string:describe("Step text"),
+                        correct     = T.boolean:describe("Whether verifier judged this step correct"),
+                        explanation = T.string:describe("Raw verifier output including VERDICT line"),
+                    })):describe("Per-step verification records (may stop early at first INCORRECT)"),
+                    verified_count = T.number:describe("Correct steps accumulated this round"),
+                    error_at       = T.number:is_optional():describe("1-based index of first INCORRECT step (nil if all correct)"),
+                })):describe("Per-round verification trace"),
+                total_rounds    = T.number:describe("Number of rounds actually executed (= #rounds)"),
+                total_llm_calls = T.number:describe("Total LLM calls (generation + verification + synthesis)"),
+            }),
+        },
+    },
 }
 
 --- Parse a multi-step reasoning into individual steps.
@@ -289,5 +323,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

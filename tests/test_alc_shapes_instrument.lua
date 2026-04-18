@@ -448,6 +448,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- factscore. critic declares `scores = T.table` (rubric dim → number map),
     -- `history` nested array-of-shape with per-round trace, and `rubric` as
     -- array_of({name, description}).
+    -- Phase 4-b (category="validation"/"exploration") pkgs: falsify /
+    -- step_verify / counterfactual_verify. falsify declares nested
+    -- hypothesis shape with `derived_from` optional (seed vs derived) and
+    -- per-hypothesis `history` refutation trace; step_verify has per-round
+    -- `steps` array + optional `error_at`; counterfactual_verify carries
+    -- `faithful` boolean + `mismatches` subset array.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -463,6 +469,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "usc", "diverse", "gumbel_search",
         "compute_alloc", "optimize", "bisect",
         "critic", "cove", "factscore",
+        "falsify", "step_verify", "counterfactual_verify",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

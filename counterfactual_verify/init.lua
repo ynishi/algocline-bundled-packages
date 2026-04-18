@@ -26,6 +26,9 @@
 --- ctx.gen_tokens: Max tokens for solving (default: 600)
 --- ctx.cf_tokens: Max tokens for counterfactual generation (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,38 @@ M.meta = {
         .. "reasoning causally depends on inputs by simulating condition changes. "
         .. "Detects pattern-matching and unfaithful CoT.",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:describe("The problem to solve"),
+                n_counterfactuals = T.number:is_optional():describe("Number of counterfactual variants (default: 2)"),
+                gen_tokens        = T.number:is_optional():describe("Max tokens for solving (default: 600)"),
+                cf_tokens         = T.number:is_optional():describe("Max tokens for counterfactual generation (default: 400)"),
+            }),
+            result = T.shape({
+                answer                 = T.string:describe("Final answer (original CoT when faithful, re-solved otherwise)"),
+                faithful               = T.boolean:describe("Whether reasoning is causally faithful to inputs (all CFs matched)"),
+                match_count            = T.number:describe("Count of counterfactuals where predicted matched actual"),
+                total_counterfactuals  = T.number:describe("Total counterfactuals evaluated (= #counterfactual_results)"),
+                original_cot           = T.string:describe("Original chain-of-thought reasoning for unmodified task"),
+                counterfactual_results = T.array_of(T.shape({
+                    change    = T.string:describe("Natural-language description of the modified condition"),
+                    predicted = T.string:describe("Predicted answer derived by tracing the original CoT"),
+                    actual    = T.string:describe("Independently-solved answer for the modified task"),
+                    match     = T.boolean:describe("Whether judge ruled predicted and actual agree"),
+                    reason    = T.string:describe("Judge's justification for MATCH/MISMATCH verdict"),
+                })):describe("Per-counterfactual evaluation records"),
+                mismatches             = T.array_of(T.shape({
+                    change = T.string:describe("Modified condition that produced a mismatch"),
+                    reason = T.string:describe("Judge's reason for MISMATCH"),
+                })):describe("Subset of counterfactual_results where match=false (empty when faithful)"),
+            }),
+        },
+    },
 }
 
 --- Parse individual counterfactuals from LLM output.
@@ -307,5 +342,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
