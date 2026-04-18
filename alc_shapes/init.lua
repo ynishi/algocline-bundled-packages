@@ -25,6 +25,7 @@ local T = require("alc_shapes.t")
 local check = require("alc_shapes.check")
 local reflect = require("alc_shapes.reflect")
 local luacats = require("alc_shapes.luacats")
+local spec_resolver = require("alc_shapes.spec_resolver")
 
 local M = {}
 
@@ -285,6 +286,10 @@ M.T = T
 -- Codegen namespace (used by scripts/gen_shapes_luacats.lua).
 M.LuaCats = luacats
 
+-- Spec resolver namespace (routing / recipe layer uses this to treat
+-- typed bundled pkgs and opaque external pkgs uniformly).
+M.spec_resolver = spec_resolver
+
 -- ── reserved-name guard ──────────────────────────────────────────────
 -- Certain names collide with `check.assert` shortcut semantics:
 --   `M.assert(v, "any")` is always a no-op pass-through. Registering a
@@ -295,7 +300,8 @@ M.LuaCats = luacats
 -- are not shape-kind and therefore never trip this check.
 local RESERVED_SHAPE_NAMES = {
     "any", "check", "assert", "assert_dev", "is_dev_mode",
-    "fields", "walk", "is_schema", "T", "LuaCats", "_internal",
+    "fields", "walk", "is_schema", "T", "LuaCats", "spec_resolver",
+    "_internal",
 }
 
 local function assert_no_reserved_shapes(mod)
