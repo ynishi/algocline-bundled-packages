@@ -601,6 +601,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- T.table / T.any). contrastive has {wrong_reasoning, error_analysis}
     -- pairs. robust_qa's `phases` is array_of(T.any) because per-phase
     -- shape differs (discriminated by `name`).
+    -- Phase 5-a (category="orchestration") pkgs: orch_fixpipe /
+    -- orch_adaptive / orch_gatephase. All three share a phase record
+    -- sub-shape {name, output, gate_passed, attempts}. orch_adaptive
+    -- adds depth_config/active_phase_count/total_phase_count; gatephase
+    -- adds task_type/skipped_phases. Phase definition arrays are
+    -- array_of(T.any) because callers supply opaque phase records.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -619,6 +625,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "falsify", "step_verify", "counterfactual_verify",
         "claim_trace", "blind_spot", "negation",
         "pre_mortem", "contrastive", "robust_qa",
+        "orch_fixpipe", "orch_adaptive", "orch_gatephase",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

@@ -15,6 +15,9 @@
 --- ctx.depth_config (optional): Custom difficulty→config mapping
 --- ctx.on_fail      (optional): "error" | "partial" (default: "error")
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -26,6 +29,45 @@ M.meta = {
         .. "Combines with router_daao for pre-classified difficulty, "
         .. "or estimates internally. Based on DAAO (arxiv 2509.11079).",
     category = "orchestration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("Task description"),
+                phases       = T.array_of(T.any)
+                    :describe("Phase definitions (superset; trimmed by difficulty)"),
+                difficulty   = T.string:is_optional()
+                    :describe("Pre-classified difficulty (simple|medium|complex)"),
+                depth_config = T.any:is_optional()
+                    :describe("Custom difficulty→config mapping (opaque)"),
+                on_fail      = T.string:is_optional()
+                    :describe("\"error\" | \"partial\" (default: \"error\")"),
+            }),
+            result = T.shape({
+                status             = T.string
+                    :describe("\"completed\" / \"failed\" / \"partial\""),
+                difficulty         = T.string
+                    :describe("Final difficulty (pre-classified or estimated)"),
+                depth_config       = T.table
+                    :describe("Active depth config (max_phases / max_retries / context_mode / max_tokens)"),
+                active_phase_count = T.number
+                    :describe("Phases actually run (min(max_phases, #phases))"),
+                total_phase_count  = T.number:describe("Original phase count"),
+                phases             = T.array_of(T.shape({
+                    name        = T.string:describe("Phase name"),
+                    output      = T.string:describe("Final phase output"),
+                    gate_passed = T.boolean:describe("Gate decision"),
+                    attempts    = T.number:describe("Retry attempts used"),
+                })):describe("Per-phase execution record"),
+                final_output       = T.string
+                    :describe("Last phase output (empty on failure before first phase)"),
+                total_llm_calls    = T.number:describe("Total LLM invocations"),
+            }),
+        },
+    },
 }
 
 -- Difficulty→execution parameter mapping
@@ -199,5 +241,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

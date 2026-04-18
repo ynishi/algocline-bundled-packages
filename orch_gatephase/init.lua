@@ -14,6 +14,9 @@
 --- ctx.skip_rules (optional): Custom skip rules table
 --- ctx.on_fail    (optional): "error" | "partial" (default: "error")
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -25,6 +28,44 @@ M.meta = {
         .. "Task type determines which phases to skip. "
         .. "Based on Thin Agent / Fat Platform (Praetorian).",
     category = "orchestration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("Task description"),
+                phases      = T.array_of(T.any)
+                    :describe("Phase definitions [{name, prompt, gate, checks, ...}, ...]"),
+                max_retries = T.number:is_optional()
+                    :describe("Gate NG retry limit (default: 3)"),
+                task_type   = T.string:is_optional()
+                    :describe("Pre-classified type (bugfix|typo|refactor|feature|test)"),
+                skip_rules  = T.any:is_optional()
+                    :describe("Custom skip rules table (opaque)"),
+                on_fail     = T.string:is_optional()
+                    :describe("\"error\" | \"partial\" (default: \"error\")"),
+            }),
+            result = T.shape({
+                status          = T.string
+                    :describe("\"completed\" / \"failed\" / \"partial\""),
+                task_type       = T.string
+                    :describe("Final task type (pre-classified or estimated)"),
+                skipped_phases  = T.array_of(T.string)
+                    :describe("Phase names skipped for this task_type"),
+                phases          = T.array_of(T.shape({
+                    name        = T.string:describe("Phase name"),
+                    output      = T.string:describe("Final phase output"),
+                    gate_passed = T.boolean:describe("All checks passed?"),
+                    attempts    = T.number:describe("Retry attempts used"),
+                })):describe("Per-phase execution record (active only)"),
+                final_output    = T.string
+                    :describe("Last phase output (empty on failure before first phase)"),
+                total_llm_calls = T.number:describe("Total LLM invocations"),
+            }),
+        },
+    },
 }
 
 -- Default skip rules (coding task oriented)
@@ -256,5 +297,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
