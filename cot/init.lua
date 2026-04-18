@@ -101,4 +101,10 @@ function M.run(ctx)
     return ctx
 end
 
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1. cot uses inline T.shape(...) for both fields
+-- (no registry name), exercising instrument's inline-schema path.
+M.run = S.instrument(M, "run")
+
 return M

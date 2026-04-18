@@ -405,4 +405,18 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         expect(rawget(r.entries.run.result, "name")).to.equal("calibrated")
         expect(rawget(r.entries.assess.result, "name")).to.equal("assessed")
     end)
+
+    it("cot.run is wrapped with inline T.shape input + result", function()
+        -- cot exercises the inline-schema path: spec.entries.run.input
+        -- and .result are both inline T.shape(...) (not T.ref). The
+        -- instrument wrapper must accept them directly without going
+        -- through the registry.
+        package.loaded["cot"] = nil
+        local cot = require("cot")
+        expect(type(cot.run)).to.equal("function")
+        local r = S.spec_resolver.resolve(cot)
+        expect(r.kind).to.equal("typed")
+        expect(rawget(r.entries.run.input, "kind")).to.equal("shape")
+        expect(rawget(r.entries.run.result, "kind")).to.equal("shape")
+    end)
 end)
