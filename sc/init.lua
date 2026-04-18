@@ -208,7 +208,6 @@ function M.run(ctx)
         n_sampled = n,
         total_llm_calls = total_llm_calls,
     }
-    require("alc_shapes").assert_dev(ctx.result, "voted", "sc.run")
     return ctx
 end
 
@@ -217,5 +216,9 @@ M._internal = {
     clean_answer = clean_answer,
     normalize_for_vote = normalize_for_vote,
 }
+
+-- Malli-style self-decoration: wrapper asserts ret.result against
+-- M.spec.entries.run.result ("voted") when ALC_SHAPE_CHECK=1.
+M.run = require("alc_shapes").instrument(M, "run")
 
 return M

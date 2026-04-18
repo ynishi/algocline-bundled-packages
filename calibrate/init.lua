@@ -109,7 +109,6 @@ function M.assess(ctx)
         confidence = confidence,
         total_llm_calls = 1,
     }
-    require("alc_shapes").assert_dev(ctx.result, "assessed", "calibrate.assess")
     return ctx
 end
 
@@ -142,7 +141,6 @@ function M.run(ctx)
             strategy = "direct",
             total_llm_calls = total_llm_calls,
         }
-        require("alc_shapes").assert_dev(ctx.result, "calibrated", "calibrate.run/direct")
         return ctx
     end
 
@@ -216,8 +214,22 @@ function M.run(ctx)
         }
     end
 
-    require("alc_shapes").assert_dev(ctx.result, "calibrated", "calibrate.run/" .. fallback)
     return ctx
 end
+
+-- Malli-style self-decoration. Both entries (M.run → calibrated, M.assess
+-- → assessed) are declared under M.spec.entries, so no override is
+-- needed. The wrapper looks up each entry's result schema via
+-- spec_resolver when ALC_SHAPE_CHECK=1.
+--
+-- Note on nested M.run → M.assess dispatch: the body of M.run calls
+-- `M.assess(ctx)` via a table lookup evaluated at call time, so the
+-- inner call resolves to the (already-reassigned) wrapped M.assess.
+-- In dev mode this means the assessed shape is checked once for each
+-- external M.run invocation in addition to the calibrated post-check.
+-- That is intentional: catching a bad assess intermediate before it
+-- leaks into the run payload is worth the two extra asserts per dev run.
+M.assess = require("alc_shapes").instrument(M, "assess")
+M.run    = require("alc_shapes").instrument(M, "run")
 
 return M

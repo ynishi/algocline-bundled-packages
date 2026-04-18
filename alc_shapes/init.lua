@@ -26,6 +26,7 @@ local check = require("alc_shapes.check")
 local reflect = require("alc_shapes.reflect")
 local luacats = require("alc_shapes.luacats")
 local spec_resolver = require("alc_shapes.spec_resolver")
+local instrument = require("alc_shapes.instrument")
 
 local M = {}
 
@@ -290,6 +291,11 @@ M.LuaCats = luacats
 -- typed bundled pkgs and opaque external pkgs uniformly).
 M.spec_resolver = spec_resolver
 
+-- Malli-style producer-wrap instrumentation (see alc_shapes/instrument.lua).
+-- Bundled pkgs self-decorate with `M.run = S.instrument(M, "run")` at
+-- module tail, reading shapes from `M.spec.entries[entry_name]`.
+M.instrument   = instrument.instrument
+
 -- ── reserved-name guard ──────────────────────────────────────────────
 -- Certain names collide with `check.assert` shortcut semantics:
 --   `M.assert(v, "any")` is always a no-op pass-through. Registering a
@@ -301,7 +307,7 @@ M.spec_resolver = spec_resolver
 local RESERVED_SHAPE_NAMES = {
     "any", "check", "assert", "assert_dev", "is_dev_mode",
     "fields", "walk", "is_schema", "T", "LuaCats", "spec_resolver",
-    "_internal",
+    "instrument", "_internal",
 }
 
 local function assert_no_reserved_shapes(mod)

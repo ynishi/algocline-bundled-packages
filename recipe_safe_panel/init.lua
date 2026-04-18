@@ -498,7 +498,6 @@ function M.run(ctx)
                 is_anti_jury = is_anti,
             } },
         }
-        require("alc_shapes").assert_dev(ctx.result, "safe_paneled", "recipe_safe_panel.run/abort")
         return ctx
     end
 
@@ -831,7 +830,6 @@ function M.run(ctx)
         total_llm_calls = total_llm_calls,
         stages = stages,
     }
-    require("alc_shapes").assert_dev(ctx.result, "safe_paneled", "recipe_safe_panel.run")
     return ctx
 end
 
@@ -841,5 +839,9 @@ M._internal = {
     analyze_votes = analyze_votes,
     build_accuracy_proxy = build_accuracy_proxy,
 }
+
+-- Malli-style self-decoration: the wrapper asserts ret.result against
+-- M.spec.entries.run.result ("safe_paneled") when ALC_SHAPE_CHECK=1.
+M.run = require("alc_shapes").instrument(M, "run")
 
 return M

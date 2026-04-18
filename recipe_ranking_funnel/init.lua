@@ -406,7 +406,6 @@ function M.run(ctx)
             -- conceptual stages see N candidates: no reduction happens.
             funnel_shape = { N, N, N },
         }
-        require("alc_shapes").assert_dev(ctx.result, "funnel_ranked", "recipe_ranking_funnel.run/bypass")
         return ctx
     end
 
@@ -737,7 +736,6 @@ function M.run(ctx)
         -- Length is always 3. Bypass path emits {N, N, N} (no reduction).
         funnel_shape = { N, stages[1].output_count, stages[2].output_count },
     }
-    require("alc_shapes").assert_dev(ctx.result, "funnel_ranked", "recipe_ranking_funnel.run")
     return ctx
 end
 
@@ -749,5 +747,11 @@ M._internal = {
     build_scoring_prompt = build_scoring_prompt,
     parse_scoring_response = parse_scoring_response,
 }
+
+-- Malli-style self-decoration: wrapper asserts ret.result against
+-- M.spec.entries.run.result ("funnel_ranked") when ALC_SHAPE_CHECK=1.
+-- The bypass branch and the full funnel path share a single post-check
+-- at the wrapper boundary; per-branch hints are no longer needed.
+M.run = require("alc_shapes").instrument(M, "run")
 
 return M

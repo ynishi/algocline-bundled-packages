@@ -145,8 +145,11 @@ function M.run(ctx)
         candidates = candidates,
         matches = match_log,
     }
-    require("alc_shapes").assert_dev(ctx.result, "tournament", "rank.run")
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ret.result against
+-- M.spec.entries.run.result ("tournament") when ALC_SHAPE_CHECK=1.
+M.run = require("alc_shapes").instrument(M, "run")
 
 return M

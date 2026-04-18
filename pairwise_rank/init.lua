@@ -291,8 +291,11 @@ function M.run(ctx)
         position_bias_splits = splits,
         both_tie_pairs = ties,
     }
-    require("alc_shapes").assert_dev(ctx.result, "pairwise_ranked", "pairwise_rank.run")
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ret.result against
+-- M.spec.entries.run.result ("pairwise_ranked") when ALC_SHAPE_CHECK=1.
+M.run = require("alc_shapes").instrument(M, "run")
 
 return M
