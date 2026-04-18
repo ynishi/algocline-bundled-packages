@@ -39,6 +39,9 @@
 ---   assert(bft.threshold(7, 2) == 5)    -- quorum = 2*2+1 = 5
 ---   assert(bft.max_faults(7) == 2)      -- floor((7-1)/3) = 2
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -50,6 +53,51 @@ M.meta = {
         .. "Computes minimum panel sizes and fault tolerance limits "
         .. "(Lamport-Shostak-Pease 1982, Theorem 1: n >= 3f+1).",
     category = "governance",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        validate = {
+            args   = { T.number, T.number },
+            result = T.boolean,
+        },
+        threshold = {
+            args   = { T.number, T.number },
+            result = T.number,
+        },
+        max_faults = {
+            args   = { T.number },
+            result = T.number,
+        },
+        validate_signed = {
+            args   = { T.number, T.number },
+            result = T.boolean,
+        },
+        signed_threshold = {
+            args   = { T.number, T.number },
+            result = T.number,
+        },
+        max_faults_signed = {
+            args   = { T.number },
+            result = T.number,
+        },
+        summary = {
+            args   = { T.number, T.number },
+            result = T.shape({
+                n             = T.number,
+                f             = T.number,
+                oral_ok       = T.boolean,
+                oral_reason   = T.string,
+                oral_quorum   = T.number:is_optional(),
+                signed_ok     = T.boolean,
+                signed_reason = T.string,
+                signed_quorum = T.number:is_optional(),
+                max_f_oral    = T.number,
+                max_f_signed  = T.number,
+            }),
+        },
+    },
 }
 
 --- Validate whether BFT agreement is possible with oral messages.
@@ -162,5 +210,15 @@ function M.summary(n, f)
         max_f_signed = M.max_faults_signed(math.max(n, 2)),
     }
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). direct-args mode:
+-- each entry is a pure function with positional args + raw return.
+M.validate          = S.instrument(M, "validate")
+M.threshold         = S.instrument(M, "threshold")
+M.max_faults        = S.instrument(M, "max_faults")
+M.validate_signed   = S.instrument(M, "validate_signed")
+M.signed_threshold  = S.instrument(M, "signed_threshold")
+M.max_faults_signed = S.instrument(M, "max_faults_signed")
+M.summary           = S.instrument(M, "summary")
 
 return M

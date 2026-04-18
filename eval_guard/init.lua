@@ -50,6 +50,9 @@
 ---     metric_type = "absolute",
 ---   })
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -62,6 +65,43 @@ M.meta = {
         .. "(N4, Zhu EMNLP 2024). Pre-flight checks before trusting "
         .. "any multi-agent evaluation result.",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        self_critique = {
+            -- opts is a loose options table; shape-light T.table keeps it open.
+            args   = { T.table },
+            result = T.boolean,
+        },
+        baseline = {
+            args   = { T.table },
+            result = T.boolean,
+        },
+        contamination = {
+            args   = { T.table },
+            result = T.boolean,
+        },
+        check_all = {
+            args   = { T.table },
+            result = T.shape({
+                passed     = T.boolean,
+                violations = T.array_of(T.shape({
+                    gate   = T.string,
+                    reason = T.string,
+                })),
+                details    = T.array_of(T.shape({
+                    gate   = T.string,
+                    passed = T.boolean,
+                    reason = T.string,
+                })),
+                n_passed   = T.number,
+                n_failed   = T.number,
+                n_total    = T.number,
+            }),
+        },
+    },
 }
 
 --- N2: Self-critique gate.
@@ -204,5 +244,13 @@ function M.check_all(opts)
         n_total = #details,
     }
 end
+
+-- Malli-style self-decoration. self_critique/baseline/contamination return
+-- (bool, string) — Option A' preserves the 2nd value. check_all's return
+-- shape is inline T.shape above.
+M.self_critique = S.instrument(M, "self_critique")
+M.baseline      = S.instrument(M, "baseline")
+M.contamination = S.instrument(M, "contamination")
+M.check_all     = S.instrument(M, "check_all")
 
 return M

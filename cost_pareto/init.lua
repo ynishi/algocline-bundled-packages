@@ -45,6 +45,9 @@
 ---   local b = {accuracy = 0.88, neg_cost = -134.50}
 ---   cp.dominates(a, b) -- => true (a dominates b)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -56,6 +59,29 @@ M.meta = {
         .. "selection on accuracy/cost/diversity trade-offs "
         .. "(Kapoor et al. 'AI Agents That Matter', 2024).",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        dominates = {
+            -- a, b are numeric-valued candidate tables; keys is optional.
+            args   = { T.table, T.table, T.array_of(T.string):is_optional() },
+            result = T.boolean,
+        },
+        frontier = {
+            args   = { T.array_of(T.table), T.array_of(T.string):is_optional() },
+            result = T.array_of(T.table),
+        },
+        is_dominated = {
+            args   = { T.table, T.table, T.array_of(T.string):is_optional() },
+            result = T.boolean,
+        },
+        layers = {
+            args   = { T.array_of(T.table), T.array_of(T.string):is_optional() },
+            result = T.array_of(T.array_of(T.table)),
+        },
+    },
 }
 
 --- Extract numeric values from a candidate table.
@@ -224,5 +250,12 @@ function M.layers(candidates, keys)
 
     return layers
 end
+
+-- Malli-style self-decoration. is_dominated returns (bool, string) —
+-- Option A' preserves the 2nd value.
+M.dominates    = S.instrument(M, "dominates")
+M.frontier     = S.instrument(M, "frontier")
+M.is_dominated = S.instrument(M, "is_dominated")
+M.layers       = S.instrument(M, "layers")
 
 return M

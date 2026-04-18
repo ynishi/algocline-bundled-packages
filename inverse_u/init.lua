@@ -42,6 +42,9 @@
 ---   local r = iu.detect({0.70, 0.75, 0.73, 0.71})
 ---   -- r.peak_idx=2, r.is_declining=true, r.consecutive_drops=2
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -53,6 +56,38 @@ M.meta = {
         .. "performance. Safety gate for multi-agent scaling "
         .. "(Chen et al. NeurIPS 2024, Theorem 2).",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        detect = {
+            args   = {
+                T.array_of(T.number),
+                T.table:is_optional(),
+            },
+            result = T.shape({
+                peak_idx          = T.number,
+                peak_n            = T.number,
+                peak_acc          = T.number,
+                is_declining      = T.boolean,
+                consecutive_drops = T.number,
+                trend             = T.string,
+            }),
+        },
+        should_stop = {
+            args   = {
+                T.array_of(T.number),
+                T.number:is_optional(),
+                T.table:is_optional(),
+            },
+            result = T.boolean,
+        },
+        chen_condition = {
+            args   = { T.number, T.number, T.number, T.number },
+            result = T.boolean,
+        },
+    },
 }
 
 --- Detect inverse-U pattern in an accuracy-by-N series.
@@ -210,5 +245,11 @@ function M.chen_condition(p1, p2, alpha, t)
         alpha_lt_threshold = alpha_lt,
     }
 end
+
+-- Malli-style self-decoration. should_stop and chen_condition return
+-- (bool, ...) — Option A' preserves the 2nd+ value.
+M.detect         = S.instrument(M, "detect")
+M.should_stop    = S.instrument(M, "should_stop")
+M.chen_condition = S.instrument(M, "chen_condition")
 
 return M

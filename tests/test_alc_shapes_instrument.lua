@@ -749,4 +749,63 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
             expect(rawget(r.entries.run.result, "kind")).to.equal("shape")
         end)
     end
+
+    -- Phase 3.5 library-style pkgs: pure functions with direct-args mode.
+    -- No ctx-threading; each entry declares `args = {...}` (positional list)
+    -- and `result` (raw return shape). Multi-return (bool, string) preserved
+    -- via Option A' table.pack / table.unpack.
+    --
+    -- 3.5-a batch: bft / eval_guard / cost_pareto / inverse_u. These four
+    -- exercise the multi-return path most heavily (bft.validate,
+    -- eval_guard.self_critique, cost_pareto.is_dominated, inverse_u.should_stop
+    -- all return (bool, string)).
+    local library_pkg_entries = {
+        bft          = { "validate", "threshold", "max_faults",
+                         "validate_signed", "signed_threshold",
+                         "max_faults_signed", "summary" },
+        eval_guard   = { "self_critique", "baseline",
+                         "contamination", "check_all" },
+        cost_pareto  = { "dominates", "frontier", "is_dominated", "layers" },
+        inverse_u    = { "detect", "should_stop", "chen_condition" },
+    }
+    for pkg_name, entries in pairs(library_pkg_entries) do
+        it(pkg_name .. " (library-style): every entry is instrumented with declared args+result", function()
+            package.loaded[pkg_name] = nil
+            local pkg = require(pkg_name)
+            local r = S.spec_resolver.resolve(pkg)
+            expect(r.kind).to.equal("typed")
+            for _, entry in ipairs(entries) do
+                expect(type(pkg[entry])).to.equal("function")
+                local e = r.entries[entry]
+                expect(e).to.exist()
+                expect(type(e.args)).to.equal("table")
+                expect(e.result).to.exist()
+            end
+        end)
+    end
+
+    -- Smoke-test the multi-return path end-to-end: bft.validate returns
+    -- (bool, string). Under Option A' both values must reach the caller.
+    it("bft.validate preserves (bool, string) multi-return after instrument", function()
+        package.loaded["bft"] = nil
+        local bft = require("bft")
+        local ok, reason = bft.validate(7, 2)
+        expect(ok).to.equal(true)
+        expect(type(reason)).to.equal("string")
+        expect(reason:match("possible")).to.exist()
+        local bad_ok, bad_reason = bft.validate(3, 2)
+        expect(bad_ok).to.equal(false)
+        expect(bad_reason:match("IMPOSSIBLE")).to.exist()
+    end)
+
+    it("eval_guard.self_critique preserves (bool, string) after instrument", function()
+        package.loaded["eval_guard"] = nil
+        local eg = require("eval_guard")
+        local ok, reason = eg.self_critique({ has_external_grader = true })
+        expect(ok).to.equal(true)
+        expect(reason:match("PASS")).to.exist()
+        local bad_ok, bad_reason = eg.self_critique({ has_external_grader = false })
+        expect(bad_ok).to.equal(false)
+        expect(bad_reason:match("FAIL")).to.exist()
+    end)
 end)
