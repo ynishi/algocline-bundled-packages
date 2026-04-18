@@ -16,6 +16,9 @@
 --- ctx.target_length: Approximate target length in words (default: auto ~1/3 of input)
 --- ctx.gen_tokens: Max tokens per round (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -24,6 +27,32 @@ M.meta = {
     version = "0.1.0",
     description = "Chain-of-Density — iterative information densification with fidelity preservation",
     category = "optimization",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                text          = T.string:describe("Source text to compress (uses ctx.text, not ctx.task)"),
+                rounds        = T.number:is_optional():describe("Number of densification rounds (default: 3)"),
+                target_length = T.number:is_optional():describe("Approximate target length in words (default: auto ~1/3 of input)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens per round (default: 400)"),
+            }),
+            result = T.shape({
+                output            = T.string:describe("Final densified summary after all rounds"),
+                history           = T.array_of(T.shape({
+                    round      = T.number,
+                    summary    = T.string,
+                    word_count = T.number,
+                })):describe("Per-round history starting with round 0 (initial sparse summary)"),
+                total_rounds      = T.number:describe("Number of densification rounds executed (excludes round 0)"),
+                input_words       = T.number:describe("Word count of original source text"),
+                output_words      = T.number:describe("Word count of final densified summary"),
+                compression_ratio = T.number:describe("output_words / input_words (0 when input_words == 0)"),
+            }),
+        },
+    },
 }
 
 --- Rough word count.
@@ -111,5 +140,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
