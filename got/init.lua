@@ -32,6 +32,9 @@
 --- ctx.agg_tokens: Max tokens for aggregation (default: 500)
 --- ctx.refine_tokens: Max tokens for refinement (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -42,6 +45,34 @@ M.meta = {
         .. "refinement, and multi-path synthesis. Enables thought merging "
         .. "impossible in tree-based approaches (ToT).",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("The problem to solve"),
+                k_generate    = T.number:is_optional():describe("Branches per Generate (default: 3)"),
+                keep_best     = T.number:is_optional():describe("Nodes to keep after KeepBest pruning (default: 2)"),
+                max_refine    = T.number:is_optional():describe("Max refinement rounds on kept thoughts (default: 2)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens for Generate step (default: 300)"),
+                agg_tokens    = T.number:is_optional():describe("Max tokens for Aggregate / final synthesis (default: 500)"),
+                refine_tokens = T.number:is_optional():describe("Max tokens for Refine step (default: 400)"),
+            }),
+            result = T.shape({
+                answer               = T.string:describe("Final synthesized answer from the aggregated reasoning"),
+                aggregated_reasoning = T.string:describe("State of the merged node produced by the Aggregate op (after final Refine)"),
+                graph_stats          = T.shape({
+                    total_nodes        = T.number,
+                    operations         = T.map_of(T.string, T.number),
+                    branches_generated = T.number,
+                    branches_kept      = T.number,
+                    refine_rounds      = T.number,
+                }):describe("Graph-shape diagnostics; operations is { [origin_op] = count }"),
+            }),
+        },
+    },
 }
 
 -- ─── Graph primitives ───
@@ -326,5 +357,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

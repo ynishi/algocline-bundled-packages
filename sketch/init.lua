@@ -27,6 +27,9 @@
 --- ctx.max_tokens: Max tokens for reasoning (default: 200)
 --- ctx.routing_threshold: Keyword confidence threshold for LLM fallback (default: 0.4)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -37,6 +40,29 @@ M.meta = {
         .. "Routes to Conceptual Chaining, Chunked Symbolism, or Expert Lexicons "
         .. "based on task type. 60-84% token reduction vs standard CoT.",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:describe("The problem to solve"),
+                paradigm          = T.string:is_optional():describe("Force paradigm name (conceptual_chaining / chunked_symbolism / expert_lexicons); nil => auto-route"),
+                max_tokens        = T.number:is_optional():describe("Max tokens for reasoning (default: 200)"),
+                routing_threshold = T.number:is_optional():describe("Keyword confidence threshold for LLM fallback (default: 0.4)"),
+            }),
+            result = T.shape({
+                answer    = T.string:describe("Extracted final answer string"),
+                reasoning = T.string:describe("Extracted <sketch>...</sketch> body (or full LLM text if parsing failed)"),
+                paradigm  = T.string:describe("Paradigm used in execution after routing"),
+                routing   = T.shape({
+                    method     = T.string,
+                    confidence = T.number,
+                }):describe("Routing diagnostic: method ∈ {manual, keyword, llm}, confidence 0-1"),
+            }),
+        },
+    },
 }
 
 -- ─── Paradigm definitions ───
@@ -278,5 +304,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

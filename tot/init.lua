@@ -15,6 +15,9 @@
 --- ctx.depth: Maximum tree depth (default: 3)
 --- ctx.beam_width: Branches kept after pruning (default: 2)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -23,6 +26,35 @@ M.meta = {
     version = "0.1.0",
     description = "Tree-of-Thought — branching reasoning with evaluation and pruning",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The problem to solve"),
+                breadth    = T.number:is_optional():describe("Thoughts generated per beam node (default: 3)"),
+                depth      = T.number:is_optional():describe("Maximum tree depth (default: 3)"),
+                beam_width = T.number:is_optional():describe("Branches kept after pruning (default: 2)"),
+            }),
+            result = T.shape({
+                conclusion     = T.string:describe("Synthesized final answer from the best-scored beam path"),
+                best_path      = T.array_of(T.string):describe("Best beam path: ordered reasoning steps"),
+                best_score     = T.number:describe("Score of the best beam (1-10)"),
+                explored_paths = T.array_of(T.shape({
+                    rank  = T.number,
+                    path  = T.array_of(T.string),
+                    score = T.number,
+                })):describe("All surviving beams, rank-ordered by score"),
+                tree_stats     = T.shape({
+                    depth      = T.number,
+                    breadth    = T.number,
+                    beam_width = T.number,
+                }):describe("Configuration echo for traceability"),
+            }),
+        },
+    },
 }
 
 --- Evaluate a partial reasoning path. Returns a numeric score 1-10.
@@ -184,5 +216,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
