@@ -21,12 +21,12 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.epsilon` | number | optional |  |
-| `ctx.initial_distribution` | string | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.epsilon` | number | optional | Bounded-confidence threshold (default 0.25) |
+| `ctx.initial_distribution` | string | optional | 'uniform' \| 'bimodal' \| 'clustered' (default 'uniform') |
+| `ctx.n_agents` | number | optional | Number of agents (default 50) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 50) |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 

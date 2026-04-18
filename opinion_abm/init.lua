@@ -51,9 +51,9 @@ M.meta = {
 -- bad values fall back to "uniform" rather than erroring, so shape
 -- cannot be stricter at the input layer).
 local params_shape = T.shape({
-    n_agents     = T.number,
-    epsilon      = T.number,
-    steps        = T.number,
+    n_agents     = T.number:describe("Number of agents (default 50)"),
+    epsilon      = T.number:describe("Bounded-confidence threshold (default 0.25)"),
+    steps        = T.number:describe("Simulation steps (default 50)"),
     distribution = T.string,
 })
 
@@ -61,12 +61,12 @@ M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task                 = T.string:is_optional(),
-                n_agents             = T.number:is_optional(),
-                epsilon              = T.number:is_optional(),
-                steps                = T.number:is_optional(),
-                runs                 = T.number:is_optional(),
-                initial_distribution = T.string:is_optional(),
+                task                 = T.string:is_optional():describe("Task description (free text)"),
+                n_agents             = T.number:is_optional():describe("Number of agents (default 50)"),
+                epsilon              = T.number:is_optional():describe("Bounded-confidence threshold (default 0.25)"),
+                steps                = T.number:is_optional():describe("Simulation steps (default 50)"),
+                runs                 = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
+                initial_distribution = T.string:is_optional():describe("'uniform' | 'bimodal' | 'clustered' (default 'uniform')"),
             }),
             result = T.shape({
                 params      = params_shape,

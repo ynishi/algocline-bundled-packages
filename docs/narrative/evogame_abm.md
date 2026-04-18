@@ -21,14 +21,14 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.generations` | number | optional |  |
-| `ctx.mutation_rate` | number | optional |  |
-| `ctx.n_agents` | number | optional |  |
+| `ctx.generations` | number | optional | Number of generations (default 30) |
+| `ctx.mutation_rate` | number | optional | Mutation rate per offspring (default 0.05) |
+| `ctx.n_agents` | number | optional | Number of agents (default 50) |
 | `ctx.payoff_matrix` | table | optional | Payoff matrix (CC/CD/DC/DD → {a,b} pairs) |
-| `ctx.rounds_per_gen` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.strategies` | array of string | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.rounds_per_gen` | number | optional | Games per generation (default 10) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.strategies` | array of string | optional | Initial strategy distribution |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 

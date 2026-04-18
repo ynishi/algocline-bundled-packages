@@ -21,16 +21,16 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.grid_size` | number | optional |  |
-| `ctx.initial_wealth_range` | array of number | optional |  |
-| `ctx.max_sugar` | number | optional |  |
-| `ctx.metabolism_range` | array of number | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.regrow_rate` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.vision_range` | array of number | optional |  |
+| `ctx.grid_size` | number | optional | Square-grid side length (default 25) |
+| `ctx.initial_wealth_range` | array of number | optional | [min, max] initial wealth (default {5, 25}) |
+| `ctx.max_sugar` | number | optional | Peak sugar capacity per cell (default 4) |
+| `ctx.metabolism_range` | array of number | optional | [min, max] metabolism (default {1, 4}) |
+| `ctx.n_agents` | number | optional | Initial population (default 100) |
+| `ctx.regrow_rate` | number | optional | Sugar regrowth per step (default 1) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.vision_range` | array of number | optional | [min, max] vision (default {1, 6}) |
 
 ## Result {#result}
 

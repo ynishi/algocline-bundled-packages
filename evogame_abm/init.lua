@@ -46,26 +46,26 @@ M.meta = {
 -- so user-supplied matrices with arbitrary numeric entries pass.
 -- strategies is optional (nil → default cycle through STRATEGY_NAMES).
 local params_shape = T.shape({
-    n_agents       = T.number,
-    generations    = T.number,
-    rounds_per_gen = T.number,
-    mutation_rate  = T.number,
+    n_agents       = T.number:describe("Number of agents (default 50)"),
+    generations    = T.number:describe("Number of generations (default 30)"),
+    rounds_per_gen = T.number:describe("Games per generation (default 10)"),
+    mutation_rate  = T.number:describe("Mutation rate per offspring (default 0.05)"),
     payoff_matrix  = T.table:describe("Payoff matrix (CC/CD/DC/DD → {a,b} pairs)"),
-    strategies     = T.array_of(T.string):is_optional(),
+    strategies     = T.array_of(T.string):is_optional():describe("Initial strategy distribution"),
 })
 
 M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task           = T.string:is_optional(),
-                n_agents       = T.number:is_optional(),
-                generations    = T.number:is_optional(),
-                rounds_per_gen = T.number:is_optional(),
-                mutation_rate  = T.number:is_optional(),
+                task           = T.string:is_optional():describe("Task description (free text)"),
+                n_agents       = T.number:is_optional():describe("Number of agents (default 50)"),
+                generations    = T.number:is_optional():describe("Number of generations (default 30)"),
+                rounds_per_gen = T.number:is_optional():describe("Games per generation (default 10)"),
+                mutation_rate  = T.number:is_optional():describe("Mutation rate per offspring (default 0.05)"),
                 payoff_matrix  = T.table:is_optional():describe("Payoff matrix (CC/CD/DC/DD → {a,b} pairs)"),
-                strategies     = T.array_of(T.string):is_optional(),
-                runs           = T.number:is_optional(),
+                strategies     = T.array_of(T.string):is_optional():describe("Initial strategy distribution"),
+                runs           = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
             }),
             result = T.shape({
                 params      = params_shape,

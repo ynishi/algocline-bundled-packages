@@ -21,13 +21,13 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.density` | number | optional |  |
-| `ctx.grid_size` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.threshold` | number | optional |  |
-| `ctx.type_ratio` | number | optional |  |
+| `ctx.density` | number | optional | Occupancy fraction (default 0.8) |
+| `ctx.grid_size` | number | optional | Square-grid side length (default 20) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Max simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.threshold` | number | optional | Tolerance threshold (min same-type neighbor fraction, default 0.375) |
+| `ctx.type_ratio` | number | optional | Fraction of type-A agents (default 0.5) |
 
 ## Result {#result}
 

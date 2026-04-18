@@ -53,30 +53,30 @@ M.meta = {
 -- T.array_of(T.number) (length-2 invariant is enforced at runtime
 -- by the rand_int lookups in run_single, not at the shape layer).
 local params_shape = T.shape({
-    grid_size            = T.number,
-    n_agents             = T.number,
-    max_sugar            = T.number,
-    regrow_rate          = T.number,
-    metabolism_range     = T.array_of(T.number),
-    vision_range         = T.array_of(T.number),
-    initial_wealth_range = T.array_of(T.number),
-    steps                = T.number,
+    grid_size            = T.number:describe("Square-grid side length (default 25)"),
+    n_agents             = T.number:describe("Initial population (default 100)"),
+    max_sugar            = T.number:describe("Peak sugar capacity per cell (default 4)"),
+    regrow_rate          = T.number:describe("Sugar regrowth per step (default 1)"),
+    metabolism_range     = T.array_of(T.number):describe("[min, max] metabolism (default {1, 4})"),
+    vision_range         = T.array_of(T.number):describe("[min, max] vision (default {1, 6})"),
+    initial_wealth_range = T.array_of(T.number):describe("[min, max] initial wealth (default {5, 25})"),
+    steps                = T.number:describe("Simulation steps (default 100)"),
 })
 
 M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task                 = T.string:is_optional(),
-                grid_size            = T.number:is_optional(),
-                n_agents             = T.number:is_optional(),
-                max_sugar            = T.number:is_optional(),
-                regrow_rate          = T.number:is_optional(),
-                metabolism_range     = T.array_of(T.number):is_optional(),
-                vision_range         = T.array_of(T.number):is_optional(),
-                initial_wealth_range = T.array_of(T.number):is_optional(),
-                steps                = T.number:is_optional(),
-                runs                 = T.number:is_optional(),
+                task                 = T.string:is_optional():describe("Task description (free text)"),
+                grid_size            = T.number:is_optional():describe("Square-grid side length (default 25)"),
+                n_agents             = T.number:is_optional():describe("Initial population (default 100)"),
+                max_sugar            = T.number:is_optional():describe("Peak sugar capacity per cell (default 4)"),
+                regrow_rate          = T.number:is_optional():describe("Sugar regrowth per step (default 1)"),
+                metabolism_range     = T.array_of(T.number):is_optional():describe("[min, max] metabolism (default {1, 4})"),
+                vision_range         = T.array_of(T.number):is_optional():describe("[min, max] vision (default {1, 6})"),
+                initial_wealth_range = T.array_of(T.number):is_optional():describe("[min, max] initial wealth (default {5, 25})"),
+                steps                = T.number:is_optional():describe("Simulation steps (default 100)"),
+                runs                 = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
             }),
             result = T.shape({
                 params      = params_shape,

@@ -341,17 +341,17 @@ Returns:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.alignment_weight` | number | optional |  |
-| `ctx.cohesion_weight` | number | optional |  |
-| `ctx.max_force` | number | optional |  |
-| `ctx.max_speed` | number | optional |  |
-| `ctx.n_boids` | number | optional |  |
-| `ctx.perception_radius` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.separation_weight` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.world_size` | number | optional |  |
+| `ctx.alignment_weight` | number | optional | Alignment rule weight (default 1.0) |
+| `ctx.cohesion_weight` | number | optional | Cohesion rule weight (default 1.0) |
+| `ctx.max_force` | number | optional | Per-step steering force cap (default 0.3) |
+| `ctx.max_speed` | number | optional | Per-step velocity cap (default 4) |
+| `ctx.n_boids` | number | optional | Number of boids (default 50) |
+| `ctx.perception_radius` | number | optional | Neighbor perception radius (default 50) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.separation_weight` | number | optional | Separation rule weight (default 1.5) |
+| `ctx.steps` | number | optional | Simulation steps per run (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.world_size` | number | optional | Square-world side length (default 300) |
 
 ## Result {#result}
 
@@ -1333,14 +1333,14 @@ Returns:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.beta` | number | optional |  |
-| `ctx.contacts_per_step` | number | optional |  |
-| `ctx.gamma` | number | optional |  |
-| `ctx.initial_infected` | number | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.beta` | number | optional | Transmission probability per contact (default 0.3) |
+| `ctx.contacts_per_step` | number | optional | Mean contacts per agent per step (default 5) |
+| `ctx.gamma` | number | optional | Recovery probability per step (default 0.1) |
+| `ctx.initial_infected` | number | optional | Initial infected count (default 5) |
+| `ctx.n_agents` | number | optional | Population size (default 200) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 
@@ -1379,14 +1379,14 @@ Returns:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.generations` | number | optional |  |
-| `ctx.mutation_rate` | number | optional |  |
-| `ctx.n_agents` | number | optional |  |
+| `ctx.generations` | number | optional | Number of generations (default 30) |
+| `ctx.mutation_rate` | number | optional | Mutation rate per offspring (default 0.05) |
+| `ctx.n_agents` | number | optional | Number of agents (default 50) |
 | `ctx.payoff_matrix` | table | optional | Payoff matrix (CC/CD/DC/DD → {a,b} pairs) |
-| `ctx.rounds_per_gen` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.strategies` | array of string | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.rounds_per_gen` | number | optional | Games per generation (default 10) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.strategies` | array of string | optional | Initial strategy distribution |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 
@@ -2315,12 +2315,12 @@ Returns:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.epsilon` | number | optional |  |
-| `ctx.initial_distribution` | string | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.epsilon` | number | optional | Bounded-confidence threshold (default 0.25) |
+| `ctx.initial_distribution` | string | optional | 'uniform' \| 'bimodal' \| 'clustered' (default 'uniform') |
+| `ctx.n_agents` | number | optional | Number of agents (default 50) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 50) |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 
@@ -3392,13 +3392,13 @@ Returns `voted` shape:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.density` | number | optional |  |
-| `ctx.grid_size` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.threshold` | number | optional |  |
-| `ctx.type_ratio` | number | optional |  |
+| `ctx.density` | number | optional | Occupancy fraction (default 0.8) |
+| `ctx.grid_size` | number | optional | Square-grid side length (default 20) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Max simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.threshold` | number | optional | Tolerance threshold (min same-type neighbor fraction, default 0.375) |
+| `ctx.type_ratio` | number | optional | Fraction of type-A agents (default 0.5) |
 
 ## Result {#result}
 
@@ -3623,16 +3623,16 @@ Returns:
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.grid_size` | number | optional |  |
-| `ctx.initial_wealth_range` | array of number | optional |  |
-| `ctx.max_sugar` | number | optional |  |
-| `ctx.metabolism_range` | array of number | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.regrow_rate` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.vision_range` | array of number | optional |  |
+| `ctx.grid_size` | number | optional | Square-grid side length (default 25) |
+| `ctx.initial_wealth_range` | array of number | optional | [min, max] initial wealth (default {5, 25}) |
+| `ctx.max_sugar` | number | optional | Peak sugar capacity per cell (default 4) |
+| `ctx.metabolism_range` | array of number | optional | [min, max] metabolism (default {1, 4}) |
+| `ctx.n_agents` | number | optional | Initial population (default 100) |
+| `ctx.regrow_rate` | number | optional | Sugar regrowth per step (default 1) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.vision_range` | array of number | optional | [min, max] vision (default {1, 6}) |
 
 ## Result {#result}
 

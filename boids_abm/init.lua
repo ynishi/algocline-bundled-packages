@@ -52,32 +52,32 @@ M.meta = {
 -- by M.run — all fields are required numbers after the defaults are
 -- applied at runtime.
 local params_shape = T.shape({
-    n_boids            = T.number,
-    steps              = T.number,
-    separation_weight  = T.number,
-    alignment_weight   = T.number,
-    cohesion_weight    = T.number,
-    perception_radius  = T.number,
-    max_speed          = T.number,
-    max_force          = T.number,
-    world_size         = T.number,
+    n_boids            = T.number:describe("Number of boids (default 50)"),
+    steps              = T.number:describe("Simulation steps per run (default 100)"),
+    separation_weight  = T.number:describe("Separation rule weight (default 1.5)"),
+    alignment_weight   = T.number:describe("Alignment rule weight (default 1.0)"),
+    cohesion_weight    = T.number:describe("Cohesion rule weight (default 1.0)"),
+    perception_radius  = T.number:describe("Neighbor perception radius (default 50)"),
+    max_speed          = T.number:describe("Per-step velocity cap (default 4)"),
+    max_force          = T.number:describe("Per-step steering force cap (default 0.3)"),
+    world_size         = T.number:describe("Square-world side length (default 300)"),
 })
 
 M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task                = T.string:is_optional(),
-                n_boids             = T.number:is_optional(),
-                steps               = T.number:is_optional(),
-                separation_weight   = T.number:is_optional(),
-                alignment_weight    = T.number:is_optional(),
-                cohesion_weight     = T.number:is_optional(),
-                perception_radius   = T.number:is_optional(),
-                max_speed           = T.number:is_optional(),
-                max_force           = T.number:is_optional(),
-                world_size          = T.number:is_optional(),
-                runs                = T.number:is_optional(),
+                task                = T.string:is_optional():describe("Task description (free text)"),
+                n_boids             = T.number:is_optional():describe("Number of boids (default 50)"),
+                steps               = T.number:is_optional():describe("Simulation steps per run (default 100)"),
+                separation_weight   = T.number:is_optional():describe("Separation rule weight (default 1.5)"),
+                alignment_weight    = T.number:is_optional():describe("Alignment rule weight (default 1.0)"),
+                cohesion_weight     = T.number:is_optional():describe("Cohesion rule weight (default 1.0)"),
+                perception_radius   = T.number:is_optional():describe("Neighbor perception radius (default 50)"),
+                max_speed           = T.number:is_optional():describe("Per-step velocity cap (default 4)"),
+                max_force           = T.number:is_optional():describe("Per-step steering force cap (default 0.3)"),
+                world_size          = T.number:is_optional():describe("Square-world side length (default 300)"),
+                runs                = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
             }),
             result = T.shape({
                 params      = params_shape,

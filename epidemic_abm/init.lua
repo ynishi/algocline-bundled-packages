@@ -48,26 +48,26 @@ M.meta = {
 -- abm.sweep.shape helpers (suffix convention SSOT lives in abm/mc.lua
 -- and abm/sweep.lua).
 local params_shape = T.shape({
-    n_agents          = T.number,
-    initial_infected  = T.number,
-    beta              = T.number,
-    gamma             = T.number,
-    contacts_per_step = T.number,
-    steps             = T.number,
+    n_agents          = T.number:describe("Population size (default 200)"),
+    initial_infected  = T.number:describe("Initial infected count (default 5)"),
+    beta              = T.number:describe("Transmission probability per contact (default 0.3)"),
+    gamma             = T.number:describe("Recovery probability per step (default 0.1)"),
+    contacts_per_step = T.number:describe("Mean contacts per agent per step (default 5)"),
+    steps             = T.number:describe("Simulation steps (default 100)"),
 })
 
 M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task              = T.string:is_optional(),
-                n_agents          = T.number:is_optional(),
-                initial_infected  = T.number:is_optional(),
-                beta              = T.number:is_optional(),
-                gamma             = T.number:is_optional(),
-                contacts_per_step = T.number:is_optional(),
-                steps             = T.number:is_optional(),
-                runs              = T.number:is_optional(),
+                task              = T.string:is_optional():describe("Task description (free text)"),
+                n_agents          = T.number:is_optional():describe("Population size (default 200)"),
+                initial_infected  = T.number:is_optional():describe("Initial infected count (default 5)"),
+                beta              = T.number:is_optional():describe("Transmission probability per contact (default 0.3)"),
+                gamma             = T.number:is_optional():describe("Recovery probability per step (default 0.1)"),
+                contacts_per_step = T.number:is_optional():describe("Mean contacts per agent per step (default 5)"),
+                steps             = T.number:is_optional():describe("Simulation steps (default 100)"),
+                runs              = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
             }),
             result = T.shape({
                 params      = params_shape,

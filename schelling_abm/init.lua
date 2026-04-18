@@ -46,24 +46,24 @@ M.meta = {
 -- Phase 6-a-fix: result is shaped precisely via abm.mc.shape /
 -- abm.sweep.shape helpers.
 local params_shape = T.shape({
-    grid_size  = T.number,
-    threshold  = T.number,
-    density    = T.number,
-    type_ratio = T.number,
-    steps      = T.number,
+    grid_size  = T.number:describe("Square-grid side length (default 20)"),
+    threshold  = T.number:describe("Tolerance threshold (min same-type neighbor fraction, default 0.375)"),
+    density    = T.number:describe("Occupancy fraction (default 0.8)"),
+    type_ratio = T.number:describe("Fraction of type-A agents (default 0.5)"),
+    steps      = T.number:describe("Max simulation steps (default 100)"),
 })
 
 M.spec = {
     entries = {
         run = {
             input = T.shape({
-                task       = T.string:is_optional(),
-                grid_size  = T.number:is_optional(),
-                threshold  = T.number:is_optional(),
-                density    = T.number:is_optional(),
-                type_ratio = T.number:is_optional(),
-                steps      = T.number:is_optional(),
-                runs       = T.number:is_optional(),
+                task       = T.string:is_optional():describe("Task description (free text)"),
+                grid_size  = T.number:is_optional():describe("Square-grid side length (default 20)"),
+                threshold  = T.number:is_optional():describe("Tolerance threshold (min same-type neighbor fraction, default 0.375)"),
+                density    = T.number:is_optional():describe("Occupancy fraction (default 0.8)"),
+                type_ratio = T.number:is_optional():describe("Fraction of type-A agents (default 0.5)"),
+                steps      = T.number:is_optional():describe("Max simulation steps (default 100)"),
+                runs       = T.number:is_optional():describe("Monte Carlo runs (default 100)"),
             }),
             result = T.shape({
                 params      = params_shape,

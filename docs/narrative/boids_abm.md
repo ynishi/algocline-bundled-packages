@@ -21,17 +21,17 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.alignment_weight` | number | optional |  |
-| `ctx.cohesion_weight` | number | optional |  |
-| `ctx.max_force` | number | optional |  |
-| `ctx.max_speed` | number | optional |  |
-| `ctx.n_boids` | number | optional |  |
-| `ctx.perception_radius` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.separation_weight` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
-| `ctx.world_size` | number | optional |  |
+| `ctx.alignment_weight` | number | optional | Alignment rule weight (default 1.0) |
+| `ctx.cohesion_weight` | number | optional | Cohesion rule weight (default 1.0) |
+| `ctx.max_force` | number | optional | Per-step steering force cap (default 0.3) |
+| `ctx.max_speed` | number | optional | Per-step velocity cap (default 4) |
+| `ctx.n_boids` | number | optional | Number of boids (default 50) |
+| `ctx.perception_radius` | number | optional | Neighbor perception radius (default 50) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.separation_weight` | number | optional | Separation rule weight (default 1.5) |
+| `ctx.steps` | number | optional | Simulation steps per run (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
+| `ctx.world_size` | number | optional | Square-world side length (default 300) |
 
 ## Result {#result}
 

@@ -21,14 +21,14 @@ generated: gen_docs (V0)
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.beta` | number | optional |  |
-| `ctx.contacts_per_step` | number | optional |  |
-| `ctx.gamma` | number | optional |  |
-| `ctx.initial_infected` | number | optional |  |
-| `ctx.n_agents` | number | optional |  |
-| `ctx.runs` | number | optional |  |
-| `ctx.steps` | number | optional |  |
-| `ctx.task` | string | optional |  |
+| `ctx.beta` | number | optional | Transmission probability per contact (default 0.3) |
+| `ctx.contacts_per_step` | number | optional | Mean contacts per agent per step (default 5) |
+| `ctx.gamma` | number | optional | Recovery probability per step (default 0.1) |
+| `ctx.initial_infected` | number | optional | Initial infected count (default 5) |
+| `ctx.n_agents` | number | optional | Population size (default 200) |
+| `ctx.runs` | number | optional | Monte Carlo runs (default 100) |
+| `ctx.steps` | number | optional | Simulation steps (default 100) |
+| `ctx.task` | string | optional | Task description (free text) |
 
 ## Result {#result}
 
