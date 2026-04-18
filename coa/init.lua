@@ -28,6 +28,9 @@
 --- ctx.gen_tokens: Max tokens for abstract chain (default: 600)
 --- ctx.ground_tokens: Max tokens per grounding call (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -38,6 +41,40 @@ M.meta = {
         .. "then ground via parallel knowledge resolution. Decouples reasoning "
         .. "structure from concrete facts.",
     category = "reasoning",
+}
+
+local grounding_entry_shape = T.shape({
+    var    = T.string:describe("Placeholder variable name (e.g., 'y1', 'y2')"),
+    tool   = T.string:describe("Tool name selected by the abstract chain"),
+    query  = T.string:describe("Resolved query after earlier variables are substituted"),
+    result = T.string:describe("LLM-resolved value for this placeholder"),
+    depth  = T.number:describe("Resolution pass depth (1-based); dependent placeholders resolve at higher depths"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("Problem to solve (required)"),
+                tools         = T.map_of(T.string, T.string):is_optional()
+                    :describe("tool_name → description; defaults to a single 'knowledge' tool"),
+                max_depth     = T.number:is_optional():describe("Max dependency-resolution depth (default 3)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens for the abstract chain and final answer (default 600)"),
+                ground_tokens = T.number:is_optional():describe("Max tokens per grounding call (default 300)"),
+            }),
+            result = T.shape({
+                answer                 = T.string:describe("Final answer produced from the grounded chain"),
+                abstract_chain         = T.string:describe("Raw abstract chain with [FUNC tool(\"query\") = yN] placeholders"),
+                grounded_chain         = T.string:describe("Chain after placeholder substitution"),
+                groundings             = T.array_of(grounding_entry_shape)
+                    :describe("Per-placeholder resolution trace in resolution order"),
+                placeholders_resolved  = T.number:describe("Count of placeholders actually resolved"),
+                tools_used             = T.map_of(T.string, T.string)
+                    :describe("Echo of the tools map used for this run"),
+            }),
+        },
+    },
 }
 
 --- Extract placeholders from abstract chain.
@@ -282,5 +319,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

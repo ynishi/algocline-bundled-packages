@@ -28,6 +28,9 @@
 --- ctx.gen_tokens: Max tokens per position (default: 500)
 --- ctx.synth_tokens: Max tokens for synthesis (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,36 @@ M.meta = {
     version = "0.1.0",
     description = "Dialectical reasoning — thesis, antithesis, and synthesis for deeper analysis",
     category = "reasoning",
+}
+
+local debate_entry_shape = T.shape({
+    role  = T.one_of({ "thesis", "antithesis", "rebuttal", "synthesis" })
+        :describe("Dialectical role of this entry"),
+    round = T.number:describe("Round index; 0 for initial thesis and rounds for synthesis, 1..N for antithesis/rebuttal"),
+    text  = T.string:describe("LLM output for this dialectical turn"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("Task or question to analyze (required)"),
+                rounds       = T.number:is_optional():describe("Number of thesis–antithesis exchange rounds (default 1)"),
+                gen_tokens   = T.number:is_optional():describe("Max tokens per thesis/antithesis/rebuttal (default 500)"),
+                synth_tokens = T.number:is_optional():describe("Max tokens for the final synthesis (default 600)"),
+            }),
+            result = T.shape({
+                answer     = T.string:describe("Final synthesis text; alias of result.synthesis for caller convenience"),
+                thesis     = T.string:describe("Initial reasoned position (round 0)"),
+                antithesis = T.string:describe("Last antithesis produced (round N)"),
+                synthesis  = T.string:describe("Integrated position from the dialectic"),
+                rounds     = T.number:describe("Number of rounds actually executed"),
+                debate_log = T.array_of(debate_entry_shape)
+                    :describe("Full dialectical transcript in chronological order (thesis → antithesis/rebuttal*rounds → synthesis)"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -211,5 +244,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

@@ -30,6 +30,9 @@
 --- ctx.model_tokens: Max tokens for model construction (default: 500)
 --- ctx.solve_tokens: Max tokens for solving (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -40,6 +43,35 @@ M.meta = {
         .. "(entities, states, actions, constraints) before solving. "
         .. "Reduces constraint violations in planning and scheduling tasks.",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("Problem to solve (required)"),
+                verify       = T.boolean:is_optional():describe("Run constraint-verification + repair step (default true)"),
+                extract      = T.boolean:is_optional():describe("Extract concise final answer (default true)"),
+                model_tokens = T.number:is_optional():describe("Max tokens for model construction (default 500)"),
+                solve_tokens = T.number:is_optional():describe("Max tokens for solve/verify/repair steps (default 600)"),
+            }),
+            result = T.shape({
+                answer           = T.string
+                    :describe("Final answer (concise extract when extract=true, otherwise the verified solution)"),
+                model            = T.string
+                    :describe("Raw problem model text (entities / state vars / actions / constraints)"),
+                solution         = T.string
+                    :describe("Verified solution text; equals the initial solution when verify=false or no violations"),
+                violations_found = T.number
+                    :describe("Count of constraint violations parsed from the verification LLM output (0 when verify=false)"),
+                violations       = T.array_of(T.string)
+                    :describe("Parsed violation descriptions; empty when verify=false or no violations"),
+                verified         = T.boolean
+                    :describe("Whether the verification step actually ran (mirrors input.verify)"),
+            }),
+        },
+    },
 }
 
 --- Parse constraint violations from verification output.
@@ -239,5 +271,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

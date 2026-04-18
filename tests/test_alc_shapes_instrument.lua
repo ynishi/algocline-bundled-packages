@@ -755,6 +755,24 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- remains correct. Inner parser outputs (sub_intents, elements,
     -- options, hypotheses) get named shapes with :describe() on
     -- every field for caller discoverability.
+    -- Phase 7-c (category="reasoning" meta-reasoning) pkgs:
+    -- dmad / coa / model_first / bot. All four are single-path
+    -- reasoning pipelines with fully static result shapes; no
+    -- optional fields are needed on the happy path.
+    --   dmad.debate_log uses T.one_of({thesis, antithesis,
+    --     rebuttal, synthesis}) for role to pin down the 4 valid
+    --     dialectical phases.
+    --   coa.groundings uses a named entry shape and both
+    --     input.tools and result.tools_used are T.map_of(string,
+    --     string) — tools are user-pluggable, not a fixed set.
+    --   model_first.violations is array_of(string) — parser
+    --     emits one line per violation; empty when verify=false
+    --     or none found. result.verified mirrors input.verify.
+    --   bot.templates is T.map_of(string, template_shape) where
+    --     template_shape = { name, pattern } — pluggable template
+    --     library matching the built-in TEMPLATES structure.
+    --     errors_found is derived from ERRORS: NONE parsing so
+    --     remains T.boolean even when verification text is noisy.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -782,6 +800,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "coevolve",
         "router_capability", "router_daao", "router_semantic", "topo_route",
         "prism", "ambig", "intent_belief", "intent_discovery",
+        "dmad", "coa", "model_first", "bot",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

@@ -22,6 +22,9 @@
 --- ctx.templates: Custom template library (optional; uses built-in if absent)
 --- ctx.gen_tokens: Max tokens per step (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -30,6 +33,37 @@ M.meta = {
     version = "0.1.0",
     description = "Buffer of Thoughts — identify problem type, apply thought template, verify",
     category = "reasoning",
+}
+
+local template_shape = T.shape({
+    name    = T.string:describe("Human-readable template title (e.g., 'Arithmetic / Calculation')"),
+    pattern = T.string:describe("Numbered reasoning steps that structure the instantiate phase"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("Problem to solve (required)"),
+                templates  = T.map_of(T.string, template_shape):is_optional()
+                    :describe("Custom template_key → {name, pattern} map; defaults to built-in TEMPLATES"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per instantiate / verify step (default 500)"),
+            }),
+            result = T.shape({
+                answer                 = T.string
+                    :describe("Final answer extracted from the verification LLM output (falls back to full verification text)"),
+                template_key           = T.string
+                    :describe("Selected template key; 'analytical' is used as a fallback when parsing fails"),
+                template_name          = T.string:describe("Display name of the selected template"),
+                template_pattern       = T.string:describe("Reasoning steps of the selected template"),
+                instantiated_reasoning = T.string:describe("LLM output from Step 2 (template applied to the specific task)"),
+                verification           = T.string:describe("Full Step-3 verification text including ERRORS: and FINAL ANSWER: sections"),
+                errors_found           = T.boolean
+                    :describe("True when verification did not emit ERRORS: NONE (or NO ERRORS) — i.e., errors were reported"),
+            }),
+        },
+    },
 }
 
 --- Built-in thought template library.
@@ -234,5 +268,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M
