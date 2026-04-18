@@ -16,6 +16,9 @@
 --- ctx.gen_tokens: Max tokens per explanation (default: 300)
 --- ctx.consistency_tokens: Max tokens per consistency check (default: 100)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -24,6 +27,34 @@ M.meta = {
     version = "0.1.0",
     description = "Maieutic prompting — recursive explanation tree with logical consistency verification",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                proposition        = T.string:describe("The claim to analyze"),
+                max_depth          = T.number:is_optional():describe("Tree depth (default: 2)"),
+                gen_tokens         = T.number:is_optional():describe("Max tokens per explanation (default: 300)"),
+                consistency_tokens = T.number:is_optional():describe("Max tokens per consistency check (default: 100)"),
+            }),
+            result = T.shape({
+                verdict     = T.string:describe("Extracted verdict: likely true / likely false / insufficient evidence / unknown"),
+                synthesis   = T.string:describe("Final LLM synthesis grounded on consistent evidence"),
+                tree        = T.any:describe("Recursive explanation tree (unvalidated in V0 due to self-referencing shape)"),
+                evidence    = T.shape({
+                    support = T.array_of(T.string),
+                    oppose  = T.array_of(T.string),
+                }):describe("Propositions that passed consistency check, grouped by stance"),
+                consistency = T.shape({
+                    consistent    = T.number,
+                    contradictory = T.number,
+                    independent   = T.number,
+                }):describe("Status histogram across the whole tree"),
+            }),
+        },
+    },
 }
 
 --- Generate supporting and opposing explanations for a proposition.
@@ -243,5 +274,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

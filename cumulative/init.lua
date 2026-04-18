@@ -14,6 +14,9 @@
 --- ctx.max_rounds: Maximum propose-verify cycles (default: 4)
 --- ctx.propositions_per_round: Propositions to generate per round (default: 2)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -22,6 +25,37 @@ M.meta = {
     version = "0.1.0",
     description = "Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                   = T.string:describe("The problem to solve"),
+                max_rounds             = T.number:is_optional():describe("Max propose-verify cycles (default: 4)"),
+                propositions_per_round = T.number:is_optional():describe("Propositions generated per round (default: 2)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Reporter's synthesis grounded in established facts"),
+                established_facts = T.array_of(T.shape({
+                    proposition = T.string,
+                    round       = T.number,
+                })):describe("Verified propositions accumulated across rounds"),
+                rounds            = T.array_of(T.shape({
+                    round    = T.number,
+                    proposed = T.array_of(T.string),
+                    verified = T.array_of(T.shape({
+                        proposition  = T.string,
+                        verification = T.string,
+                        accepted     = T.boolean,
+                    })),
+                })):describe("Per-round propose/verify trace"),
+                total_rounds      = T.number:describe("Number of rounds actually executed (may be < max_rounds due to early termination)"),
+                total_established = T.number:describe("Count of verified propositions"),
+            }),
+        },
+    },
 }
 
 local function format_established(established)
@@ -161,5 +195,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

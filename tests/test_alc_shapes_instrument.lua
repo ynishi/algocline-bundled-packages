@@ -430,6 +430,9 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- Phase 2-e (category="preprocessing") pkgs: s2a.
     -- Phase 2-f (category="optimization") pkgs: cod.
     -- Phase 2-g-1 (category="reasoning" 派生) pkgs: sketch / got / tot.
+    -- Phase 2-g-2 (category="reasoning" 派生) pkgs: maieutic / cumulative /
+    -- analogical. maieutic declares `tree = T.any` (recursive explanation
+    -- tree is not expressible as a finite shape in V0).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -438,6 +441,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "s2a",
         "cod",
         "sketch", "got", "tot",
+        "maieutic", "cumulative", "analogical",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

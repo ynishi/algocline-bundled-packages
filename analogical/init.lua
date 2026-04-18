@@ -13,6 +13,9 @@
 --- ctx.n_analogies: Number of analogies to generate (default: 3)
 --- ctx.domain_hint: Optional domain to draw analogies from
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,28 @@ M.meta = {
     version = "0.1.0",
     description = "Analogical prompting — self-generate analogies, extract patterns, apply to original",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The problem to solve"),
+                n_analogies = T.number:is_optional():describe("Number of analogies to generate (default: 3)"),
+                domain_hint = T.string:is_optional():describe("Optional domain to draw analogies from"),
+            }),
+            result = T.shape({
+                answer          = T.string:describe("Solution to the original problem produced by applying transferred patterns"),
+                analogies       = T.array_of(T.shape({
+                    problem  = T.string,
+                    solution = T.string,
+                })):describe("Self-generated analogous problems and their solutions"),
+                patterns        = T.string:describe("Transferable reasoning patterns extracted from the analogies"),
+                total_analogies = T.number:describe("Count of analogies actually generated"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -136,5 +161,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
