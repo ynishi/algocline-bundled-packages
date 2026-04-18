@@ -419,4 +419,19 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         expect(rawget(r.entries.run.input, "kind")).to.equal("shape")
         expect(rawget(r.entries.run.result, "kind")).to.equal("shape")
     end)
+
+    -- Phase 2-a (category="reasoning") pkgs: plan_solve / step_back /
+    -- least_to_most. All three follow the cot precedent (inline T.shape
+    -- for both input and result, no registry name).
+    for _, name in ipairs({ "plan_solve", "step_back", "least_to_most" }) do
+        it(name .. ".run is wrapped with inline T.shape input + result", function()
+            package.loaded[name] = nil
+            local pkg = require(name)
+            expect(type(pkg.run)).to.equal("function")
+            local r = S.spec_resolver.resolve(pkg)
+            expect(r.kind).to.equal("typed")
+            expect(rawget(r.entries.run.input, "kind")).to.equal("shape")
+            expect(rawget(r.entries.run.result, "kind")).to.equal("shape")
+        end)
+    end
 end)

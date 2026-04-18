@@ -13,6 +13,9 @@
 --- ctx.task (required): The problem to solve
 --- ctx.max_subproblems: Maximum number of subproblems (default: 5)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,26 @@ M.meta = {
     version = "0.1.0",
     description = "Least-to-Most — decompose into ordered subproblems, solve simplest first, build up",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("The problem to solve"),
+                max_subproblems = T.number:is_optional():describe("Maximum number of subproblems (default: 5)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Synthesized final answer"),
+                subproblems       = T.array_of(T.shape({
+                    subproblem = T.string,
+                    solution   = T.string,
+                })):describe("Ordered subproblem/solution pairs (simplest first)"),
+                total_subproblems = T.number:describe("Count of subproblems parsed and solved"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -130,5 +153,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

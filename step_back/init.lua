@@ -13,6 +13,9 @@
 --- ctx.abstraction_levels: Number of abstraction rounds (default: 1)
 --- ctx.domain_hint: Optional domain hint to guide abstraction
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,30 @@ M.meta = {
     version = "0.1.0",
     description = "Step-Back prompting — abstract the principle first, then solve from principles",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task               = T.string:describe("The problem to solve"),
+                abstraction_levels = T.number:is_optional():describe("Number of abstraction rounds (default: 1)"),
+                domain_hint        = T.string:is_optional():describe("Optional domain hint to guide abstraction"),
+            }),
+            result = T.shape({
+                answer       = T.string:describe("Final answer (post-verification / post-revision)"),
+                abstractions = T.array_of(T.shape({
+                    level     = T.number,
+                    question  = T.string,
+                    principle = T.string,
+                })):describe("Ordered step-back Q/A per abstraction level"),
+                verification = T.string:describe("Verifier output"),
+                verified     = T.boolean:describe("Whether verification returned VERIFIED"),
+                revised      = T.boolean:describe("Whether a revision pass was triggered"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -167,5 +194,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

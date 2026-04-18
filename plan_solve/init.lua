@@ -21,6 +21,9 @@
 --- ctx.plan_tokens: Max tokens for plan generation (default: 300)
 --- ctx.solve_tokens: Max tokens for execution (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -29,6 +32,26 @@ M.meta = {
     version = "0.1.0",
     description = "Plan-and-Solve — devise an explicit plan, then execute step by step",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task         = T.string:describe("The problem to solve"),
+                extract      = T.boolean:is_optional():describe("Extract concise final answer (default: true)"),
+                plan_tokens  = T.number:is_optional():describe("Max tokens for plan generation (default: 300)"),
+                solve_tokens = T.number:is_optional():describe("Max tokens for execution (default: 500)"),
+            }),
+            result = T.shape({
+                answer     = T.string:describe("Final answer (extracted or raw execution)"),
+                plan       = T.string:describe("Numbered plan devised in Step 1"),
+                execution  = T.string:describe("Full step-by-step execution trace"),
+                plan_steps = T.number:describe("Count of numbered steps parsed from plan"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -124,5 +147,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
