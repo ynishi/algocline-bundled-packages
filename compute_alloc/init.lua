@@ -29,6 +29,9 @@
 --- ctx.strategies: Custom strategy map (overrides defaults)
 --- ctx.gen_tokens: Max tokens per LLM call (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -39,6 +42,28 @@ M.meta = {
         .. "reasoning method (parallel/sequential/hybrid) and budget allocation "
         .. "based on problem difficulty. Uses existing packages as components.",
     category = "orchestration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The problem to solve"),
+                budget     = T.string:is_optional():describe("Budget hint: 'low' | 'medium' | 'high' (default: 'medium')"),
+                strategies = T.table:is_optional():describe("Custom difficulty→strategy map (overrides DEFAULT_STRATEGIES)"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per LLM call (default: 400)"),
+            }),
+            result = T.shape({
+                answer          = T.string:describe("Final answer produced by the selected paradigm"),
+                difficulty      = T.string:describe("Classified difficulty: 'easy' | 'medium' | 'hard' | 'very_hard'"),
+                strategy        = T.string:describe("Selected strategy name (e.g., 'direct', 'parallel', 'sequential', 'hybrid')"),
+                paradigm        = T.string:describe("Execution paradigm: 'single' | 'parallel' | 'sequential' | 'hybrid'"),
+                candidates      = T.array_of(T.string):is_optional():describe("Parallel candidates (set only for parallel / hybrid paradigms)"),
+                total_llm_calls = T.number:describe("Total LLM calls (classification + execution)"),
+            }),
+        },
+    },
 }
 
 --- Difficulty levels and their default strategy mappings.
@@ -369,5 +394,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

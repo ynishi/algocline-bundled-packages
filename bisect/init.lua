@@ -22,6 +22,9 @@
 --- ctx.gen_tokens: Max tokens for chain generation (default: 800)
 --- ctx.verify_tokens: Max tokens per verification (default: 200)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -30,6 +33,39 @@ M.meta = {
     version = "0.1.0",
     description = "Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point",
     category = "debugging",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("The task/question to solve"),
+                max_repairs   = T.number:is_optional():describe("Maximum number of bisect→repair cycles (default: 2)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens for chain generation (default: 800)"),
+                verify_tokens = T.number:is_optional():describe("Max tokens per verification (default: 200)"),
+            }),
+            result = T.shape({
+                answer        = T.string:describe("Final reasoning chain after all repairs"),
+                initial_chain = T.string:describe("Original pre-repair reasoning chain"),
+                repairs       = T.array_of(T.shape({
+                    repair_round  = T.number:describe("1-based repair iteration index"),
+                    error_step    = T.number:describe("Step index of the first incorrect step located"),
+                    error_label   = T.string:describe("Label text of the erroneous step (e.g., 'Step 3:')"),
+                    error_content = T.string:describe("Content of the erroneous step"),
+                    bisect_log    = T.array_of(T.shape({
+                        lo      = T.number:describe("Binary-search low bound at probe time"),
+                        hi      = T.number:describe("Binary-search high bound at probe time"),
+                        mid     = T.number:describe("Probed midpoint"),
+                        correct = T.boolean:describe("Whether steps 1..mid were verified correct"),
+                        reason  = T.string:describe("Verifier's one-sentence justification"),
+                    })):describe("Per-probe binary-search log"),
+                    regenerated   = T.string:describe("Regenerated suffix from the failure point"),
+                })):describe("Per-cycle repair records"),
+                total_repairs = T.number:describe("Number of repair cycles applied"),
+            }),
+        },
+    },
 }
 
 --- Parse a numbered reasoning chain into a list of steps.
@@ -249,5 +285,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

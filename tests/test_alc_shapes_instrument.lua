@@ -438,6 +438,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- Phase 3-a (category="selection") pkgs: ucb / setwise_rank / mbr_select.
     -- Phase 3-b (category="selection") pkgs: f_race / cs_pruner / ab_select.
     -- Phase 3-c (aggregation + reasoning 派生) pkgs: usc / diverse / gumbel_search.
+    -- Phase 3-d (orchestration + optimization + debugging) pkgs:
+    -- compute_alloc / optimize / bisect. compute_alloc declares `strategies =
+    -- T.table` (user-supplied difficulty→strategy map) and `candidates` is
+    -- optional (only populated for parallel / hybrid paradigms). optimize uses
+    -- T.any for string-or-table inputs (scenario / search / evaluator / stop)
+    -- and T.table for parameter maps (space / defaults / best_params).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -451,6 +457,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "ucb", "setwise_rank", "mbr_select",
         "f_race", "cs_pruner", "ab_select",
         "usc", "diverse", "gumbel_search",
+        "compute_alloc", "optimize", "bisect",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

@@ -59,6 +59,8 @@
 local search_mod = require("optimize.search")
 local eval_mod   = require("optimize.eval")
 local stop_mod   = require("optimize.stop")
+local S          = require("alc_shapes")
+local T          = S.T
 
 math.randomseed(os.time())
 
@@ -73,6 +75,47 @@ M.meta = {
         .. "evaluators (evalframe, custom, LLM judge), and stopping criteria "
         .. "(variance, patience, threshold). Persists history via alc.state.",
     category = "optimization",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                target         = T.string:describe("Strategy package name to optimize (e.g., 'biz_kernel')"),
+                space          = T.table:describe("Parameter search space (map of param_name → def {type, min, max, step, values})"),
+                scenario       = T.any:describe("Eval scenario — inline table or scenario name string"),
+                rounds         = T.number:is_optional():describe("Max optimization rounds (default: 20)"),
+                search         = T.any:is_optional():describe("Search strategy — name string or config table (default: 'ucb')"),
+                evaluator      = T.any:is_optional():describe("Evaluator — name string or config table (default: 'evalframe')"),
+                stop           = T.any:is_optional():describe("Stopping criterion — name string or config table (default: 'variance')"),
+                stop_config    = T.table:is_optional():describe("Extra config for stopping criterion"),
+                name           = T.string:is_optional():describe("Run name used as state key suffix (default: ctx.target)"),
+                defaults       = T.table:is_optional():describe("Base parameter defaults merged with arm params"),
+                strategy_opts  = T.table:is_optional():describe("Extra opts passed through to the target strategy"),
+                eval_fn        = T.any:is_optional():describe("Custom evaluation function (only for evaluator='custom')"),
+                auto_card      = T.boolean:is_optional():describe("Emit a Card on completion (default: false)"),
+                card_pkg       = T.string:is_optional():describe("Card pkg.name override (default: 'optimize_{target}')"),
+                scenario_name  = T.string:is_optional():describe("Explicit scenario name for the emitted Card"),
+            }),
+            result = T.shape({
+                status            = T.string:describe("'converged' (stopper fired) or 'budget_exhausted'"),
+                stop_reason       = T.string:is_optional():describe("Stopper's reason string; nil when budget_exhausted"),
+                best_params       = T.table:describe("Best-ranked parameter set"),
+                best_score        = T.number:describe("Average score of best_params"),
+                rounds_used       = T.number:describe("Actual rounds executed this run"),
+                total_evaluations = T.number:describe("Cumulative evaluations in history (including prior runs)"),
+                arm_count         = T.number:describe("Number of distinct arms in history"),
+                top_5             = T.array_of(T.shape({
+                    params    = T.table:describe("Arm parameter set"),
+                    avg_score = T.number:describe("Arm's average score"),
+                    pulls     = T.number:describe("Arm's total pull count"),
+                })):describe("Top-5 ranked arms (may contain fewer than 5)"),
+                history_key       = T.string:describe("alc.state key for the persisted history"),
+                card_id           = T.string:is_optional():describe("Emitted Card id (only when auto_card=true)"),
+            }),
+        },
+    },
 }
 
 -- Re-export submodules for direct access
@@ -281,5 +324,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
