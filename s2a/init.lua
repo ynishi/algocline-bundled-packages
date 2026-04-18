@@ -20,6 +20,9 @@
 --- ctx.context: The full (potentially noisy) context to denoise
 --- ctx.gen_tokens: Max tokens per LLM call (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -28,6 +31,25 @@ M.meta = {
     version = "0.1.0",
     description = "System 2 Attention — strip irrelevant context before reasoning to reduce distraction and sycophancy",
     category = "preprocessing",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The question or task to answer"),
+                context    = T.string:is_optional():describe("Full (potentially noisy) context to denoise; empty/absent => task itself is reformulated"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per LLM call (default: 500)"),
+            }),
+            result = T.shape({
+                answer                  = T.string:describe("Final answer produced from the denoised context"),
+                denoised_context        = T.string:describe("LLM-denoised context (or reformulated task when no context given)"),
+                original_context_length = T.number:describe("Length in chars of the original context (or task when no context given)"),
+                denoised_context_length = T.number:describe("Length in chars of the denoised_context"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -123,5 +145,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
