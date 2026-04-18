@@ -31,6 +31,9 @@
 --- ctx.deep_threshold: Confidence threshold for deep analysis (default: 0.6)
 --- ctx.max_fixes: Max fix candidates per theme (default: 3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 --- UTF-8 safe truncate: find last valid boundary at or before max_bytes.
@@ -54,6 +57,114 @@ M.meta = {
     version = "0.1.0",
     description = "Deep code review with investigation — detect, verify, explore, diagnose, research, prescribe",
     category = "combinator",
+}
+
+-- Shape sub-definitions. Themes accumulate fields across 6 phases,
+-- so most per-theme fields are :is_optional(). Three early-return
+-- paths also trim the summary; the summary shape below is a flat
+-- union (everything except total_themes is optional).
+
+local expert_consultation_shape = T.shape({
+    role     = T.string:describe("Expert role label (echo of meta_prompt.experts_consulted[].role)"),
+    focus    = T.string:describe("Expert focus area"),
+    question = T.string:describe("Question posed to the expert"),
+    response = T.string:describe("Expert's response"),
+})
+
+local contrast_shape = T.shape({
+    wrong_reasoning = T.string:describe("Plausible-but-incorrect reasoning path (from contrastive.contrasts)"),
+    error_analysis  = T.string:describe("Analysis of the error and its correct replacement"),
+})
+
+local deep_analysis_shape = T.shape({
+    verdict = T.string:is_optional():describe("Full triad verdict text"),
+    winner  = T.string:is_optional():describe("Triad winner label (proponent|opponent|unknown)"),
+})
+
+local fix_shape = T.shape({
+    id       = T.string:is_optional():describe("Fix id such as 'F1', 'F2'"),
+    summary  = T.string:is_optional():describe("Short fix summary"),
+    approach = T.string:is_optional():describe("Concrete fix approach"),
+    impact   = T.string:is_optional():describe("Impact scope"),
+    risk     = T.string:is_optional():describe("Risk description"),
+    avoids   = T.string:is_optional():describe("Which anti-pattern the fix explicitly avoids"),
+})
+
+local match_log_shape = T.shape({
+    a      = T.string:describe("Left competitor fix id"),
+    b      = T.string:describe("Right competitor fix id"),
+    winner = T.string:describe("Winning fix id"),
+    reason = T.string:describe("LLM judge's reason text"),
+})
+
+local ranking_shape = T.shape({
+    best    = fix_shape:describe("The tournament winner"),
+    matches = T.array_of(match_log_shape):describe("Pairwise match log of the tournament"),
+})
+
+local theme_shape = T.shape({
+    -- Detect phase (always set on themes that reach downstream phases)
+    id                   = T.string:is_optional():describe("Theme id parsed from detect JSON (e.g., 'T1')"),
+    name                 = T.string:describe("Theme name; required because logs and prompts format with it"),
+    category             = T.string:is_optional():describe("safety|logic|design|performance|style (LLM-chosen)"),
+    surface_symptom      = T.string:is_optional():describe("Description of the surface symptom"),
+    principle_violated   = T.string:is_optional():describe("Which design principle this theme violates"),
+    locations            = T.array_of(T.string):is_optional():describe("file:line or function name references"),
+    span                 = T.array_of(T.number):is_optional():describe("[start_line, end_line] 1-indexed line range"),
+    -- Verify phase
+    verification         = T.string:is_optional():describe("Confirmed rationale text from Phase 2"),
+    -- Explore phase
+    related_locations    = T.array_of(T.string):is_optional():describe("Additional locations found by Phase 3 exploration"),
+    search_pattern       = T.string:is_optional():describe("Grep pattern used by Phase 3"),
+    total_occurrences    = T.number:is_optional():describe("Count of related occurrences found in Phase 3"),
+    -- Diagnose phase
+    expert_consultations = T.array_of(expert_consultation_shape):is_optional():describe("meta_prompt consultation log"),
+    root_cause           = T.string:is_optional():describe("Structural root-cause analysis text"),
+    diagnosis_confidence = T.number:is_optional():describe("calibrate confidence in [0, 1]"),
+    diagnosis_escalated  = T.boolean:is_optional():describe("Whether calibrate escalated to retry"),
+    deep_analysis        = deep_analysis_shape:is_optional():describe("Triad debate result when confidence < threshold"),
+    -- Research phase
+    best_practice        = T.string:is_optional():describe("Summary of best-practice guidance"),
+    current_state        = T.string:is_optional():describe("Summary of current implementation state"),
+    gap                  = T.string:is_optional():describe("Gap between BP and current state"),
+    references           = T.array_of(T.string):is_optional():describe("References cited in Phase 5 research"),
+    -- Prescribe phase
+    fix_anti_patterns    = T.array_of(contrast_shape):is_optional():describe("contrastive.contrasts capturing common fix anti-patterns"),
+    fixes                = T.array_of(fix_shape):is_optional():describe("Fix candidates proposed for the theme"),
+    ranking              = ranking_shape:is_optional():describe("Pairwise tournament ranking of fixes (only when >= 2 fixes)"),
+})
+
+local policy_shape = T.shape({
+    priorities       = T.array_of(T.string):is_optional():describe("Ordered policy priorities (e.g., 'correctness' > 'non_breaking' > ...)"),
+    severity_weights = T.map_of(T.string, T.number):is_optional():describe("severity label → numeric weight"),
+})
+
+local summary_shape = T.shape({
+    total_themes            = T.number:describe("Surviving theme count; always set"),
+    false_positives_removed = T.number:is_optional():describe("Count removed by Phase 2 (verify); absent on the no-themes-at-detect and context-filter-all paths"),
+    by_category             = T.map_of(T.string, T.number):is_optional():describe("Distribution over theme.category; present only on the full-run path"),
+    deep_analyzed           = T.number:is_optional():describe("Count of themes that went through the triad deep-analysis branch"),
+    policy_applied          = T.string:is_optional():describe("Policy priorities joined with ' > '"),
+    context_filtered        = T.boolean:is_optional():describe("True on the Phase-1.5 context-filter-all-themes early-return path"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                code            = T.string:describe("Source code or diff to review (required)"),
+                context         = T.string:is_optional():describe("Free-text design context used in Phase 1/1.5/2/4"),
+                policy          = policy_shape:is_optional():describe("Review policy (default: correctness > non_breaking > safety > testability > maintainability)"),
+                deep_threshold  = T.number:is_optional():describe("Confidence threshold below which the diagnose phase escalates to triad (default 0.6)"),
+                max_fixes       = T.number:is_optional():describe("Max fix candidates per theme (default 3)"),
+            }),
+            result = T.shape({
+                themes  = T.array_of(theme_shape):describe("Surviving themes with accumulated per-phase fields; empty on any early-return path"),
+                summary = summary_shape:describe("Run summary; field presence varies by early-return path (see summary_shape)"),
+            }),
+        },
+    },
 }
 
 --- Extract the code slice for a theme using its span [start, end].
@@ -804,5 +915,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

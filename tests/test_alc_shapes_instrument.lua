@@ -773,6 +773,39 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     --     library matching the built-in TEMPLATES structure.
     --     errors_found is derived from ERRORS: NONE parsing so
     --     remains T.boolean even when verification text is noisy.
+    -- Phase 7-d (misc 6 pkg final batch): anti_cascade / lineage /
+    -- cascade / prompt_breed / review_and_investigate / distill.
+    --   anti_cascade and prompt_breed are single-path — step_results
+    --     / population / evolution_history use named entry shapes.
+    --   lineage uses T.array_of(T.any) for trace_entry.derives_from
+    --     because that array is legitimately heterogeneous:
+    --     {previous-step claim numbers...} | {"ORIGINAL_INPUT"} | {}.
+    --     T.array_of takes a single element type and T.one_of only
+    --     accepts literal values, so T.any at the leaf is the
+    --     documented representation (same pattern as condorcet /
+    --     shapley / kemeny / mwu / scoring_rule).
+    --   cascade uses T.any for history_entry.detail because that
+    --     field crosses string|table kinds by design (Level 1 returns
+    --     the raw LLM response as a string; Level 2/3 return per-
+    --     level trace tables). The surrounding history entry is
+    --     still fully shaped (level/name/answer/confidence).
+    --   distill applies flat-union handling for three early-return
+    --     paths: #chunks==0 (only summary + chunks_processed),
+    --     #relevant==0 (+ relevant_chunks), normal (+ extractions).
+    --     relevant_chunks and extractions are therefore
+    --     `:is_optional()`.
+    --   review_and_investigate is the most accumulating shape in the
+    --     codebase: theme entries gather fields across 6 phases
+    --     (detect / verify / explore / diagnose / research /
+    --     prescribe), so every phase-added field is
+    --     `:is_optional()`. The summary shape is a flat union over
+    --     four early-return paths (no-themes-at-detect /
+    --     context-filter-empty / no-themes-at-verify / full);
+    --     total_themes is the only always-present summary key.
+    --     Nested expert_consultation_shape / contrast_shape mirror
+    --     the meta_prompt / contrastive result shapes declared in
+    --     their respective pkgs (no cross-pkg schema reuse is
+    --     supported at the T-DSL level yet).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -801,6 +834,8 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "router_capability", "router_daao", "router_semantic", "topo_route",
         "prism", "ambig", "intent_belief", "intent_discovery",
         "dmad", "coa", "model_first", "bot",
+        "anti_cascade", "lineage", "cascade", "prompt_breed",
+        "review_and_investigate", "distill",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

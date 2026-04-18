@@ -35,6 +35,9 @@
 --- ctx.trace_tokens: Max tokens for dependency tracing (default: 500)
 --- ctx.summary_tokens: Max tokens for final summary (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -47,6 +50,64 @@ M.meta = {
         .. "from 'From Spark to Fire' (Xie et al., AAMAS 2026). "
         .. "Defense rate improvement: 0.32 → 0.89.",
     category = "governance",
+}
+
+local input_step_shape = T.shape({
+    name   = T.string:describe("Step name used to key claims and traces"),
+    output = T.string:describe("Text output of this step"),
+})
+
+local claim_shape = T.shape({
+    id   = T.number:describe("Claim number parsed from the extractor output"),
+    text = T.string:describe("Atomic factual claim text"),
+})
+
+local step_claims_shape = T.shape({
+    name   = T.string:describe("Step name (echo)"),
+    claims = T.array_of(claim_shape):describe("Atomic claims parsed from the step's output"),
+    raw    = T.string:describe("Raw LLM extractor output"),
+})
+
+local trace_entry_shape = T.shape({
+    id             = T.number:describe("Current-step claim id whose provenance is being described"),
+    derives_from   = T.array_of(T.any):is_optional():describe(
+        "Provenance list. Element type is heterogeneous by design: "
+        .. "either a list of previous-step claim numbers (number), "
+        .. "or the single-string marker {\"ORIGINAL_INPUT\"}, "
+        .. "or {} for NOVEL/NONE. Declared as T.array_of(T.any) because "
+        .. "T.one_of only accepts literal values and T.array_of needs a "
+        .. "single element type; this follows the codebase convention "
+        .. "used in condorcet/shapley/kemeny/mwu/scoring_rule."),
+    transformation = T.string:is_optional():describe("PRESERVED|REFINED|MERGED|INFERRED|NOVEL"),
+})
+
+local trace_shape = T.shape({
+    from_step = T.string:describe("Previous step name"),
+    to_step   = T.string:describe("Current step name"),
+    traces    = T.array_of(trace_entry_shape):describe("Per-current-claim provenance entries"),
+    raw       = T.string:describe("Raw LLM trace output"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("Original task description passed to trace/summary prompts (required)"),
+                steps          = T.array_of(input_step_shape):describe("Ordered step outputs; at least 2 entries (required)"),
+                extract_tokens = T.number:is_optional():describe("Max tokens per claim extraction (default 600)"),
+                trace_tokens   = T.number:is_optional():describe("Max tokens per dependency trace (default 500)"),
+                summary_tokens = T.number:is_optional():describe("Max tokens for conflict/integrity summary (default 600)"),
+            }),
+            result = T.shape({
+                step_claims     = T.array_of(step_claims_shape):describe("Per-step extracted claims"),
+                traces          = T.array_of(trace_shape):describe("Consecutive-step dependency traces"),
+                lineage_graph   = T.string:describe("Human-readable lineage graph text used as input to the conflict analyzer"),
+                analysis        = T.string:describe("Full conflict/ungrounded/drift analyzer output"),
+                integrity_score = T.number:is_optional():describe("Parsed SCORE in [0, 1]; nil when the analyzer did not emit a parseable score"),
+            }),
+        },
+    },
 }
 
 -- ─── Prompts ───
@@ -325,5 +386,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

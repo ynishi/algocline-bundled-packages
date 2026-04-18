@@ -44,6 +44,9 @@
 --- ctx.hyper_mutation_rate: Probability of meta-mutation (default: 0.15)
 --- ctx.crossover_rate: Probability of crossover vs mutation (default: 0.3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -54,6 +57,51 @@ M.meta = {
         .. "via genetic operators with meta-mutation (the mutation operators "
         .. "themselves evolve). Double evolutionary loop.",
     category = "exploration",
+}
+
+local population_entry_shape = T.shape({
+    rank   = T.number:describe("1-based rank in the final population (1 = best score)"),
+    prompt = T.string:describe("Task prompt text"),
+    score  = T.number:describe("Evaluator score produced by evaluate_prompt"),
+})
+
+local history_entry_shape = T.shape({
+    generation = T.number:describe("1-based generation index"),
+    best_score = T.number:describe("Best score observed up to and including this generation"),
+    avg_score  = T.number:describe("Average score over the current population"),
+})
+
+local stats_shape = T.shape({
+    generations         = T.number:describe("Echo of input.generations"),
+    population_size     = T.number:describe("Echo of input.population_size"),
+    mutation_pool       = T.number:describe("Echo of input.mutation_pool"),
+    hyper_mutation_rate = T.number:describe("Echo of input.hyper_mutation_rate"),
+    crossover_rate      = T.number:describe("Echo of input.crossover_rate"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                = T.string:describe("Task domain description used in all prompts (required)"),
+                evaluator           = T.string:describe("Evaluation criteria/prompt used by evaluate_prompt (required)"),
+                population_size     = T.number:is_optional():describe("Number of task prompts in the population (default 6)"),
+                generations         = T.number:is_optional():describe("Number of evolution generations (default 8)"),
+                mutation_pool       = T.number:is_optional():describe("Number of mutation meta-prompts (default 3)"),
+                hyper_mutation_rate = T.number:is_optional():describe("Per-mutation-prompt probability of meta-mutation (default 0.15)"),
+                crossover_rate      = T.number:is_optional():describe("Probability of crossover vs mutation for offspring (default 0.3)"),
+            }),
+            result = T.shape({
+                best_prompt       = T.string:describe("Highest-scoring task prompt encountered across the entire run"),
+                best_score        = T.number:describe("Score of best_prompt"),
+                population        = T.array_of(population_entry_shape):describe("Final population sorted descending by score"),
+                mutation_prompts  = T.array_of(T.string):describe("Final mutation meta-prompts (after hyper-mutation)"),
+                evolution_history = T.array_of(history_entry_shape):describe("Per-generation best/avg summary"),
+                stats             = stats_shape,
+            }),
+        },
+    },
 }
 
 -- ─── Initialization ───
@@ -369,5 +417,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

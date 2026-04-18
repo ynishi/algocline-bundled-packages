@@ -25,6 +25,9 @@
 --- ctx.gen_tokens: Max tokens per generation (default: 400)
 --- ctx.verify_tokens: Max tokens for verification (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -33,6 +36,44 @@ M.meta = {
     version = "0.1.0",
     description = "Multi-level difficulty routing — escalate from fast to deep only when confidence is low",
     category = "routing",
+}
+
+local history_entry_shape = T.shape({
+    level      = T.number:describe("Level index (1=fast zero-shot, 2=cot+verify, 3=ensemble synthesis)"),
+    name       = T.string:describe("Level name: 'fast' | 'cot_verify' | 'ensemble'"),
+    answer     = T.string:describe("Answer extracted for this level (before the confidence marker)"),
+    confidence = T.number:describe("Parsed confidence in [0, 1]; 0.5 when unparseable"),
+    detail     = T.any:describe(
+        "Level-polymorphic trace: Level 1 returns the raw LLM response as a string; "
+        .. "Level 2 returns {cot = string, verification = string}; "
+        .. "Level 3 returns {perspectives = array<string>, candidates = array<string>, synthesis = string}. "
+        .. "Declared as T.any because the detail leaf crosses string/table kinds by design; "
+        .. "follows the codebase convention used in condorcet/shapley/scoring_rule for "
+        .. "legitimately heterogeneous leaves inside an otherwise shaped container."),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("Problem to solve (required)"),
+                threshold     = T.number:is_optional():describe("Confidence threshold at which the cascade stops early (default 0.8)"),
+                max_level     = T.number:is_optional():describe("Maximum cascade level to attempt (default 3)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens per generation call (default 400)"),
+                verify_tokens = T.number:is_optional():describe("Max tokens per verification call (default 300)"),
+            }),
+            result = T.shape({
+                answer     = T.string:describe("Final answer from the highest level actually run"),
+                confidence = T.number:describe("Final confidence in [0, 1]"),
+                level_used = T.number:describe("Level at which the cascade stopped"),
+                max_level  = T.number:describe("Echo of input.max_level"),
+                threshold  = T.number:describe("Echo of input.threshold"),
+                escalated  = T.boolean:describe("True iff level_used > 1"),
+                history    = T.array_of(history_entry_shape):describe("Per-level execution trace in run order"),
+            }),
+        },
+    },
 }
 
 --- Parse confidence from self-assessment.
@@ -310,5 +351,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

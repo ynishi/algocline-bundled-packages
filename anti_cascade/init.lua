@@ -33,6 +33,9 @@
 --- ctx.rederive_tokens: Max tokens for re-derivation (default: 500)
 --- ctx.compare_tokens: Max tokens for comparison (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -45,6 +48,43 @@ M.meta = {
         .. "countermeasure from 'From Spark to Fire' (Xie et al., AAMAS 2026). "
         .. "Addresses MAST failure modes F3/F9.",
     category = "governance",
+}
+
+local step_input_shape = T.shape({
+    name        = T.string:describe("Step identifier used in logs and result keys"),
+    instruction = T.string:is_optional():describe("What this step should produce; falls back to step.name when absent"),
+    output      = T.string:describe("Pipeline step's actual output text (subject of drift comparison)"),
+})
+
+local step_result_shape = T.shape({
+    name         = T.string:describe("Step name (echo of input steps[i].name)"),
+    drift_score  = T.number:describe("Parsed DRIFT_SCORE in [0, 1]; 0 when the compare LLM output was unparseable"),
+    drift_type   = T.string:describe("Parsed DRIFT_TYPE (NONE|MINOR_REFINEMENT|ADDED_DETAIL|SHIFTED_FOCUS|FACTUAL_DIVERGENCE|CONTRADICTORY|UNKNOWN)"),
+    cascade_risk = T.string:describe("Parsed CASCADE_RISK (LOW|MEDIUM|HIGH|UNKNOWN)"),
+    flagged      = T.boolean:describe("True when drift_score >= ctx.drift_threshold"),
+    raw          = T.string:describe("Full raw LLM comparison output for this step"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("Original task/input that the pipeline was given (required)"),
+                steps           = T.array_of(step_input_shape):describe("Ordered pipeline step outputs; at least 1 entry (required)"),
+                drift_threshold = T.number:is_optional():describe("Drift score threshold at which a step is flagged (default 0.4)"),
+                rederive_tokens = T.number:is_optional():describe("Max tokens per independent re-derivation (default 500)"),
+                compare_tokens  = T.number:is_optional():describe("Max tokens per pipeline-vs-independent comparison (default 400)"),
+                summary_tokens  = T.number:is_optional():describe("Max tokens for the final summary analysis (default 500)"),
+            }),
+            result = T.shape({
+                step_results  = T.array_of(step_result_shape):describe("Per-step drift analysis in pipeline order"),
+                flagged_steps = T.array_of(T.string):describe("Names of steps whose drift_score crossed the threshold"),
+                max_drift     = T.number:describe("Highest drift_score observed across all steps"),
+                summary       = T.string:describe("LLM-generated cascade analysis summary text"),
+            }),
+        },
+    },
 }
 
 -- ─── Prompts ───
@@ -266,5 +306,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

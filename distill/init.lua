@@ -16,6 +16,9 @@
 --- ctx.map_tokens: Max tokens per map call (default: 300)
 --- ctx.reduce_tokens: Max tokens for final reduce (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -24,6 +27,35 @@ M.meta = {
     version = "0.1.0",
     description = "MapReduce summarization — parallel chunk processing with unified reduction",
     category = "extraction",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                text          = T.string:describe("Source text to process (required)"),
+                goal          = T.string:is_optional():describe("What to extract/summarize (default 'Summarize the key points')"),
+                chunk_size    = T.number:is_optional():describe("Lines per chunk passed to alc.chunk (default 100)"),
+                chunk_overlap = T.number:is_optional():describe("Overlap lines between chunks (default 5)"),
+                map_tokens    = T.number:is_optional():describe("Max tokens per map call (default 300)"),
+                reduce_tokens = T.number:is_optional():describe("Max tokens for the final reduce call (default 600)"),
+            }),
+            result = T.shape({
+                summary          = T.string:describe(
+                    "Final synthesized output. Empty string on the no-chunks early-return path, "
+                    .. "a canned 'No relevant information' message when every chunk was filtered out, "
+                    .. "and the reduce-phase LLM output on the normal path."),
+                chunks_processed = T.number:describe("Number of chunks produced by alc.chunk (0 when the input did not split)"),
+                relevant_chunks  = T.number:is_optional():describe(
+                    "Count of chunks whose map output was not 'NONE'. "
+                    .. "Absent on the no-chunks early-return path; present on both the all-filtered and normal paths."),
+                extractions      = T.array_of(T.string):is_optional():describe(
+                    "Per-chunk raw map outputs in chunk order. "
+                    .. "Present only on the normal path — absent on both early-return paths."),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -114,5 +146,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M
