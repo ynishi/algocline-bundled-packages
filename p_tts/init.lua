@@ -31,6 +31,9 @@
 --- ctx.gen_tokens: Max tokens for solving (default: 600)
 --- ctx.verify_tokens: Max tokens per constraint check (default: 150)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -39,6 +42,44 @@ M.meta = {
     version = "0.1.0",
     description = "Plan-Test-Then-Solve — generate constraints before solving, verify solution against specification",
     category = "planning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("The task/question to solve"),
+                max_constraints = T.number:is_optional():describe("Max constraints to generate (default: 6)"),
+                max_repairs     = T.number:is_optional():describe("Max repair attempts (default: 2)"),
+                plan_tokens     = T.number:is_optional():describe("Max tokens for planning (default: 400)"),
+                gen_tokens      = T.number:is_optional():describe("Max tokens for solving (default: 600)"),
+                verify_tokens   = T.number:is_optional():describe("Max tokens per constraint check (default: 150)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Final answer after verify+repair"),
+                plan              = T.string:describe("Planning phase LLM output"),
+                constraints       = T.array_of(T.string):describe("Verifiable constraints the answer must satisfy"),
+                pass_count        = T.number:describe("Number of constraints passing in the final round"),
+                fail_count        = T.number:describe("Number of constraints failing in the final round"),
+                total_constraints = T.number:describe("Total number of constraints generated"),
+                repairs           = T.number:describe("Number of repair rounds performed"),
+                all_passed        = T.boolean:describe("Whether all constraints passed"),
+                history = T.array_of(T.shape({
+                    attempt = T.number:describe("Round index (0-based)"),
+                    answer  = T.string:describe("Answer produced in this round"),
+                    results = T.array_of(T.shape({
+                        constraint = T.string:describe("The constraint being checked"),
+                        verdict    = T.one_of({ "pass", "fail" })
+                            :describe("Verification verdict for this constraint"),
+                        reason     = T.string:describe("Rationale behind the verdict"),
+                    })):describe("Per-constraint verification results"),
+                    pass_count = T.number:describe("PASS count for this round"),
+                    fail_count = T.number:describe("FAIL count for this round"),
+                })):describe("Per-round repair history"),
+            }),
+        },
+    },
 }
 
 --- Parse numbered constraints from LLM output.
@@ -303,5 +344,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

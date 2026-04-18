@@ -9,6 +9,21 @@
 
 > Extends standard MCTS by dynamically deciding at each node whether to explore wider (generate new candidates) or deeper (refine existing ones). Uses Thompson Sampling with Beta posteriors instead of UCB1, enabling principled exploration-exploitation balance that adapts to problem structure.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alpha_prior` | number | optional | Beta prior alpha for Thompson sampling (default: 1.0) |
+| `ctx.beta_prior` | number | optional | Beta prior beta for Thompson sampling (default: 1.0) |
+| `ctx.budget` | number | optional | Total expansion iterations (default: 8) |
+| `ctx.gen_tokens` | number | optional | Max tokens for generation/refinement (default: 400) |
+| `ctx.max_depth` | number | optional | Maximum tree depth (default: 3) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── ab_select.md ── -->
@@ -53,6 +68,29 @@
 # aco — Ant Colony Optimization for discrete path search
 
 > Implements the Ant System (Dorigo 1996) with convergence guarantees from Gutjahr 2000 (GBAS). Provides both a pure-computation engine and an LLM-integrated run(ctx) for workflow/path optimization.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.alpha` | number | optional | Pheromone exponent α (default: 1.0) |
+| `ctx.answer_tokens` | number | optional | Max tokens for final answer synthesis (default: 500) |
+| `ctx.beta` | number | optional | Heuristic exponent β (default: 2.0) |
+| `ctx.budget` | number | optional | Max iterations (default: 20) |
+| `ctx.decompose_system` | string | optional | System prompt for the decompose LLM |
+| `ctx.eval_fn` | any | optional | Optional user-supplied scorer: function(path) -> score; when absent an LLM-based scorer is used |
+| `ctx.eval_system` | string | optional | System prompt for the eval LLM |
+| `ctx.exec_system` | string | optional | System prompt for the exec LLM |
+| `ctx.n_ants` | number | optional | Ants per iteration (default: 5) |
+| `ctx.nodes` | array of string | optional | Node labels for the graph; generated via decompose LLM when omitted |
+| `ctx.rho` | number | optional | Pheromone evaporation rate ρ ∈ (0,1) (default: 0.2) |
+| `ctx.seed` | number | optional | RNG seed (default: 42) |
+| `ctx.stagnation` | number | optional | Stagnation iteration threshold (default: 5) |
+| `ctx.task` | string | **required** | The task to solve |
 
 ---
 
@@ -1437,6 +1475,22 @@ Comparison with related packages:
 
 > Applies MCTS to LLM reasoning: selection (UCB1), expansion (generate), simulation (rollout to conclusion), backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.exploration` | number | optional | UCB1 exploration constant C (default: √2 ≈ 1.41) |
+| `ctx.iterations` | number | optional | Number of MCTS iterations (default: 6) |
+| `ctx.max_depth` | number | optional | Maximum tree depth per rollout (default: 3) |
+| `ctx.max_reflections` | number | optional | Maximum stored reflections (default: 5) |
+| `ctx.reflection` | boolean | optional | Enable reflection on low-score paths (default: false) |
+| `ctx.reflection_threshold` | number | optional | Score below which reflection triggers (default: 4) |
+| `ctx.task` | string | **required** | The problem to solve |
+
 ---
 
 <!-- ── meta_prompt.md ── -->
@@ -1715,6 +1769,21 @@ Comparison with related packages:
 
 > Before solving, generates expected properties and test cases the answer must satisfy. Then solves while checking against those constraints. Finally verifies the solution against all generated test cases.
 
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens for solving (default: 600) |
+| `ctx.max_constraints` | number | optional | Max constraints to generate (default: 6) |
+| `ctx.max_repairs` | number | optional | Max repair attempts (default: 2) |
+| `ctx.plan_tokens` | number | optional | Max tokens for planning (default: 400) |
+| `ctx.task` | string | **required** | The task/question to solve |
+| `ctx.verify_tokens` | number | optional | Max tokens per constraint check (default: 150) |
+
 ---
 
 <!-- ── pairwise_rank.md ── -->
@@ -1882,6 +1951,20 @@ Comparison with related packages:
 # qdaif — Quality-Diversity through AI Feedback
 
 > Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by: (1) seeding the archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality and feature placement via LLM, (5) inserting into the archive if superior.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.elite_tokens` | number | optional | Max tokens for candidate generation (default: 400) |
+| `ctx.features` | array of shape { bins: array of string, name: string } | **required** | Feature axes defining the MAP-Elites grid |
+| `ctx.iterations` | number | optional | Mutation-evaluation cycles (default: 20) |
+| `ctx.seed_count` | number | optional | Initial candidates to generate (default: 5) |
+| `ctx.task` | string | **required** | Problem / domain description |
 
 ---
 
@@ -2079,6 +2162,18 @@ Comparison with related packages:
 # rstar — Mutual reasoning verification via self-play
 
 > Generates two independent reasoning paths, then each path verifies the other. Disagreements trigger a resolution round. Achieves MCTS-level accuracy at a fraction of the cost by replacing tree search with targeted mutual critique.
+
+## Contents
+
+- [Parameters](#parameters)
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per reasoning path (default: 400) |
+| `ctx.task` | string | **required** | The problem to solve |
+| `ctx.verify_tokens` | number | optional | Max tokens per cross-verification (default: 300) |
 
 ---
 

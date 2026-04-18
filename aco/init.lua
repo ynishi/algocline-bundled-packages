@@ -32,6 +32,9 @@
 ---   return aco.run(ctx)
 ---   -- ctx.task, ctx.nodes, ctx.budget
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -41,6 +44,47 @@ M.meta = {
     description = "Ant Colony Optimization — discrete path search with "
         .. "pheromone-based learning (Dorigo 1996, Gutjahr 2000 convergence)",
     category = "exploration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task             = T.string:describe("The task to solve"),
+                nodes            = T.array_of(T.string):is_optional()
+                    :describe("Node labels for the graph; generated via decompose LLM when omitted"),
+                budget           = T.number:is_optional():describe("Max iterations (default: 20)"),
+                n_ants           = T.number:is_optional():describe("Ants per iteration (default: 5)"),
+                rho              = T.number:is_optional():describe("Pheromone evaporation rate ρ ∈ (0,1) (default: 0.2)"),
+                alpha            = T.number:is_optional():describe("Pheromone exponent α (default: 1.0)"),
+                beta             = T.number:is_optional():describe("Heuristic exponent β (default: 2.0)"),
+                stagnation       = T.number:is_optional():describe("Stagnation iteration threshold (default: 5)"),
+                seed             = T.number:is_optional():describe("RNG seed (default: 42)"),
+                answer_tokens    = T.number:is_optional():describe("Max tokens for final answer synthesis (default: 500)"),
+                decompose_system = T.string:is_optional():describe("System prompt for the decompose LLM"),
+                eval_system      = T.string:is_optional():describe("System prompt for the eval LLM"),
+                exec_system      = T.string:is_optional():describe("System prompt for the exec LLM"),
+                eval_fn          = T.any:is_optional()
+                    :describe("Optional user-supplied scorer: function(path) -> score; when absent an LLM-based scorer is used"),
+            }),
+            result = T.shape({
+                answer     = T.string:describe("Final answer synthesized from the best path"),
+                best_path  = T.array_of(T.string)
+                    :describe("Best step sequence (excludes start/end sentinel nodes)"),
+                best_score = T.number:describe("Best path score"),
+                iterations = T.number:describe("Iterations actually performed"),
+                history = T.array_of(T.shape({
+                    iteration  = T.number:describe("Iteration index"),
+                    best_score = T.number:describe("Best score at this iteration"),
+                    avg_score  = T.number:describe("Average score across ants in this iteration"),
+                })):describe("Per-iteration convergence history"),
+                n_nodes = T.number:describe("Total number of graph nodes"),
+                n_ants  = T.number:describe("Ant count used"),
+                rho     = T.number:describe("Evaporation rate used"),
+            }),
+        },
+    },
 }
 
 -- ─── RNG helper ───
@@ -447,5 +491,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

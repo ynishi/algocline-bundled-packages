@@ -29,6 +29,9 @@
 --- ctx.reflection_threshold: Score below which reflection triggers (default: 4)
 --- ctx.max_reflections: Maximum stored reflections (default: 5)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -37,6 +40,38 @@ M.meta = {
     version = "0.1.0",
     description = "Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                 = T.string:describe("The problem to solve"),
+                iterations           = T.number:is_optional():describe("Number of MCTS iterations (default: 6)"),
+                max_depth            = T.number:is_optional():describe("Maximum tree depth per rollout (default: 3)"),
+                exploration          = T.number:is_optional():describe("UCB1 exploration constant C (default: √2 ≈ 1.41)"),
+                reflection           = T.boolean:is_optional():describe("Enable reflection on low-score paths (default: false)"),
+                reflection_threshold = T.number:is_optional():describe("Score below which reflection triggers (default: 4)"),
+                max_reflections      = T.number:is_optional():describe("Maximum stored reflections (default: 5)"),
+            }),
+            result = T.shape({
+                conclusion = T.string:describe("Synthesized final answer from the best path"),
+                best_path = T.array_of(T.shape({
+                    thought   = T.string:describe("Reasoning thought at this node"),
+                    avg_score = T.number:describe("Average score across visits"),
+                    visits    = T.number:describe("Visit count for this node"),
+                })):describe("Best path from root to leaf"),
+                total_iterations = T.number:describe("Iterations actually performed"),
+                tree_stats = T.shape({
+                    root_visits          = T.number:describe("Visit count at the root node"),
+                    root_children        = T.number:describe("Number of direct children of root"),
+                    exploration_constant = T.number:describe("UCB1 constant C used"),
+                    max_depth            = T.number:describe("Max depth setting used"),
+                }):describe("Tree-level statistics"),
+            }),
+        },
+    },
 }
 
 --- Node structure:
@@ -337,5 +372,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

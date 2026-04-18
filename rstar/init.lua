@@ -22,6 +22,9 @@
 --- ctx.gen_tokens: Max tokens per reasoning path (default: 400)
 --- ctx.verify_tokens: Max tokens per verification (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -30,6 +33,39 @@ M.meta = {
     version = "0.1.0",
     description = "Mutual reasoning verification — two paths cross-verify each other for efficient accuracy",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("The problem to solve"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens per reasoning path (default: 400)"),
+                verify_tokens = T.number:is_optional():describe("Max tokens per cross-verification (default: 300)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Final answer (from agreement or resolution)"),
+                agreement         = T.one_of({ "full", "partial", "none" })
+                    :describe("Agreement level between path_a and path_b"),
+                resolution_needed = T.boolean:describe("Whether a resolution LLM call was issued"),
+                path_a = T.shape({
+                    reasoning  = T.string:describe("Path A full reasoning text"),
+                    conclusion = T.string:describe("Path A extracted conclusion"),
+                }):describe("Path A (first-principles approach)"),
+                path_b = T.shape({
+                    reasoning  = T.string:describe("Path B full reasoning text"),
+                    conclusion = T.string:describe("Path B extracted conclusion"),
+                }):describe("Path B (multi-angle approach)"),
+                verification = T.shape({
+                    a_checks_b = T.string:describe("A's verification of B's reasoning"),
+                    b_checks_a = T.string:describe("B's verification of A's reasoning"),
+                    a_agrees_b = T.boolean:describe("Whether A agrees with B's conclusion"),
+                    b_agrees_a = T.boolean:describe("Whether B agrees with A's conclusion"),
+                }):describe("Cross-verification outputs"),
+            }),
+        },
+    },
 }
 
 --- Extract the core conclusion from a reasoning path.
@@ -217,5 +253,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

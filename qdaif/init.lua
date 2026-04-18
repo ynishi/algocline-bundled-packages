@@ -37,6 +37,9 @@
 --- ctx.seed_count: Initial candidates to generate (default: 5)
 --- ctx.elite_tokens: Max tokens for candidate generation (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -47,6 +50,41 @@ M.meta = {
         .. "with LLM-driven mutation, evaluation, and feature classification. "
         .. "Produces diverse, high-quality solution populations.",
     category = "exploration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task = T.string:describe("Problem / domain description"),
+                features = T.array_of(T.shape({
+                    name = T.string:describe("Feature axis name"),
+                    bins = T.array_of(T.string):describe("Bin labels along this axis (≥2)"),
+                })):describe("Feature axes defining the MAP-Elites grid"),
+                iterations   = T.number:is_optional():describe("Mutation-evaluation cycles (default: 20)"),
+                seed_count   = T.number:is_optional():describe("Initial candidates to generate (default: 5)"),
+                elite_tokens = T.number:is_optional():describe("Max tokens for candidate generation (default: 400)"),
+            }),
+            result = T.shape({
+                best       = T.string:is_optional():describe("Archive-best candidate (nil if archive empty)"),
+                best_score = T.number:describe("Best score across the archive"),
+                archive = T.array_of(T.shape({
+                    cell      = T.string:describe("Grid key built from bin indices"),
+                    features  = T.array_of(T.string):describe("Feature bin labels (e.g. 'style=formal')"),
+                    score     = T.number:describe("Elite score"),
+                    candidate = T.string:describe("Elite solution text"),
+                })):describe("Archive elites sorted by score descending"),
+                coverage = T.number:describe("filled_cells / total_cells ∈ [0,1]"),
+                stats = T.shape({
+                    total_cells  = T.number:describe("Total grid cells"),
+                    filled_cells = T.number:describe("Cells actually populated with an elite"),
+                    seed_count   = T.number:describe("Seed count used"),
+                    iterations   = T.number:describe("Iteration count used"),
+                }):describe("Quality-diversity statistics"),
+            }),
+        },
+    },
 }
 
 -- ─── Archive (MAP-Elites grid) ───
@@ -397,5 +435,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

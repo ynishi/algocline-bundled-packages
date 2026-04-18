@@ -33,6 +33,9 @@
 --- ctx.beta_prior: Beta prior beta (default: 1.0)
 --- ctx.gen_tokens: Max tokens for generation/refinement (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -43,6 +46,35 @@ M.meta = {
         .. "wider/deeper decisions. GEN node mechanism for principled branching. "
         .. "Consistently outperforms standard MCTS and repeated sampling.",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The problem to solve"),
+                budget      = T.number:is_optional():describe("Total expansion iterations (default: 8)"),
+                max_depth   = T.number:is_optional():describe("Maximum tree depth (default: 3)"),
+                alpha_prior = T.number:is_optional():describe("Beta prior alpha for Thompson sampling (default: 1.0)"),
+                beta_prior  = T.number:is_optional():describe("Beta prior beta for Thompson sampling (default: 1.0)"),
+                gen_tokens  = T.number:is_optional():describe("Max tokens for generation/refinement (default: 400)"),
+            }),
+            result = T.shape({
+                answer     = T.string:describe("Final synthesized answer from the best leaf"),
+                best_path  = T.array_of(T.string):describe("Thought sequence from root to best leaf"),
+                best_score = T.number:describe("Best leaf score in [0,1]"),
+                tree_stats = T.shape({
+                    total_nodes      = T.number:describe("Total node count in the tree"),
+                    budget           = T.number:describe("Budget setting used"),
+                    wider_decisions  = T.number:describe("Times Thompson sampling chose wider (GEN)"),
+                    deeper_decisions = T.number:describe("Times Thompson sampling chose deeper (existing child)"),
+                    max_depth        = T.number:describe("Max depth setting used"),
+                    branching_ratio  = T.number:describe("wider / (wider + deeper) ratio"),
+                }):describe("AB-MCTS statistics"),
+            }),
+        },
+    },
 }
 
 -- ─── Beta distribution sampling ───
@@ -377,5 +409,10 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration: wrapper asserts ctx against
+-- M.spec.entries.run.input and ret.result against .result when
+-- ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
