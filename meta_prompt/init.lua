@@ -13,6 +13,9 @@
 --- ctx.task (required): The problem to solve
 --- ctx.max_experts: Maximum number of expert consultations (default: 4)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,28 @@ M.meta = {
     version = "0.1.0",
     description = "Meta-Prompting — orchestrator identifies and dispatches to specialist personas",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The problem to solve"),
+                max_experts = T.number:is_optional():describe("Maximum number of expert consultations (default: 4)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Orchestrator's integrated synthesis of all expert analyses"),
+                experts_consulted = T.array_of(T.shape({
+                    role     = T.string,
+                    focus    = T.string,
+                    question = T.string,
+                    response = T.string,
+                })):describe("Sequential expert consultations with the question asked and the response received"),
+                total_experts     = T.number:describe("Count of experts actually consulted (may be < max_experts due to parsing fallback)"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -152,5 +177,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

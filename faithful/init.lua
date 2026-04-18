@@ -23,6 +23,9 @@
 --- ctx.format: Formal representation type — "code", "logic", or "auto" (default: "auto")
 --- ctx.gen_tokens: Max tokens per step (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -31,6 +34,27 @@ M.meta = {
     version = "0.1.0",
     description = "Faithful CoT — formalize reasoning into code/logic for verification, then answer",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The problem to solve"),
+                format     = T.string:is_optional():describe("Formal representation type: code / logic / auto (default: auto)"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per step (default: 500)"),
+            }),
+            result = T.shape({
+                answer       = T.string:describe("Final answer grounded in formal verification"),
+                format       = T.string:describe("Formal representation actually used: code / logic"),
+                nl_reasoning = T.string:describe("Step 1 natural-language reasoning chain"),
+                formal       = T.string:describe("Step 2 formal representation (code or logic derivation)"),
+                verification = T.string:describe("Step 3 verification output"),
+                errors_found = T.boolean:describe("True if verification surfaced any errors in the reasoning"),
+            }),
+        },
+    },
 }
 
 --- Determine the best formal representation for a given task.
@@ -213,5 +237,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

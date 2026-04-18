@@ -28,6 +28,9 @@
 --- ctx.gen_tokens: Max tokens for generation (default: 600)
 --- ctx.verify_tokens: Max tokens for verification (default: 800)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,34 @@ M.meta = {
     version = "0.1.0",
     description = "Verification-First prompting — verify a candidate answer before generating, reducing logical errors via reverse reasoning",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("The task/question to solve"),
+                candidate     = T.string:is_optional():describe("Pre-supplied candidate answer (default: nil => auto-generate)"),
+                trivial       = T.boolean:is_optional():describe("Use trivial candidate '1' instead of CoT (default: false)"),
+                iterations    = T.number:is_optional():describe("Number of Iter-VF rounds (default: 1)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens for candidate generation (default: 600)"),
+                verify_tokens = T.number:is_optional():describe("Max tokens per verification round (default: 800)"),
+            }),
+            result = T.shape({
+                answer           = T.string:describe("Final verification text of the last round"),
+                extracted_answer = T.string:describe("Answer extracted from the final verification"),
+                iterations       = T.number:describe("Number of Iter-VF rounds actually executed"),
+                history          = T.array_of(T.shape({
+                    round            = T.number,
+                    input_candidate  = T.string,
+                    verification     = T.string,
+                    extracted_answer = T.string,
+                })):describe("Per-round Markovian trace: candidate in, verification out, extracted answer"),
+                candidate_source = T.string:describe("Origin of initial candidate: provided / trivial / cot"),
+            }),
+        },
+    },
 }
 
 --- Extract a final answer from verification output.
@@ -151,5 +182,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
