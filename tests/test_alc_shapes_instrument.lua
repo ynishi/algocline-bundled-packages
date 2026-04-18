@@ -459,6 +459,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- sources (string-or-array) with optional `source_index` /
     -- `sources_count`. blind_spot has multi-role history array. negation's
     -- `initial_answer` is optional (omitted on empty-conditions short-circuit).
+    -- Phase 4-d (category="combinator"/"reasoning"/"pipeline") pkgs:
+    -- pre_mortem / contrastive / robust_qa. pre_mortem delegates to
+    -- factscore / contrastive / calibrate (nested sub-results held as
+    -- T.table / T.any). contrastive has {wrong_reasoning, error_analysis}
+    -- pairs. robust_qa's `phases` is array_of(T.any) because per-phase
+    -- shape differs (discriminated by `name`).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -476,6 +482,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "critic", "cove", "factscore",
         "falsify", "step_verify", "counterfactual_verify",
         "claim_trace", "blind_spot", "negation",
+        "pre_mortem", "contrastive", "robust_qa",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

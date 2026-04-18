@@ -41,6 +41,9 @@
 ---   ctx.skip_phases: NOT SUPPORTED — all phases run. Partial execution
 ---                    produces sub-standard output and is not meaningful.
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -49,6 +52,36 @@ M.meta = {
     version = "0.1.0",
     description = "Three-phase QA pipeline — constraint-first solving, adversarial stress-test, rubric evaluation",
     category = "pipeline",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("The task/question to solve"),
+                max_constraints = T.number:is_optional():describe("Phase 1 (p_tts): max constraints (default: 5)"),
+                max_repairs     = T.number:is_optional():describe("Phase 1 (p_tts): max repair attempts (default: 1)"),
+                plan_tokens     = T.number:is_optional():describe("Phase 1 (p_tts): planning token budget (default: 400)"),
+                max_conditions  = T.number:is_optional():describe("Phase 2 (negation): max destruction conditions (default: 4)"),
+                rubric          = T.any:is_optional():describe("Phase 3 (critic): rubric dimension list (passed through)"),
+                threshold       = T.number:is_optional():describe("Phase 3 (critic): min acceptable per-dimension score (default: 7)"),
+                max_revisions   = T.number:is_optional():describe("Phase 3 (critic): max revision rounds (default: 1)"),
+                gen_tokens      = T.number:is_optional():describe("Shared generation token budget (default: 600)"),
+            }),
+            result = T.shape({
+                answer               = T.string:describe("Final answer after all 3 phases"),
+                phases               = T.array_of(T.any):describe("Sequential phase records (phase1 p_tts / phase2 negation / phase3 critic) — each carries per-phase fields keyed by name"),
+                constraints_passed   = T.boolean:describe("Phase 1 all_passed flag (convenience)"),
+                adversarial_survived = T.boolean:describe("Phase 2 survived flag (convenience)"),
+                critic_avg_score     = T.number:describe("Phase 3 avg score (convenience)"),
+                critic_scores        = T.table:describe("Phase 3 per-dimension score map"),
+                phase1_answer        = T.string:describe("Answer at end of Phase 1 (p_tts)"),
+                phase2_answer        = T.string:describe("Answer at end of Phase 2 (negation)"),
+                phase3_answer        = T.string:describe("Answer at end of Phase 3 (critic) — matches `answer`"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -189,5 +222,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

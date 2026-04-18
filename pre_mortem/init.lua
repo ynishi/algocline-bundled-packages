@@ -37,6 +37,9 @@
 --- ctx.extract_tokens: Max tokens for prerequisite extraction (default: 500)
 --- ctx.verify_tokens: Max tokens per prerequisite verification (default: 200)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -45,6 +48,51 @@ M.meta = {
     version = "0.1.0",
     description = "Feasibility-gated proposal filtering — prerequisite verification before rating",
     category = "combinator",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("Original task/question addressed by the proposals"),
+                proposals      = T.any:describe("Array of proposal strings or a single block to decompose"),
+                context        = T.string:is_optional():describe("Additional verification context (e.g., known constraints)"),
+                threshold      = T.number:is_optional():describe("Calibrate confidence threshold (default: 0.6)"),
+                n_contrasts    = T.number:is_optional():describe("Contrastive pairs per proposal (default: 1)"),
+                extract_tokens = T.number:is_optional():describe("Max tokens for prereq extraction (default: 500)"),
+                verify_tokens  = T.number:is_optional():describe("Max tokens per prereq verification (default: 200)"),
+            }),
+            result = T.shape({
+                proposals           = T.array_of(T.shape({
+                    proposal           = T.string:describe("Proposal text"),
+                    status             = T.string:describe("'accepted' | 'needs_investigation' | 'rejected'"),
+                    verdict            = T.string:describe("'adopt' | 'reject' (calibrate judgment)"),
+                    confidence         = T.number:describe("Calibrate confidence in its own judgment"),
+                    prerequisites      = T.table:describe("factscore result for prerequisite decomposition"),
+                    rejection_reasons  = T.array_of(T.string):describe("Rejection rationales from contrastive analysis"),
+                    contrastive_answer = T.string:describe("Contrastive-derived answer text"),
+                    calibrate_detail   = T.table:describe("Full calibrate result sub-record"),
+                    rank               = T.number:is_optional():describe("1-based rank (only for accepted proposals)"),
+                })):describe("Sorted evaluation records: ranked accepted → needs_investigation → rejected"),
+                accepted            = T.number:describe("Count of accepted proposals"),
+                needs_investigation = T.number:describe("Count of low-confidence proposals needing escalation"),
+                rejected            = T.number:describe("Count of rejected proposals"),
+                total               = T.number:describe("Total evaluated proposals"),
+                ranking             = T.array_of(T.shape({
+                    proposal           = T.string:describe("Proposal text"),
+                    status             = T.string:describe("'accepted' (ranking only includes accepted)"),
+                    verdict            = T.string:describe("'adopt'"),
+                    confidence         = T.number:describe("Calibrate confidence"),
+                    prerequisites      = T.table:describe("factscore result"),
+                    rejection_reasons  = T.array_of(T.string):describe("Rejection rationales"),
+                    contrastive_answer = T.string:describe("Contrastive-derived answer"),
+                    calibrate_detail   = T.table:describe("Full calibrate result"),
+                    rank               = T.number:describe("1-based rank from pairwise tournament"),
+                })):describe("Accepted proposals in tournament-ranked order (empty when none accepted)"),
+            }),
+        },
+    },
 }
 
 --- Parse VERDICT from calibrate answer text.
@@ -418,5 +466,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

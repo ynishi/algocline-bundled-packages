@@ -13,6 +13,9 @@
 --- ctx.task (required): The problem to solve
 --- ctx.n_contrasts: Number of contrast pairs (default: 2)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,26 @@ M.meta = {
     version = "0.1.0",
     description = "Contrastive CoT — generate correct and incorrect reasoning, learn from contrast",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The problem to solve"),
+                n_contrasts = T.number:is_optional():describe("Number of contrast pairs (default: 2)"),
+            }),
+            result = T.shape({
+                answer          = T.string:describe("Final answer informed by contrast analysis"),
+                contrasts       = T.array_of(T.shape({
+                    wrong_reasoning = T.string:describe("Plausible-but-incorrect reasoning path"),
+                    error_analysis  = T.string:describe("Analysis of the error and its correct replacement"),
+                })):describe("Per-iteration wrong-reasoning + error-analysis pairs"),
+                total_contrasts = T.number:describe("= #contrasts"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -109,5 +132,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
