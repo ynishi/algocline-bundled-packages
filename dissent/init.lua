@@ -36,6 +36,9 @@
 --- ctx.merit_threshold (optional): Score threshold for revision (default: 0.6)
 --- ctx.gen_tokens: Max tokens per generation (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -48,6 +51,41 @@ M.meta = {
         .. "'From Spark to Fire' (Xie et al., AAMAS 2026). "
         .. "Composable with moa, panel, sc.",
     category = "governance",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("Original task description"),
+                consensus       = T.string
+                    :describe("The consensus text to challenge (REQUIRED)"),
+                perspectives    = T.array_of(T.any):is_optional()
+                    :describe("Individual agent outputs that formed consensus; elements are either strings or {name?, output? | text?} tables"),
+                merit_threshold = T.number:is_optional()
+                    :describe("Score threshold for revision (default: 0.6)"),
+                gen_tokens      = T.number:is_optional()
+                    :describe("Max tokens per generation (default: 500)"),
+            }),
+            result = T.shape({
+                dissent           = T.string
+                    :describe("Raw adversarial challenge produced in Phase 1"),
+                evaluation        = T.string
+                    :describe("Raw judge output from Phase 2"),
+                merit_score       = T.number
+                    :describe("Parsed merit score in [0, 1]; 0 on parse failure"),
+                key_issues        = T.string
+                    :describe("Parsed key issues block from judge output (empty string when absent)"),
+                revised_consensus = T.string:is_optional()
+                    :describe("Revised consensus text; nil iff no revision was triggered"),
+                consensus_held    = T.boolean
+                    :describe("True iff the original consensus was NOT revised"),
+                output            = T.string
+                    :describe("Final output — original consensus when held, revised otherwise"),
+            }),
+        },
+    },
 }
 
 -- ─── Prompts ───
@@ -276,5 +314,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

@@ -21,6 +21,9 @@
 --- ctx.debate_rounds: Triad debate rounds per comparison (default: 2)
 --- ctx.confidence_threshold: Calibrate threshold (default: 0.7)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -29,6 +32,60 @@ M.meta = {
     version = "0.1.0",
     description = "Structured deliberation — abstract principles, expert consultation, debate, ranked decision",
     category = "combinator",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                 = T.string:describe("The decision question"),
+                options              = T.array_of(T.any):is_optional()
+                    :describe("Pre-defined options (auto-generated if absent); each opaque {name?, description?, strengths?, risks?}"),
+                max_options          = T.number:is_optional()
+                    :describe("Max options to consider (default: 4)"),
+                debate_rounds        = T.number:is_optional()
+                    :describe("Triad debate rounds per option (default: 2)"),
+                confidence_threshold = T.number:is_optional()
+                    :describe("Calibrate threshold (default: 0.7)"),
+            }),
+            result = T.shape({
+                recommendation       = T.shape({
+                    name           = T.string:is_optional()
+                        :describe("Selected option's name (nil when caller-supplied option omits name)"),
+                    description    = T.string:is_optional()
+                        :describe("Selected option's description (nil when caller-supplied option omits it)"),
+                    debate_outcome = T.string
+                        :describe("Triad winner verdict for the selected option"),
+                    ranking_wins   = T.number
+                        :describe("Pairwise-tournament wins accumulated by the selected option"),
+                }):describe("Final recommendation built from the tournament winner"),
+                principles           = T.string
+                    :describe("Extracted principles and criteria (from step_back)"),
+                abstractions         = T.any
+                    :describe("step_back's abstractions sub-result (opaque; shape owned by step_back)"),
+                expert_consultations = T.any
+                    :describe("meta_prompt's experts_consulted sub-result (opaque; shape owned by meta_prompt)"),
+                expert_analysis      = T.string
+                    :describe("meta_prompt's aggregated analysis answer"),
+                options              = T.array_of(T.any)
+                    :describe("Options actually considered (as supplied or auto-generated)"),
+                debates              = T.array_of(T.any)
+                    :describe("Per-option triad result {option, verdict, winner}; option is opaque (user-shaped)"),
+                confidence           = T.number
+                    :describe("Calibrate confidence score"),
+                confidence_escalated = T.boolean
+                    :describe("Whether the confidence gate escalated"),
+                ranking_matches      = T.array_of(T.shape({
+                    a      = T.number:describe("Left bracket index"),
+                    b      = T.number:describe("Right bracket index"),
+                    winner = T.number:describe("Winner's original option index"),
+                    reason = T.string:describe("LLM verdict text"),
+                })):describe("Pairwise-tournament match log"),
+                total_options        = T.number:describe("Number of options considered"),
+            }),
+        },
+    },
 }
 
 -- ─── Phase 1: Abstract ──────────────────────────────────
@@ -362,5 +419,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

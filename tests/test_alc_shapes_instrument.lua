@@ -620,6 +620,16 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- and rebuttal rounds in one array. pbft has vote_distribution as
     -- array_of({proposal, votes}) + raw proposals preserved per N2
     -- Red Line (initial answer preservation).
+    -- Phase 5-d (category="combinator"/"governance") pkgs:
+    -- deliberate / dissent. deliberate delegates to step_back /
+    -- meta_prompt / triad / calibrate / rank, so nested sub-pkg
+    -- sub-results (abstractions / expert_consultations / options /
+    -- debates) are declared as T.any or T.array_of(T.any) — the
+    -- shape contract is owned by each delegated pkg. dissent's
+    -- consensus input is REQUIRED (not optional); revised_consensus
+    -- is `:is_optional()` because it stays nil when no revision
+    -- was triggered. perspectives accepts both string-array and
+    -- table-array variants hence T.array_of(T.any).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -641,6 +651,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "orch_fixpipe", "orch_adaptive", "orch_gatephase",
         "orch_escalate", "orch_nver", "moa",
         "php", "triad", "pbft",
+        "deliberate", "dissent",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil
