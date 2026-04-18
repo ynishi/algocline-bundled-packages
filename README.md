@@ -501,6 +501,23 @@ The tool name follows Claude Code's `mcp__<local-alias>__<tool>` convention,
 so `lua-debugger` (the alias in `.mcp.json`) becomes `mcp__lua-debugger__*`.
 Returns structured JSON: `{ passed, failed, total, tests: [{ suite, name, passed, error }] }`.
 
+> **Worktree gotcha.** mlua-probe-mcp pins its CWD to the directory the server
+> was first launched in (typically the main repo root). When invoking from a
+> git worktree (`.worktrees/xxx/`), a relative `code_file = "tests/..."` will
+> silently resolve against the main repo, so you end up validating the *old*
+> code while the green count looks fine. Pass **absolute paths** for both
+> `code_file` and `search_paths` when running from a worktree:
+>
+> ```
+> mcp__lua-debugger__test_launch(
+>   code_file    = "/abs/path/to/.worktrees/xxx/tests/test_foo.lua",
+>   search_paths = ["/abs/path/to/.worktrees/xxx"]
+> )
+> ```
+>
+> The local CLI path below does **not** have this pitfall — it uses the
+> shell's CWD directly.
+
 ### Running tests locally (optional, opt-in)
 
 The tests use only upstream `lust` core API (`describe / it / expect / after`,
