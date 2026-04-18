@@ -54,6 +54,9 @@
 --- ctx.set_size: tournament group size (default 4)
 --- ctx.gen_tokens: max tokens per pick response (default 20)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -64,6 +67,43 @@ M.meta = {
         .. "small sets and winners advance. Mid-cost/mid-accuracy sweet "
         .. "spot between listwise and pairwise. Resolves calibration issue.",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("Ranking criterion"),
+                candidates = T.array_of(T.string):describe("Candidate texts to rank (>= 2)"),
+                top_k      = T.number:is_optional():describe("How many to keep (default: N = full ranked list)"),
+                set_size   = T.number:is_optional():describe("Tournament group size (default: 4)"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per pick response (default: 20)"),
+            }),
+            result = T.shape({
+                ranked          = T.array_of(T.shape({
+                    rank  = T.number,
+                    index = T.number,
+                    text  = T.string,
+                })):describe("Full ranked list: top_k winners followed by unranked tail"),
+                top_k           = T.array_of(T.shape({
+                    rank  = T.number,
+                    index = T.number,
+                    text  = T.string,
+                })):describe("Winners (the top-k portion of ranked)"),
+                killed          = T.array_of(T.shape({
+                    rank  = T.number,
+                    index = T.number,
+                    text  = T.string,
+                })):describe("Unranked tail (candidates not extracted into top_k)"),
+                best            = T.string:describe("Text of the #1 candidate"),
+                best_index      = T.number:describe("Original 1-based index of the #1 candidate"),
+                set_size        = T.number:describe("Tournament group size actually used"),
+                n_candidates    = T.number:describe("Total number of input candidates"),
+                total_llm_calls = T.number:describe("Count of pick_best LLM calls performed"),
+            }),
+        },
+    },
 }
 
 --- Ask the LLM to pick the index of the best candidate in a set.
@@ -223,5 +263,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

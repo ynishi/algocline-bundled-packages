@@ -34,6 +34,9 @@
 --- ctx.gen_tokens: Max tokens per candidate (default: 400)
 --- ctx.sim_tokens: Max tokens per similarity judgment (default: 80)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -44,6 +47,33 @@ M.meta = {
         .. "highest expected agreement across all others. Bayes-optimal "
         .. "selection without bracket luck or position bias.",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("The task to generate candidates for"),
+                n          = T.number:is_optional():describe("Number of candidates to generate (default: 5)"),
+                criteria   = T.string:is_optional():describe("Similarity criteria (default: substantive agreement)"),
+                gen_tokens = T.number:is_optional():describe("Max tokens per candidate (default: 400)"),
+                sim_tokens = T.number:is_optional():describe("Max tokens per similarity judgment (default: 80)"),
+            }),
+            result = T.shape({
+                best              = T.string:describe("Text of the MBR-selected candidate"),
+                best_index        = T.number:describe("1-based index of the selected candidate"),
+                best_mbr_score    = T.number:describe("Expected similarity score (0-1) of the winner"),
+                ranking           = T.array_of(T.shape({
+                    index     = T.number,
+                    mbr_score = T.number,
+                })):describe("All candidates sorted by MBR score descending"),
+                candidates        = T.array_of(T.string):describe("All generated candidate texts"),
+                similarity_matrix = T.array_of(T.array_of(T.number)):describe("Symmetric N×N pairwise similarity matrix (values in [0, 1])"),
+                total_llm_calls   = T.number:describe("Generation calls (N) + pairwise similarity calls (N(N-1)/2)"),
+            }),
+        },
+    },
 }
 
 --- Compute pairwise similarity score between two candidates.
@@ -162,5 +192,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

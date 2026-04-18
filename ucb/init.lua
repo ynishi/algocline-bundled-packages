@@ -9,6 +9,9 @@
 --- ctx.rounds: Number of rounds (default: 2)
 --- ctx.n: Number of hypotheses (default: 3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -17,6 +20,28 @@ M.meta = {
     version = "0.1.0",
     description = "UCB1 hypothesis space exploration — generate, score, select, refine",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task   = T.string:describe("The problem to solve"),
+                rounds = T.number:is_optional():describe("Number of evaluate+refine rounds (default: 2)"),
+                n      = T.number:is_optional():describe("Number of hypotheses to generate (default: 3)"),
+            }),
+            result = T.shape({
+                best    = T.string:describe("Highest avg-scored hypothesis after rounds"),
+                ranking = T.array_of(T.shape({
+                    rank       = T.number,
+                    hypothesis = T.string,
+                    avg_score  = T.number,
+                    pulls      = T.number,
+                })):describe("Full ranking sorted by average score descending"),
+            }),
+        },
+    },
 }
 
 -- UCB1 score: exploitation + exploration
@@ -108,5 +133,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
