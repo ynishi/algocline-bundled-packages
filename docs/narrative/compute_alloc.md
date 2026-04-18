@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 400) |
 | `ctx.strategies` | table | optional | Custom difficulty→strategy map (overrides DEFAULT_STRATEGIES) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer produced by the selected paradigm |
+| `candidates` | array of string | optional | Parallel candidates (set only for parallel / hybrid paradigms) |
+| `difficulty` | string | — | Classified difficulty: 'easy' \| 'medium' \| 'hard' \| 'very_hard' |
+| `paradigm` | string | — | Execution paradigm: 'single' \| 'parallel' \| 'sequential' \| 'hybrid' |
+| `strategy` | string | — | Selected strategy name (e.g., 'direct', 'parallel', 'sequential', 'hybrid') |
+| `total_llm_calls` | number | — | Total LLM calls (classification + execution) |

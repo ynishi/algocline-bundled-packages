@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.max_repair_rounds` | number | optional | Max re-derivation rounds (default: 2) |
 | `ctx.task` | string | **required** | The problem to solve |
 | `ctx.verify_tokens` | number | optional | Max tokens per step verification (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final synthesized answer from verified reasoning |
+| `rounds` | array of shape { error_at?: number, round: number, steps: array of shape { correct: boolean, explanation: string, step: string }, verified_count: number } | — | Per-round verification trace |
+| `total_llm_calls` | number | — | Total LLM calls (generation + verification + synthesis) |
+| `total_rounds` | number | — | Number of rounds actually executed (= #rounds) |
+| `total_verified` | number | — | Count of verified steps (= #verified_steps) |
+| `verified_steps` | array of string | — | Ordered list of verified-correct reasoning steps |

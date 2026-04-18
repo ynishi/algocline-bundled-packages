@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,15 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.n_paths` | number | optional | Number of diverse reasoning paths (default: 3) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final synthesized answer from the best path |
+| `best_avg_score` | number | — | Average step score of the winning path |
+| `best_path_id` | number | — | path_id of the highest-scoring path |
+| `paths` | array of shape { path_id: number, reasoning: string, verification: shape { avg_score: number, step_scores: array of shape { score: number, step: string }, total_score: number } } | — | All generated paths with verification details (sorted) |
+| `ranking` | array of shape { avg_score: number, path_id: number, rank: number, steps_verified: number } | — | Paths ordered from best to worst by avg_score |

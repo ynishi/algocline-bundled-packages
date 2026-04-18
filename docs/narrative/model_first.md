@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,16 @@ generated: gen_docs (V0)
 | `ctx.solve_tokens` | number | optional | Max tokens for solve/verify/repair steps (default 600) |
 | `ctx.task` | string | **required** | Problem to solve (required) |
 | `ctx.verify` | boolean | optional | Run constraint-verification + repair step (default true) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer (concise extract when extract=true, otherwise the verified solution) |
+| `model` | string | — | Raw problem model text (entities / state vars / actions / constraints) |
+| `solution` | string | — | Verified solution text; equals the initial solution when verify=false or no violations |
+| `verified` | boolean | — | Whether the verification step actually ran (mirrors input.verify) |
+| `violations` | array of string | — | Parsed violation descriptions; empty when verify=false or no violations |
+| `violations_found` | number | — | Count of constraint violations parsed from the verification LLM output (0 when verify=false) |

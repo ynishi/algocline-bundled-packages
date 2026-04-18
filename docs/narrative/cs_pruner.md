@@ -17,6 +17,7 @@ generated: gen_docs (V0)
   - [Operating regime — READ FIRST](#operating-regime-read-first)
   - [Theoretical foundations](#theoretical-foundations)
 - [Parameters](#parameters)
+- [Result](#result)
 
 ### Operating regime — READ FIRST {#operating-regime-read-first}
 
@@ -172,3 +173,26 @@ Based on:
 | `ctx.stitching_s` | number | optional | Howard 2021 eq.(10) exponent (default: 1.4) |
 | `ctx.task` | string | **required** | Problem statement |
 | `ctx.weights` | array of number | optional | Per-dimension weights (default: uniform) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `alive_count` | number | — |  |
+| `alpha_per_side` | number | — | δ/(2N) for stitched/hoeffding/kl; δ/N for betting |
+| `best` | string | — | Text of the best surviving candidate |
+| `best_index` | number | — | 1-based index of the winner |
+| `best_score` | number | — | Empirical mean of the winner |
+| `candidates` | array of string | — | All generated candidate texts |
+| `cs_variant` | string | — |  |
+| `delta` | number | — |  |
+| `evaluations` | number | — | Per-dimension evaluations performed |
+| `kill_events` | array of shape { candidate: number, mean: number, n: number } | — | Elimination events (open shape; CS and layer2 events share candidate/n/mean) |
+| `n_candidates` | number | — |  |
+| `n_dimensions` | number | — |  |
+| `protect_events` | array of shape { candidate: number, mean: number, n: number } | — | Layer-2 gap-guard protections (open shape) |
+| `ranking` | array of shape { alive: boolean, index: number, lcb: number, mean: number, n: number, radius: number, ucb: number, v_hat: number } | — | All candidates sorted by alive, then mean descending |
+| `rounds` | array of shape { candidate: number, dimension: number, dimension_name: string, iteration: number, mean_after: number, n_after: number, score: number, v_hat_after: number } | — | Per-evaluation trace |
+| `total_llm_calls` | number | — |  |

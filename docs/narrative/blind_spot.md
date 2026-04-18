@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,16 @@ generated: gen_docs (V0)
 | `ctx.rounds` | number | optional | Externalize→correct rounds (default: 1) |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.wait` | boolean | optional | Enable 'Wait' reflection trigger (default: true) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer after externalize→correct (+ Wait) |
+| `corrections_detected` | number | — | Count of rounds whose output matched error/correction keywords |
+| `history` | array of shape { role: string, round: number, text: string } | — | Per-round trace including initial draft, corrections, and optional wait reflection |
+| `initial_answer` | string | — | Initial answer before any correction rounds |
+| `rounds` | number | — | Number of externalize→correct rounds executed |
+| `wait_applied` | boolean | — | Whether 'Wait' reflection round ran |

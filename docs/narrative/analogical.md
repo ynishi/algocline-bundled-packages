@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,14 @@ generated: gen_docs (V0)
 | `ctx.domain_hint` | string | optional | Optional domain to draw analogies from |
 | `ctx.n_analogies` | number | optional | Number of analogies to generate (default: 3) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `analogies` | array of shape { problem: string, solution: string } | — | Self-generated analogous problems and their solutions |
+| `answer` | string | — | Solution to the original problem produced by applying transferred patterns |
+| `patterns` | string | — | Transferable reasoning patterns extracted from the analogies |
+| `total_analogies` | number | — | Count of analogies actually generated |

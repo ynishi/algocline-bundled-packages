@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -27,3 +28,16 @@ generated: gen_docs (V0)
 | `ctx.mutation_pool` | number | optional | Number of mutation meta-prompts (default 3) |
 | `ctx.population_size` | number | optional | Number of task prompts in the population (default 6) |
 | `ctx.task` | string | **required** | Task domain description used in all prompts (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best_prompt` | string | — | Highest-scoring task prompt encountered across the entire run |
+| `best_score` | number | — | Score of best_prompt |
+| `evolution_history` | array of shape { avg_score: number, best_score: number, generation: number } | — | Per-generation best/avg summary |
+| `mutation_prompts` | array of string | — | Final mutation meta-prompts (after hyper-mutation) |
+| `population` | array of shape { prompt: string, rank: number, score: number } | — | Final population sorted descending by score |
+| `stats` | shape { crossover_rate: number, generations: number, hyper_mutation_rate: number, mutation_pool: number, population_size: number } | — |  |

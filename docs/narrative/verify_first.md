@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,15 @@ generated: gen_docs (V0)
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.trivial` | boolean | optional | Use trivial candidate '1' instead of CoT (default: false) |
 | `ctx.verify_tokens` | number | optional | Max tokens per verification round (default: 800) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final verification text of the last round |
+| `candidate_source` | string | — | Origin of initial candidate: provided / trivial / cot |
+| `extracted_answer` | string | — | Answer extracted from the final verification |
+| `history` | array of shape { extracted_answer: string, input_candidate: string, round: number, verification: string } | — | Per-round Markovian trace: candidate in, verification out, extracted answer |
+| `iterations` | number | — | Number of Iter-VF rounds actually executed |

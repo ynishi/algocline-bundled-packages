@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,12 @@ generated: gen_docs (V0)
 | `ctx.n` | number | optional | Number of hypotheses to generate (default: 3) |
 | `ctx.rounds` | number | optional | Number of evaluate+refine rounds (default: 2) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best` | string | — | Highest avg-scored hypothesis after rounds |
+| `ranking` | array of shape { avg_score: number, hypothesis: string, pulls: number, rank: number } | — | Full ranking sorted by average score descending |

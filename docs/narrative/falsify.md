@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,14 @@ generated: gen_docs (V0)
 | `ctx.max_hypotheses` | number | optional | Upper bound on active hypotheses (default: 12) |
 | `ctx.max_rounds` | number | optional | Maximum falsification rounds (default: 3) |
 | `ctx.task` | string | **required** | The problem or question to investigate |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `all_hypotheses` | array of shape { confidence: number, derived_from?: number, history: array of shape { refutation: string, round: number, verdict: string }, id: number, refutation_attempts: number, status: string, text: string } | — | All hypotheses (initial + derived), survivors and refuted alike |
+| `answer` | string | — | Synthesized final answer from surviving hypotheses (or post-all-refuted fallback) |
+| `stats` | shape { initial_count: number, rounds: number, total_derived: number, total_generated: number, total_refuted: number, total_survived: number } | — | Aggregate falsification statistics |
+| `survivors` | array of shape { confidence: number, derived_from?: number, history: array of shape { refutation: string, round: number, verdict: string }, id: number, refutation_attempts: number, status: string, text: string } | — | Hypotheses that survived all refutation rounds |

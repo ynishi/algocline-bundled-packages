@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,14 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens for generation/refinement (default: 400) |
 | `ctx.max_depth` | number | optional | Maximum tree depth (default: 3) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final synthesized answer from the best leaf |
+| `best_path` | array of string | — | Thought sequence from root to best leaf |
+| `best_score` | number | — | Best leaf score in [0,1] |
+| `tree_stats` | shape { branching_ratio: number, budget: number, deeper_decisions: number, max_depth: number, total_nodes: number, wider_decisions: number } | — | AB-MCTS statistics |

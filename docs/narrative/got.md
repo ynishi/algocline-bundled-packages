@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -27,3 +28,13 @@ generated: gen_docs (V0)
 | `ctx.max_refine` | number | optional | Max refinement rounds on kept thoughts (default: 2) |
 | `ctx.refine_tokens` | number | optional | Max tokens for Refine step (default: 400) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `aggregated_reasoning` | string | — | State of the merged node produced by the Aggregate op (after final Refine) |
+| `answer` | string | — | Final synthesized answer from the aggregated reasoning |
+| `graph_stats` | shape { branches_generated: number, branches_kept: number, operations: map of string to number, refine_rounds: number, total_nodes: number } | — | Graph-shape diagnostics; operations is { [origin_op] = count } |

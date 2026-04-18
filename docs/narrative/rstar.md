@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,16 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens per reasoning path (default: 400) |
 | `ctx.task` | string | **required** | The problem to solve |
 | `ctx.verify_tokens` | number | optional | Max tokens per cross-verification (default: 300) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `agreement` | one_of("full", "partial", "none") | — | Agreement level between path_a and path_b |
+| `answer` | string | — | Final answer (from agreement or resolution) |
+| `path_a` | shape { conclusion: string, reasoning: string } | — | Path A (first-principles approach) |
+| `path_b` | shape { conclusion: string, reasoning: string } | — | Path B (multi-angle approach) |
+| `resolution_needed` | boolean | — | Whether a resolution LLM call was issued |
+| `verification` | shape { a_agrees_b: boolean, a_checks_b: string, b_agrees_a: boolean, b_checks_a: string } | — | Cross-verification outputs |

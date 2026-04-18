@@ -185,8 +185,80 @@ local function render_parameters_table(input_schema)
     return table.concat(lines, "\n")
 end
 
-local function render_toc(sections, has_parameters)
-    if #sections == 0 and not has_parameters then
+--- Resolve a result schema to its underlying shape for rendering.
+---
+--- Returns: (shape_schema, ref_name?) or (nil, nil) when the result is
+--- not a renderable shape. `ref_name` is present when the input was
+--- T.ref(name), so the caller can surface the label in the header.
+---
+--- `ref` lookup goes through the alc_shapes module table (M.voted /
+--- M.paneled / ...) — the same SSoT used by spec_resolver at runtime.
+--- An unregistered ref returns (nil, nil) so narrative generation
+--- degrades gracefully; strict validation is the responsibility of
+--- spec_resolver at runtime and lint at commit time. This mirrors the
+--- `type_to_json` tolerance on line 391-392 (emits label without the
+--- registry being complete).
+local function resolve_shape(schema)
+    local peeled = peel(schema)
+    local k = rawget(peeled, "kind")
+    if k == "ref" then
+        local name = rawget(peeled, "name")
+        local target = rawget(S, name)
+        if target == nil then
+            return nil, nil
+        end
+        peeled = peel(target)
+        if rawget(peeled, "kind") ~= "shape" then
+            return nil, nil
+        end
+        return peeled, name
+    elseif k == "shape" then
+        return peeled, nil
+    else
+        return nil, nil
+    end
+end
+
+local function render_result_section(result_schema)
+    local shape_peeled, ref_name = resolve_shape(result_schema)
+    if shape_peeled == nil then
+        return ""
+    end
+    local header
+    if ref_name then
+        header = string.format("Returns `%s` shape:", ref_name)
+    else
+        header = "Returns:"
+    end
+    local lines = {
+        "## Result {#result}",
+        "",
+        header,
+        "",
+        "| key | type | optional | description |",
+        "|---|---|---|---|",
+    }
+    local entries = S.fields(shape_peeled)
+    for i = 1, #entries do
+        local e = entries[i]
+        local opt = e.optional and "optional" or "—"
+        local type_str = M.shape_type_string(e.type)
+        local doc = escape_md_table_cell(e.doc or "")
+        lines[#lines + 1] = string.format(
+            "| `%s` | %s | %s | %s |",
+            e.name, type_str, opt, doc)
+    end
+    return table.concat(lines, "\n")
+end
+
+local function has_renderable_result(result_schema)
+    if result_schema == nil then return false end
+    local shape_peeled = resolve_shape(result_schema)
+    return shape_peeled ~= nil
+end
+
+local function render_toc(sections, has_parameters, has_result)
+    if #sections == 0 and not has_parameters and not has_result then
         return ""
     end
     local lines = { "## Contents", "" }
@@ -198,6 +270,9 @@ local function render_toc(sections, has_parameters)
     if has_parameters then
         lines[#lines + 1] = "- [Parameters](#parameters)"
     end
+    if has_result then
+        lines[#lines + 1] = "- [Result](#result)"
+    end
     return table.concat(lines, "\n")
 end
 
@@ -205,6 +280,7 @@ function M.narrative_md(pkg_info)
     local nar = pkg_info.narrative
     local shape = pkg_info.shape
     local has_params = shape.input ~= nil
+    local has_result = has_renderable_result(shape.result)
 
     local parts = {}
     parts[#parts + 1] = build_frontmatter(pkg_info)
@@ -216,7 +292,7 @@ function M.narrative_md(pkg_info)
         parts[#parts + 1] = "> " .. nar.summary
     end
 
-    local toc = render_toc(nar.sections, has_params)
+    local toc = render_toc(nar.sections, has_params, has_result)
     if toc ~= "" then
         parts[#parts + 1] = ""
         parts[#parts + 1] = toc
@@ -241,6 +317,11 @@ function M.narrative_md(pkg_info)
     if has_params then
         parts[#parts + 1] = ""
         parts[#parts + 1] = render_parameters_table(shape.input)
+    end
+
+    if has_result then
+        parts[#parts + 1] = ""
+        parts[#parts + 1] = render_result_section(shape.result)
     end
 
     return table.concat(parts, "\n") .. "\n"

@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,14 @@ generated: gen_docs (V0)
 | `ctx.steps` | array of shape { instruction?: string, name: string, output: string } | **required** | Ordered pipeline step outputs; at least 1 entry (required) |
 | `ctx.summary_tokens` | number | optional | Max tokens for the final summary analysis (default 500) |
 | `ctx.task` | string | **required** | Original task/input that the pipeline was given (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `flagged_steps` | array of string | — | Names of steps whose drift_score crossed the threshold |
+| `max_drift` | number | — | Highest drift_score observed across all steps |
+| `step_results` | array of shape { cascade_risk: string, drift_score: number, drift_type: string, flagged: boolean, name: string, raw: string } | — | Per-step drift analysis in pipeline order |
+| `summary` | string | — | LLM-generated cascade analysis summary text |

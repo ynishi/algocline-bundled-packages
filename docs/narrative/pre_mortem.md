@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -27,3 +28,16 @@ generated: gen_docs (V0)
 | `ctx.task` | string | **required** | Original task/question addressed by the proposals |
 | `ctx.threshold` | number | optional | Calibrate confidence threshold (default: 0.6) |
 | `ctx.verify_tokens` | number | optional | Max tokens per prereq verification (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `accepted` | number | — | Count of accepted proposals |
+| `needs_investigation` | number | — | Count of low-confidence proposals needing escalation |
+| `proposals` | array of shape { calibrate_detail: table, confidence: number, contrastive_answer: string, prerequisites: table, proposal: string, rank?: number, rejection_reasons: array of string, status: string, verdict: string } | — | Sorted evaluation records: ranked accepted → needs_investigation → rejected |
+| `ranking` | array of shape { calibrate_detail: table, confidence: number, contrastive_answer: string, prerequisites: table, proposal: string, rank: number, rejection_reasons: array of string, status: string, verdict: string } | — | Accepted proposals in tournament-ranked order (empty when none accepted) |
+| `rejected` | number | — | Count of rejected proposals |
+| `total` | number | — | Total evaluated proposals |

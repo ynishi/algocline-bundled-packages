@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -27,3 +28,14 @@ generated: gen_docs (V0)
 | `ctx.reflection` | boolean | optional | Enable reflection on low-score paths (default: false) |
 | `ctx.reflection_threshold` | number | optional | Score below which reflection triggers (default: 4) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best_path` | array of shape { avg_score: number, thought: string, visits: number } | — | Best path from root to leaf |
+| `conclusion` | string | — | Synthesized final answer from the best path |
+| `total_iterations` | number | — | Iterations actually performed |
+| `tree_stats` | shape { exploration_constant: number, max_depth: number, root_children: number, root_visits: number } | — | Tree-level statistics |

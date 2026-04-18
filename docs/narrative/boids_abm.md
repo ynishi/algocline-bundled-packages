@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -31,3 +32,13 @@ generated: gen_docs (V0)
 | `ctx.steps` | number | optional |  |
 | `ctx.task` | string | optional |  |
 | `ctx.world_size` | number | optional |  |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `params` | shape { alignment_weight: number, cohesion_weight: number, max_force: number, max_speed: number, n_boids: number, perception_radius: number, separation_weight: number, steps: number, world_size: number } | — |  |
+| `sensitivity` | array of shape { base_value: number, delta: number, factor: number, high_value: number, low_value: number, param: string, score_at_high: number, score_at_low: number } | — |  |
+| `simulation` | shape { alignment_score_mean: number, alignment_score_median: number, alignment_score_p25: number, alignment_score_p75: number, alignment_score_std: number, avg_nearest_distance_mean: number, avg_nearest_distance_median: number, avg_nearest_distance_p25: number, avg_nearest_distance_p75: number, avg_nearest_distance_std: number, clusters_mean: number, clusters_median: number, clusters_p25: number, clusters_p75: number, clusters_std: number, cohesive_flock_ci: shape { lower: number, upper: number }, cohesive_flock_count: number, cohesive_flock_rate: number, runs: number, scattered_ci: shape { lower: number, upper: number }, scattered_count: number, scattered_rate: number } | — |  |

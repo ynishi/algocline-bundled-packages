@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -29,3 +30,22 @@ generated: gen_docs (V0)
 | `ctx.task` | string | **required** | The problem to solve |
 | `ctx.vote_system` | string | optional | Custom system prompt for voting phase |
 | `ctx.vote_tokens` | number | optional | Max tokens per vote (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Committed answer (winning proposal or synthesized) |
+| `bft_valid` | boolean | — | True when bft.validate(n, f) passed (always true if we reach here) |
+| `commit_method` | string | — | "quorum" (2f+1 agreement) \| "synthesis" (no consensus) |
+| `f_assumed` | number | — | Byzantine-fault budget passed to bft |
+| `n_agents` | number | — | Number of agents actually used |
+| `proposals` | array of string | — | Raw proposals from Phase 1 (always preserved per N2 Red Line) |
+| `quorum_met` | boolean | — | True iff winner_votes >= quorum_required |
+| `quorum_required` | number | — | BFT threshold = n - f |
+| `vote_distribution` | array of shape { proposal: number, votes: number } | — | Vote counts sorted desc by votes |
+| `votes` | array of number | — | Per-agent vote (proposal index); falls back to own index on parse failure |
+| `winner_proposal` | number | — | Proposal index with plurality (arbitrary tie-break order) |
+| `winner_votes` | number | — | Vote count for winner_proposal |

@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,15 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens per explanation (default: 300) |
 | `ctx.max_depth` | number | optional | Tree depth (default: 2) |
 | `ctx.proposition` | string | **required** | The claim to analyze |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `consistency` | shape { consistent: number, contradictory: number, independent: number } | — | Status histogram across the whole tree |
+| `evidence` | shape { oppose: array of string, support: array of string } | — | Propositions that passed consistency check, grouped by stance |
+| `synthesis` | string | — | Final LLM synthesis grounded on consistent evidence |
+| `tree` | any | — | Recursive explanation tree (unvalidated in V0 due to self-referencing shape) |
+| `verdict` | string | — | Extracted verdict: likely true / likely false / insufficient evidence / unknown |

@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.judge_tokens` | number | optional | Max tokens for final verdict (default: 500) |
 | `ctx.rounds` | number | optional | Number of debate rounds after opening (default: 3) |
 | `ctx.task` | string | **required** | The question or claim to debate |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `total_rounds` | number | — | Number of rebuttal rounds (excludes opening) |
+| `transcript` | array of shape { opponent: string, proponent: string, round: number } | — | Full debate transcript including opening |
+| `verdict` | string | — | Full verdict text from the judge |
+| `winner` | string | — | Parsed winner token ("proponent"\|"opponent"\|"draw"\|"unknown") |

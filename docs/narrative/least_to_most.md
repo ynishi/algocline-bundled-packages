@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,13 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.max_subproblems` | number | optional | Maximum number of subproblems (default: 5) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Synthesized final answer |
+| `subproblems` | array of shape { solution: string, subproblem: string } | — | Ordered subproblem/solution pairs (simplest first) |
+| `total_subproblems` | number | — | Count of subproblems parsed and solved |

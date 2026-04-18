@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,17 @@ generated: gen_docs (V0)
 | `ctx.merit_threshold` | number | optional | Score threshold for revision (default: 0.6) |
 | `ctx.perspectives` | array of any | optional | Individual agent outputs that formed consensus; elements are either strings or {name?, output? \| text?} tables |
 | `ctx.task` | string | **required** | Original task description |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `consensus_held` | boolean | — | True iff the original consensus was NOT revised |
+| `dissent` | string | — | Raw adversarial challenge produced in Phase 1 |
+| `evaluation` | string | — | Raw judge output from Phase 2 |
+| `key_issues` | string | — | Parsed key issues block from judge output (empty string when absent) |
+| `merit_score` | number | — | Parsed merit score in [0, 1]; 0 on parse failure |
+| `output` | string | — | Final output — original consensus when held, revised otherwise |
+| `revised_consensus` | string | optional | Revised consensus text; nil iff no revision was triggered |

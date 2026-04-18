@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,15 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.max_rounds` | number | optional | Maximum hint-retry cycles (default: 4) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer at convergence (or last round) |
+| `conclusion` | string | — | Extracted core conclusion of the final answer |
+| `converged` | boolean | — | True iff the last two rounds' conclusions match |
+| `rounds` | array of shape { answer: string, conclusion: string, hint_used: boolean, round: number } | — | Per-round execution record |
+| `total_rounds` | number | — | Total rounds actually executed |

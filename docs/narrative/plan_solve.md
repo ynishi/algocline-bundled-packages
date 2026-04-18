@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.plan_tokens` | number | optional | Max tokens for plan generation (default: 300) |
 | `ctx.solve_tokens` | number | optional | Max tokens for execution (default: 500) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer (extracted or raw execution) |
+| `execution` | string | — | Full step-by-step execution trace |
+| `plan` | string | — | Numbered plan devised in Step 1 |
+| `plan_steps` | number | — | Count of numbered steps parsed from plan |

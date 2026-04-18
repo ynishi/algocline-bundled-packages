@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,19 @@ generated: gen_docs (V0)
 | `ctx.plan_tokens` | number | optional | Max tokens for planning (default: 400) |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.verify_tokens` | number | optional | Max tokens per constraint check (default: 150) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `all_passed` | boolean | — | Whether all constraints passed |
+| `answer` | string | — | Final answer after verify+repair |
+| `constraints` | array of string | — | Verifiable constraints the answer must satisfy |
+| `fail_count` | number | — | Number of constraints failing in the final round |
+| `history` | array of shape { answer: string, attempt: number, fail_count: number, pass_count: number, results: array of shape { constraint: string, reason: string, verdict: one_of("pass", "fail") } } | — | Per-round repair history |
+| `pass_count` | number | — | Number of constraints passing in the final round |
+| `plan` | string | — | Planning phase LLM output |
+| `repairs` | number | — | Number of repair rounds performed |
+| `total_constraints` | number | — | Total number of constraints generated |

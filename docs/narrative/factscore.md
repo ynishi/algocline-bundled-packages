@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.extract_tokens` | number | optional | Max tokens for claim extraction (default: 500) |
 | `ctx.text` | string | **required** | The text to fact-check |
 | `ctx.verify_tokens` | number | optional | Max tokens per claim verification (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `claims` | array of shape { claim: string, justification: string, status: string } | — | Per-claim verification records (empty when extraction yields no claims) |
+| `score` | number | — | Factual precision score = supported / (supported+unsupported); 1.0 when no decisive claims |
+| `supported` | number | — | Count of SUPPORTED claims |
+| `total` | number | — | Total number of extracted claims |
+| `uncertain` | number | — | Count of UNCERTAIN claims |
+| `unsupported` | number | — | Count of UNSUPPORTED claims |

@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,18 @@ generated: gen_docs (V0)
 | `ctx.revise_tokens` | number | optional | Max tokens for revision (default: 600) |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.verify_tokens` | number | optional | Max tokens per condition verification (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer (original when survived, revised when conditions held) |
+| `conditions` | array of shape { condition: string, raw: string, reasoning: string, verdict: string } | — | Per-condition verification records (empty when no conditions parsed) |
+| `holding` | number | — | Count of conditions judged to HOLD |
+| `initial_answer` | string | optional | Answer tested this round (omitted when no conditions parsed) |
+| `refuted` | number | — | Count of conditions judged REFUTED |
+| `revised` | boolean | — | Whether revision round ran (holding > 0) |
+| `survived` | boolean | — | Whether every destruction condition was refuted (holding==0) |
+| `total` | number | — | Total conditions evaluated (= #conditions) |

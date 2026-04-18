@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -28,3 +29,18 @@ generated: gen_docs (V0)
 | `ctx.rubric` | any | optional | List of dimensions — either string names or {name, description} tables |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.threshold` | number | optional | Minimum acceptable per-dimension score (default: 7) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final (possibly revised) answer |
+| `avg_score` | number | — | Average of final per-dimension scores |
+| `history` | array of shape { answer: string, avg_score: number, round: number, scores: array of shape { dimension: string, feedback: string, raw: string, score: number }, weak_count: number } | — | Per-round evaluation trace |
+| `initial_answer` | string | — | Initial answer before any revisions |
+| `revisions` | number | — | Number of revision rounds actually performed |
+| `rubric` | array of shape { description: string, name: string } | — | Normalized rubric used for evaluation |
+| `scores` | table | — | Final per-dimension score map (dim_name → number) |
+| `threshold` | number | — | Threshold value used (echoed from input) |

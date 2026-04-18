@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,14 @@ generated: gen_docs (V0)
 | `ctx.context` | string | optional | Full (potentially noisy) context to denoise; empty/absent => task itself is reformulated |
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 500) |
 | `ctx.task` | string | **required** | The question or task to answer |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer produced from the denoised context |
+| `denoised_context` | string | — | LLM-denoised context (or reformulated task when no context given) |
+| `denoised_context_length` | number | — | Length in chars of the denoised_context |
+| `original_context_length` | number | — | Length in chars of the original context (or task when no context given) |

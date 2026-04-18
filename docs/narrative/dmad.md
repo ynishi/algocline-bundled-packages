@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.rounds` | number | optional | Number of thesis–antithesis exchange rounds (default 1) |
 | `ctx.synth_tokens` | number | optional | Max tokens for the final synthesis (default 600) |
 | `ctx.task` | string | **required** | Task or question to analyze (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final synthesis text; alias of result.synthesis for caller convenience |
+| `antithesis` | string | — | Last antithesis produced (round N) |
+| `debate_log` | array of shape { role: one_of("thesis", "antithesis", "rebuttal", "synthesis"), round: number, text: string } | — | Full dialectical transcript in chronological order (thesis → antithesis/rebuttal*rounds → synthesis) |
+| `rounds` | number | — | Number of rounds actually executed |
+| `synthesis` | string | — | Integrated position from the dialectic |
+| `thesis` | string | — | Initial reasoned position (round 0) |

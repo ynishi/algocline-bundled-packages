@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.max_repairs` | number | optional | Maximum number of bisect→repair cycles (default: 2) |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.verify_tokens` | number | optional | Max tokens per verification (default: 200) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final reasoning chain after all repairs |
+| `initial_chain` | string | — | Original pre-repair reasoning chain |
+| `repairs` | array of shape { bisect_log: array of shape { correct: boolean, hi: number, lo: number, mid: number, reason: string }, error_content: string, error_label: string, error_step: number, regenerated: string, repair_round: number } | — | Per-cycle repair records |
+| `total_repairs` | number | — | Number of repair cycles applied |

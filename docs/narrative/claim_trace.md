@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,19 @@ generated: gen_docs (V0)
 | `ctx.sources` | any | **required** | Source text(s): single string or array of strings |
 | `ctx.task` | string | **required** | The original question/task |
 | `ctx.trace_tokens` | number | optional | Max tokens per claim attribution (default: 300) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Answer whose claims were traced (auto-generated or passed in) |
+| `attribution_score` | number | — | (supported + 0.5*partial) / total; 1.0 when no claims |
+| `claims` | array of shape { claim: string, raw: string, reasoning: string, source_index?: number, span: string, status: string } | — | Per-claim attribution records (empty when no claims extracted) |
+| `coverage` | number | — | (supported + partial) / total; 1.0 when no claims |
+| `partial` | number | — | Count of PARTIAL claims |
+| `sources_count` | number | optional | Number of source documents (omitted on empty-claims short-circuit) |
+| `supported` | number | — | Count of SUPPORTED claims |
+| `total` | number | — | Total extracted claims |
+| `unsupported` | number | — | Count of UNSUPPORTED claims |

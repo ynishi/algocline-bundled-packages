@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,17 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens per instantiate / verify step (default 500) |
 | `ctx.task` | string | **required** | Problem to solve (required) |
 | `ctx.templates` | map of string to shape { name: string, pattern: string } | optional | Custom template_key → {name, pattern} map; defaults to built-in TEMPLATES |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer extracted from the verification LLM output (falls back to full verification text) |
+| `errors_found` | boolean | — | True when verification did not emit ERRORS: NONE (or NO ERRORS) — i.e., errors were reported |
+| `instantiated_reasoning` | string | — | LLM output from Step 2 (template applied to the specific task) |
+| `template_key` | string | — | Selected template key; 'analytical' is used as a fallback when parsing fails |
+| `template_name` | string | — | Display name of the selected template |
+| `template_pattern` | string | — | Reasoning steps of the selected template |
+| `verification` | string | — | Full Step-3 verification text including ERRORS: and FINAL ANSWER: sections |

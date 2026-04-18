@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -29,3 +30,19 @@ generated: gen_docs (V0)
 | `ctx.score_hi` | number | optional | Maximum raw score for normalization (default: 10) |
 | `ctx.seed` | number | optional | PRNG seed for Thompson sampling (default: 1) |
 | `ctx.task` | string | **required** | The problem to generate and select an answer for |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best` | string | — | Text of the winning candidate |
+| `best_index` | number | — | 1-based index of the winner |
+| `best_score` | number | — | Posterior mean of the winner |
+| `budget` | number | — | Total fidelity-cost budget supplied |
+| `budget_used` | number | — | Total fidelity cost consumed |
+| `candidates` | array of string | — | All generated candidate texts |
+| `ranking` | array of shape { alpha: number, beta: number, evaluations: table, index: number, n_evals: number, posterior_mean: number } | — | All candidates sorted by posterior mean descending |
+| `rounds` | array of shape { alpha: number, beta: number, budget_used: number, candidate: number, cost: number, iteration: number, level: number, level_name: string, score: number, score_norm: number, theta_pick: number } | — | Per-iteration Thompson sampling trace |
+| `total_llm_calls` | number | — | Generation calls + evaluation calls |

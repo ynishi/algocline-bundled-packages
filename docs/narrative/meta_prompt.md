@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,13 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.max_experts` | number | optional | Maximum number of expert consultations (default: 4) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Orchestrator's integrated synthesis of all expert analyses |
+| `experts_consulted` | array of shape { focus: string, question: string, response: string, role: string } | — | Sequential expert consultations with the question asked and the response received |
+| `total_experts` | number | — | Count of experts actually consulted (may be < max_experts due to parsing fallback) |

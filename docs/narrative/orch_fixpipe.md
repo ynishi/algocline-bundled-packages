@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,14 @@ generated: gen_docs (V0)
 | `ctx.on_fail` | string | optional | "error" \| "partial" (default: "error") |
 | `ctx.phases` | array of any | **required** | Phase definitions (opaque user-supplied records) |
 | `ctx.task` | string | **required** | Task description |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `final_output` | string | — | Last phase output (empty on failure before first phase) |
+| `phases` | array of shape { attempts: number, gate_passed: boolean, name: string, output: string } | — | Per-phase execution record |
+| `status` | string | — | "completed" / "failed" / "partial" |
+| `total_llm_calls` | number | — | Total LLM invocations |

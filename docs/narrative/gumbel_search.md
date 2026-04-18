@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,17 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens for generation (default: 400) |
 | `ctx.initial_candidates` | number | optional | Number of initial candidates (default: 8) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Winning candidate's response text |
+| `best_index` | number | — | 1-based index of the winning candidate |
+| `best_score` | number | — | Final mean score of the winner in [0,1] |
+| `candidates` | array of shape { index: number, mean_score: number, n_evals: number } | — | All candidates' final state (order preserved from generation) |
+| `halving_rounds` | number | — | Number of Sequential Halving rounds executed |
+| `total_evaluations` | number | — | Total per-candidate evaluations across rounds |
+| `total_llm_calls` | number | — | Total LLM calls (generation + evaluations) |

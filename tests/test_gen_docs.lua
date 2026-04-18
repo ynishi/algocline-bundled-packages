@@ -427,6 +427,87 @@ describe("tools.docs.projections.narrative_md", function()
         local md = Projections.narrative_md(info)
         expect(md:find("## Contents", 1, true) == nil).to.equal(true)
         expect(md:find("## Parameters", 1, true) == nil).to.equal(true)
+        expect(md:find("## Result", 1, true) == nil).to.equal(true)
+    end)
+
+    it("renders Result section for inline T.shape result", function()
+        local info = PI.make_pkg_info(
+            { name = "r_inline", version = "0", category = "c",
+              description = "d", source_path = "r_inline/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil,
+              result = T.shape({
+                  answer     = T.string:describe("final answer text"),
+                  confidence = T.number:is_optional():describe("0.0-1.0"),
+              }) }
+        )
+        local md = Projections.narrative_md(info)
+        expect(md:find("## Result {#result}", 1, true) ~= nil).to.equal(true)
+        expect(md:find("Returns:", 1, true) ~= nil).to.equal(true)
+        expect(md:find("| `answer` | string | — | final answer text |",
+                       1, true) ~= nil).to.equal(true)
+        expect(md:find("| `confidence` | number | optional | 0.0-1.0 |",
+                       1, true) ~= nil).to.equal(true)
+        expect(md:find("- [Result](#result)", 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("resolves T.ref result through the alc_shapes registry", function()
+        -- "voted" is registered in alc_shapes/init.lua. The Result section
+        -- must expand the named shape inline while keeping the label.
+        local info = PI.make_pkg_info(
+            { name = "r_ref", version = "0", category = "c",
+              description = "d", source_path = "r_ref/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = T.ref("voted") }
+        )
+        local md = Projections.narrative_md(info)
+        expect(md:find("## Result {#result}", 1, true) ~= nil).to.equal(true)
+        expect(md:find("Returns `voted` shape:", 1, true) ~= nil).to.equal(true)
+        -- S.voted has `consensus` field with a describe string.
+        expect(md:find("| `consensus` | string |", 1, true) ~= nil).to.equal(true)
+        expect(md:find("LLM-synthesized majority summary",
+                       1, true) ~= nil).to.equal(true)
+    end)
+
+    it("skips Result section when result is a primitive or nil", function()
+        local info_prim = PI.make_pkg_info(
+            { name = "r_num", version = "0", category = "c",
+              description = "d", source_path = "r_num/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = T.number }
+        )
+        local md_prim = Projections.narrative_md(info_prim)
+        expect(md_prim:find("## Result", 1, true) == nil).to.equal(true)
+
+        local info_nil = PI.make_pkg_info(
+            { name = "r_nil", version = "0", category = "c",
+              description = "d", source_path = "r_nil/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = nil }
+        )
+        local md_nil = Projections.narrative_md(info_nil)
+        expect(md_nil:find("## Result", 1, true) == nil).to.equal(true)
+    end)
+
+    it("degrades gracefully (no Result section) on unregistered ref", function()
+        -- Narrative generation must not fail on a ref that is absent
+        -- from the alc_shapes registry. hub_entry also tolerates this
+        -- case by emitting {kind:"label", name}, so both projections stay
+        -- in sync: machine contract keeps the label, narrative drops the
+        -- expansion. Strict validation is the responsibility of lint +
+        -- spec_resolver.
+        local info = PI.make_pkg_info(
+            { name = "r_bad", version = "0", category = "c",
+              description = "d", source_path = "r_bad/init.lua" },
+            { title = "R", summary = "s", sections = {} },
+            { input = nil, result = T.ref("no_such_shape") }
+        )
+        local md = Projections.narrative_md(info)
+        expect(md:find("## Result", 1, true) == nil).to.equal(true)
+        expect(md:find("- [Result](#result)", 1, true) == nil).to.equal(true)
+        -- Frontmatter still carries the ref name (existing behavior).
+        expect(md:find("result_shape: no_such_shape", 1, true) ~= nil)
+            .to.equal(true)
     end)
 end)
 
@@ -1015,6 +1096,25 @@ describe("tools.docs.lint", function()
         local codes = {}
         for _, v in ipairs(r.violations) do codes[v.code] = true end
         expect(codes["E_PARAMETERS_CONFLICT"]).to.equal(true)
+    end)
+
+    it("flags result_shape + Result section conflict", function()
+        local info = minimal_info({
+            narrative = {
+                title = "T", summary = "s",
+                sections = {
+                    PI.make_section(2, "Result", "result", "body"),
+                },
+            },
+            shape = {
+                input  = nil,
+                result = T.shape({ answer = T.string }, { open = false }),
+            },
+        })
+        local r = Lint.check(info, "T\n\ns\n\n## Result\n\nbody\n", "p")
+        local codes = {}
+        for _, v in ipairs(r.violations) do codes[v.code] = true end
+        expect(codes["E_RESULT_CONFLICT"]).to.equal(true)
     end)
 
     it("warns on fake 'Usage:' label", function()

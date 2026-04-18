@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,16 @@ generated: gen_docs (V0)
 | `ctx.n_options` | number | optional | Number of options to present per round (default 3) |
 | `ctx.surface_tokens` | number | optional | Max tokens for option generation (default 600) |
 | `ctx.task` | string | **required** | Initial (possibly vague) user request (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `converged` | boolean | — | Whether exploration ended early via CONVERGENCE:YES or empty remaining |
+| `exploration_log` | array of shape { key_dimension: string, options: array of shape { description: string, label: string, title: string }, preference: string, round: number } | — | Per-round record of options, key_dimension, and user preference |
+| `intent_hierarchy` | array of shape { remaining: string, resolved: string, understanding: string } | — | Per-round resolved/remaining/understanding trace (round-indexed, 1-based) |
+| `original_task` | string | — | Echo of input task |
+| `rounds` | number | — | Number of exploration rounds actually executed |
+| `specified_task` | string | — | Current understanding after final round |

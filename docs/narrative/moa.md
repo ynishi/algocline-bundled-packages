@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,15 @@ generated: gen_docs (V0)
 | `ctx.n_agents` | number | optional | Agents per layer (default: 3, capped to #PERSONAS=5) |
 | `ctx.n_layers` | number | optional | Number of improvement layers (default: 2) |
 | `ctx.task` | string | **required** | Task description |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final synthesized answer |
+| `layer_outputs` | array of array of string | — | Per-layer agent outputs ([layer_idx][agent_idx]) |
+| `n_agents` | number | — | Agents per layer actually used |
+| `n_layers` | number | — | Layers actually executed |
+| `total_calls` | number | — | Total LLM invocations (agents * layers + 1 aggregation) |

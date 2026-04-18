@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,15 @@ generated: gen_docs (V0)
 | `ctx.max_rounds` | number | optional | Max propose-verify cycles (default: 4) |
 | `ctx.propositions_per_round` | number | optional | Propositions generated per round (default: 2) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Reporter's synthesis grounded in established facts |
+| `established_facts` | array of shape { proposition: string, round: number } | — | Verified propositions accumulated across rounds |
+| `rounds` | array of shape { proposed: array of string, round: number, verified: array of shape { accepted: boolean, proposition: string, verification: string } } | — | Per-round propose/verify trace |
+| `total_established` | number | — | Count of verified propositions |
+| `total_rounds` | number | — | Number of rounds actually executed (may be < max_rounds due to early termination) |

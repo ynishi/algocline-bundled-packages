@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,14 @@ generated: gen_docs (V0)
 | `ctx.max_rounds` | number | optional | Maximum critique-revise cycles (default: 3) |
 | `ctx.stop_when` | string | optional | Stop condition: 'no_major_issues' or 'no_issues' (default: 'no_major_issues') |
 | `ctx.task` | string | **required** | The task to perform |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `converged` | boolean | — | Whether the last round converged |
+| `output` | string | — | Final refined draft |
+| `rounds` | array of shape { converged: boolean, critique: string, round: number } | — | Ordered critique rounds with convergence flag |
+| `total_rounds` | number | — | Number of critique rounds executed |

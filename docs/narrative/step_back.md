@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,15 @@ generated: gen_docs (V0)
 | `ctx.abstraction_levels` | number | optional | Number of abstraction rounds (default: 1) |
 | `ctx.domain_hint` | string | optional | Optional domain hint to guide abstraction |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `abstractions` | array of shape { level: number, principle: string, question: string } | — | Ordered step-back Q/A per abstraction level |
+| `answer` | string | — | Final answer (post-verification / post-revision) |
+| `revised` | boolean | — | Whether a revision pass was triggered |
+| `verification` | string | — | Verifier output |
+| `verified` | boolean | — | Whether verification returned VERIFIED |

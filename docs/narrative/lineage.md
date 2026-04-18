@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,15 @@ generated: gen_docs (V0)
 | `ctx.summary_tokens` | number | optional | Max tokens for conflict/integrity summary (default 600) |
 | `ctx.task` | string | **required** | Original task description passed to trace/summary prompts (required) |
 | `ctx.trace_tokens` | number | optional | Max tokens per dependency trace (default 500) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `analysis` | string | — | Full conflict/ungrounded/drift analyzer output |
+| `integrity_score` | number | optional | Parsed SCORE in [0, 1]; nil when the analyzer did not emit a parseable score |
+| `lineage_graph` | string | — | Human-readable lineage graph text used as input to the conflict analyzer |
+| `step_claims` | array of shape { claims: array of shape { id: number, text: string }, name: string, raw: string } | — | Per-step extracted claims |
+| `traces` | array of shape { from_step: string, raw: string, to_step: string, traces: array of shape { derives_from?: array of any, id: number, transformation?: string } } | — | Consecutive-step dependency traces |

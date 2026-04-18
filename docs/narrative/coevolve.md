@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,17 @@ generated: gen_docs (V0)
 | `ctx.seed_problems` | array of string | optional | Initial problem set; if nil, LLM generates problems_per_round seeds |
 | `ctx.solver_tokens` | number | optional | Max tokens for Solver responses (default 400) |
 | `ctx.task` | string | **required** | The domain / problem to explore (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `all_results` | array of shape { answer: string, problem: shape { difficulty: string, round: number, text: string }, reason?: string, round: number, verdict: string } | — | Full trace of every solve attempt |
+| `answer` | string | — | Final synthesis answer using accumulated skill from all rounds |
+| `round_stats` | array of shape { correct: number, difficulty_hint: string, problems: number, round: number, success_rate: number } | — | Per-round statistics (length = rounds) |
+| `total_correct` | number | — | Total CORRECT verdicts |
+| `total_partial` | number | — | Total PARTIAL verdicts |
+| `total_problems` | number | — | Total problems attempted across all rounds |
+| `total_wrong` | number | — | Total WRONG verdicts |

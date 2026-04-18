@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.paradigm` | string | optional | Force paradigm name (conceptual_chaining / chunked_symbolism / expert_lexicons); nil => auto-route |
 | `ctx.routing_threshold` | number | optional | Keyword confidence threshold for LLM fallback (default: 0.4) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Extracted final answer string |
+| `paradigm` | string | — | Paradigm used in execution after routing |
+| `reasoning` | string | — | Extracted <sketch>...</sketch> body (or full LLM text if parsing failed) |
+| `routing` | shape { confidence: number, method: string } | — | Routing diagnostic: method ∈ {manual, keyword, llm}, confidence 0-1 |

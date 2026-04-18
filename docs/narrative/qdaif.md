@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,15 @@ generated: gen_docs (V0)
 | `ctx.iterations` | number | optional | Mutation-evaluation cycles (default: 20) |
 | `ctx.seed_count` | number | optional | Initial candidates to generate (default: 5) |
 | `ctx.task` | string | **required** | Problem / domain description |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `archive` | array of shape { candidate: string, cell: string, features: array of string, score: number } | — | Archive elites sorted by score descending |
+| `best` | string | optional | Archive-best candidate (nil if archive empty) |
+| `best_score` | number | — | Best score across the archive |
+| `coverage` | number | — | filled_cells / total_cells ∈ [0,1] |
+| `stats` | shape { filled_cells: number, iterations: number, seed_count: number, total_cells: number } | — | Quality-diversity statistics |

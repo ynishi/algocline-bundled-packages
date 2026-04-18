@@ -18,6 +18,9 @@
 ---   E_PARAMETERS_CONFLICT: `spec.entries.run.input` declared AND the
 ---                          docstring already contains a `## Parameters`
 ---                          section (shape is the SSoT).
+---   E_RESULT_CONFLICT    : `spec.entries.run.result` declared AND the
+---                          docstring already contains a `## Result`
+---                          section (shape is the SSoT).
 ---   W_FAKE_LABEL         : a line like `Usage:` / `Args:` appears at
 ---                          column 0 outside a `## ` heading — common
 ---                          pre-V0 shape that should be promoted to H2.
@@ -63,6 +66,13 @@ end
 local function has_parameters_section(sections)
     for i = 1, #sections do
         if sections[i].heading == "Parameters" then return true end
+    end
+    return false
+end
+
+local function has_result_section(sections)
+    for i = 1, #sections do
+        if sections[i].heading == "Result" then return true end
     end
     return false
 end
@@ -162,6 +172,14 @@ function M.check(pkg_info, docstring, pkg_dir)
             severity = "error", code = "E_PARAMETERS_CONFLICT",
             msg = "spec.entries.run.input is declared AND docstring has a ## " ..
                   "Parameters section; remove the docstring section (shape is the SSoT)" }
+    end
+
+    -- Result conflict
+    if shp.result ~= nil and has_result_section(nar.sections) then
+        out[#out + 1] = {
+            severity = "error", code = "E_RESULT_CONFLICT",
+            msg = "spec.entries.run.result is declared AND docstring has a ## " ..
+                  "Result section; remove the docstring section (shape is the SSoT)" }
     end
 
     return { violations = out }

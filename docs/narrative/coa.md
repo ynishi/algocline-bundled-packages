@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,16 @@ generated: gen_docs (V0)
 | `ctx.max_depth` | number | optional | Max dependency-resolution depth (default 3) |
 | `ctx.task` | string | **required** | Problem to solve (required) |
 | `ctx.tools` | map of string to string | optional | tool_name → description; defaults to a single 'knowledge' tool |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `abstract_chain` | string | — | Raw abstract chain with [FUNC tool("query") = yN] placeholders |
+| `answer` | string | — | Final answer produced from the grounded chain |
+| `grounded_chain` | string | — | Chain after placeholder substitution |
+| `groundings` | array of shape { depth: number, query: string, result: string, tool: string, var: string } | — | Per-placeholder resolution trace in resolution order |
+| `placeholders_resolved` | number | — | Count of placeholders actually resolved |
+| `tools_used` | map of string to string | — | Echo of the tools map used for this run |

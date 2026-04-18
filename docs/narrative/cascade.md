@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,17 @@ generated: gen_docs (V0)
 | `ctx.task` | string | **required** | Problem to solve (required) |
 | `ctx.threshold` | number | optional | Confidence threshold at which the cascade stops early (default 0.8) |
 | `ctx.verify_tokens` | number | optional | Max tokens per verification call (default 300) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer from the highest level actually run |
+| `confidence` | number | — | Final confidence in [0, 1] |
+| `escalated` | boolean | — | True iff level_used > 1 |
+| `history` | array of shape { answer: string, confidence: number, detail: any, level: number, name: string } | — | Per-level execution trace in run order |
+| `level_used` | number | — | Level at which the cascade stopped |
+| `max_level` | number | — | Echo of input.max_level |
+| `threshold` | number | — | Echo of input.threshold |

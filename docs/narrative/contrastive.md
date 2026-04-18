@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,13 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.n_contrasts` | number | optional | Number of contrast pairs (default: 2) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer informed by contrast analysis |
+| `contrasts` | array of shape { error_analysis: string, wrong_reasoning: string } | — | Per-iteration wrong-reasoning + error-analysis pairs |
+| `total_contrasts` | number | — | = #contrasts |

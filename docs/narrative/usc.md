@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.n` | number | optional | Number of candidate responses to sample (default: 5) |
 | `ctx.select_tokens` | number | optional | Max tokens for selection response (default: 500) |
 | `ctx.task` | string | **required** | The problem/question to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `candidates` | array of string | — | All sampled candidate responses |
+| `n_sampled` | number | — | Number of candidates sampled |
+| `selected_index` | number | optional | 1-based index parsed from the selection (nil if unparseable) |
+| `selection` | string | — | LLM's consistency-selection response (analysis + chosen answer content) |

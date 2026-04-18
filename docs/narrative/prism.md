@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.decompose_tokens` | number | optional | Max tokens for decomposition phase (default 600) |
 | `ctx.max_sub_intents` | number | optional | Maximum sub-intents to extract (default 8) |
 | `ctx.task` | string | **required** | Task or request to analyze (required) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `clarifications` | array of shape { question: string, sub_intent: string, sub_intent_index: number } | — | Empty when task was fully specified; otherwise one entry per underspecified sub-intent |
+| `dependencies` | array of shape { from: number, to: number } | — | Empty when task was fully specified or no dependencies detected |
+| `specified_task` | string | — | Fully-specified task (equals input task when was_underspecified=false) |
+| `sub_intents` | array of shape { status: one_of("specified", "underspecified"), text: string } | — | All extracted sub-intents in natural parse order |
+| `user_response` | string | optional | Raw alc.specify response; present only when was_underspecified=true |
+| `was_underspecified` | boolean | — | Whether any sub-intent required clarification |

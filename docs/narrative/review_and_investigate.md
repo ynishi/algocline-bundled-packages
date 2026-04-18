@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -25,3 +26,12 @@ generated: gen_docs (V0)
 | `ctx.deep_threshold` | number | optional | Confidence threshold below which the diagnose phase escalates to triad (default 0.6) |
 | `ctx.max_fixes` | number | optional | Max fix candidates per theme (default 3) |
 | `ctx.policy` | shape { priorities?: array of string, severity_weights?: map of string to number } | optional | Review policy (default: correctness > non_breaking > safety > testability > maintainability) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `summary` | shape { by_category?: map of string to number, context_filtered?: boolean, deep_analyzed?: number, false_positives_removed?: number, policy_applied?: string, total_themes: number } | — | Run summary; field presence varies by early-return path (see summary_shape) |
+| `themes` | array of shape { best_practice?: string, category?: string, current_state?: string, deep_analysis?: shape { verdict?: string, winner?: string }, diagnosis_confidence?: number, diagnosis_escalated?: boolean, expert_consultations?: array of shape { focus: string, question: string, response: string, role: string }, fix_anti_patterns?: array of shape { error_analysis: string, wrong_reasoning: string }, fixes?: array of shape { approach?: string, avoids?: string, id?: string, impact?: string, risk?: string, summary?: string }, gap?: string, id?: string, locations?: array of string, name: string, principle_violated?: string, ranking?: shape { best: shape { approach?: string, avoids?: string, id?: string, impact?: string, risk?: string, summary?: string }, matches: array of shape { a: string, b: string, reason: string, winner: string } }, references?: array of string, related_locations?: array of string, root_cause?: string, search_pattern?: string, span?: array of number, surface_symptom?: string, total_occurrences?: number, verification?: string } | — | Surviving themes with accumulated per-phase fields; empty on any early-return path |

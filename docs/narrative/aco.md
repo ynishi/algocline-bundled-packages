@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -34,3 +35,18 @@ generated: gen_docs (V0)
 | `ctx.seed` | number | optional | RNG seed (default: 42) |
 | `ctx.stagnation` | number | optional | Stagnation iteration threshold (default: 5) |
 | `ctx.task` | string | **required** | The task to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer synthesized from the best path |
+| `best_path` | array of string | — | Best step sequence (excludes start/end sentinel nodes) |
+| `best_score` | number | — | Best path score |
+| `history` | array of shape { avg_score: number, best_score: number, iteration: number } | — | Per-iteration convergence history |
+| `iterations` | number | — | Iterations actually performed |
+| `n_ants` | number | — | Ant count used |
+| `n_nodes` | number | — | Total number of graph nodes |
+| `rho` | number | — | Evaporation rate used |

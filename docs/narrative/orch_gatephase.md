@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,16 @@ generated: gen_docs (V0)
 | `ctx.skip_rules` | any | optional | Custom skip rules table (opaque) |
 | `ctx.task` | string | **required** | Task description |
 | `ctx.task_type` | string | optional | Pre-classified type (bugfix\|typo\|refactor\|feature\|test) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `final_output` | string | — | Last phase output (empty on failure before first phase) |
+| `phases` | array of shape { attempts: number, gate_passed: boolean, name: string, output: string } | — | Per-phase execution record (active only) |
+| `skipped_phases` | array of string | — | Phase names skipped for this task_type |
+| `status` | string | — | "completed" / "failed" / "partial" |
+| `task_type` | string | — | Final task type (pre-classified or estimated) |
+| `total_llm_calls` | number | — | Total LLM invocations |

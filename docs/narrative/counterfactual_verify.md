@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,17 @@ generated: gen_docs (V0)
 | `ctx.gen_tokens` | number | optional | Max tokens for solving (default: 600) |
 | `ctx.n_counterfactuals` | number | optional | Number of counterfactual variants (default: 2) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer (original CoT when faithful, re-solved otherwise) |
+| `counterfactual_results` | array of shape { actual: string, change: string, match: boolean, predicted: string, reason: string } | — | Per-counterfactual evaluation records |
+| `faithful` | boolean | — | Whether reasoning is causally faithful to inputs (all CFs matched) |
+| `match_count` | number | — | Count of counterfactuals where predicted matched actual |
+| `mismatches` | array of shape { change: string, reason: string } | — | Subset of counterfactual_results where match=false (empty when faithful) |
+| `original_cot` | string | — | Original chain-of-thought reasoning for unmodified task |
+| `total_counterfactuals` | number | — | Total counterfactuals evaluated (= #counterfactual_results) |

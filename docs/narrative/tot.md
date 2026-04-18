@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,15 @@ generated: gen_docs (V0)
 | `ctx.breadth` | number | optional | Thoughts generated per beam node (default: 3) |
 | `ctx.depth` | number | optional | Maximum tree depth (default: 3) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best_path` | array of string | — | Best beam path: ordered reasoning steps |
+| `best_score` | number | — | Score of the best beam (1-10) |
+| `conclusion` | string | — | Synthesized final answer from the best-scored beam path |
+| `explored_paths` | array of shape { path: array of string, rank: number, score: number } | — | All surviving beams, rank-ordered by score |
+| `tree_stats` | shape { beam_width: number, breadth: number, depth: number } | — | Configuration echo for traceability |

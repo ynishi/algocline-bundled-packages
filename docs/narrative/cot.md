@@ -17,6 +17,7 @@ generated: gen_docs (V0)
 - [Usage](#usage)
 - [Behavior](#behavior)
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Usage {#usage}
 
@@ -40,3 +41,12 @@ Each `alc.llm` call is capped at 200 tokens for the chain steps and
 |---|---|---|---|
 | `ctx.depth` | number | optional | Number of reasoning steps (default: 3) |
 | `ctx.task` | string | **required** | The question or task to reason about |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `chain` | array of string | — | Ordered insights, one per reasoning step |
+| `conclusion` | string | — | Synthesized final answer |

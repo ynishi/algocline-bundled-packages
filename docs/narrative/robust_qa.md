@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -29,3 +30,19 @@ generated: gen_docs (V0)
 | `ctx.rubric` | any | optional | Phase 3 (critic): rubric dimension list (passed through) |
 | `ctx.task` | string | **required** | The task/question to solve |
 | `ctx.threshold` | number | optional | Phase 3 (critic): min acceptable per-dimension score (default: 7) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `adversarial_survived` | boolean | — | Phase 2 survived flag (convenience) |
+| `answer` | string | — | Final answer after all 3 phases |
+| `constraints_passed` | boolean | — | Phase 1 all_passed flag (convenience) |
+| `critic_avg_score` | number | — | Phase 3 avg score (convenience) |
+| `critic_scores` | table | — | Phase 3 per-dimension score map |
+| `phase1_answer` | string | — | Answer at end of Phase 1 (p_tts) |
+| `phase2_answer` | string | — | Answer at end of Phase 2 (negation) |
+| `phase3_answer` | string | — | Answer at end of Phase 3 (critic) — matches `answer` |
+| `phases` | array of any | — | Sequential phase records (phase1 p_tts / phase2 negation / phase3 critic) — each carries per-phase fields keyed by name |

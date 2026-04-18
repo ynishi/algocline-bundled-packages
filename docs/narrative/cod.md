@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,16 @@ generated: gen_docs (V0)
 | `ctx.rounds` | number | optional | Number of densification rounds (default: 3) |
 | `ctx.target_length` | number | optional | Approximate target length in words (default: auto ~1/3 of input) |
 | `ctx.text` | string | **required** | Source text to compress (uses ctx.text, not ctx.task) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `compression_ratio` | number | — | output_words / input_words (0 when input_words == 0) |
+| `history` | array of shape { round: number, summary: string, word_count: number } | — | Per-round history starting with round 0 (initial sparse summary) |
+| `input_words` | number | — | Word count of original source text |
+| `output` | string | — | Final densified summary after all rounds |
+| `output_words` | number | — | Word count of final densified summary |
+| `total_rounds` | number | — | Number of densification rounds executed (excludes round 0) |

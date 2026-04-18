@@ -21,6 +21,7 @@ generated: gen_docs (V0)
   - [Kill rate limit (important)](#kill-rate-limit-important)
   - [Post-hoc multiplicity and sequential testing](#post-hoc-multiplicity-and-sequential-testing)
 - [Parameters](#parameters)
+- [Result](#result)
 
 ### Why F-Race for this scale {#why-f-race-for-this-scale}
 
@@ -234,3 +235,25 @@ Comparison with related packages:
 | `ctx.rubric_type` | string | optional | "binary" \| "likert5" (default: "binary") |
 | `ctx.score_domain` | shape { max: number, min: number } | optional | Score range for clipping (default: {min=0,max=1}) |
 | `ctx.task` | string | **required** | Problem statement |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `alive_count` | number | — | Number of survivors at termination |
+| `alpha_spending` | boolean | — | Whether Bonferroni sequential correction was applied |
+| `best` | string | — | Text of the best surviving candidate |
+| `best_index` | number | — | 1-based index of the winner |
+| `best_score` | number | — | Empirical mean score of the winner |
+| `candidates` | array of string | — | All generated candidate texts |
+| `delta` | number | — | User-requested significance level |
+| `effective_delta` | number | — | Resolved tabulated α (possibly Bonferroni-tightened) |
+| `evaluations` | number | — | Number of per-dimension evaluations performed |
+| `kill_events` | array of shape { best_candidate: number, best_rank_sum: number, block: number, blocks_used: number, candidate: number, chi2_critical: number, crit_diff: number, mean: number, n: number, q: number, rank_sum: number } | — | Elimination events triggered by Friedman+Nemenyi |
+| `n_candidates` | number | — |  |
+| `n_dimensions` | number | — |  |
+| `ranking` | array of shape { alive: boolean, index: number, mean: number, mean_rank?: number, n: number } | — | All candidates sorted by alive+mean_rank/mean descending |
+| `rounds` | array of shape { candidate: number, dimension: number, dimension_name: string, iteration: number, n_after: number, score: number } | — | Per-evaluation trace |
+| `total_llm_calls` | number | — | Candidate generation + evaluation calls |

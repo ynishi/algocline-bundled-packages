@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -22,3 +23,13 @@ generated: gen_docs (V0)
 |---|---|---|---|
 | `ctx.n_questions` | number | optional | Number of verification questions (default: 3) |
 | `ctx.task` | string | **required** | The question/task to answer |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `draft` | string | — | Baseline draft answer |
+| `final_response` | string | — | Final answer after fact-check revision |
+| `verifications` | array of shape { answer: string, question: string } | — | Per-question verification records (may be shorter than n_questions) |

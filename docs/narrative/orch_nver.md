@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,18 @@ generated: gen_docs (V0)
 | `ctx.phases` | array of any | optional | Phase definitions for each variant's pipeline |
 | `ctx.selection` | string | optional | "score" \| "vote" (default: "score") |
 | `ctx.task` | string | **required** | Task description |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `best_reasoning` | string | optional | Reasoning for the top-ranked variant (score-branch only) |
+| `best_score` | number | optional | Highest score (score-branch only) |
+| `method` | string | — | Selection method actually used ("score" \| "vote") |
+| `rankings` | array of shape { output: string, phase_outputs?: array of shape { name: string, output: string }, reasoning: string, score: number, variant_id: number } | optional | Variants sorted by score desc (score-branch only) |
+| `selected` | string | — | Selected variant's final output |
+| `status` | string | — | "completed" |
+| `total_llm_calls` | number | — | Total LLM invocations |
+| `variants` | array of shape { output: string, phase_outputs?: array of shape { name: string, output: string }, variant_id: number } | optional | Raw variants (vote-branch only) |

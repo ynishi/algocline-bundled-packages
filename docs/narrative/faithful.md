@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -23,3 +24,16 @@ generated: gen_docs (V0)
 | `ctx.format` | string | optional | Formal representation type: code / logic / auto (default: auto) |
 | `ctx.gen_tokens` | number | optional | Max tokens per step (default: 500) |
 | `ctx.task` | string | **required** | The problem to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Final answer grounded in formal verification |
+| `errors_found` | boolean | — | True if verification surfaced any errors in the reasoning |
+| `formal` | string | — | Step 2 formal representation (code or logic derivation) |
+| `format` | string | — | Formal representation actually used: code / logic |
+| `nl_reasoning` | string | — | Step 1 natural-language reasoning chain |
+| `verification` | string | — | Step 3 verification output |

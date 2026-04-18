@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -35,3 +36,20 @@ generated: gen_docs (V0)
 | `ctx.stop_config` | table | optional | Extra config for stopping criterion |
 | `ctx.strategy_opts` | table | optional | Extra opts passed through to the target strategy |
 | `ctx.target` | string | **required** | Strategy package name to optimize (e.g., 'biz_kernel') |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `arm_count` | number | — | Number of distinct arms in history |
+| `best_params` | table | — | Best-ranked parameter set |
+| `best_score` | number | — | Average score of best_params |
+| `card_id` | string | optional | Emitted Card id (only when auto_card=true) |
+| `history_key` | string | — | alc.state key for the persisted history |
+| `rounds_used` | number | — | Actual rounds executed this run |
+| `status` | string | — | 'converged' (stopper fired) or 'budget_exhausted' |
+| `stop_reason` | string | optional | Stopper's reason string; nil when budget_exhausted |
+| `top_5` | array of shape { avg_score: number, params: table, pulls: number } | — | Top-5 ranked arms (may contain fewer than 5) |
+| `total_evaluations` | number | — | Cumulative evaluations in history (including prior runs) |

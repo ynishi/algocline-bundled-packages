@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,18 @@ generated: gen_docs (V0)
 | `ctx.reflect_tokens` | number | optional | Max tokens per reflection (default: 300) |
 | `ctx.success_threshold` | number | optional | Score threshold to accept, 1-10 scale (default: 8) |
 | `ctx.task` | string | **required** | The task to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Best attempt across all trials |
+| `best_score` | number | — | Score of the best-scoring attempt |
+| `best_trial` | number | — | 1-based index of the best trial |
+| `passed` | boolean | — | Whether the final trial passed the threshold |
+| `reflections` | array of string | — | Accumulated episodic memory (one per failed trial except the last) |
+| `total_llm_calls` | number | — | Total alc.llm invocations across trials |
+| `total_trials` | number | — | Number of trials executed |
+| `trials` | array of shape { attempt: string, feedback: string, passed: boolean, reflection?: string, score: number, trial: number } | — | Ordered trial records with score, feedback, and optional reflection |

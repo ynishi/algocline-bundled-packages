@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -26,3 +27,13 @@ generated: gen_docs (V0)
 | `ctx.runs` | number | optional |  |
 | `ctx.steps` | number | optional |  |
 | `ctx.task` | string | optional |  |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `params` | shape { distribution: string, epsilon: number, n_agents: number, steps: number } | — |  |
+| `sensitivity` | array of shape { base_value: number, delta: number, factor: number, high_value: number, low_value: number, param: string, score_at_high: number, score_at_low: number } | — |  |
+| `simulation` | shape { clusters_mean: number, clusters_median: number, clusters_p25: number, clusters_p75: number, clusters_std: number, consensus_ci: shape { lower: number, upper: number }, consensus_count: number, consensus_rate: number, converged_ci: shape { lower: number, upper: number }, converged_count: number, converged_rate: number, polarized_ci: shape { lower: number, upper: number }, polarized_count: number, polarized_rate: number, runs: number, variance_mean: number, variance_median: number, variance_p25: number, variance_p75: number, variance_std: number } | — |  |

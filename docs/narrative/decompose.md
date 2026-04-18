@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Parameters](#parameters)
+- [Result](#result)
 
 ## Parameters {#parameters}
 
@@ -24,3 +25,14 @@ generated: gen_docs (V0)
 | `ctx.merge_tokens` | number | optional | Max tokens for final merge (default: 600) |
 | `ctx.subtask_tokens` | number | optional | Max tokens per sub-task (default: 400) |
 | `ctx.task` | string | **required** | The complex task to decompose |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `answer` | string | — | Unified merged answer across sub-tasks |
+| `decomposition_raw` | string | — | Raw decomposition LLM output before parsing |
+| `subtask_results` | array of string | — | Per-sub-task LLM outputs, same order as subtasks |
+| `subtasks` | array of string | — | Parsed sub-task descriptions (fallback: single-element = original task) |
