@@ -607,6 +607,13 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- adds depth_config/active_phase_count/total_phase_count; gatephase
     -- adds task_type/skipped_phases. Phase definition arrays are
     -- array_of(T.any) because callers supply opaque phase records.
+    -- Phase 5-b (category="orchestration"/"selection") pkgs: orch_escalate /
+    -- orch_nver / moa. orch_escalate declares per-level record with optional
+    -- phase_outputs (multi_phase level only). orch_nver's result is a
+    -- branch-polymorphic shape: score-branch exposes rankings/best_score/
+    -- best_reasoning, vote-branch exposes variants; all such fields are
+    -- `:is_optional()`. moa has a nested array_of(array_of(T.string)) for
+    -- layer_outputs [layer_idx][agent_idx].
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -626,6 +633,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "claim_trace", "blind_spot", "negation",
         "pre_mortem", "contrastive", "robust_qa",
         "orch_fixpipe", "orch_adaptive", "orch_gatephase",
+        "orch_escalate", "orch_nver", "moa",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

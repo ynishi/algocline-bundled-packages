@@ -13,6 +13,9 @@
 --- ctx.phases    (optional): Phase definitions for each variant's pipeline
 --- ctx.selection (optional): "score" | "vote" (default: "score")
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 --- Expand template variables safely (% in values won't break).
@@ -34,6 +37,60 @@ M.meta = {
         .. "Based on N-version approach from Agentic SE Roadmap (arxiv 2509.06216). "
         .. "Mitigates 29.6% regression rate found in SWE-Bench audits.",
     category = "orchestration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task      = T.string:describe("Task description"),
+                n         = T.number:is_optional()
+                    :describe("Number of parallel variants (default: 3)"),
+                phases    = T.array_of(T.any):is_optional()
+                    :describe("Phase definitions for each variant's pipeline"),
+                selection = T.string:is_optional()
+                    :describe("\"score\" | \"vote\" (default: \"score\")"),
+            }),
+            result = T.shape({
+                status          = T.string
+                    :describe("\"completed\""),
+                selected        = T.string
+                    :describe("Selected variant's final output"),
+                method          = T.string
+                    :describe("Selection method actually used (\"score\" | \"vote\")"),
+                total_llm_calls = T.number:describe("Total LLM invocations"),
+                -- score-branch fields (present when method == "score")
+                rankings        = T.array_of(T.shape({
+                    variant_id    = T.number:describe("Variant index (1-based)"),
+                    output        = T.string:describe("Variant's final output"),
+                    phase_outputs = T.array_of(T.shape({
+                        name   = T.string:describe("Phase name"),
+                        output = T.string:describe("Phase output"),
+                    })):is_optional()
+                        :describe("Multi-phase intermediate outputs (present when ctx.phases provided)"),
+                    score         = T.number:describe("Evaluator score (1-10)"),
+                    reasoning     = T.string:describe("Evaluator's reasoning"),
+                })):is_optional()
+                    :describe("Variants sorted by score desc (score-branch only)"),
+                best_score      = T.number:is_optional()
+                    :describe("Highest score (score-branch only)"),
+                best_reasoning  = T.string:is_optional()
+                    :describe("Reasoning for the top-ranked variant (score-branch only)"),
+                -- vote-branch fields (present when method == "vote")
+                variants        = T.array_of(T.shape({
+                    variant_id    = T.number:describe("Variant index (1-based)"),
+                    output        = T.string:describe("Variant's final output"),
+                    phase_outputs = T.array_of(T.shape({
+                        name   = T.string:describe("Phase name"),
+                        output = T.string:describe("Phase output"),
+                    })):is_optional()
+                        :describe("Multi-phase intermediate outputs (present when ctx.phases provided)"),
+                })):is_optional()
+                    :describe("Raw variants (vote-branch only)"),
+            }),
+        },
+    },
 }
 
 local EVAL_SYSTEM = [[You are an evaluator for software engineering outputs.
@@ -214,5 +271,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

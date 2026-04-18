@@ -13,6 +13,9 @@
 --- ctx.levels  (optional): Custom escalation chain [{name, prompt_template|multi_phase, threshold, ...}]
 --- ctx.on_fail (optional): "error" | "partial" (default: "partial")
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -24,6 +27,44 @@ M.meta = {
         .. "Minimizes cost for easy tasks, guarantees quality for hard ones. "
         .. "Based on Cascade Escalation (Microsoft + DAAO cost optimization).",
     category = "orchestration",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task    = T.string:describe("Task description"),
+                levels  = T.array_of(T.any):is_optional()
+                    :describe("Custom escalation chain [{name, prompt_template|multi_phase, threshold, ...}]"),
+                on_fail = T.string:is_optional()
+                    :describe("\"error\" | \"partial\" (default: \"partial\")"),
+            }),
+            result = T.shape({
+                status           = T.string
+                    :describe("\"completed\" / \"failed\" / \"partial\""),
+                selected_level   = T.string
+                    :describe("Level name whose output was returned (best effort on exhaustion)"),
+                escalation_depth = T.number
+                    :describe("1-based index of the level that produced the selected output"),
+                output           = T.string
+                    :describe("Final selected output text"),
+                score            = T.number
+                    :describe("Evaluator score (1-10) of the selected output"),
+                levels           = T.array_of(T.shape({
+                    name          = T.string:describe("Level name"),
+                    output        = T.string:describe("Level's final output"),
+                    phase_outputs = T.array_of(T.string):is_optional()
+                        :describe("Multi-phase intermediate outputs (absent for single-prompt levels)"),
+                    score         = T.number:describe("Evaluator score"),
+                    threshold     = T.number:describe("Required score to pass at this level"),
+                    passed        = T.boolean:describe("score >= threshold"),
+                    feedback      = T.string:describe("Evaluator's feedback / parse failure hint"),
+                })):describe("Per-level execution record (up to escalation_depth)"),
+                total_llm_calls  = T.number:describe("Total LLM invocations"),
+            }),
+        },
+    },
 }
 
 local EVAL_SYSTEM = [[You are a quality evaluator for software engineering outputs.
@@ -264,5 +305,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

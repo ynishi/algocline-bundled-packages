@@ -26,6 +26,9 @@
 --- ctx.gen_tokens: Max tokens per agent response (default: 400)
 --- ctx.agg_tokens: Max tokens for final aggregation (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -34,6 +37,34 @@ M.meta = {
     version = "0.1.0",
     description = "Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("Task description"),
+                n_agents   = T.number:is_optional()
+                    :describe("Agents per layer (default: 3, capped to #PERSONAS=5)"),
+                n_layers   = T.number:is_optional()
+                    :describe("Number of improvement layers (default: 2)"),
+                gen_tokens = T.number:is_optional()
+                    :describe("Max tokens per agent response (default: 400)"),
+                agg_tokens = T.number:is_optional()
+                    :describe("Max tokens for final aggregation (default: 500)"),
+            }),
+            result = T.shape({
+                answer        = T.string:describe("Final synthesized answer"),
+                n_agents      = T.number:describe("Agents per layer actually used"),
+                n_layers      = T.number:describe("Layers actually executed"),
+                total_calls   = T.number
+                    :describe("Total LLM invocations (agents * layers + 1 aggregation)"),
+                layer_outputs = T.array_of(T.array_of(T.string))
+                    :describe("Per-layer agent outputs ([layer_idx][agent_idx])"),
+            }),
+        },
+    },
 }
 
 --- Agent personas for diversity.
@@ -179,5 +210,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
