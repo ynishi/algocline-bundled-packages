@@ -12,6 +12,9 @@
 --- ctx.task (required): The question/task to answer
 --- ctx.n_questions: Number of verification questions (default: 3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -20,6 +23,26 @@ M.meta = {
     version = "0.1.0",
     description = "Draft-verify-revise — reduces hallucination via independent fact-checking",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The question/task to answer"),
+                n_questions = T.number:is_optional():describe("Number of verification questions (default: 3)"),
+            }),
+            result = T.shape({
+                draft          = T.string:describe("Baseline draft answer"),
+                verifications  = T.array_of(T.shape({
+                    question = T.string:describe("Verification question text"),
+                    answer   = T.string:describe("Independent answer to the verification question"),
+                })):describe("Per-question verification records (may be shorter than n_questions)"),
+                final_response = T.string:describe("Final answer after fact-check revision"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx
@@ -108,5 +131,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

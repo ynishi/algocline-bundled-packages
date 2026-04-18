@@ -28,6 +28,9 @@
 --- ctx.eval_tokens: Max tokens per dimension evaluation (default: 200)
 --- ctx.revise_tokens: Max tokens for revision (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -36,6 +39,48 @@ M.meta = {
     version = "0.1.0",
     description = "Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas",
     category = "evaluation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("The task/question to solve"),
+                answer         = T.string:is_optional():describe("Pre-supplied answer to evaluate (default: nil → auto-generate)"),
+                rubric         = T.any:is_optional():describe("List of dimensions — either string names or {name, description} tables"),
+                threshold      = T.number:is_optional():describe("Minimum acceptable per-dimension score (default: 7)"),
+                max_revisions  = T.number:is_optional():describe("Max revision rounds (default: 2)"),
+                gen_tokens     = T.number:is_optional():describe("Max tokens for initial generation (default: 600)"),
+                eval_tokens    = T.number:is_optional():describe("Max tokens per dimension evaluation (default: 200)"),
+                revise_tokens  = T.number:is_optional():describe("Max tokens for revision (default: 600)"),
+            }),
+            result = T.shape({
+                answer         = T.string:describe("Final (possibly revised) answer"),
+                initial_answer = T.string:describe("Initial answer before any revisions"),
+                scores         = T.table:describe("Final per-dimension score map (dim_name → number)"),
+                avg_score      = T.number:describe("Average of final per-dimension scores"),
+                revisions      = T.number:describe("Number of revision rounds actually performed"),
+                history        = T.array_of(T.shape({
+                    round      = T.number:describe("0-based round index (0 = initial evaluation)"),
+                    answer     = T.string:describe("Answer evaluated in this round"),
+                    scores     = T.array_of(T.shape({
+                        dimension = T.string:describe("Rubric dimension name"),
+                        score     = T.number:describe("Per-dimension score (1-10)"),
+                        feedback  = T.string:describe("Parsed feedback for this dimension"),
+                        raw       = T.string:describe("Raw evaluator output"),
+                    })):describe("Per-dimension evaluation records"),
+                    avg_score  = T.number:describe("Round average score"),
+                    weak_count = T.number:describe("Dimensions below threshold this round"),
+                })):describe("Per-round evaluation trace"),
+                rubric         = T.array_of(T.shape({
+                    name        = T.string:describe("Dimension name"),
+                    description = T.string:describe("Dimension description (mirrors name when raw string rubric provided)"),
+                })):describe("Normalized rubric used for evaluation"),
+                threshold      = T.number:describe("Threshold value used (echoed from input)"),
+            }),
+        },
+    },
 }
 
 local DEFAULT_RUBRIC = {
@@ -249,5 +294,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

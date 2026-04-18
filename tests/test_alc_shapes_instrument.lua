@@ -444,6 +444,10 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- optional (only populated for parallel / hybrid paradigms). optimize uses
     -- T.any for string-or-table inputs (scenario / search / evaluator / stop)
     -- and T.table for parameter maps (space / defaults / best_params).
+    -- Phase 4-a (category="evaluation"/"validation") pkgs: critic / cove /
+    -- factscore. critic declares `scores = T.table` (rubric dim → number map),
+    -- `history` nested array-of-shape with per-round trace, and `rubric` as
+    -- array_of({name, description}).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -458,6 +462,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "f_race", "cs_pruner", "ab_select",
         "usc", "diverse", "gumbel_search",
         "compute_alloc", "optimize", "bisect",
+        "critic", "cove", "factscore",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

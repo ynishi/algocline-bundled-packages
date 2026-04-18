@@ -15,6 +15,9 @@
 --- ctx.verify_tokens: Max tokens per claim verification (default: 200)
 --- ctx.extract_tokens: Max tokens for claim extraction (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -23,6 +26,32 @@ M.meta = {
     version = "0.1.0",
     description = "Atomic claim decomposition — per-claim factual verification with scoring",
     category = "validation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                text           = T.string:describe("The text to fact-check"),
+                context        = T.string:is_optional():describe("Optional reference context for verification"),
+                verify_tokens  = T.number:is_optional():describe("Max tokens per claim verification (default: 200)"),
+                extract_tokens = T.number:is_optional():describe("Max tokens for claim extraction (default: 500)"),
+            }),
+            result = T.shape({
+                score       = T.number:describe("Factual precision score = supported / (supported+unsupported); 1.0 when no decisive claims"),
+                claims      = T.array_of(T.shape({
+                    claim         = T.string:describe("Atomic claim text"),
+                    status        = T.string:describe("'supported' | 'unsupported' | 'uncertain'"),
+                    justification = T.string:describe("One-sentence justification from the verifier"),
+                })):describe("Per-claim verification records (empty when extraction yields no claims)"),
+                supported   = T.number:describe("Count of SUPPORTED claims"),
+                unsupported = T.number:describe("Count of UNSUPPORTED claims"),
+                uncertain   = T.number:describe("Count of UNCERTAIN claims"),
+                total       = T.number:describe("Total number of extracted claims"),
+            }),
+        },
+    },
 }
 
 --- Parse extracted claims from LLM output.
@@ -162,5 +191,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
