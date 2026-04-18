@@ -14,6 +14,9 @@
 --- ctx.profiles   (optional): Custom difficulty→profile mapping table
 ---   Each profile may include confidence (0-1) and fallback_confidence (0-1)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -24,6 +27,37 @@ M.meta = {
         .. "Classifies task difficulty with a single LLM call, then maps to "
         .. "optimal strategy/depth/parameters via deterministic lookup.",
     category = "routing",
+}
+
+local profile_shape = T.shape({
+    depth                  = T.number:describe("Recommended reasoning depth"),
+    max_retries            = T.number:describe("Retry budget for the difficulty class"),
+    recommended_strategies = T.array_of(T.string):describe("Strategy names to prefer, in priority order"),
+    skip_phases            = T.array_of(T.string):describe("Pipeline phases that may be skipped"),
+    context_mode           = T.string:describe("'summary' | 'full' — how much context to pass downstream"),
+    confidence             = T.number:is_optional():describe("Baseline confidence for this difficulty (0-1)"),
+    fallback_confidence    = T.number:is_optional():describe("Confidence when LLM parse fails (0-1)"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:describe("Task description (required)"),
+                candidates = T.any:is_optional():describe("Candidate strategies — string[] or {name=string}[] mix accepted"),
+                profiles   = T.map_of(T.string, profile_shape):is_optional():describe("Custom difficulty→profile mapping; defaults to DEFAULT_PROFILES"),
+            }),
+            result = T.shape({
+                selected     = T.string:describe("Selected strategy name"),
+                difficulty   = T.string:describe("Classified difficulty: 'simple' | 'medium' | 'complex' (or default 'medium' on parse failure)"),
+                confidence   = T.number:describe("Profile-derived confidence (0-1)"),
+                reasoning    = T.string:describe("LLM reasoning or parse-failure note"),
+                profile      = profile_shape:describe("Full profile record for the selected difficulty"),
+                alternatives = T.array_of(T.string):describe("profile.recommended_strategies"),
+            }),
+        },
+    },
 }
 
 -- Default difficulty→strategy profile mapping.
@@ -169,5 +203,7 @@ function M.run(ctx)
 
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

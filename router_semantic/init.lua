@@ -12,6 +12,9 @@
 --- ctx.rules     (optional): Routing rules [{name, keywords, description}, ...]
 --- ctx.threshold (optional): Minimum keyword score to skip LLM (default: 0.3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -22,6 +25,41 @@ M.meta = {
         .. "Zero LLM calls for clear matches, one call for ambiguous cases. "
         .. "Based on Semantic Router pattern (Microsoft Multi-Agent Reference Architecture).",
     category = "routing",
+}
+
+local rule_shape = T.shape({
+    name        = T.string:describe("Rule identifier"),
+    keywords    = T.array_of(T.string):describe("Keyword list used for substring matching"),
+    description = T.string:describe("Human-readable rule description (used in LLM fallback prompt)"),
+})
+
+local score_shape = T.shape({
+    name             = T.string:describe("Rule name"),
+    score            = T.number:describe("Normalized score (matches / total keywords, 0-1)"),
+    raw_matches      = T.number:describe("Raw keyword hit count"),
+    matched_keywords = T.array_of(T.string):describe("Which keywords matched the task"),
+    description      = T.string,
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task      = T.string:describe("Task description (required)"),
+                rules     = T.array_of(rule_shape):is_optional():describe("Routing rules; defaults to DEFAULT_RULES"),
+                threshold = T.number:is_optional():describe("Minimum keyword score to skip LLM (default 0.3)"),
+            }),
+            result = T.shape({
+                selected     = T.string:describe("Best-match rule name"),
+                confidence   = T.number:describe("Score in [0, 1] — keyword score or LLM-reported"),
+                reasoning    = T.string:describe("Keyword match list, LLM reasoning, or failure note"),
+                method       = T.one_of({ "keyword", "llm_fallback", "keyword_forced" })
+                    :describe("Which dispatch path produced the verdict"),
+                alternatives = T.array_of(score_shape):describe("All rules scored by keyword, sorted by score desc"),
+            }),
+        },
+    },
 }
 
 -- Default routing rules (coding task oriented)
@@ -167,5 +205,7 @@ function M.run(ctx)
 
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

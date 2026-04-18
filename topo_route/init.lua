@@ -28,6 +28,9 @@
 --- ctx.available_packages (optional): Override default package registry
 --- ctx.analysis_tokens: Max tokens for analysis (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -40,6 +43,34 @@ M.meta = {
         .. "from 'From Spark to Fire' (Xie et al., AAMAS 2026). Same agents, "
         .. "different topology → up to 40% reliability variation.",
     category = "routing",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task               = T.string:describe("Task description to route (required)"),
+                available_packages = T.any:is_optional():describe("Override default package registry (reserved; not currently consumed)"),
+                analysis_tokens    = T.number:is_optional():describe("Max tokens for the analysis LLM call (default 600)"),
+            }),
+            result = T.shape({
+                topology          = T.string:describe("Recommended topology name: linear | star | dag | debate | ensemble | escalation"),
+                description       = T.string:describe("Short topology description"),
+                confidence        = T.number:describe("Parsed CONFIDENCE in [0, 1] (default 0.5 on parse failure)"),
+                dimensions        = T.map_of(T.string, T.string)
+                    :describe("Task analysis axes; keys are complexity/decomposability/verification_need/adversarial_value/cost_sensitivity, values are LOW|MEDIUM|HIGH"),
+                packages          = T.array_of(T.shape({
+                    package = T.string:describe("Package name"),
+                    role    = T.string:describe("Role slot (orchestration/verification/aggregation/reasoning/routing/governance)"),
+                })):describe("Flattened package list covering all roles of the selected topology plus governance addons"),
+                governance_addons = T.array_of(T.string):describe("Filtered governance packages from LLM suggestion (subset of {lineage, dissent, anti_cascade})"),
+                risks             = T.string:describe("Topology-specific risk summary"),
+                mitigations       = T.string:describe("Suggested mitigation packages for those risks"),
+                analysis          = T.string:describe("Raw LLM analysis text (kept for downstream consumers)"),
+            }),
+        },
+    },
 }
 
 -- ─── Topology Registry ───
@@ -308,5 +339,7 @@ function M.run(ctx)
     }
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M

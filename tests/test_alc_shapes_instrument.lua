@@ -727,6 +727,15 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- un-instrumented because ctx.extract / ctx.sim_fn / ctx.classify_fn
     -- / ctx.param_schema are all ctx-supplied at run time, so result
     -- keys are unknowable at load (see hybrid_abm/init.lua Shape policy).
+    -- Phase 7-a (category="routing") pkgs: router_capability /
+    -- router_daao / router_semantic / topo_route. All share a
+    -- selected + confidence + alternatives-style result with
+    -- pkg-specific auxiliaries (requirements, profile, method tag,
+    -- topology dimensions). router_semantic's method is constrained
+    -- via T.one_of({"keyword","llm_fallback","keyword_forced"}) to
+    -- reflect the three dispatch paths. topo_route's dimensions map
+    -- uses T.map_of(T.string, T.string) because the parser emits
+    -- only the axes that appear in the raw LLM output.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -752,6 +761,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "boids_abm", "epidemic_abm", "evogame_abm",
         "opinion_abm", "schelling_abm", "sugarscape_abm",
         "coevolve",
+        "router_capability", "router_daao", "router_semantic", "topo_route",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

@@ -10,6 +10,9 @@
 --- ctx.registry    (optional): Agent registry [{name, capabilities, description, cost}, ...]
 --- ctx.max_results (optional): Number of top matches to return (default: 3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -20,6 +23,42 @@ M.meta = {
         .. "Extracts task requirements via LLM, then scores against agent capabilities "
         .. "using Jaccard similarity. Based on Dynamic Agent Registry pattern.",
     category = "routing",
+}
+
+local agent_entry_shape = T.shape({
+    name         = T.string:describe("Agent identifier"),
+    capabilities = T.array_of(T.string):describe("Capability tags used for Jaccard scoring"),
+    description  = T.string:describe("Human-readable role description"),
+    cost         = T.number:describe("Relative cost ranking (tiebreak: lower wins at equal score)"),
+})
+
+local scored_agent_shape = T.shape({
+    name         = T.string:describe("Agent name"),
+    score        = T.number:describe("Jaccard similarity in [0, 1]"),
+    capabilities = T.array_of(T.string),
+    description  = T.string,
+    cost         = T.number,
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("Task description (required)"),
+                registry    = T.array_of(agent_entry_shape):is_optional():describe("Agent registry; defaults to DEFAULT_REGISTRY"),
+                max_results = T.number:is_optional():describe("Number of top matches to return in alternatives (default 3)"),
+            }),
+            result = T.shape({
+                selected     = T.string:describe("Best-match agent name, or 'unknown' if registry empty"),
+                confidence   = T.number:describe("Top agent's Jaccard score (0 if no match)"),
+                reasoning    = T.string:describe("LLM-extracted reasoning, or failure note"),
+                requirements = T.array_of(T.string):describe("Capability tags extracted from task"),
+                method       = T.string:describe("Scoring method identifier ('jaccard')"),
+                alternatives = T.array_of(scored_agent_shape):describe("Top N candidates sorted by score desc, cost asc"),
+            }),
+        },
+    },
 }
 
 -- Default agent registry (coding pipeline oriented)
@@ -165,5 +204,7 @@ function M.run(ctx)
 
     return ctx
 end
+
+M.run = S.instrument(M, "run")
 
 return M
