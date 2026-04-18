@@ -13,6 +13,9 @@
 --- ctx.task (required): The problem to solve
 --- ctx.n_paths: Number of diverse reasoning paths (default: 3)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -21,6 +24,41 @@ M.meta = {
     version = "0.1.0",
     description = "DiVERSe — diverse reasoning paths with step-level verification and selection",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task    = T.string:describe("The problem to solve"),
+                n_paths = T.number:is_optional():describe("Number of diverse reasoning paths (default: 3)"),
+            }),
+            result = T.shape({
+                answer         = T.string:describe("Final synthesized answer from the best path"),
+                best_path_id   = T.number:describe("path_id of the highest-scoring path"),
+                best_avg_score = T.number:describe("Average step score of the winning path"),
+                ranking        = T.array_of(T.shape({
+                    rank           = T.number:describe("1-based rank after sorting by avg_score"),
+                    path_id        = T.number:describe("Original path identifier"),
+                    avg_score      = T.number:describe("Average step-level score"),
+                    steps_verified = T.number:describe("Number of steps that received a verification score"),
+                })):describe("Paths ordered from best to worst by avg_score"),
+                paths          = T.array_of(T.shape({
+                    path_id      = T.number:describe("Original path identifier"),
+                    reasoning    = T.string:describe("Full reasoning text for the path"),
+                    verification = T.shape({
+                        step_scores = T.array_of(T.shape({
+                            step  = T.string:describe("Step text (or whole reasoning when fallback)"),
+                            score = T.number:describe("Per-step correctness score"),
+                        })):describe("Per-step verification results"),
+                        total_score = T.number:describe("Sum of per-step scores"),
+                        avg_score   = T.number:describe("Mean of per-step scores"),
+                    }):describe("Step-level verification results for the path"),
+                })):describe("All generated paths with verification details (sorted)"),
+            }),
+        },
+    },
 }
 
 --- Parse a reasoning path into individual steps.
@@ -213,5 +251,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

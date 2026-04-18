@@ -25,6 +25,9 @@
 --- ctx.gen_tokens: Max tokens per candidate (default: 400)
 --- ctx.select_tokens: Max tokens for selection response (default: 500)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -35,6 +38,26 @@ M.meta = {
         .. "across free-form responses. Extends SC to open-ended tasks where "
         .. "majority vote is inapplicable.",
     category = "aggregation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task          = T.string:describe("The problem/question to solve"),
+                n             = T.number:is_optional():describe("Number of candidate responses to sample (default: 5)"),
+                gen_tokens    = T.number:is_optional():describe("Max tokens per candidate (default: 400)"),
+                select_tokens = T.number:is_optional():describe("Max tokens for selection response (default: 500)"),
+            }),
+            result = T.shape({
+                selection      = T.string:describe("LLM's consistency-selection response (analysis + chosen answer content)"),
+                selected_index = T.number:is_optional():describe("1-based index parsed from the selection (nil if unparseable)"),
+                candidates     = T.array_of(T.string):describe("All sampled candidate responses"),
+                n_sampled      = T.number:describe("Number of candidates sampled"),
+            }),
+        },
+    },
 }
 
 --- Diversity hints to encourage different reasoning paths (shared with sc).
@@ -127,5 +150,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

@@ -36,6 +36,9 @@
 --- ctx.gen_tokens: Max tokens for generation (default: 400)
 --- ctx.eval_tokens: Max tokens for evaluation (default: 100)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -46,6 +49,33 @@ M.meta = {
         .. "budget allocation + Gumbel Top-k for unbiased sampling. Provably "
         .. "minimizes simple regret under fixed evaluation budget.",
     category = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task               = T.string:describe("The problem to solve"),
+                initial_candidates = T.number:is_optional():describe("Number of initial candidates (default: 8)"),
+                gen_tokens         = T.number:is_optional():describe("Max tokens for generation (default: 400)"),
+                eval_tokens        = T.number:is_optional():describe("Max tokens for evaluation (default: 100)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Winning candidate's response text"),
+                best_index        = T.number:describe("1-based index of the winning candidate"),
+                best_score        = T.number:describe("Final mean score of the winner in [0,1]"),
+                halving_rounds    = T.number:describe("Number of Sequential Halving rounds executed"),
+                total_evaluations = T.number:describe("Total per-candidate evaluations across rounds"),
+                total_llm_calls   = T.number:describe("Total LLM calls (generation + evaluations)"),
+                candidates        = T.array_of(T.shape({
+                    index      = T.number:describe("Original candidate index"),
+                    mean_score = T.number:describe("Final mean evaluation score in [0,1]"),
+                    n_evals    = T.number:describe("Number of evaluations this candidate received"),
+                })):describe("All candidates' final state (order preserved from generation)"),
+            }),
+        },
+    },
 }
 
 --- Sample from Gumbel(0,1) distribution.
@@ -212,5 +242,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
