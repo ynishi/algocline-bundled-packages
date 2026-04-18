@@ -1382,7 +1382,7 @@ Returns:
 | `ctx.generations` | number | optional |  |
 | `ctx.mutation_rate` | number | optional |  |
 | `ctx.n_agents` | number | optional |  |
-| `ctx.payoff_matrix` | table | optional |  |
+| `ctx.payoff_matrix` | table | optional | CC/CD/DC/DD → {a,b} 形式の利得行列 |
 | `ctx.rounds_per_gen` | number | optional |  |
 | `ctx.runs` | number | optional |  |
 | `ctx.strategies` | array of string | optional |  |

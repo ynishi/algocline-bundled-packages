@@ -50,7 +50,7 @@ local params_shape = T.shape({
     generations    = T.number,
     rounds_per_gen = T.number,
     mutation_rate  = T.number,
-    payoff_matrix  = T.table,
+    payoff_matrix  = T.table:describe("CC/CD/DC/DD → {a,b} 形式の利得行列"),
     strategies     = T.array_of(T.string):is_optional(),
 })
 
@@ -63,7 +63,7 @@ M.spec = {
                 generations    = T.number:is_optional(),
                 rounds_per_gen = T.number:is_optional(),
                 mutation_rate  = T.number:is_optional(),
-                payoff_matrix  = T.table:is_optional(),
+                payoff_matrix  = T.table:is_optional():describe("CC/CD/DC/DD → {a,b} 形式の利得行列"),
                 strategies     = T.array_of(T.string):is_optional(),
                 runs           = T.number:is_optional(),
             }),
