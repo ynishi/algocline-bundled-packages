@@ -425,9 +425,11 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- for both input and result, no registry name).
     --
     -- Phase 2-b (category="refinement") pkgs: reflect / reflexion.
+    -- Phase 2-c (category="planning") pkgs: decompose.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
+        "decompose",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

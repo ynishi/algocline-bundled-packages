@@ -14,6 +14,9 @@
 --- ctx.subtask_tokens: Max tokens per sub-task (default: 400)
 --- ctx.merge_tokens: Max tokens for final merge (default: 600)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -22,6 +25,26 @@ M.meta = {
     version = "0.1.0",
     description = "Task decomposition — LLM-driven split, parallel execution, merge",
     category = "planning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:describe("The complex task to decompose"),
+                max_subtasks   = T.number:is_optional():describe("Maximum sub-tasks to generate (default: 5)"),
+                subtask_tokens = T.number:is_optional():describe("Max tokens per sub-task (default: 400)"),
+                merge_tokens   = T.number:is_optional():describe("Max tokens for final merge (default: 600)"),
+            }),
+            result = T.shape({
+                answer            = T.string:describe("Unified merged answer across sub-tasks"),
+                subtasks          = T.array_of(T.string):describe("Parsed sub-task descriptions (fallback: single-element = original task)"),
+                subtask_results   = T.array_of(T.string):describe("Per-sub-task LLM outputs, same order as subtasks"),
+                decomposition_raw = T.string:describe("Raw decomposition LLM output before parsing"),
+            }),
+        },
+    },
 }
 
 --- Parse sub-tasks from LLM output.
@@ -126,5 +149,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
