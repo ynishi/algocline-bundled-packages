@@ -436,6 +436,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- Phase 2-g-3 (category="reasoning" 派生) pkgs: verify_first / faithful /
     -- meta_prompt. Completes the 9-pkg reasoning sweep (2-g-1/2/3).
     -- Phase 3-a (category="selection") pkgs: ucb / setwise_rank / mbr_select.
+    -- Phase 3-b (category="selection") pkgs: f_race / cs_pruner / ab_select.
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -447,6 +448,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "maieutic", "cumulative", "analogical",
         "verify_first", "faithful", "meta_prompt",
         "ucb", "setwise_rank", "mbr_select",
+        "f_race", "cs_pruner", "ab_select",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil

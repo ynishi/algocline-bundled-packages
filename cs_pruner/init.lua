@@ -136,6 +136,9 @@
 ---     JRSS-B 86(1):1-27. arXiv:2010.09686 (Theorem 2, predictable
 ---     plug-in empirical-Bernstein CS)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -150,6 +153,85 @@ M.meta = {
         .. "lower bound. Strategic/Injectable — every parameter is "
         .. "overridable.",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                = T.string:describe("Problem statement"),
+                n_candidates        = T.number:is_optional():describe("Number of candidates (default: 6)"),
+                rubric              = T.array_of(T.shape({
+                    name      = T.string,
+                    criterion = T.string,
+                })):is_optional():describe("Rubric dimensions (default: 20-dim binary)"),
+                delta               = T.number:is_optional():describe("Overall error probability (default: 0.05)"),
+                cs_variant          = T.string:is_optional():describe("\"polynomial_stitched\" | \"hoeffding\" | \"betting\" | \"kl\" (default: polynomial_stitched)"),
+                betting_lambda_max  = T.number:is_optional():describe("Betting λ truncation (default: 0.5)"),
+                betting_prior_var   = T.number:is_optional():describe("Betting σ̂² prior (default: 0.25)"),
+                score_domain        = T.shape({
+                    min = T.number,
+                    max = T.number,
+                }):is_optional():describe("Score range (default: {min=0,max=1})"),
+                stitching_s         = T.number:is_optional():describe("Howard 2021 eq.(10) exponent (default: 1.4)"),
+                stitching_eta       = T.number:is_optional():describe("Howard 2021 eq.(10) epoch ratio (default: 2.0)"),
+                bootstrap_m         = T.number:is_optional():describe("Howard 2021 eq.(10) bootstrap time (default: 1.0)"),
+                aggregation         = T.string:is_optional():describe("Only \"scalarize\" supported in v0.1"),
+                weights             = T.array_of(T.number):is_optional():describe("Per-dimension weights (default: uniform)"),
+                layer2_halving      = T.boolean:is_optional():describe("Enable Successive Halving as primary kill mechanism (default: false)"),
+                halving_checkpoints = T.array_of(T.number):is_optional():describe("Checkpoint n-values for layer-2 halving (default: {5,10,15})"),
+                halving_keep_ratio  = T.number:is_optional():describe("Fraction kept at each halving (default: 0.5)"),
+                halving_min_gap     = T.number:is_optional():describe("Gap guard around the median (default: 0)"),
+                gen_tokens          = T.number:is_optional():describe("Max tokens per candidate generation (default: 400)"),
+                min_n_before_kill   = T.number:is_optional():describe("Warmup minimum before kills are considered"),
+            }),
+            result = T.shape({
+                best            = T.string:describe("Text of the best surviving candidate"),
+                best_index      = T.number:describe("1-based index of the winner"),
+                best_score      = T.number:describe("Empirical mean of the winner"),
+                ranking         = T.array_of(T.shape({
+                    index  = T.number,
+                    alive  = T.boolean,
+                    n      = T.number,
+                    mean   = T.number,
+                    lcb    = T.number,
+                    ucb    = T.number,
+                    radius = T.number,
+                    v_hat  = T.number,
+                })):describe("All candidates sorted by alive, then mean descending"),
+                candidates      = T.array_of(T.string):describe("All generated candidate texts"),
+                rounds          = T.array_of(T.shape({
+                    iteration      = T.number,
+                    candidate      = T.number,
+                    dimension      = T.number,
+                    dimension_name = T.string,
+                    score          = T.number,
+                    n_after        = T.number,
+                    v_hat_after    = T.number,
+                    mean_after     = T.number,
+                })):describe("Per-evaluation trace"),
+                kill_events     = T.array_of(T.shape({
+                    candidate = T.number,
+                    n         = T.number,
+                    mean      = T.number,
+                })):describe("Elimination events (open shape; CS and layer2 events share candidate/n/mean)"),
+                protect_events  = T.array_of(T.shape({
+                    candidate = T.number,
+                    n         = T.number,
+                    mean      = T.number,
+                })):describe("Layer-2 gap-guard protections (open shape)"),
+                alive_count     = T.number,
+                n_candidates    = T.number,
+                n_dimensions    = T.number,
+                evaluations     = T.number:describe("Per-dimension evaluations performed"),
+                total_llm_calls = T.number,
+                delta           = T.number,
+                alpha_per_side  = T.number:describe("δ/(2N) for stitched/hoeffding/kl; δ/N for betting"),
+                cs_variant      = T.string,
+            }),
+        },
+    },
 }
 
 -- Riemann zeta(1.4) ≈ 3.10555 — used as default in Howard 2021 eq.(10)
@@ -989,5 +1071,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

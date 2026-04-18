@@ -59,6 +59,9 @@
 ---     quick/detail/thorough ladder.
 --- ctx.seed: PRNG seed for Thompson sampling (default: 1)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -70,6 +73,60 @@ M.meta = {
         .. "evaluators only to promising candidates. Unique multi-fidelity "
         .. "axis vs other selection packages.",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task        = T.string:describe("The problem to generate and select an answer for"),
+                n           = T.number:is_optional():describe("Number of initial candidates (default: 6)"),
+                budget      = T.number:is_optional():describe("Total fidelity-cost budget (default: 18)"),
+                alpha_prior = T.number:is_optional():describe("Beta prior α (default: 1.0)"),
+                beta_prior  = T.number:is_optional():describe("Beta prior β (default: 1.0)"),
+                score_hi    = T.number:is_optional():describe("Maximum raw score for normalization (default: 10)"),
+                gen_tokens  = T.number:is_optional():describe("Max tokens per candidate generation (default: 400)"),
+                fidelities  = T.array_of(T.shape({
+                    name       = T.string,
+                    cost       = T.number,
+                    prompt     = T.string,
+                    max_tokens = T.number,
+                })):is_optional():describe("Override the evaluator ladder (default: 3-level quick/detail/thorough)"),
+                seed        = T.number:is_optional():describe("PRNG seed for Thompson sampling (default: 1)"),
+            }),
+            result = T.shape({
+                best            = T.string:describe("Text of the winning candidate"),
+                best_index      = T.number:describe("1-based index of the winner"),
+                best_score      = T.number:describe("Posterior mean of the winner"),
+                ranking         = T.array_of(T.shape({
+                    index          = T.number,
+                    posterior_mean = T.number,
+                    alpha          = T.number,
+                    beta           = T.number,
+                    evaluations    = T.table:describe("Sparse map level(number) -> raw score"),
+                    n_evals        = T.number,
+                })):describe("All candidates sorted by posterior mean descending"),
+                candidates      = T.array_of(T.string):describe("All generated candidate texts"),
+                rounds          = T.array_of(T.shape({
+                    iteration   = T.number,
+                    candidate   = T.number,
+                    level       = T.number,
+                    level_name  = T.string,
+                    score       = T.number,
+                    score_norm  = T.number,
+                    alpha       = T.number,
+                    beta        = T.number,
+                    theta_pick  = T.number,
+                    cost        = T.number,
+                    budget_used = T.number,
+                })):describe("Per-iteration Thompson sampling trace"),
+                budget_used     = T.number:describe("Total fidelity cost consumed"),
+                budget          = T.number:describe("Total fidelity-cost budget supplied"),
+                total_llm_calls = T.number:describe("Generation calls + evaluation calls"),
+            }),
+        },
+    },
 }
 
 -- ─── Deterministic xorshift32 PRNG ───
@@ -366,5 +423,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

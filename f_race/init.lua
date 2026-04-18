@@ -205,6 +205,9 @@
 ---                     "Post-hoc multiplicity and sequential testing"
 ---                     above for the caveat on repeated testing.
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -217,6 +220,73 @@ M.meta = {
         .. "Friedman + Nemenyi post-hoc test. Designed for small N (≤10) "
         .. "× D (≤30) where Empirical-Bernstein CS cannot fire.",
     category = "selection",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                   = T.string:describe("Problem statement"),
+                n_candidates           = T.number:is_optional():describe("Number of candidates (default: 6)"),
+                rubric                 = T.array_of(T.shape({
+                    name      = T.string,
+                    criterion = T.string,
+                })):is_optional():describe("Rubric dimensions (default: 20-dim binary)"),
+                delta                  = T.number:is_optional():describe("Significance level (default: 0.05); resolved to largest tabulated α ≤ delta"),
+                min_blocks_before_race = T.number:is_optional():describe("Warmup block count before elimination (default: 5)"),
+                score_domain           = T.shape({
+                    min = T.number,
+                    max = T.number,
+                }):is_optional():describe("Score range for clipping (default: {min=0,max=1})"),
+                gen_tokens             = T.number:is_optional():describe("Max tokens per candidate generation (default: 400)"),
+                rubric_type            = T.string:is_optional():describe("\"binary\" | \"likert5\" (default: \"binary\")"),
+                alpha_spending         = T.boolean:is_optional():describe("Bonferroni sequential correction (default: false)"),
+            }),
+            result = T.shape({
+                best            = T.string:describe("Text of the best surviving candidate"),
+                best_index      = T.number:describe("1-based index of the winner"),
+                best_score      = T.number:describe("Empirical mean score of the winner"),
+                ranking         = T.array_of(T.shape({
+                    index     = T.number,
+                    alive     = T.boolean,
+                    n         = T.number,
+                    mean      = T.number,
+                    mean_rank = T.number:is_optional(),
+                })):describe("All candidates sorted by alive+mean_rank/mean descending"),
+                candidates      = T.array_of(T.string):describe("All generated candidate texts"),
+                rounds          = T.array_of(T.shape({
+                    iteration      = T.number,
+                    candidate      = T.number,
+                    dimension      = T.number,
+                    dimension_name = T.string,
+                    score          = T.number,
+                    n_after        = T.number,
+                })):describe("Per-evaluation trace"),
+                kill_events     = T.array_of(T.shape({
+                    candidate      = T.number,
+                    block          = T.number,
+                    n              = T.number,
+                    mean           = T.number,
+                    rank_sum       = T.number,
+                    best_rank_sum  = T.number,
+                    best_candidate = T.number,
+                    q              = T.number,
+                    chi2_critical  = T.number,
+                    crit_diff      = T.number,
+                    blocks_used    = T.number,
+                })):describe("Elimination events triggered by Friedman+Nemenyi"),
+                alive_count     = T.number:describe("Number of survivors at termination"),
+                n_candidates    = T.number,
+                n_dimensions    = T.number,
+                evaluations     = T.number:describe("Number of per-dimension evaluations performed"),
+                total_llm_calls = T.number:describe("Candidate generation + evaluation calls"),
+                delta           = T.number:describe("User-requested significance level"),
+                effective_delta = T.number:describe("Resolved tabulated α (possibly Bonferroni-tightened)"),
+                alpha_spending  = T.boolean:describe("Whether Bonferroni sequential correction was applied"),
+            }),
+        },
+    },
 }
 
 -- ─── χ² and Nemenyi critical-value tables ──────────────────────────────
@@ -874,5 +944,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
