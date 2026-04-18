@@ -16,7 +16,15 @@ M.meta = {
     version = "0.1.0",
     description = "Multi-perspective deliberation — distinct roles engage, moderator synthesizes",
     category = "synthesis",
-    result_shape = "paneled",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "paneled",
+        },
+    },
 }
 
 ---@param ctx AlcCtx

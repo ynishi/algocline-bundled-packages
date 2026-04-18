@@ -88,7 +88,15 @@ M.meta = {
         .. "multi-axis scoring, pairwise final rank. -87% calls vs naive "
         .. "pairwise on N=8 (verified). Encodes known failure modes as caveats.",
     category = "recipe",
-    result_shape = "funnel_ranked",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "funnel_ranked",
+        },
+    },
 }
 
 --- Packages composed by this recipe, in execution order.

@@ -25,7 +25,15 @@ M.meta = {
     version = "0.1.0",
     description = "Tournament selection — generate candidates, pairwise LLM-as-Judge ranking",
     category = "selection",
-    result_shape = "tournament",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "tournament",
+        },
+    },
 }
 
 --- Pairwise comparison: returns "A" or "B".

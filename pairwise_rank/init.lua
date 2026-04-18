@@ -62,7 +62,15 @@ M.meta = {
         .. "Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the "
         .. "calibration problem.",
     category = "selection",
-    result_shape = "pairwise_ranked",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "pairwise_ranked",
+        },
+    },
 }
 
 --- Ask the LLM which of two candidates is better. Returns one of:

@@ -15,9 +15,9 @@
 ---   E_META_MISSING_*     : required `meta.{name,version,description,
 ---                          category}` field absent or empty.
 ---   E_NAME_MISMATCH      : `meta.name` ≠ pkg directory name.
----   E_PARAMETERS_CONFLICT: `input_shape` declared AND the docstring
----                          already contains a `## Parameters` section
----                          (shape is the SSoT).
+---   E_PARAMETERS_CONFLICT: `spec.entries.run.input` declared AND the
+---                          docstring already contains a `## Parameters`
+---                          section (shape is the SSoT).
 ---   W_FAKE_LABEL         : a line like `Usage:` / `Args:` appears at
 ---                          column 0 outside a `## ` heading — common
 ---                          pre-V0 shape that should be promoted to H2.
@@ -160,8 +160,8 @@ function M.check(pkg_info, docstring, pkg_dir)
     if shp.input ~= nil and has_parameters_section(nar.sections) then
         out[#out + 1] = {
             severity = "error", code = "E_PARAMETERS_CONFLICT",
-            msg = "input_shape is declared AND docstring has a ## Parameters " ..
-                  "section; remove the docstring section (shape is the SSoT)" }
+            msg = "spec.entries.run.input is declared AND docstring has a ## " ..
+                  "Parameters section; remove the docstring section (shape is the SSoT)" }
     end
 
     return { violations = out }

@@ -14,11 +14,12 @@
 --- AST) are prohibited: downstream consumers must project, not mirror.
 --- See README.md §Core concept.
 ---
---- NOTE: meta.result_shape accepts either a string (registry lookup
---- key) or an inline `T.shape(...)` schema. Packages with multiple
---- entry points (e.g. calibrate.run vs calibrate.assess) declare the
---- primary shape in meta and document secondary shapes in docstrings.
---- A future `meta.shapes("key")` accessor is a possible extension.
+--- NOTE: bundled packages declare their I/O contract under
+--- `M.spec.entries.run.{input, result}`. Each field accepts either a
+--- string (registry lookup key) or an inline `T.shape(...)` schema.
+--- Packages with multiple entry points (e.g. calibrate.run vs
+--- calibrate.assess) add further `M.spec.entries.{name}` blocks.
+--- Packages without `M.spec` are treated as opaque by spec_resolver.
 
 local T = require("alc_shapes.t")
 local check = require("alc_shapes.check")

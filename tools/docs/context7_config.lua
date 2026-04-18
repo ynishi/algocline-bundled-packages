@@ -17,16 +17,18 @@ return {
         "(CoT, Self-Consistency, CoVe, panel / ucb / cot / ... packages).",
     rules = {
         "Each package is a Pure Lua module with a top-level `M.meta` " ..
-            "table describing identity (name / version / category / " ..
-            "description) and shapes (`input_shape` / `result_shape` " ..
-            "built from `alc_shapes.t` combinators).",
+            "table for identity (name / version / category / description) " ..
+            "and (for bundled packages) an `M.spec` table declaring " ..
+            "entry-point I/O shapes via `alc_shapes.t` combinators — the " ..
+            "primary entry is `M.spec.entries.run.{input, result}`.",
         "Invoke a strategy through `alc.run(ctx)`; `ctx` is a plain Lua " ..
-            "table shaped by the package's `M.meta.input_shape`.",
+            "table shaped by the package's `M.spec.entries.run.input`.",
         "An `alc.llm(prompt)` call inside a strategy pauses execution " ..
             "and resumes when the host provides the completion via " ..
             "`alc_continue`.",
         "Package narratives live under `docs/narrative/{pkg}.md` and are " ..
             "generated deterministically by `tools/gen_docs.lua` from " ..
-            "each package's `init.lua` docstring plus its `M.meta`.",
+            "each package's `init.lua` docstring plus its `M.meta` and " ..
+            "`M.spec`.",
     },
 }

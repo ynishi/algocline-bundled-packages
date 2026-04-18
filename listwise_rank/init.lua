@@ -60,7 +60,15 @@ M.meta = {
         .. "generation in 1 LLM call. Resolves the calibration problem of "
         .. "pointwise scoring. Sliding window for large N.",
     category = "selection",
-    result_shape = "listwise_ranked",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "listwise_ranked",
+        },
+    },
 }
 
 --- Format a window of candidates as numbered passages.

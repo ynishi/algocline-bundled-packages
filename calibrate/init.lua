@@ -26,7 +26,14 @@ M.meta = {
     version = "0.2.0",
     description = "Confidence-gated reasoning — fast path when confident, escalation when not",
     category = "meta",
-    result_shape = "calibrated",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run    = { result = "calibrated" },
+        assess = { result = "assessed" },
+    },
 }
 
 --- Extract confidence score from LLM self-assessment.

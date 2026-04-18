@@ -28,13 +28,31 @@
 ---@field result? any Package output (set by M.run)
 ---@field [string] any Open extension — upstream fields pass through
 
--- ── M.meta: package metadata table ──
+-- ── M.meta: package identity ──
 
 ---@class AlcMeta
 ---@field name string Package identifier (e.g. "cot", "mcts")
 ---@field version string SemVer string (e.g. "0.1.0")
 ---@field description string One-line summary
 ---@field category string Category tag (e.g. "reasoning", "exploration")
----@field input_shape? table Input ctx shape (T.shape schema)
----@field result_shape? string|table Registry-name lookup key (string) or inline `T.shape(...)` schema
+
+-- ── M.spec: package I/O contract (bundled packages only) ──
+--
+-- Opaque packages (community / experimental) omit M.spec entirely;
+-- spec_resolver treats them as kind = "opaque" and skips type checks.
+
+---@class AlcSpecEntry
+---@field input? string|table Input ctx shape — registry name (string) or inline T.shape
+---@field result? string|table Result shape — registry name (string) or inline T.shape
+---@field events? any Reserved for future streaming use
+
+---@class AlcSpecCompose
+---@field passthrough? string|string[] This entry returns the same shape it consumes
+---@field transforms? table[] Declared { from, to } shape transformations
+---@field requires? string[] Shape names expected to already exist in ctx
+
+---@class AlcSpec
+---@field entries table<string, AlcSpecEntry> Entry points; `run` is the primary by convention
+---@field compose? AlcSpecCompose Composability hints for routing / recipe layers
+---@field exports? string[] Shape names this pkg registers into the shape registry
 

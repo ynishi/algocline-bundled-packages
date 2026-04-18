@@ -26,18 +26,26 @@ local M = {}
 
 ---@type AlcMeta
 M.meta = {
-    name         = "cot",
-    version      = "0.1.0",
-    description  = "Iterative chain-of-thought — cumulative reasoning steps, then synthesis",
-    category     = "reasoning",
-    input_shape  = T.shape({
-        task  = T.string:describe("The question or task to reason about"),
-        depth = T.number:is_optional():describe("Number of reasoning steps (default: 3)"),
-    }),
-    result_shape = T.shape({
-        chain      = T.array_of(T.string):describe("Ordered insights, one per reasoning step"),
-        conclusion = T.string:describe("Synthesized final answer"),
-    }),
+    name        = "cot",
+    version     = "0.1.0",
+    description = "Iterative chain-of-thought — cumulative reasoning steps, then synthesis",
+    category    = "reasoning",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task  = T.string:describe("The question or task to reason about"),
+                depth = T.number:is_optional():describe("Number of reasoning steps (default: 3)"),
+            }),
+            result = T.shape({
+                chain      = T.array_of(T.string):describe("Ordered insights, one per reasoning step"),
+                conclusion = T.string:describe("Synthesized final answer"),
+            }),
+        },
+    },
 }
 
 ---@param ctx AlcCtx

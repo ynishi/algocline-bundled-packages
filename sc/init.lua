@@ -37,7 +37,15 @@ M.meta = {
     version = "0.2.0",
     description = "Independent multi-path sampling with majority vote aggregation",
     category = "aggregation",
-    result_shape = "voted",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "voted",
+        },
+    },
 }
 
 --- Extract a concise final answer from a reasoning chain.

@@ -1,11 +1,14 @@
 --- Shape conformance test — static validation of producer declarations.
---- Verifies meta.result_shape declarations match alc_shapes dictionary
---- entries without requiring live LLM calls.
+--- Verifies M.spec.entries.run.result declarations match alc_shapes
+--- dictionary entries without requiring live LLM calls.
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- NOTE: do not prepend os.getenv("PWD") to package.path here. Under the
+-- mlua-probe-mcp test runner, PWD points to the main repo (the server CWD)
+-- even when tests are launched from a worktree, so forcing PWD-first would
+-- shadow search_paths and load stale pkg versions. search_paths is already
+-- passed by the caller — rely on that.
 
 package.loaded["alc_shapes"]         = nil
 package.loaded["alc_shapes.t"]       = nil
@@ -27,15 +30,28 @@ local DECLARED_PACKAGES = {
     { name = "recipe_safe_panel",      shape = "safe_paneled" },
 }
 
-describe("shape conformance: meta declarations", function()
+local function resolve_shape_name(result)
+    if type(result) == "string" then
+        return result
+    end
+    if type(result) == "table" and rawget(result, "kind") == "ref" then
+        return rawget(result, "name")
+    end
+    return nil
+end
+
+describe("shape conformance: spec declarations", function()
     for _, entry in ipairs(DECLARED_PACKAGES) do
         describe(entry.name, function()
             package.loaded[entry.name] = nil
             local pkg = require(entry.name)
 
-            it("declares result_shape in meta", function()
-                expect(pkg.meta).to.exist()
-                expect(pkg.meta.result_shape).to.equal(entry.shape)
+            it("declares result in spec.entries.run", function()
+                expect(pkg.spec).to.exist()
+                expect(pkg.spec.entries).to.exist()
+                expect(pkg.spec.entries.run).to.exist()
+                local name = resolve_shape_name(pkg.spec.entries.run.result)
+                expect(name).to.equal(entry.shape)
             end)
 
             it("shape name exists in alc_shapes dictionary", function()

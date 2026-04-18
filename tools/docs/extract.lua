@@ -13,10 +13,14 @@
 --- Heuristic-free. V0 convention violations are detected separately
 --- by `tools.docs.lint`; this module reports the literal structure.
 ---
---- Single-AST doctrine: `meta.input_shape` / `meta.result_shape` are
+--- Single-AST doctrine: `M.spec.entries.run.{input, result}` are
 --- alc_shapes schemas and flow through unchanged. A string
---- `meta.result_shape` is wrapped as `T.ref(name)` so every downstream
---- consumer sees a uniform kind-tagged schema.
+--- `spec.entries.run.result` is wrapped as `T.ref(name)` so every
+--- downstream consumer sees a uniform kind-tagged schema.
+---
+--- Packages without `M.spec` (opaque pkg) produce a PkgInfo with
+--- `shape = { input = nil, result = nil }`. Downstream docs / LuaCATS
+--- generation treats it as "no declared shape".
 
 local PI = require("tools.docs.pkg_info")
 local T  = require("alc_shapes.t")
@@ -228,13 +232,13 @@ function M.split_sections(docstring)
     return title, summary, sections
 end
 
--- ── pkg loading (M.meta access) ────────────────────────────────────────
+-- ── pkg loading (M.meta + M.spec access) ──────────────────────────────
 
---- Load the pkg via `require` and return M.meta.
+--- Load the pkg via `require` and return the module table.
 ---
 --- Resets `package.loaded[pkg_name]` first to ensure a fresh load
 --- (multiple iterations in one run would otherwise see stale state).
-function M.load_meta(pkg_name)
+function M.load_pkg(pkg_name)
     package.loaded[pkg_name] = nil
     local ok, mod = pcall(require, pkg_name)
     if not ok then
@@ -247,12 +251,11 @@ function M.load_meta(pkg_name)
             "tools.docs.extract: require('%s') did not return a table",
             pkg_name), 2)
     end
-    local meta = mod.meta
-    if type(meta) ~= "table" then
+    if type(mod.meta) ~= "table" then
         error(string.format(
             "tools.docs.extract: pkg '%s' has no M.meta table", pkg_name), 2)
     end
-    return meta
+    return mod
 end
 
 -- ── assemble PkgInfo ───────────────────────────────────────────────────
@@ -267,7 +270,8 @@ end
 function M.build_pkg_info(pkg_name, init_path, source_path)
     local docstring = M.extract_docstring(init_path)
     local title, summary, sections = M.split_sections(docstring)
-    local meta = M.load_meta(pkg_name)
+    local mod = M.load_pkg(pkg_name)
+    local meta = mod.meta
 
     local identity = {
         name        = meta.name or pkg_name,
@@ -283,31 +287,42 @@ function M.build_pkg_info(pkg_name, init_path, source_path)
         sections = sections,
     }
 
+    -- Shape extraction: read from M.spec.entries.run (primary entry).
+    -- Packages without M.spec are opaque → shape.{input,result} = nil.
+    -- String shortcuts in spec are normalized to T.ref(name), matching
+    -- the spec_resolver coerce rule.
     local shape = {
         input  = nil,
         result = nil,
     }
-    if meta.input_shape ~= nil then
-        if not is_schema(meta.input_shape) then
-            error(string.format(
-                "tools.docs.extract: pkg '%s' meta.input_shape must be an " ..
-                "alc_shapes schema", pkg_name), 2)
-        end
-        shape.input = meta.input_shape
-    end
-    if meta.result_shape ~= nil then
-        if type(meta.result_shape) == "string" then
-            -- Named result type — wrap as `T.ref` so downstream sees a
-            -- uniform kind-tagged schema (Malli `[:ref :name]` analogue).
-            -- Projection renders it verbatim as the name.
-            shape.result = T.ref(meta.result_shape)
-        elseif is_schema(meta.result_shape) then
-            shape.result = meta.result_shape
-        else
-            error(string.format(
-                "tools.docs.extract: pkg '%s' meta.result_shape must be " ..
-                "a string or an alc_shapes schema (got type '%s')",
-                pkg_name, type(meta.result_shape)), 2)
+    local spec = mod.spec
+    if type(spec) == "table" and type(spec.entries) == "table" then
+        local run = spec.entries.run
+        if type(run) == "table" then
+            if run.input ~= nil then
+                if type(run.input) == "string" then
+                    shape.input = T.ref(run.input)
+                elseif is_schema(run.input) then
+                    shape.input = run.input
+                else
+                    error(string.format(
+                        "tools.docs.extract: pkg '%s' spec.entries.run.input " ..
+                        "must be a string or an alc_shapes schema (got type '%s')",
+                        pkg_name, type(run.input)), 2)
+                end
+            end
+            if run.result ~= nil then
+                if type(run.result) == "string" then
+                    shape.result = T.ref(run.result)
+                elseif is_schema(run.result) then
+                    shape.result = run.result
+                else
+                    error(string.format(
+                        "tools.docs.extract: pkg '%s' spec.entries.run.result " ..
+                        "must be a string or an alc_shapes schema (got type '%s')",
+                        pkg_name, type(run.result)), 2)
+                end
+            end
         end
     end
 

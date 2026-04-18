@@ -78,7 +78,15 @@ M.meta = {
         .. "Composes condorcet + sc + inverse_u + calibrate with known "
         .. "failure mode awareness.",
     category = "recipe",
-    result_shape = "safe_paneled",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            result = "safe_paneled",
+        },
+    },
 }
 
 --- Packages composed by this recipe, in execution order.
