@@ -58,6 +58,9 @@
 ---   -- Helper: build v_fn from agent outputs + ground truth
 ---   local v_fn = shapley.accuracy_coalition(outputs, truth)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -70,6 +73,52 @@ M.meta = {
         .. "harmful agents in multi-agent ensembles "
         .. "(Shapley 1953, Ghorbani-Zou AISTATS 2019).",
     category = "attribution",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        exact = {
+            -- agents: list of identifiers (string or number); v_fn: function.
+            -- Using T.any for the agent element so mixed id types work.
+            args   = { T.array_of(T.any), T.any },
+            result = T.shape({
+                -- values is a map (agent_id -> number), not an array;
+                -- kept opaque as T.table.
+                values           = T.table,
+                efficiency_check = T.boolean,
+                efficiency_error = T.number,
+                v_N              = T.number,
+                v_empty          = T.number,
+                n                = T.number,
+                evaluations      = T.number,
+            }),
+        },
+        montecarlo = {
+            args   = { T.array_of(T.any), T.any, T.table:is_optional() },
+            result = T.shape({
+                values           = T.table,
+                std              = T.table,
+                ci95             = T.table,
+                samples          = T.number,
+                efficiency_check = T.boolean,
+                efficiency_error = T.number,
+                v_N              = T.number,
+                v_empty          = T.number,
+                n                = T.number,
+            }),
+        },
+        accuracy_coalition = {
+            -- Returns (v_fn, agents). First return is a function closure;
+            -- use T.any for both. Option A' preserves the 2nd value.
+            args   = {
+                T.table,                           -- agent_outputs
+                T.array_of(T.any),                 -- ground_truth (0/1 or bool)
+                T.array_of(T.any):is_optional(),   -- agents (when outputs is a map)
+            },
+            result = T.any,
+        },
+    },
 }
 
 -- ─── RNG helper ───
@@ -413,5 +462,11 @@ function M.accuracy_coalition(agent_outputs, ground_truth, agents)
 
     return v_fn, agents
 end
+
+-- Malli-style self-decoration. accuracy_coalition returns (v_fn, agents)
+-- — Option A' preserves the 2nd value.
+M.exact              = S.instrument(M, "exact")
+M.montecarlo         = S.instrument(M, "montecarlo")
+M.accuracy_coalition = S.instrument(M, "accuracy_coalition")
 
 return M

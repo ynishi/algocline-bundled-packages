@@ -759,6 +759,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- exercise the multi-return path most heavily (bft.validate,
     -- eval_guard.self_critique, cost_pareto.is_dominated, inverse_u.should_stop
     -- all return (bool, string)).
+    -- 3.5-b batch: condorcet / shapley / mwu. condorcet has 4 multi-return
+    -- entries (is_anti_jury, optimal_n, correlation, estimate_p). shapley's
+    -- accuracy_coalition returns (v_fn, agents). mwu instruments only the
+    -- module-level new/solve/accuracy_to_loss; Updater instance methods
+    -- (u:weights/update/stats) stay untouched because OOP ":" sugar is
+    -- incompatible with direct-args arg-shape declarations.
     local library_pkg_entries = {
         bft          = { "validate", "threshold", "max_faults",
                          "validate_signed", "signed_threshold",
@@ -767,6 +773,10 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
                          "contamination", "check_all" },
         cost_pareto  = { "dominates", "frontier", "is_dominated", "layers" },
         inverse_u    = { "detect", "should_stop", "chen_condition" },
+        condorcet    = { "prob_majority", "is_anti_jury", "optimal_n",
+                         "correlation", "estimate_p" },
+        shapley      = { "exact", "montecarlo", "accuracy_coalition" },
+        mwu          = { "new", "solve", "accuracy_to_loss" },
     }
     for pkg_name, entries in pairs(library_pkg_entries) do
         it(pkg_name .. " (library-style): every entry is instrumented with declared args+result", function()
@@ -807,5 +817,45 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         local bad_ok, bad_reason = eg.self_critique({ has_external_grader = false })
         expect(bad_ok).to.equal(false)
         expect(bad_reason:match("FAIL")).to.exist()
+    end)
+
+    it("condorcet.is_anti_jury preserves (bool, string) after instrument", function()
+        package.loaded["condorcet"] = nil
+        local c = require("condorcet")
+        local ok, reason = c.is_anti_jury(0.4)
+        expect(ok).to.equal(true)
+        expect(reason:match("Anti%-Jury")).to.exist()
+        local hi_ok, _ = c.is_anti_jury(0.7)
+        expect(hi_ok).to.equal(false)
+    end)
+
+    it("condorcet.estimate_p preserves (p_hat, ci_half) after instrument", function()
+        package.loaded["condorcet"] = nil
+        local c = require("condorcet")
+        local p_hat, ci_half = c.estimate_p({ 1, 1, 1, 0 })
+        expect(p_hat).to.equal(0.75)
+        expect(type(ci_half)).to.equal("number")
+        expect(ci_half > 0).to.equal(true)
+    end)
+
+    it("shapley.accuracy_coalition preserves (v_fn, agents) after instrument", function()
+        package.loaded["shapley"] = nil
+        local sh = require("shapley")
+        local v_fn, agents = sh.accuracy_coalition(
+            { {1,1,0}, {1,0,0} },
+            { 1, 0, 0 })
+        expect(type(v_fn)).to.equal("function")
+        expect(type(agents)).to.equal("table")
+        expect(#agents).to.equal(2)
+    end)
+
+    it("mwu.accuracy_to_loss roundtrips after instrument", function()
+        package.loaded["mwu"] = nil
+        local mwu = require("mwu")
+        local l = mwu.accuracy_to_loss({ 1.0, 0.75, 0.25, 0.0 })
+        expect(#l).to.equal(4)
+        expect(l[1]).to.equal(0.0)
+        expect(l[2]).to.equal(0.25)
+        expect(l[4]).to.equal(1.0)
     end)
 end)

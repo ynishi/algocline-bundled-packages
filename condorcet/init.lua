@@ -42,6 +42,9 @@
 ---   condorcet.prob_majority(5, 0.7)  -- => ~0.837
 ---   condorcet.is_anti_jury(0.4)      -- => true
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -53,6 +56,38 @@ M.meta = {
         .. "verification for multi-agent voting systems "
         .. "(Condorcet 1785, Dietrich-List 2008).",
     category = "aggregation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        prob_majority = {
+            args   = { T.number, T.number },
+            result = T.number,
+        },
+        is_anti_jury = {
+            args   = { T.number },
+            result = T.boolean,
+        },
+        optimal_n = {
+            -- Returns (n_min | nil, prob_at_n | nil). When p <= 0.5 the
+            -- target is unreachable and both returns are nil — hence
+            -- :is_optional() on the first-return shape.
+            args   = { T.number, T.number:is_optional(), T.number:is_optional() },
+            result = T.number:is_optional(),
+        },
+        correlation = {
+            -- Returns (matrix, avg_corr). matrix is a nested
+            -- array_of(array_of(number)); Option A' preserves the 2nd value.
+            args   = { T.array_of(T.array_of(T.number)) },
+            result = T.array_of(T.array_of(T.number)),
+        },
+        estimate_p = {
+            -- Returns (p_hat, ci_half); accepts boolean or 0/1 values.
+            args   = { T.array_of(T.any) },
+            result = T.number,
+        },
+    },
 }
 
 -- ─── Combinatorics helpers ───
@@ -229,5 +264,13 @@ function M.estimate_p(correct)
     local ci_half = 1.96 * math.sqrt(p_hat * (1 - p_hat) / n)
     return p_hat, ci_half
 end
+
+-- Malli-style self-decoration. is_anti_jury, optimal_n, correlation,
+-- estimate_p all return multiple values — Option A' preserves them.
+M.prob_majority = S.instrument(M, "prob_majority")
+M.is_anti_jury  = S.instrument(M, "is_anti_jury")
+M.optimal_n     = S.instrument(M, "optimal_n")
+M.correlation   = S.instrument(M, "correlation")
+M.estimate_p    = S.instrument(M, "estimate_p")
 
 return M

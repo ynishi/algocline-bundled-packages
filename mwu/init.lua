@@ -64,6 +64,9 @@
 ---   -- One-shot from loss matrix
 ---   local r = mwu.solve(loss_matrix)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -75,6 +78,45 @@ M.meta = {
         .. "agent mixture weights over time without stochastic assumptions "
         .. "(Littlestone-Warmuth 1994, Freund-Schapire 1997).",
     category = "selection",
+}
+
+---@type AlcSpec
+-- Only module-level functions are instrumented. Updater instance methods
+-- (u:weights / u:update / u:stats) live on the metatable and are NOT
+-- wrapped — the wrapper would lose the `self` binding via `u:method()`
+-- syntactic sugar, and Lua's ":" sugar isn't compatible with direct-args
+-- mode arg-shape declarations.
+M.spec = {
+    entries = {
+        new = {
+            args   = { T.table },
+            result = T.table,  -- opaque Updater instance
+        },
+        solve = {
+            args   = {
+                T.array_of(T.array_of(T.number)),  -- loss_matrix[t][i]
+                T.table:is_optional(),              -- opts
+            },
+            result = T.shape({
+                final_weights       = T.array_of(T.number),
+                regret              = T.number,
+                regret_bound        = T.number,
+                regret_within_bound = T.boolean,
+                cumulative_loss     = T.number,
+                best_agent          = T.number,
+                best_agent_loss     = T.number,
+                -- weight_history: per-round {round, weights}; kept opaque
+                weight_history      = T.array_of(T.any),
+                n                   = T.number,
+                T                   = T.number,
+                eta                 = T.number,
+            }),
+        },
+        accuracy_to_loss = {
+            args   = { T.array_of(T.number) },
+            result = T.array_of(T.number),
+        },
+    },
 }
 
 -- ─── Updater class ───
@@ -339,5 +381,12 @@ function M.accuracy_to_loss(accuracies)
     end
     return losses
 end
+
+-- Malli-style self-decoration. Only module-level functions are wrapped;
+-- Updater:weights/update/stats are instance methods (OOP), outside the
+-- direct-args contract.
+M.new              = S.instrument(M, "new")
+M.solve            = S.instrument(M, "solve")
+M.accuracy_to_loss = S.instrument(M, "accuracy_to_loss")
 
 return M
