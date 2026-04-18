@@ -7,49 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-04-19
+
+### Added
+
+- **V0 SoT docs pipeline** (`tools/gen_docs.lua` + `tools/docs/*`): single-source-of-truth pipeline that extracts `PkgInfo` from each pkg's `init.lua` + `M.meta` / `M.spec` and projects it into narrative Markdown / machine-contract JSON / LLM-facing indexes. No legacy / fallback path — the SSoT is the pkg source. Byte-deterministic output (sorted keys, stable anchor resolution).
+  - `tools/docs/pkg_info.lua`: Entity layer (`PkgInfo` / `Shape` / `TypeExpr` / `Section` / `Identity` / `Narrative`).
+  - `tools/docs/extract.lua`: reads pkg → builds `PkgInfo` (deterministic anchor-collision suffix `-2` / `-3`).
+  - `tools/docs/projections.lua`: Entity → String (narrative, llms index / full, hub entry JSON, context7 manifest, devin wiki manifest). Shape-as-Data kind dispatch for both `input` and `result`.
+  - `tools/docs/lint.lua`: V0 convention violation detection (`W_FAKE_LABEL`, `E_RESULT_CONFLICT`, `E_PARAMETERS_CONFLICT`).
+  - `tools/docs/entity_schemas.lua`: Entity registry expressed as `alc_shapes` Schema-as-Data (`open=false`, `Section.level = T.one_of({2,3})`, `AlcSchema = {kind=T.string}`). `extract.build_pkg_info` now `assert_dev`s PkgInfo against this registry in dev mode.
+  - `tools/gen_docs.lua`: CLI entry (`--lint` / `--strict` / `--lint-only` / `--hub` / `--context7` / `--devin`).
+  - `docs/docstring-convention.md`: V0 docstring convention spec.
+- **Generated docs artefacts** (byte-deterministic, regenerated on every pipeline run):
+  - `docs/narrative/*.md` (106 files): per-pkg narrative Markdown with YAML frontmatter + `## Usage` / `## Behavior` / `## Parameters` / `## Result` sections. `T.ref`-based pkgs resolve through the alc_shapes registry so ref pkgs get a symmetric Result section (previously inline-only).
+  - `docs/llms.txt` + `docs/llms-full.txt`: aggregated LLM-facing index and full dump.
+  - `docs/hub/*.json` (106 per-pkg machine-contract JSON): `{name, version, category, description, narrative_md, input_shape, result_shape}`. Kind-tagged `input_shape` / `result_shape` share a single walker — unblocks `alc_hub_info` chain dispatch, LLM context injection with structural semantics, and cross-pkg type lint.
+  - `docs/hub/index.json` (106 pkgs aggregate, `schema_version = "hub_index/v0"`): produced via `alc_hub_reindex`.
+  - `context7.json` (repo root): Context7 public-schema manifest (`$schema` + `folders=["docs/narrative"]` fixed by projection, `projectTitle` / `description` / `rules` from `tools/docs/context7_config.lua`).
+  - `.devin/wiki.json`: DeepWiki public-schema manifest. `repo_notes` point consumers at `docs/narrative` as the canonical source. Page limits and content length validated at projection time.
+- **`alc_shapes` DSL extensions**:
+  - `T.ref(name)`: named registry reference (Malli `[:ref :name]` analogue) — resolves lazily so forward references are legal.
+  - `S.instrument(mod, entry_name, spec?)`: Malli-style producer-wrap self-decoration. Reads `M.spec.entries[entry_name].{input, result}` and replaces the entry with a dev-gated validator. Bundled pkgs now self-decorate at module tail via `M.run = require("alc_shapes").instrument(M, "run")` instead of inlining `assert_dev`.
+  - `S.spec_resolver` (public API): unified resolver for typed (`M.spec` declared) and opaque (external / experimental) pkgs. `resolve(pkg)` → `ResolvedSpec{kind="typed"|"opaque"}`; `run(pkg, ctx, entry_name?)` runs the entry with typed-only pre/post `assert_dev` (dev_off / opaque pass-through).
+  - **Direct-args mode** for library-style pkgs: `spec.entries.{entry}.args` (positional array of shapes) validates each caller-supplied arg against `args[i]`, validates the raw return against `result` (no `ret.result` unwrapping). `input` and `args` are mutually exclusive per entry. Multi-return preserved via `table.pack` / `table.unpack` — library functions returning `(ok, reason)` / `(bool, string)` tuples no longer drop 2nd+ returns through the wrapper.
+  - **Schema-as-Data invariants**: single AST / persistable (every kind's state lives in `rawget`-readable fields) / reflectable (`kind` as universal dispatch discriminator). `tests/test_alc_shapes_persist.lua` proves every consumer (`check` / `fields` / `walk` / `luacats` / ref resolution) works after deep metatable-stripping.
+  - **`opts.registry` (Schema-as-Data registry)**: `S.check` / `S.assert` / `S.assert_dev` accept `opts.registry` as a plain `{name → schema}` table. `T.ref` handler does `rawget(registry, name)` — no closure invocation. Closures and non-table opts are loud-rejected. Default registry stays `require("alc_shapes")`.
+  - **DSL hardening C1-C6**: (C1) `T.array_of(T.x:is_optional())` rejected at construction time (Lua `#` cannot detect holes); described-wrapper is peeled through. (C2) LuaCATS codegen expands `T.discriminated` variants as inline union literals; `array_of(union)` renders as `(A|B)[]`. (C3) `T.shape` / `T.discriminated` fields / variants are shallow-copied for Schema-as-Data immutability. (C4) `T.discriminated` variants must declare the tag field (fail loud at construction). (C5) `T.one_of` rejects duplicate literals with type-sensitive keys (string `"1"` ≠ number `1`). (C6) `AlcSchema.kind` is a whitelist of known kinds.
+- **`M.spec.entries.{entry}.{input, result, args}` V0 I/O contract**: replaces the earlier `M.meta.{input_shape, result_shape}`. Clean break (pre-release, no compat shim). 106 bundled pkgs migrated across Phase 1–8 + Phase 3.5.
+- **Instrument rollout across ~95 packages** (Phases 1 through 8 + 3.5):
+  - **Phase 1** (`cot`): first inline-shape self-decoration.
+  - **Phase 2-a / 2-b / 2-c / 2-d / 2-e / 2-f / 2-g-1/2/3**: reasoning / refinement / planning / generation / preprocessing / optimization / reasoning tier 2 (~19 pkgs).
+  - **Phase 3-a / 3-b / 3-c / 3-d**: selection / mixed (12 pkgs).
+  - **Phase 3.5-a / 3.5-b / 3.5-c**: library-style pkgs via direct-args mode (10 pkgs: `bft`, `eval_guard`, `cost_pareto`, `inverse_u`, `condorcet`, `shapley`, `mwu`, `scoring_rule`, `kemeny`, `ensemble_div`).
+  - **Phase 4-a / 4-b / 4-c / 4-d**: validation / mixed (12 pkgs).
+  - **Phase 5-a / 5-b / 5-c / 5-d**: orchestration (11 pkgs including `orch_*`, `moa`, `php`, `triad`, `pbft`, `deliberate`, `dissent`).
+  - **Phase 6-a / 6-b**: ABM (7 pkgs: `boids_abm`, `epidemic_abm`, `evogame_abm`, `opinion_abm`, `schelling_abm`, `sugarscape_abm`, `coevolve`). `abm/mc.lua` + `abm/sweep.lua` expose `M.shape(...)` helpers as SSoT for the suffix-expanded MC / sweep result layout. `hybrid_abm` kept un-instrumented (ctx-supplied shapes unknowable at load time — un-instrument is principled).
+  - **Phase 7-a / 7-b / 7-c / 7-d**: routing / intent / meta-reasoning / misc (18 pkgs).
+  - **Phase 8-A**: search / tree (6 pkgs: `ab_mcts`, `mcts`, `rstar`, `aco`, `qdaif`, `p_tts`) with native-DSL-only nested shapes (no opaque `T.table`).
+- **`:describe()` field-level annotations on 35 packages** (Phase 9-a/b/c): surfaces semantics at the spec layer for runtime introspection via `S.instrument`.
+  - **Phase 9-a (Category B, 6 ABM pkgs)**: promotes head-docstring `ctx.X?` comments to field-level `:describe()` on `params_shape` (internal post-defaults hash) and `run.input`. Fills the now-empty description column in each ABM pkg's narrative.md Parameters table.
+  - **Phase 9-b (Category A, 9 library-style pkgs)**: attach `:describe()` to positional `args` and result fields. DRY via local constants (`N_DESC` / `F_DESC` / `PREDS` / `TARGET` / `WEIGHTS`).
+  - **Phase 9-c (Category C, 10 inline-shape pkgs)**: selective describes on domain-specific / statistical-term fields only (Beta α/β, LCB/UCB, V̂, Friedman `rank_sum` / `Q` / `χ²` critical, MBR score, inverse-U trend labels). Self-evident names (`index`, `rank`, `score`, `text`) remain un-described per Category C rationale.
+- **Test additions**:
+  - `tests/test_alc_shapes_instrument.lua` (133 cases): direct-args mode, multi-return preservation, nested dispatch, per-pkg self-decoration.
+  - `tests/test_alc_shapes_persist.lua` (7 cases): Schema-as-Data metatable-strip survival across all consumers.
+  - `tests/test_entity_schemas.lua` (136 cases): Entity registry accept/reject, composed PkgInfo nested-path reporting, conformance sweep over every `*/init.lua` that declares `M.meta`.
+  - `tests/test_gen_docs.lua` (87 cases): extract / shape / projections / lint / e2e golden / context7 / devin wiki / ref resolution.
+  - `tests/test_spec_resolver.lua` (22 cases): typed / opaque / inline-fixture / real-pkg (`cot`, `calibrate`) resolve, Schema-as-Data invariant.
+
 ### Changed
 
-- **alc_shapes cycle guard** (`alc_shapes/check.lua`): `S.check`
-  now enforces a recursion depth cap of 256. Previously a schema
-  self-loop (`A = T.ref("A")` in the registry) or a value-side
-  self-reference traversed through a recursive schema (e.g. a
-  linked-list node with `node.next = node`) could recurse forever
-  in the `ref` / `shape` handlers. The cap is far above any
-  realistic schema depth in this codebase (Entity shapes top out
-  at 3 levels) and raises a clear `recursion depth exceeded at
-  <path>` error with the JSONPath at the cap site.
-- **alc_shapes LuaCATS codegen** (`types/alc_shapes.d.lua`): Nested
-  `T.shape(...)` fields are now inline-expanded as LuaLS table type
-  literals (`{ field: type, ... }` / `{ ... }[]`) instead of being
-  collapsed to bare `table` / `table[]`. 11 of 13 previously-opaque
-  `table`-typed fields across 9 registered shapes (`voted.paths`,
-  `paneled.arguments`, `tournament.matches`, ranking `ranked_item`
-  variants, funnel `warnings`, …) are now walkable for IDE
-  completion and typo detection. Field order is alphabetical and
-  optional fields carry the `?` suffix inside inline literals.
-  `T.discriminated` is still rendered as `table` (union codegen
-  deferred). Class names and field names are unchanged, so consumer
-  annotations (`---@type AlcResultVoted`) remain valid — this is a
-  strict strengthening of the existing annotations, not a break.
-- **BREAKING** (`docs/hub/*.json` wire): `result_shape` is now a
-  kind-tagged JSON object (`type_to_json` form) instead of a
-  human-readable string. Consumers must switch from string match
-  to `kind` dispatch:
+- **`M.meta.{input_shape, result_shape}` → `M.spec.entries.run.{input, result}`** (clean break, pre-release): 9 bundled pkgs migrated in the initial refactor (`sc`, `panel`, `calibrate`, `cot`, `rank`, `listwise_rank`, `pairwise_rank`, `recipe_safe_panel`, `recipe_ranking_funnel`); remaining 95+ pkgs migrated across Phases 1–8 + 3.5. `types/alc_pkg.d.lua`: `AlcMeta.shape` removed; `AlcSpec` / `AlcSpecEntry` / `AlcSpecCompose` classes added.
+- **Caller-wrap (`spec_resolver.run`) and producer-wrap (`instrument`) coexist**: bundled pkgs prefer `instrument` — producer is the single source of truth for its own contract; every caller (direct, `SR.run`, recipe ingredient) inherits the check for free.
+- **`alc_shapes` cycle guard** (`alc_shapes/check.lua`): `S.check` now enforces a recursion depth cap of 256. Previously a schema self-loop (`A = T.ref("A")`) or a value-side self-reference traversed through a recursive schema (e.g. linked-list `node.next = node`) could recurse forever in the `ref` / `shape` handlers. Raises `recursion depth exceeded at <path>` with JSONPath at the cap site.
+- **`alc_shapes` LuaCATS codegen** (`types/alc_shapes.d.lua`): Nested `T.shape(...)` fields are inline-expanded as LuaLS table type literals (`{ field: type, ... }` / `{ ... }[]`) instead of `table` / `table[]`. 11 of 13 previously-opaque `table`-typed fields across 9 registered shapes are now walkable for IDE completion. Field order alphabetical, optional fields carry `?` inside inline literals. `T.discriminated` still renders as `table` (union codegen deferred via C2 for stages fields only). Class / field names unchanged — strict strengthening, not a break.
+- **BREAKING (`docs/hub/*.json` wire)**: `result_shape` is now a kind-tagged JSON object (`type_to_json` form) instead of a human-readable string. Consumers must switch from string match to `kind` dispatch:
   - `T.ref(name)` → `{"kind":"label","name":"..."}`
   - inline `T.shape(...)` → `{"kind":"shape","shape":{...}}`
   - other schemas → `{"kind":"primitive|array_of|map_of|one_of|discriminated",...}`
 
-  `input_shape` and `result_shape` now share the same discriminated
-  wire format, so a single walker can process both. This unblocks
-  alc_hub_info chain dispatch (pkg A.result → pkg B.input), LLM
-  context injection with structural semantics, and cross-pkg type
-  integrity lint.
+  `input_shape` and `result_shape` share the same discriminated wire format, so a single walker processes both. Role split preserved: `docs/hub/*.json` is the machine contract (structured); `docs/narrative/*.md` YAML frontmatter `result_shape:` remains a human-readable string.
+- **`alc_shapes.spec_resolver.run` ctx-threading**: aligned with `AlcCtx` convention (earlier prototype in `workspace/` diverged; migration preserved test fixtures).
+- **Reserved-name list**: extended with `instrument` and `spec_resolver` (shape-name shadow prevention).
 
-  Role split: `docs/hub/*.json` is the machine contract (structured),
-  while `docs/narrative/*.md` YAML frontmatter `result_shape:` remains
-  a human-readable string (shape_type_string form). See
-  `workspace/tasks/1776402892-97073-docs-sot-proto/pipeline-spec.md §7.4`
-  and `ee4-design.md`.
+### Fixed
+
+- **EE4 (`docs/hub/*.json` wire)**: see BREAKING above — pre-fix, inline `T.shape` result_shapes were serialized as human-readable strings that downstream consumers could not walk. Kind-tag dispatch lifts that ceiling.
+- **EE5 (hardcoded `require("alc_shapes")` in ref handler)**: replaced via `opts.registry` plumbing — unblocks `entity_schemas.lua` as an independent namespace.
+- **EE6 (`T.shape` open default)**: Layer contract documented — open default is a Layer-2 convention, not a primitive default.
+- **EE7 (`S.assert` on nil schema)**: loud-fails with a clear error instead of silently accepting.
+- **EE8 (`S.check` on ref cycles)**: addressed via the cycle guard above.
+- **ABM test harness (`tests/test_abm*.lua`)**: removed `REPO = os.getenv("PWD")` + manual `package.path` preamble. Per `README.md §"Adding a new test file"`, the MCP harness sets `package.path` via `search_paths=[REPO]`; manual prepend in worktree context pointed at the parent repo, which silently shadowed worktree code and produced false-green passes. ABM result shapes (Phase 6-a-fix) now use `abm.mc.shape(...)` / `abm.sweep.shape()` helpers instead of opaque `T.table`, giving callers actual discoverability over MC / sweep suffix keys.
+- **`docs/narrative/*.md` ref-based pkgs missing Result section** (Option D): `projections.lua` now resolves `T.ref` via the alc_shapes registry and emits Result symmetrically with Parameters. Unknown refs degrade silently (no Result section) to mirror `type_to_json`'s existing tolerance. `E_RESULT_CONFLICT` lint rule added for symmetry with `E_PARAMETERS_CONFLICT`. Hub JSON still carries `{kind:"label", name:...}` — resolution is narrative-projection-only (machine contract unchanged).
+- **`evogame_abm.payoff_matrix` describe**: spot fix — now carries a proper English `:describe()` at the shape layer (previously undescribed, then initially committed with a Japanese string that violated the English-only shape-convention rule).
 
 ## [0.14.0] - 2026-04-17
 
