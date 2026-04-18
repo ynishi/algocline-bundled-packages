@@ -31,6 +31,8 @@
 --- ctx.runs?: number MC runs (default 100)
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -42,6 +44,35 @@ M.meta = {
         .. "emergent wealth inequality, Pareto-like distributions, "
         .. "and carrying capacity. Based on Epstein & Axtell (1996).",
     category = "simulation",
+}
+
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. metabolism_range / vision_range /
+-- initial_wealth_range are {lo, hi} number pairs; accepted as opaque
+-- tables here since T.array_of(T.number) + length constraint is not
+-- expressible in the current DSL. Result sub-tables stay opaque.
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                 = T.string:is_optional(),
+                grid_size            = T.number:is_optional(),
+                n_agents             = T.number:is_optional(),
+                max_sugar            = T.number:is_optional(),
+                regrow_rate          = T.number:is_optional(),
+                metabolism_range     = T.table:is_optional(),
+                vision_range         = T.table:is_optional(),
+                initial_wealth_range = T.table:is_optional(),
+                steps                = T.number:is_optional(),
+                runs                 = T.number:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
 }
 
 ---------------------------------------------------------------------------
@@ -310,5 +341,9 @@ function M.run(ctx)
 end
 
 M.run_single = run_single
+
+-- Malli-style self-decoration. run_single stays uninstrumented
+-- (hot-loop helper + hybrid_abm sim_fn callback).
+M.run = S.instrument(M, "run")
 
 return M

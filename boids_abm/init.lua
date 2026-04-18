@@ -30,6 +30,8 @@
 --- ctx.runs?: number MC runs (default 100)
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -41,6 +43,38 @@ M.meta = {
         .. "produce emergent flocking behavior. Tunable weights for "
         .. "Hybrid LLM parameter optimization. Based on Reynolds (1987).",
     category = "simulation",
+}
+
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. Input accepts optional task +
+-- numeric hyperparameters; T.shape default open=true absorbs any
+-- additional fields. Result keeps the 3-section structure
+-- (params / simulation / sensitivity) but leaves each sub-table
+-- opaque — the inner agents/grid/history structures are pkg-private
+-- and should not be shape-locked at this layer.
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                = T.string:is_optional(),
+                n_boids             = T.number:is_optional(),
+                steps               = T.number:is_optional(),
+                separation_weight   = T.number:is_optional(),
+                alignment_weight    = T.number:is_optional(),
+                cohesion_weight     = T.number:is_optional(),
+                perception_radius   = T.number:is_optional(),
+                max_speed           = T.number:is_optional(),
+                max_force           = T.number:is_optional(),
+                world_size          = T.number:is_optional(),
+                runs                = T.number:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
 }
 
 ---------------------------------------------------------------------------
@@ -329,5 +363,10 @@ function M.run(ctx)
 end
 
 M.run_single = run_single
+
+-- Malli-style self-decoration. run_single is left uninstrumented —
+-- it is a hot-loop helper called by M.run internally and also
+-- re-exported for hybrid_abm as a sim_fn callback.
+M.run = S.instrument(M, "run")
 
 return M

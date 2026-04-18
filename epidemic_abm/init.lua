@@ -28,6 +28,8 @@
 --- ctx.runs?: number MC runs (default 100)
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -41,11 +43,40 @@ M.meta = {
     category = "simulation",
 }
 
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. params/simulation/sensitivity
+-- sub-tables stay opaque (SIR state arrays and snapshots are
+-- pkg-private).
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:is_optional(),
+                n_agents          = T.number:is_optional(),
+                initial_infected  = T.number:is_optional(),
+                beta              = T.number:is_optional(),
+                gamma             = T.number:is_optional(),
+                contacts_per_step = T.number:is_optional(),
+                steps             = T.number:is_optional(),
+                runs              = T.number:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
+}
+
 ---------------------------------------------------------------------------
 -- SIR states
 ---------------------------------------------------------------------------
 
-local S, I, R = 1, 2, 3
+-- Phase 6-a: renamed from single-letter S/I/R to avoid shadowing the
+-- module-level `S = require("alc_shapes")` binding used by the tail
+-- self-decoration.
+local SUSCEPTIBLE, INFECTED, RECOVERED = 1, 2, 3
 
 ---------------------------------------------------------------------------
 -- Simulation
@@ -65,10 +96,10 @@ local function run_single(params, seed)
 
     -- Initialize population
     local state = {}
-    for i = 1, n do state[i] = S end
+    for i = 1, n do state[i] = SUSCEPTIBLE end
     -- Infect initial agents
     for i = 1, math.min(initial_infected, n) do
-        state[i] = I
+        state[i] = INFECTED
     end
 
     -- Tracking
@@ -84,7 +115,7 @@ local function run_single(params, seed)
         -- Count current infected
         local current_infected = 0
         for i = 1, n do
-            if state[i] == I then current_infected = current_infected + 1 end
+            if state[i] == INFECTED then current_infected = current_infected + 1 end
         end
 
         if current_infected == 0 then
@@ -99,12 +130,13 @@ local function run_single(params, seed)
 
         -- Transmission: each infected agent contacts `contacts` random agents
         for i = 1, n do
-            if state[i] == I then
+            if state[i] == INFECTED then
                 for _ = 1, contacts do
                     local j = math.floor(rng() * n) + 1
                     -- Check both old and new state to avoid double-counting
-                    if state[j] == S and new_state[j] == S and rng() < beta then
-                        new_state[j] = I
+                    if state[j] == SUSCEPTIBLE and new_state[j] == SUSCEPTIBLE
+                        and rng() < beta then
+                        new_state[j] = INFECTED
                         total_ever_infected = total_ever_infected + 1
                     end
                 end
@@ -113,8 +145,8 @@ local function run_single(params, seed)
 
         -- Recovery
         for i = 1, n do
-            if state[i] == I and rng() < gamma then
-                new_state[i] = R
+            if state[i] == INFECTED and rng() < gamma then
+                new_state[i] = RECOVERED
             end
         end
 
@@ -123,8 +155,8 @@ local function run_single(params, seed)
         -- Count states
         local s_count, i_count, r_count = 0, 0, 0
         for i = 1, n do
-            if state[i] == S then s_count = s_count + 1
-            elseif state[i] == I then i_count = i_count + 1
+            if state[i] == SUSCEPTIBLE then s_count = s_count + 1
+            elseif state[i] == INFECTED then i_count = i_count + 1
             else r_count = r_count + 1
             end
         end
@@ -200,5 +232,9 @@ function M.run(ctx)
 end
 
 M.run_single = run_single
+
+-- Malli-style self-decoration. run_single stays uninstrumented
+-- (hot-loop helper + hybrid_abm sim_fn callback).
+M.run = S.instrument(M, "run")
 
 return M

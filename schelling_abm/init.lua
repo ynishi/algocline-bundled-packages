@@ -27,6 +27,8 @@
 --- ctx.runs?: number MC runs (default 100)
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -38,6 +40,30 @@ M.meta = {
         .. "when local same-type fraction falls below tolerance threshold. "
         .. "Mild preferences produce strong emergent segregation.",
     category = "simulation",
+}
+
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. 2D grid is pkg-private; result
+-- sub-tables stay opaque.
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task       = T.string:is_optional(),
+                grid_size  = T.number:is_optional(),
+                threshold  = T.number:is_optional(),
+                density    = T.number:is_optional(),
+                type_ratio = T.number:is_optional(),
+                steps      = T.number:is_optional(),
+                runs       = T.number:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
 }
 
 ---------------------------------------------------------------------------
@@ -279,5 +305,9 @@ function M.run(ctx)
 end
 
 M.run_single = run_single
+
+-- Malli-style self-decoration. run_single stays uninstrumented
+-- (hot-loop helper + hybrid_abm sim_fn callback).
+M.run = S.instrument(M, "run")
 
 return M

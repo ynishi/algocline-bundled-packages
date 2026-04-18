@@ -29,6 +29,8 @@
 --- ctx.initial_distribution?: "uniform"|"bimodal"|"clustered" (default "uniform")
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -40,6 +42,31 @@ M.meta = {
         .. "agents update opinions by averaging nearby opinions within threshold ε. "
         .. "Emergent consensus, polarization, or fragmentation.",
     category = "simulation",
+}
+
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. initial_distribution is a string
+-- (uniform/bimodal/clustered) — pkg internally gates by DISTRIBUTIONS
+-- table, so T.string is sufficient (bad values fall back to uniform
+-- rather than erroring, so shape cannot be stricter).
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                 = T.string:is_optional(),
+                n_agents             = T.number:is_optional(),
+                epsilon              = T.number:is_optional(),
+                steps                = T.number:is_optional(),
+                runs                 = T.number:is_optional(),
+                initial_distribution = T.string:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
 }
 
 ---------------------------------------------------------------------------
@@ -237,5 +264,9 @@ end
 
 --- Expose run_single for use as sim_fn in hybrid_abm.
 M.run_single = run_single
+
+-- Malli-style self-decoration. run_single stays uninstrumented
+-- (hybrid_abm sim_fn callback).
+M.run = S.instrument(M, "run")
 
 return M

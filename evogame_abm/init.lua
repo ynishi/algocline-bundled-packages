@@ -24,6 +24,8 @@
 --- ctx.runs?: number MC runs (default 100)
 
 local abm = require("abm")
+local S = require("alc_shapes")
+local T = S.T
 
 local M = {}
 
@@ -35,6 +37,31 @@ M.meta = {
         .. "selection and mutation. Prisoner's Dilemma, Hawk-Dove, "
         .. "or custom payoff matrices. Based on Axelrod (1984).",
     category = "simulation",
+}
+
+---@type AlcSpec
+-- Phase 6-a: ABM MC-sweep pattern. payoff_matrix and strategies are
+-- accepted as opaque tables; result sub-tables stay opaque.
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task           = T.string:is_optional(),
+                n_agents       = T.number:is_optional(),
+                generations    = T.number:is_optional(),
+                rounds_per_gen = T.number:is_optional(),
+                mutation_rate  = T.number:is_optional(),
+                payoff_matrix  = T.table:is_optional(),
+                strategies     = T.array_of(T.string):is_optional(),
+                runs           = T.number:is_optional(),
+            }),
+            result = T.shape({
+                params      = T.table,
+                simulation  = T.table,
+                sensitivity = T.table,
+            }),
+        },
+    },
 }
 
 ---------------------------------------------------------------------------
@@ -321,5 +348,8 @@ M.run_single = run_single
 M.PD_PAYOFF = PD_PAYOFF
 M.HD_PAYOFF = HD_PAYOFF
 M.STRATEGY_NAMES = STRATEGY_NAMES
+
+-- Malli-style self-decoration. run_single stays uninstrumented.
+M.run = S.instrument(M, "run")
 
 return M
