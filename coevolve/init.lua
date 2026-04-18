@@ -35,6 +35,9 @@
 --- ctx.difficulty_target: Target success rate for calibration (default: 0.5)
 --- ctx.solver_tokens: Max tokens for Solver responses (default: 400)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -45,6 +48,57 @@ M.meta = {
         .. "Challenger generates problems at Solver's ability boundary and "
         .. "Solver evolves to solve them. Automatic search space expansion.",
     category = "exploration",
+}
+
+-- Per-round stats emitted to ctx.result.round_stats[] (one entry per round,
+-- all fields populated regardless of success_rate because the loop always
+-- runs to completion and records).
+local round_stat_shape = T.shape({
+    round           = T.number:describe("1-based round index"),
+    problems        = T.number:describe("Problem count attempted this round"),
+    correct         = T.number:describe("Count judged CORRECT this round"),
+    success_rate    = T.number:describe("correct / problems (0.0-1.0)"),
+    difficulty_hint = T.string:describe("Next-round calibration hint: 'harder ...' / 'easier ...' / 'similar ...'"),
+})
+
+-- Individual solve record kept in ctx.result.all_results[].
+-- problem.round starts at 0 for seeds, is overwritten to the actual round
+-- index when the Solver attempts it (see M.run loop, line ~258).
+local result_record_shape = T.shape({
+    problem = T.shape({
+        text       = T.string:describe("Problem statement"),
+        round      = T.number:describe("Round in which this problem was solved (0 for seed-but-unused)"),
+        difficulty = T.string:describe("Challenger's difficulty hint at generation time"),
+    }):describe("The problem that was attempted"),
+    answer  = T.string:describe("Solver's full response"),
+    verdict = T.string:describe("'correct' | 'partial' | 'wrong' — judge output"),
+    reason  = T.string:is_optional():describe("Judge's 1-sentence explanation (may be truncated / nil on parse failure)"),
+    round   = T.number:describe("Round index this record belongs to"),
+})
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task                = T.string:describe("The domain / problem to explore (required)"),
+                seed_problems       = T.array_of(T.string):is_optional():describe("Initial problem set; if nil, LLM generates problems_per_round seeds"),
+                rounds              = T.number:is_optional():describe("Co-evolution rounds (default 4)"),
+                problems_per_round  = T.number:is_optional():describe("Problems Challenger generates per round (default 3)"),
+                difficulty_target   = T.number:is_optional():describe("Target success rate for calibration (default 0.5)"),
+                solver_tokens       = T.number:is_optional():describe("Max tokens for Solver responses (default 400)"),
+            }),
+            result = T.shape({
+                answer          = T.string:describe("Final synthesis answer using accumulated skill from all rounds"),
+                round_stats     = T.array_of(round_stat_shape):describe("Per-round statistics (length = rounds)"),
+                total_problems  = T.number:describe("Total problems attempted across all rounds"),
+                total_correct   = T.number:describe("Total CORRECT verdicts"),
+                total_partial   = T.number:describe("Total PARTIAL verdicts"),
+                total_wrong     = T.number:describe("Total WRONG verdicts"),
+                all_results     = T.array_of(result_record_shape):describe("Full trace of every solve attempt"),
+            }),
+        },
+    },
 }
 
 -- ─── Problem generation ───
@@ -396,5 +450,9 @@ function M.run(ctx)
 
     return ctx
 end
+
+-- Malli-style self-decoration. Shape validation wraps M.run so the
+-- contract is discoverable by callers via alc_shapes.spec_resolver.
+M.run = S.instrument(M, "run")
 
 return M

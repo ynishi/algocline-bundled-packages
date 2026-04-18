@@ -719,10 +719,14 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- Phase 6-a (category="simulation") ABM MC-sweep pkgs:
     -- boids_abm / epidemic_abm / evogame_abm / opinion_abm /
     -- schelling_abm / sugarscape_abm. All share the same 3-section
-    -- result shape (params / simulation / sensitivity) with sub-tables
-    -- kept opaque — internal agent/grid/snapshot arrays are pkg-private
-    -- and should not be shape-locked at the DSL layer. hybrid_abm and
-    -- coevolve are deferred to Phase 6-b (LLM-integrated variants).
+    -- result shape (params / simulation / sensitivity); sub-tables
+    -- declared via abm.mc.shape / abm.sweep.shape helpers (6-a-fix-2).
+    -- Phase 6-b (category="exploration"): coevolve. Fully static output
+    -- shape (answer / round_stats / totals / all_results), all fields
+    -- deterministic regardless of LLM mock. hybrid_abm stays
+    -- un-instrumented because ctx.extract / ctx.sim_fn / ctx.classify_fn
+    -- / ctx.param_schema are all ctx-supplied at run time, so result
+    -- keys are unknowable at load (see hybrid_abm/init.lua Shape policy).
     for _, name in ipairs({
         "plan_solve", "step_back", "least_to_most",
         "reflect", "reflexion",
@@ -747,6 +751,7 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         "deliberate", "dissent",
         "boids_abm", "epidemic_abm", "evogame_abm",
         "opinion_abm", "schelling_abm", "sugarscape_abm",
+        "coevolve",
     }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil
