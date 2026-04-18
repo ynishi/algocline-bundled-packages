@@ -471,3 +471,53 @@ describe("alc_shapes.is_dev_mode / assert_dev", function()
         expect(type(v)).to.equal("table")
     end)
 end)
+
+describe("alc_shapes.check EE8 recursion depth guard", function()
+    it("EE8: rejects pure schema self-loop (A = ref('A'))", function()
+        local reg = {}
+        reg.A = T.ref("A")
+        local ok, err = pcall(S.check, "anything", reg.A, { registry = reg })
+        expect(ok).to.equal(false)
+        expect(err:match("recursion depth exceeded")).to.exist()
+    end)
+
+    it("EE8: rejects value self-cycle through a recursive schema", function()
+        local reg = {}
+        reg.listnode = T.shape({
+            value = T.string,
+            next  = T.ref("listnode"):is_optional(),
+        })
+        local node = { value = "x" }
+        node.next = node    -- Lua self-reference
+        local ok, err = pcall(S.check, node, reg.listnode, { registry = reg })
+        expect(ok).to.equal(false)
+        expect(err:match("recursion depth exceeded")).to.exist()
+    end)
+
+    it("EE8: legal deep-but-acyclic linked list validates ok", function()
+        local reg = {}
+        reg.listnode = T.shape({
+            value = T.string,
+            next  = T.ref("listnode"):is_optional(),
+        })
+        -- 20-deep legal list: well under MAX_CHECK_DEPTH / 256.
+        local head = { value = "n0" }
+        local cur = head
+        for i = 1, 19 do
+            cur.next = { value = "n" .. i }
+            cur = cur.next
+        end
+        local ok, reason = S.check(head, reg.listnode, { registry = reg })
+        expect(ok).to.equal(true)
+        expect(reason).to.equal(nil)
+    end)
+
+    it("EE8: reports the path at which the depth cap was hit", function()
+        local reg = {}
+        reg.A = T.ref("A")
+        local ok, err = pcall(S.check, "x", reg.A, { registry = reg })
+        expect(ok).to.equal(false)
+        -- path should be `$` since the loop starts at the root ref resolution.
+        expect(err:match("at %$")).to.exist()
+    end)
+end)

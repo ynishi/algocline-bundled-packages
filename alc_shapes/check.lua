@@ -198,8 +198,25 @@ handlers.one_of = function(value, schema, path, _ctx)
         path, table.concat(parts, ", "), tostring(value))
 end
 
+-- EE8 cycle guard: a recursive schema (e.g. linked-list `next = T.ref("listnode")`)
+-- combined with a self-referencing value (`node.next = node`) would otherwise
+-- recurse forever. A pure schema self-loop (`A = T.ref("A")`) in the registry
+-- would loop even on primitive values via the ref handler. A depth cap catches
+-- both paths at a single site (all recursing kinds — shape/array_of/ref/
+-- optional/described/map_of/discriminated — flow through check_node here).
+-- 256 is far above any realistic schema depth in this codebase (SoT Entity
+-- shapes top out at 3 levels) while still catching pathological cycles.
+local MAX_CHECK_DEPTH = 256
+
 check_node = function(value, schema, path, ctx)
     if schema == nil then return true end
+    ctx.depth = (ctx.depth or 0) + 1
+    if ctx.depth > MAX_CHECK_DEPTH then
+        error(string.format(
+            "alc_shapes.check: recursion depth exceeded at %s " ..
+            "(> %d; cycle in schema or value?)",
+            path, MAX_CHECK_DEPTH), 2)
+    end
     local kind = rawget(schema, "kind")
     if kind == nil then
         error("alc_shapes.check: schema missing 'kind' field", 2)
@@ -208,7 +225,9 @@ check_node = function(value, schema, path, ctx)
     if h == nil then
         error("alc_shapes.check: unknown kind '" .. tostring(kind) .. "'", 2)
     end
-    return h(value, schema, path, ctx)
+    local ok, reason = h(value, schema, path, ctx)
+    ctx.depth = ctx.depth - 1
+    return ok, reason
 end
 
 -- Build the validation ctx from caller-supplied opts. ctx.registry is

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **alc_shapes cycle guard** (`alc_shapes/check.lua`): `S.check`
+  now enforces a recursion depth cap of 256. Previously a schema
+  self-loop (`A = T.ref("A")` in the registry) or a value-side
+  self-reference traversed through a recursive schema (e.g. a
+  linked-list node with `node.next = node`) could recurse forever
+  in the `ref` / `shape` handlers. The cap is far above any
+  realistic schema depth in this codebase (Entity shapes top out
+  at 3 levels) and raises a clear `recursion depth exceeded at
+  <path>` error with the JSONPath at the cap site.
 - **alc_shapes LuaCATS codegen** (`types/alc_shapes.d.lua`): Nested
   `T.shape(...)` fields are now inline-expanded as LuaLS table type
   literals (`{ field: type, ... }` / `{ ... }[]`) instead of being
