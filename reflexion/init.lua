@@ -35,6 +35,9 @@
 --- ctx.gen_tokens: Max tokens per attempt (default: 500)
 --- ctx.reflect_tokens: Max tokens per reflection (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -45,6 +48,39 @@ M.meta = {
         .. "via verbal reinforcement. Each new attempt references accumulated "
         .. "reflections on past failures. reflect polishes; reflexion learns.",
     category = "refinement",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task              = T.string:describe("The task to solve"),
+                max_trials        = T.number:is_optional():describe("Maximum number of attempts (default: 3)"),
+                evaluator         = T.string:is_optional():describe("Custom evaluation prompt"),
+                success_threshold = T.number:is_optional():describe("Score threshold to accept, 1-10 scale (default: 8)"),
+                gen_tokens        = T.number:is_optional():describe("Max tokens per attempt (default: 500)"),
+                reflect_tokens    = T.number:is_optional():describe("Max tokens per reflection (default: 300)"),
+            }),
+            result = T.shape({
+                answer          = T.string:describe("Best attempt across all trials"),
+                passed          = T.boolean:describe("Whether the final trial passed the threshold"),
+                best_score      = T.number:describe("Score of the best-scoring attempt"),
+                best_trial      = T.number:describe("1-based index of the best trial"),
+                total_trials    = T.number:describe("Number of trials executed"),
+                reflections     = T.array_of(T.string):describe("Accumulated episodic memory (one per failed trial except the last)"),
+                trials          = T.array_of(T.shape({
+                    trial      = T.number,
+                    attempt    = T.string,
+                    score      = T.number,
+                    passed     = T.boolean,
+                    feedback   = T.string,
+                    reflection = T.string:is_optional(),
+                })):describe("Ordered trial records with score, feedback, and optional reflection"),
+                total_llm_calls = T.number:describe("Total alc.llm invocations across trials"),
+            }),
+        },
+    },
 }
 
 --- Evaluate an attempt. Returns { score, passed, feedback }.
@@ -253,5 +289,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M

@@ -423,7 +423,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- Phase 2-a (category="reasoning") pkgs: plan_solve / step_back /
     -- least_to_most. All three follow the cot precedent (inline T.shape
     -- for both input and result, no registry name).
-    for _, name in ipairs({ "plan_solve", "step_back", "least_to_most" }) do
+    --
+    -- Phase 2-b (category="refinement") pkgs: reflect / reflexion.
+    for _, name in ipairs({
+        "plan_solve", "step_back", "least_to_most",
+        "reflect", "reflexion",
+    }) do
         it(name .. ".run is wrapped with inline T.shape input + result", function()
             package.loaded[name] = nil
             local pkg = require(name)

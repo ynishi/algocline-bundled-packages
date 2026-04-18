@@ -17,6 +17,9 @@
 --- ctx.gen_tokens: Max tokens for generation (default: 500)
 --- ctx.critique_tokens: Max tokens for critique (default: 300)
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -25,6 +28,32 @@ M.meta = {
     version = "0.1.0",
     description = "Self-critique loop — generate, critique, revise until convergence",
     category = "refinement",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        run = {
+            input = T.shape({
+                task            = T.string:describe("The task to perform"),
+                initial_draft   = T.string:is_optional():describe("Pre-generated draft to refine (skips initial LLM generation)"),
+                max_rounds      = T.number:is_optional():describe("Maximum critique-revise cycles (default: 3)"),
+                stop_when       = T.string:is_optional():describe("Stop condition: 'no_major_issues' or 'no_issues' (default: 'no_major_issues')"),
+                gen_tokens      = T.number:is_optional():describe("Max tokens for generation (default: 500)"),
+                critique_tokens = T.number:is_optional():describe("Max tokens for critique (default: 300)"),
+            }),
+            result = T.shape({
+                output       = T.string:describe("Final refined draft"),
+                rounds       = T.array_of(T.shape({
+                    round     = T.number,
+                    critique  = T.string,
+                    converged = T.boolean,
+                })):describe("Ordered critique rounds with convergence flag"),
+                total_rounds = T.number:describe("Number of critique rounds executed"),
+                converged    = T.boolean:describe("Whether the last round converged"),
+            }),
+        },
+    },
 }
 
 local STOP_PATTERNS = {
@@ -127,5 +156,9 @@ function M.run(ctx)
     }
     return ctx
 end
+
+-- Malli-style self-decoration (see alc_shapes/README). inline T.shape
+-- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
+M.run = S.instrument(M, "run")
 
 return M
