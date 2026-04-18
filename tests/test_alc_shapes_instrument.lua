@@ -397,6 +397,92 @@ describe("alc_shapes.instrument: direct-args mode", function()
         expect(mod.run(voted_fixture())).to.equal("X")
     end)
 
+    -- Multi-return preservation (Option A'): library-style pkgs often
+    -- return `(bool, string)` validator tuples (bft.validate,
+    -- eval_guard.self_critique, cost_pareto.is_dominated, etc). The
+    -- wrapper must pass through all return values, not just the first.
+    it("preserves multi-return when dev check is off", function()
+        if in_dev() then return end  -- this test only meaningful when dev off
+        local mod = {
+            meta = { name = "multiret_off" },
+            spec = {
+                entries = {
+                    validate = {
+                        args   = { T.number, T.number },
+                        result = T.boolean,
+                    },
+                },
+            },
+            validate = function(n, f) return n >= 3 * f + 1, "reason-x" end,
+        }
+        mod.validate = S.instrument(mod, "validate")
+        local ok, reason = mod.validate(4, 1)
+        expect(ok).to.equal(true)
+        expect(reason).to.equal("reason-x")
+    end)
+
+    it("preserves multi-return when dev check passes", function()
+        if not in_dev() then return end
+        local mod = {
+            meta = { name = "multiret_on" },
+            spec = {
+                entries = {
+                    validate = {
+                        args   = { T.number, T.number },
+                        result = T.boolean,
+                    },
+                },
+            },
+            validate = function(n, f) return n >= 3 * f + 1, "reason-y" end,
+        }
+        mod.validate = S.instrument(mod, "validate")
+        local ok, reason = mod.validate(4, 1)
+        expect(ok).to.equal(true)
+        expect(reason).to.equal("reason-y")
+    end)
+
+    it("preserves three-plus return values", function()
+        local mod = {
+            meta = { name = "multiret_three" },
+            spec = {
+                entries = {
+                    score = {
+                        args   = { T.number },
+                        result = T.number,
+                    },
+                },
+            },
+            score = function(n) return n * 2, "label", true end,
+        }
+        mod.score = S.instrument(mod, "score")
+        local v, label, flag = mod.score(3)
+        expect(v).to.equal(6)
+        expect(label).to.equal("label")
+        expect(flag).to.equal(true)
+    end)
+
+    it("still validates first return against result_shape", function()
+        if not in_dev() then return end
+        local mod = {
+            meta = { name = "multiret_bad" },
+            spec = {
+                entries = {
+                    validate = {
+                        args   = { T.number },
+                        result = T.boolean,
+                    },
+                },
+            },
+            -- First return is a string, not a boolean → should throw even
+            -- though 2nd return would be fine.
+            validate = function(_) return "not-bool", "reason-z" end,
+        }
+        mod.validate = S.instrument(mod, "validate")
+        local ok, err = pcall(mod.validate, 1)
+        expect(ok).to.equal(false)
+        expect(err:match("multiret_bad%.validate")).to.exist()
+    end)
+
     it("rejects concurrent input + args at spec-resolve time", function()
         local mod = {
             meta = { name = "conflict" },

@@ -209,11 +209,15 @@ function M.instrument(mod, entry_name, spec)
                     end
                 end
             end
-            local ret = orig(...)
             if dev and result_shape ~= nil then
-                check.assert(ret, result_shape, hint)
+                -- Preserve multi-return (e.g. `bool, string` patterns in
+                -- bft.validate, eval_guard.self_critique, etc.). Without
+                -- table.pack, `local ret = orig(...)` would drop 2nd+ values.
+                local results = table.pack(orig(...))
+                check.assert(results[1], result_shape, hint)
+                return table.unpack(results, 1, results.n)
             end
-            return ret
+            return orig(...)
         end
     end
 
