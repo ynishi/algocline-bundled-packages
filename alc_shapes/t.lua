@@ -55,6 +55,12 @@ function M.shape(fields, opts)
     if type(fields) ~= "table" then
         error("alc_shapes.t: shape expects fields table as first argument", 2)
     end
+    -- C3: shallow-copy the fields table so a caller who later mutates
+    -- the passed table does not silently mutate this schema. Schema-as-Data
+    -- doctrine treats schemas as immutable plain data; capturing the caller's
+    -- live reference contradicts that invariant. `one_of.values` already
+    -- does this (see M.one_of below); shape/discriminated did not.
+    local copy = {}
     for name, sub in pairs(fields) do
         if type(name) ~= "string" then
             error("alc_shapes.t: shape field name must be string, got " .. type(name), 2)
@@ -63,6 +69,7 @@ function M.shape(fields, opts)
             error(string.format(
                 "alc_shapes.t: shape field '%s' must be a schema (table with kind)", name), 2)
         end
+        copy[name] = sub
     end
     local open
     if opts == nil then
@@ -77,12 +84,32 @@ function M.shape(fields, opts)
             open = opts.open and true or false
         end
     end
-    return setmetatable({ kind = "shape", fields = fields, open = open }, schema_mt)
+    return setmetatable({ kind = "shape", fields = copy, open = open }, schema_mt)
 end
 
 function M.array_of(elem)
     if not is_schema(elem) then
         error("alc_shapes.t: array_of expects a schema as argument", 2)
+    end
+    -- C1 guard: Lua's `#` operator is unspecified on arrays with holes,
+    -- so a runtime validator cannot reliably distinguish `{1, nil, 2}`
+    -- from `{1}` when iterating `1..#value`. Admitting `nil` at the
+    -- element position would make `check` silently under-validate such
+    -- arrays while LuaCATS generates `(T|nil)[]` — a doc/runtime gap.
+    -- `described` wrappers are transparent (doc-only), so peel them
+    -- before the check: `array_of(T:describe(...):is_optional())` and
+    -- `array_of(T:is_optional():describe(...))` are both rejected.
+    local probe = elem
+    while rawget(probe, "kind") == "described" do
+        probe = rawget(probe, "inner")
+    end
+    if rawget(probe, "kind") == "optional" then
+        error(
+            "alc_shapes.t: array_of(optional(T)) is not allowed — " ..
+            "Lua's `#` cannot reliably validate arrays with nil holes. " ..
+            "Use array_of(T) (require dense) or model the nil-admission " ..
+            "at the enclosing field (e.g. T.array_of(T):is_optional()).",
+            2)
     end
     return setmetatable({ kind = "array_of", elem = elem }, schema_mt)
 end
@@ -108,8 +135,25 @@ function M.one_of(values)
                 t, i), 2)
         end
     end
+    -- C5: reject duplicate literals. `T.one_of({"a", "a"})` is almost
+    -- certainly a typo (copy-paste / merge glitch), and duplicate values
+    -- produce a redundant expected-list in error messages. Lua has no
+    -- native set; use a small hash keyed by `type..value` so string "1"
+    -- and number 1 are distinguished.
+    local seen = {}
     local copy = {}
-    for i = 1, n do copy[i] = values[i] end
+    for i = 1, n do
+        local v = values[i]
+        local key = type(v) .. ":" .. tostring(v)
+        if seen[key] then
+            error(string.format(
+                "alc_shapes.t: one_of has duplicate value %s at index %d",
+                (type(v) == "string") and string.format("%q", v) or tostring(v),
+                i), 2)
+        end
+        seen[key] = true
+        copy[i] = v
+    end
     return setmetatable({ kind = "one_of", values = copy }, schema_mt)
 end
 
@@ -120,6 +164,17 @@ function M.discriminated(tag, variants)
     if type(variants) ~= "table" then
         error("alc_shapes.t: discriminated expects variants table", 2)
     end
+    -- C3: shallow-copy for the same reason as M.shape (immutability of
+    -- constructed schemas).
+    -- C4: enforce that each variant declares the discriminant tag as
+    -- one of its own fields. The validator (handlers.discriminated)
+    -- dispatches by variant key but then re-validates the variant shape
+    -- itself, which only catches the tag value mismatch if the variant
+    -- shape constrains it. In practice every production variant uses
+    -- `name = T.one_of({"X"})` as belt-and-suspenders; DSL-formalize that
+    -- convention so typos ("forgot to add the tag field") fail loud at
+    -- construction time rather than silently pass through.
+    local copy = {}
     local count = 0
     for k, v in pairs(variants) do
         if type(k) ~= "string" then
@@ -129,12 +184,18 @@ function M.discriminated(tag, variants)
             error(string.format(
                 "alc_shapes.t: discriminated variant '%s' must be a shape schema", k), 2)
         end
+        if rawget(rawget(v, "fields"), tag) == nil then
+            error(string.format(
+                "alc_shapes.t: discriminated variant '%s' must declare the tag field '%s'",
+                k, tag), 2)
+        end
+        copy[k] = v
         count = count + 1
     end
     if count == 0 then
         error("alc_shapes.t: discriminated expects at least one variant", 2)
     end
-    return setmetatable({ kind = "discriminated", tag = tag, variants = variants }, schema_mt)
+    return setmetatable({ kind = "discriminated", tag = tag, variants = copy }, schema_mt)
 end
 
 function M.ref(name)

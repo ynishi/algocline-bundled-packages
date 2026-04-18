@@ -55,31 +55,29 @@ describe("alc_shapes.LuaCats.class_for", function()
         expect(out:match("---@field grid number%[%]%[%]")).to.exist()
     end)
 
-    it("preserves array element optional as (T|nil)[] (Q2)", function()
-        local sch = T.shape({ items = T.array_of(T.number:is_optional()) })
+    it("renders plain-data array_of(optional) as (T|nil)[] for JSON round-trip (C1)", function()
+        -- C1: the DSL rejects array_of(optional(T)) (see t.lua). But the
+        -- codegen still has to handle a plain-data schema that bypasses
+        -- the DSL (Schema-as-Data JSON round-trip from an external source).
+        -- Construct the shape by hand to simulate that path.
+        local sch = {
+            kind = "shape",
+            open = true,
+            fields = {
+                items = {
+                    kind = "array_of",
+                    elem = { kind = "optional", inner = { kind = "prim", prim = "number" } },
+                },
+            },
+        }
         local out = S.LuaCats.class_for("C", sch)
         expect(out:match("---@field items %(number|nil%)%[%]")).to.exist()
     end)
 
-    it("distinguishes optional-array from array-of-optional (Q2)", function()
-        -- optional-outside: `items?` with inner number[]
+    it("optional-array (outer optional) renders as `items?` with T[] (C1)", function()
         local a = T.shape({ items = T.array_of(T.number):is_optional() })
         local out_a = S.LuaCats.class_for("C", a)
         expect(out_a:match("---@field items%? number%[%]")).to.exist()
-        -- optional-inside: `items` required but elements may be nil
-        local b = T.shape({ items = T.array_of(T.number:is_optional()) })
-        local out_b = S.LuaCats.class_for("C", b)
-        expect(out_b:match("---@field items %(number|nil%)%[%]")).to.exist()
-        -- and crucially, the optional-inside case must NOT carry `items?`
-        expect(out_b:match("---@field items%?")).to_not.exist()
-    end)
-
-    it("treats described wrapper as transparent inside array_of (Q2)", function()
-        local sch = T.shape({
-            items = T.array_of(T.number:is_optional():describe("maybe count")),
-        })
-        local out = S.LuaCats.class_for("C", sch)
-        expect(out:match("---@field items %(number|nil%)%[%]")).to.exist()
     end)
 
     it("maps one_of(strings) to quoted literal union", function()
@@ -94,14 +92,55 @@ describe("alc_shapes.LuaCats.class_for", function()
         expect(out:match("---@field counts table<string, number>")).to.exist()
     end)
 
-    it("maps discriminated to table", function()
+    it("C2: renders single-variant discriminated as a single inline table", function()
+        -- A 1-variant discriminated has no `|` at the top level, so the
+        -- enclosing array_of must NOT wrap in parens.
         local sch = T.shape({
             stages = T.array_of(T.discriminated("name", {
                 a = T.shape({ name = T.string }),
             })),
         })
         local out = S.LuaCats.class_for("C", sch)
-        expect(out:match("---@field stages table%[%]")).to.exist()
+        expect(out:match("---@field stages { name: string }%[%]")).to.exist()
+    end)
+
+    it("C2: renders multi-variant discriminated as union of inline tables", function()
+        local sch = T.shape({
+            stages = T.discriminated("name", {
+                b = T.shape({ name = T.one_of({ "b" }), y = T.number }),
+                a = T.shape({ name = T.one_of({ "a" }), x = T.string }),
+            }),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        -- Variants sorted alphabetically (a then b) for diff stability.
+        expect(out:match('---@field stages { name: "a", x: string }|{ name: "b", y: number }')).to.exist()
+    end)
+
+    it("C2: array_of(multi-variant discriminated) parenthesizes the union", function()
+        -- Without parens LuaLS would parse `A|B[]` as `A|(B[])`.
+        local sch = T.shape({
+            stages = T.array_of(T.discriminated("name", {
+                b = T.shape({ name = T.one_of({ "b" }), y = T.number }),
+                a = T.shape({ name = T.one_of({ "a" }), x = T.string }),
+            })),
+        })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match('---@field stages %({ name: "a", x: string }|{ name: "b", y: number }%)%[%]')).to.exist()
+    end)
+
+    it("C2: array_of(multi-value one_of) also parenthesizes the union", function()
+        -- Same precedence issue as array_of(discriminated). `"a"|"b"[]`
+        -- parses as `"a"|("b"[])`, not `("a"|"b")[]`.
+        local sch = T.shape({ modes = T.array_of(T.one_of({ "a", "b" })) })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match('---@field modes %("a"|"b"%)%[%]')).to.exist()
+    end)
+
+    it("C2: array_of(single-value one_of) does NOT parenthesize", function()
+        -- A 1-value one_of has no `|`, so no parens needed.
+        local sch = T.shape({ mode = T.array_of(T.one_of({ "a" })) })
+        local out = S.LuaCats.class_for("C", sch)
+        expect(out:match('---@field mode "a"%[%]')).to.exist()
     end)
 
     it("inline-expands nested shape as LuaLS table literal", function()

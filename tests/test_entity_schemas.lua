@@ -215,6 +215,37 @@ describe("entity_schemas: Shape", function()
         expect(ok).to.equal(false)
         expect(reason:match("unexpected field")).to.exist()
     end)
+
+    it("C6: rejects unknown kind at Entity boundary (no delayed fail)", function()
+        -- Before C6, kind = T.string admitted `{kind = "garbage"}`, and
+        -- the failure surfaced only later at check_node ("unknown kind").
+        -- Entity strict policy requires the fail at the boundary itself.
+        local v = { input = { kind = "garbage" }, result = nil }
+        local ok, reason = ok_check(v, ES.Shape)
+        expect(ok).to.equal(false)
+        expect(reason:match("kind")).to.exist()
+    end)
+
+    it("C6: accepts every known alc_shapes kind", function()
+        local known = {
+            { kind = "prim", prim = "string" },
+            { kind = "any" },
+            { kind = "optional", inner = { kind = "prim", prim = "number" } },
+            { kind = "described", doc = "x", inner = { kind = "prim", prim = "number" } },
+            { kind = "shape", fields = {}, open = true },
+            { kind = "array_of", elem = { kind = "prim", prim = "string" } },
+            { kind = "one_of", values = { "a", "b" } },
+            { kind = "map_of",
+              key = { kind = "prim", prim = "string" },
+              val = { kind = "prim", prim = "number" } },
+            { kind = "discriminated", tag = "t", variants = {} },
+            { kind = "ref", name = "foo" },
+        }
+        for _, sch in ipairs(known) do
+            local ok = ok_check({ input = sch, result = nil }, ES.Shape)
+            expect(ok).to.equal(true)
+        end
+    end)
 end)
 
 describe("entity_schemas: PkgInfo (composed)", function()

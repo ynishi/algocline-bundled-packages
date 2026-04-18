@@ -23,7 +23,7 @@
 ---@field naive_baseline_kind string @Baseline method identifier
 ---@field ranking { original_index: number, pairwise_score: number, rank: number, text: string }[] @Final ranking
 ---@field savings_percent? number @LLM call savings vs baseline (nil on bypass)
----@field stages table[] @Per-stage detail (discriminated by name)
+---@field stages ({ both_tie_pairs: number, input_count: number, llm_calls: number, name: "direct_pairwise", output_count: number, position_bias_splits: number }|{ input_count: number, llm_calls: number, name: "listwise_rank", output_count: number, window_size: number }|{ input_count: number, llm_calls: number, name: "listwise_skipped", output_count: number, reason: string }|{ axes_count: number, input_count: number, llm_calls: number, name: "multi_axis_scoring", output_count: number, parse_failures: number, score_range: { max: number, min: number } }|{ both_tie_pairs: number, input_count: number, llm_calls: number, name: "pairwise_rank_allpair", output_count: number, position_bias_splits: number }|{ input_count: number, llm_calls: number, name: "scoring_skipped", output_count: number, reason: string })[] @Per-stage detail (discriminated by name)
 ---@field total_llm_calls number
 ---@field warnings { code: string, data: table, message: string, severity: "warn"|"critical" }[] @Diagnostic warnings
 
@@ -66,7 +66,7 @@
 ---@field needs_investigation boolean @True if meta-confidence below threshold
 ---@field panel_size number @Actual panel size used
 ---@field plurality_fraction number @Top-answer vote fraction
----@field stages table[] @Per-stage detail (discriminated by name)
+---@field stages ({ confidence: number, escalated: boolean, llm_calls: number, name: "calibrate", needs_investigation: boolean, threshold: number }|{ expected_accuracy: number, name: "condorcet", p_estimate: number, recommended_n: number, target_accuracy: number, target_met: boolean }|{ is_anti_jury: boolean, name: "condorcet_anti_jury", p_estimate: number }|{ is_anti_jury: boolean, name: "condorcet_coin_flip", p_estimate: number }|{ answer: string, llm_calls: number, margin_gap: number, n_distinct_answers: number, name: "sc", panel_size: number, plurality_fraction: number, unanimous: boolean }|{ consecutive_drops: number, is_safe: boolean, name: "vote_prefix_stability", peak_idx: number, series_length: number, signal_type: string }|{ is_safe: boolean, name: "vote_prefix_stability_skipped", reason: string, series_length: number, signal_type: string })[] @Per-stage detail (discriminated by name)
 ---@field target_met boolean @Whether expected accuracy >= target
 ---@field total_llm_calls number
 ---@field unanimous boolean @All votes identical

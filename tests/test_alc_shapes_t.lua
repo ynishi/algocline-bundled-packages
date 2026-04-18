@@ -86,6 +86,21 @@ describe("alc_shapes.t.shape", function()
         local ok = pcall(T.shape, { [1] = T.string })
         expect(ok).to.equal(false)
     end)
+
+    it("C3: shallow-copies fields table (post-construction mutation isolated)", function()
+        local f = { a = T.string }
+        local s = T.shape(f)
+        -- Mutating the caller's table after construction must not
+        -- leak into the schema. Schema-as-Data doctrine treats
+        -- schemas as immutable plain data.
+        f.b = T.number
+        expect(rawget(s, "fields").a).to.equal(T.string)
+        expect(rawget(s, "fields").b).to.equal(nil)
+        -- And vice versa: mutating the caller table must not be
+        -- observable via the schema's own fields reference.
+        f.a = T.boolean
+        expect(rawget(s, "fields").a).to.equal(T.string)
+    end)
 end)
 
 describe("alc_shapes.t.array_of", function()
@@ -104,6 +119,39 @@ describe("alc_shapes.t.array_of", function()
     it("fails on nil elem", function()
         local ok = pcall(T.array_of, nil)
         expect(ok).to.equal(false)
+    end)
+
+    it("C1: rejects array_of(optional(T)) at construction", function()
+        local ok, err = pcall(T.array_of, T.number:is_optional())
+        expect(ok).to.equal(false)
+        expect(err:match("array_of%(optional%(T%)%)")).to.exist()
+    end)
+
+    it("C1: rejects array_of(described(optional(T))) — peels described", function()
+        local elem = T.number:is_optional():describe("maybe count")
+        local ok, err = pcall(T.array_of, elem)
+        expect(ok).to.equal(false)
+        expect(err:match("array_of%(optional%(T%)%)")).to.exist()
+    end)
+
+    it("C1: rejects array_of(optional(T):describe(...)) — describe-outside order", function()
+        -- `T.number:is_optional():describe("doc")` produces described(optional(T)).
+        -- The opposite order `T.number:describe("doc"):is_optional()` produces
+        -- optional(described(T)) — the peel loop stops at optional at the top
+        -- level, so both forms are rejected.
+        local elem_a = T.number:is_optional():describe("doc")
+        local ok_a = pcall(T.array_of, elem_a)
+        expect(ok_a).to.equal(false)
+        local elem_b = T.number:describe("doc"):is_optional()
+        local ok_b = pcall(T.array_of, elem_b)
+        expect(ok_b).to.equal(false)
+    end)
+
+    it("C1: array_of(T):is_optional() (outer optional) is still allowed", function()
+        -- Nil-admission at the enclosing field is the recommended pattern.
+        local s = T.array_of(T.number):is_optional()
+        expect(rawget(s, "kind")).to.equal("optional")
+        expect(rawget(rawget(s, "inner"), "kind")).to.equal("array_of")
     end)
 end)
 
@@ -138,6 +186,27 @@ describe("alc_shapes.t.one_of", function()
         local ok, err = pcall(T.one_of, { {} })
         expect(ok).to.equal(false)
         expect(err:match("string/number/boolean")).to.exist()
+    end)
+
+    it("C5: rejects duplicate string values", function()
+        local ok, err = pcall(T.one_of, { "a", "b", "a" })
+        expect(ok).to.equal(false)
+        expect(err:match("duplicate")).to.exist()
+    end)
+
+    it("C5: rejects duplicate number values", function()
+        local ok, err = pcall(T.one_of, { 1, 2, 1 })
+        expect(ok).to.equal(false)
+        expect(err:match("duplicate")).to.exist()
+    end)
+
+    it("C5: distinguishes string \"1\" from number 1", function()
+        -- Different Lua types at the same stringified form must not be
+        -- flagged as duplicates. `one_of({"1", 1})` is legitimate even
+        -- if unusual, since `check` uses `==` (type-sensitive) to match.
+        local s = T.one_of({ "1", 1 })
+        expect(rawget(s, "values")[1]).to.equal("1")
+        expect(rawget(s, "values")[2]).to.equal(1)
     end)
 end)
 
@@ -238,6 +307,38 @@ describe("alc_shapes.t.discriminated", function()
         expect(ok).to.equal(false)
         expect(err:match("must be a shape")).to.exist()
     end)
+
+    it("C4: rejects variant missing the tag field", function()
+        -- tag="name" but the variant shape has no `name` field. Before
+        -- C4 this was silently accepted and the mismatch between the
+        -- tag dispatch (by key) and the variant's own field set was
+        -- invisible at construction.
+        local ok, err = pcall(T.discriminated, "name", {
+            a = T.shape({ x = T.number }),
+        })
+        expect(ok).to.equal(false)
+        expect(err:match("must declare the tag field 'name'")).to.exist()
+    end)
+
+    it("C4: accepts variant with tag field as generic string", function()
+        -- The enforcement is purely about presence. A variant that
+        -- declares `name = T.string` (no literal constraint) still
+        -- passes construction; runtime discriminant mismatch is caught
+        -- by `handlers.discriminated` dispatch.
+        local s = T.discriminated("name", {
+            a = T.shape({ name = T.string, x = T.number }),
+        })
+        expect(rawget(s, "kind")).to.equal("discriminated")
+    end)
+
+    it("C3: shallow-copies variants table (post-construction mutation isolated)", function()
+        local a_shape = T.shape({ name = T.string })
+        local vs = { a = a_shape }
+        local s = T.discriminated("name", vs)
+        vs.b = T.shape({ name = T.string, x = T.number })
+        expect(rawget(s, "variants").a).to.equal(a_shape)
+        expect(rawget(s, "variants").b).to.equal(nil)
+    end)
 end)
 
 describe("alc_shapes.t.ref", function()
@@ -273,7 +374,7 @@ describe("alc_shapes.t rawget invariants", function()
         expect(rawget(T.shape({ a = T.string }), "kind")).to.equal("shape")
         expect(rawget(T.one_of({ "a" }), "kind")).to.equal("one_of")
         expect(rawget(T.map_of(T.string, T.number), "kind")).to.equal("map_of")
-        expect(rawget(T.discriminated("t", { a = T.shape({ x = T.string }) }), "kind")).to.equal("discriminated")
+        expect(rawget(T.discriminated("t", { a = T.shape({ t = T.string, x = T.string }) }), "kind")).to.equal("discriminated")
         expect(rawget(T.ref("voted"), "kind")).to.equal("ref")
     end)
 end)

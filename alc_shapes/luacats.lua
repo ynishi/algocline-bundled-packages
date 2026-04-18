@@ -33,6 +33,26 @@ end
 --- on each field).
 local type_of
 
+--- Detect a top-level `|` in a rendered LuaCATS type string, ignoring
+--- pipes that sit inside `{ ... }` or `( ... )` groups.
+--- Used to decide whether `array_of(union)` needs parens (`(A|B)[]`)
+--- vs. a non-union single type (`T[]`). `T.one_of({"a"})` → `"a"` needs
+--- no parens, but `T.one_of({"a","b"})` → `"a"|"b"` does.
+local function has_top_level_pipe(s)
+    local depth = 0
+    for i = 1, #s do
+        local c = s:sub(i, i)
+        if c == "{" or c == "(" then
+            depth = depth + 1
+        elseif c == "}" or c == ")" then
+            depth = depth - 1
+        elseif c == "|" and depth == 0 then
+            return true
+        end
+    end
+    return false
+end
+
 --- Render a nested shape as an inline LuaLS table type literal, e.g.
 ---     { answer?: string, reasoning: string }
 --- Field order is alphabetical (via reflect.fields). Empty shapes render
@@ -71,12 +91,15 @@ type_of = function(node, class_prefix)
     elseif kind == "described" then
         return type_of(rawget(node, "inner"), class_prefix)
     elseif kind == "array_of" then
-        -- Preserve inner-optional semantics:
-        --   array_of(T)            -> T[]
-        --   array_of(optional(T))  -> (T|nil)[]
-        -- Zod distinguishes z.string().array() vs z.string().optional().array()
-        -- the same way; silently flattening to T[] would lose the nil admission.
-        -- `described` wrappers are transparent (doc-only).
+        -- `described` wrappers are transparent (doc-only); peel them.
+        --
+        -- NOTE: `array_of(optional(T))` is rejected at DSL construction
+        -- (see t.lua M.array_of C1 guard). The `(T|nil)[]` branch below
+        -- is therefore unreachable via the DSL, but we keep it for
+        -- Schema-as-Data persistence round-trips: a plain-data schema
+        -- reloaded from JSON bypasses the DSL constructor, and the
+        -- codegen must still render something reasonable instead of
+        -- crashing. Production shapes in this codebase do not use it.
         local elem = rawget(node, "elem")
         local had_optional = false
         while true do
@@ -94,9 +117,31 @@ type_of = function(node, class_prefix)
         if had_optional then
             return "(" .. inner_type .. "|nil)[]"
         end
+        -- C2: when the element resolves to a top-level union (e.g.
+        -- `discriminated` → `{...}|{...}`, or `one_of` with >1 value →
+        -- `"a"|"b"`), LuaLS parses `A|B[]` as `A|(B[])`. Parenthesize
+        -- to preserve the intended `(A|B)[]` precedence.
+        if has_top_level_pipe(inner_type) then
+            return "(" .. inner_type .. ")[]"
+        end
         return inner_type .. "[]"
     elseif kind == "discriminated" then
-        return "table"
+        -- C2: render as a union of inline shape literals, one per variant,
+        -- sorted alphabetically by variant key for diff stability. Each
+        -- variant's `tag` field (enforced present at construction by C4)
+        -- typically carries a `T.one_of({"<key>"})` and inline_shape_type
+        -- renders it as a string literal, preserving the discriminant
+        -- information in the emitted type. Callers then get per-branch
+        -- field autocomplete based on the current value of `name`.
+        local variants = rawget(node, "variants")
+        local keys = {}
+        for k in pairs(variants) do keys[#keys + 1] = k end
+        table.sort(keys)
+        local parts = {}
+        for i = 1, #keys do
+            parts[i] = inline_shape_type(variants[keys[i]], class_prefix)
+        end
+        return table.concat(parts, "|")
     elseif kind == "map_of" then
         local k = type_of(rawget(node, "key"), class_prefix)
         local v = type_of(rawget(node, "val"), class_prefix)

@@ -22,11 +22,23 @@ local T = require("alc_shapes.t")
 local M = {}
 
 -- Leaf: alc_shapes schema data.
--- kind field の存在だけを必須にし、残りの structural body は alc_shapes
--- t.lua 側の invariant に委ねる。open=true により他フィールド (prim/elem/
--- fields/variants 等) はそのまま通す。
+--
+-- C6: kind は既知 kind 集合に閉じる (whitelist)。Entity 境界は strict で
+-- あるはずなのに、従来は kind = T.string だったため `{kind="garbage"}`
+-- のような malformed schema が entity 検証を通過し、後段の check_node
+-- で "unknown kind 'garbage'" として遅延失敗していた。whitelist 化に
+-- より "Entity strict = 境界で落とす" ポリシーと整合する。
+--
+-- 新しい kind を t.lua に追加するときは ALC_SCHEMA_KINDS も更新する
+-- (年単位で稀な保守コスト)。open=true により残りの structural body
+-- (prim/elem/fields/variants 等) は alc_shapes 側の invariant に委ねる。
+local ALC_SCHEMA_KINDS = {
+    "any", "array_of", "described", "discriminated", "map_of",
+    "one_of", "optional", "prim", "ref", "shape",
+}
+
 local AlcSchema = T.shape({
-    kind = T.string,
+    kind = T.one_of(ALC_SCHEMA_KINDS),
 }, { open = true })
 
 M.Identity = T.shape({
