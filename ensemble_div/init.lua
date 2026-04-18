@@ -46,6 +46,9 @@
 ---   local r = ed.decompose({0.8, 0.6, 0.9}, 1.0)
 ---   -- r.E, r.E_bar, r.A_bar, r.identity_holds
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -57,6 +60,57 @@ M.meta = {
         .. "how much agent disagreement reduces ensemble error "
         .. "(Krogh-Vedelsby NeurIPS 1995, Hong-Page PNAS 2004).",
     category = "aggregation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        ensemble = {
+            args   = {
+                T.array_of(T.number),
+                T.array_of(T.number):is_optional(),
+            },
+            result = T.number,
+        },
+        ambiguity = {
+            args   = {
+                T.array_of(T.number),
+                T.array_of(T.number):is_optional(),
+            },
+            result = T.number,
+        },
+        avg_error = {
+            args   = {
+                T.array_of(T.number),
+                T.number,
+                T.array_of(T.number):is_optional(),
+            },
+            result = T.number,
+        },
+        ensemble_error = {
+            args   = {
+                T.array_of(T.number),
+                T.number,
+                T.array_of(T.number):is_optional(),
+            },
+            result = T.number,
+        },
+        decompose = {
+            args   = {
+                T.array_of(T.number),
+                T.number,
+                T.array_of(T.number):is_optional(),
+            },
+            result = T.shape({
+                E              = T.number,
+                E_bar          = T.number,
+                A_bar          = T.number,
+                V              = T.number,
+                identity_holds = T.boolean,
+                identity_error = T.number,
+            }),
+        },
+    },
 }
 
 -- ─── Internal helpers ───
@@ -195,5 +249,13 @@ function M.decompose(scores, target, weights)
         identity_error = identity_error,
     }
 end
+
+-- Malli-style self-decoration. Internal M.ensemble calls go through
+-- the wrapper, re-validating args but returning identical results.
+M.ensemble       = S.instrument(M, "ensemble")
+M.ambiguity      = S.instrument(M, "ambiguity")
+M.avg_error      = S.instrument(M, "avg_error")
+M.ensemble_error = S.instrument(M, "ensemble_error")
+M.decompose      = S.instrument(M, "decompose")
 
 return M

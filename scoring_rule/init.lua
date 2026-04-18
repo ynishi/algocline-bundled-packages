@@ -58,6 +58,9 @@
 ---   sr.log_score(0.8, 1)       -- => -0.2231...
 ---   local cal = sr.calibration(predictions, outcomes, { bins = 10 })
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -69,6 +72,69 @@ M.meta = {
         .. "prediction quality. Audits whether agent confidence matches "
         .. "actual accuracy (Brier 1950, Gneiting-Raftery JASA 2007).",
     category = "evaluation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        -- y accepts number (0/1) or boolean; T.any preserves that.
+        brier = {
+            args   = { T.number, T.any },
+            result = T.number,
+        },
+        -- Returns (score, was_clamped). Option A' preserves the 2nd value.
+        log_score = {
+            args   = { T.number, T.any },
+            result = T.number,
+        },
+        spherical = {
+            args   = { T.number, T.any },
+            result = T.number,
+        },
+        evaluate = {
+            args = {
+                T.array_of(T.number),
+                T.array_of(T.any),
+                T.table:is_optional(),
+            },
+            -- clamped_count is only set for rule="log"; leave as opaque
+            -- table to keep the shape flexible across rules.
+            result = T.shape({
+                mean_score     = T.number,
+                scores         = T.array_of(T.number),
+                n              = T.number,
+                rule           = T.string,
+                clamped_count  = T.number:is_optional(),
+            }),
+        },
+        calibration = {
+            args = {
+                T.array_of(T.number),
+                T.array_of(T.any),
+                T.table:is_optional(),
+            },
+            result = T.shape({
+                ece            = T.number,
+                bins           = T.array_of(T.table),
+                overconfident  = T.boolean,
+                underconfident = T.boolean,
+                n              = T.number,
+                n_bins         = T.number,
+            }),
+        },
+        compare = {
+            args = {
+                T.array_of(T.table),
+                T.table:is_optional(),
+            },
+            result = T.shape({
+                ranking = T.array_of(T.string),
+                -- scores is a name→number map (opaque)
+                scores  = T.table,
+                best    = T.string,
+            }),
+        },
+    },
 }
 
 -- ─── Internal helpers ───
@@ -325,5 +391,14 @@ function M.compare(agents, opts)
         best = ranking[1],
     }
 end
+
+-- Malli-style self-decoration. log_score returns (score, clamped) —
+-- Option A' preserves the 2nd value.
+M.brier       = S.instrument(M, "brier")
+M.log_score   = S.instrument(M, "log_score")
+M.spherical   = S.instrument(M, "spherical")
+M.evaluate    = S.instrument(M, "evaluate")
+M.calibration = S.instrument(M, "calibration")
+M.compare     = S.instrument(M, "compare")
 
 return M

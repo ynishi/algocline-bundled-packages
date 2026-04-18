@@ -61,6 +61,9 @@
 ---   local r = kemeny.aggregate(rankings)
 ---   -- r.ranking, r.total_distance, r.method
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -72,6 +75,57 @@ M.meta = {
         .. "Merges multiple agent rankings into optimal consensus with "
         .. "Condorcet consistency (Kemeny 1959, Young-Levenglick 1978).",
     category = "aggregation",
+}
+
+---@type AlcSpec
+M.spec = {
+    entries = {
+        kendall_tau = {
+            args   = { T.array_of(T.any), T.array_of(T.any) },
+            result = T.number,
+        },
+        exact = {
+            args = { T.array_of(T.array_of(T.any)) },
+            result = T.shape({
+                ranking         = T.array_of(T.any),
+                total_distance  = T.number,
+                is_unique       = T.boolean,
+                ties            = T.array_of(T.array_of(T.any)),
+                method          = T.string,
+                candidates      = T.number,
+                rankings_count  = T.number,
+            }),
+        },
+        borda = {
+            args = { T.array_of(T.array_of(T.any)) },
+            result = T.shape({
+                ranking         = T.array_of(T.any),
+                -- scores is candidate→number map (opaque)
+                scores          = T.table,
+                total_distance  = T.number,
+                ties            = T.array_of(T.any),
+                method          = T.string,
+                candidates      = T.number,
+                rankings_count  = T.number,
+            }),
+        },
+        -- Returns exact-shape OR borda-shape depending on candidate count.
+        -- Keep the result opaque (T.table) to accommodate both variants.
+        aggregate = {
+            args   = { T.array_of(T.array_of(T.any)) },
+            result = T.table,
+        },
+        -- Matrix is a nested map-of-maps; keep opaque.
+        pairwise = {
+            args   = { T.array_of(T.array_of(T.any)) },
+            result = T.table,
+        },
+        -- Returns a candidate (any) or nil when no Condorcet winner exists.
+        condorcet_winner = {
+            args   = { T.array_of(T.array_of(T.any)) },
+            result = T.any:is_optional(),
+        },
+    },
 }
 
 -- ─── Internal helpers ───
@@ -398,5 +452,16 @@ function M.condorcet_winner(rankings)
 
     return nil
 end
+
+-- Malli-style self-decoration. All 6 entries have declared shapes.
+-- aggregate dispatches to exact/borda internally — wrapping is safe
+-- (internal M.* calls go through wrappers, which re-validate but
+-- return identical results).
+M.kendall_tau      = S.instrument(M, "kendall_tau")
+M.exact            = S.instrument(M, "exact")
+M.borda            = S.instrument(M, "borda")
+M.aggregate        = S.instrument(M, "aggregate")
+M.pairwise         = S.instrument(M, "pairwise")
+M.condorcet_winner = S.instrument(M, "condorcet_winner")
 
 return M

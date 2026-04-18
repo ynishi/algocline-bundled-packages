@@ -765,6 +765,11 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
     -- module-level new/solve/accuracy_to_loss; Updater instance methods
     -- (u:weights/update/stats) stay untouched because OOP ":" sugar is
     -- incompatible with direct-args arg-shape declarations.
+    -- 3.5-c batch: scoring_rule / kemeny / ensemble_div. scoring_rule's
+    -- log_score returns (score, was_clamped) — Option A' preserves the
+    -- 2nd value. kemeny.condorcet_winner returns a candidate or nil
+    -- (T.any:is_optional()); kemeny.aggregate dispatches to exact/borda
+    -- so its result is declared as T.table (both variants accepted).
     local library_pkg_entries = {
         bft          = { "validate", "threshold", "max_faults",
                          "validate_signed", "signed_threshold",
@@ -777,6 +782,12 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
                          "correlation", "estimate_p" },
         shapley      = { "exact", "montecarlo", "accuracy_coalition" },
         mwu          = { "new", "solve", "accuracy_to_loss" },
+        scoring_rule = { "brier", "log_score", "spherical",
+                         "evaluate", "calibration", "compare" },
+        kemeny       = { "kendall_tau", "exact", "borda", "aggregate",
+                         "pairwise", "condorcet_winner" },
+        ensemble_div = { "ensemble", "ambiguity", "avg_error",
+                         "ensemble_error", "decompose" },
     }
     for pkg_name, entries in pairs(library_pkg_entries) do
         it(pkg_name .. " (library-style): every entry is instrumented with declared args+result", function()
@@ -857,5 +868,54 @@ describe("alc_shapes.instrument: bundled pkg self-decoration", function()
         expect(l[1]).to.equal(0.0)
         expect(l[2]).to.equal(0.25)
         expect(l[4]).to.equal(1.0)
+    end)
+
+    -- scoring_rule.log_score returns (score, was_clamped). Option A'
+    -- must preserve the clamp-flag across the wrapper.
+    it("scoring_rule.log_score preserves (score, clamped) after instrument", function()
+        package.loaded["scoring_rule"] = nil
+        local sr = require("scoring_rule")
+        local s, clamped = sr.log_score(0.8, 1)
+        expect(type(s)).to.equal("number")
+        expect(s < 0).to.equal(true)
+        expect(clamped).to.equal(false)
+        -- p=0 triggers clamp to EPS
+        local s2, clamped2 = sr.log_score(0, 1)
+        expect(type(s2)).to.equal("number")
+        expect(clamped2).to.equal(true)
+    end)
+
+    -- kemeny.condorcet_winner returns candidate-or-nil; both paths
+    -- must survive Option A' + T.any:is_optional().
+    it("kemeny.condorcet_winner accepts winner-or-nil after instrument", function()
+        package.loaded["kemeny"] = nil
+        local k = require("kemeny")
+        -- Unanimous A > B > C → A is Condorcet winner
+        local w = k.condorcet_winner({
+            { "A", "B", "C" },
+            { "A", "B", "C" },
+            { "A", "B", "C" },
+        })
+        expect(w).to.equal("A")
+        -- Classic Condorcet cycle: A>B>C, B>C>A, C>A>B → no winner
+        local none = k.condorcet_winner({
+            { "A", "B", "C" },
+            { "B", "C", "A" },
+            { "C", "A", "B" },
+        })
+        expect(none).to.equal(nil)
+    end)
+
+    -- ensemble_div.decompose verifies the Krogh-Vedelsby identity.
+    -- Shape has 6 fields; instrument must not strip any.
+    it("ensemble_div.decompose returns full shape after instrument", function()
+        package.loaded["ensemble_div"] = nil
+        local ed = require("ensemble_div")
+        local r = ed.decompose({ 0.8, 0.6, 0.9 }, 1.0)
+        expect(type(r.E)).to.equal("number")
+        expect(type(r.E_bar)).to.equal("number")
+        expect(type(r.A_bar)).to.equal("number")
+        expect(type(r.V)).to.equal("number")
+        expect(r.identity_holds).to.equal(true)
     end)
 end)
