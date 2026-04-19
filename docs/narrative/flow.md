@@ -1,8 +1,8 @@
 ---
 name: flow
-version: 0.1.0
+version: 0.2.0
 category: substrate
-description: "Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code."
+description: "Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.2 adds session-spanning bound APIs (wrap_bound / verify_bound / llm_bound) that persist verify-side state across alc.llm yield boundaries."
 source: flow/init.lua
 generated: gen_docs (V0)
 ---

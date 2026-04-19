@@ -39,24 +39,30 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.1.0",
+    version     = "0.2.0",
     description = "Flow Frame — FlowState + ReqToken substrate for composing "
         .. "algo-based pkg (ab_mcts / cascade / coevolve / ...). "
-        .. "Light Frame: driver loop stays in user code.",
+        .. "Light Frame: driver loop stays in user code. v0.2 adds "
+        .. "session-spanning bound APIs (wrap_bound / verify_bound / "
+        .. "llm_bound) that persist verify-side state across alc.llm "
+        .. "yield boundaries.",
     category    = "substrate",
 }
 
 -- Public API (flat, module-level pure fn — Neovim/Penlight/OpenResty style).
-M.state_new    = state.new
-M.state_key    = state.key
-M.state_get    = state.get
-M.state_set    = state.set
-M.state_save   = state.save
+M.state_new          = state.new
+M.state_key          = state.key
+M.state_get          = state.get
+M.state_set          = state.set
+M.state_save         = state.save
 
-M.token_issue  = token.issue
-M.token_wrap   = token.wrap
-M.token_verify = token.verify
+M.token_issue        = token.issue
+M.token_wrap         = token.wrap
+M.token_verify       = token.verify
+M.token_wrap_bound   = token.wrap_bound
+M.token_verify_bound = token.verify_bound
 
-M.llm          = llm.llm
+M.llm                = llm.llm
+M.llm_bound          = llm.llm_bound
 
 return M

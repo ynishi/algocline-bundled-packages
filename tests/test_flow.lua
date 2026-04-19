@@ -2,7 +2,24 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
-local REPO = os.getenv("PWD") or "."
+-- Derive REPO from the first `?.lua` entry already prepended to
+-- `package.path` by `mlua-probe-mcp`'s `search_paths` (mirrors
+-- `tests/test_gen_docs.lua` §repo_root_from_package_path). Using
+-- `os.getenv("PWD")` is unreliable under mlua-probe-mcp because the
+-- server's startup CWD may be the parent repo rather than the
+-- worktree root, which would silently shadow worktree code with
+-- main-repo code and produce false-green results. The `debug`
+-- library is also unavailable in the sandbox.
+local function repo_root_from_package_path()
+    for entry in package.path:gmatch("[^;]+") do
+        local prefix = entry:match("^(.-)/%?%.lua$")
+        if prefix and prefix ~= "" and prefix:sub(1, 1) == "/" then
+            return prefix
+        end
+    end
+    return "."
+end
+local REPO = repo_root_from_package_path()
 package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
 
 -- ---------------------------------------------------------------------
@@ -449,6 +466,146 @@ describe("flow.token: verify", function()
 end)
 
 -- ---------------------------------------------------------------------
+-- flow.token: wrap_bound / verify_bound (session-spanning)
+-- ---------------------------------------------------------------------
+describe("flow.token: wrap_bound", function()
+    lust.after(reset)
+
+    it("persists a req under state.data._flow_req_<slot>", function()
+        local store = mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local req = flow.token_wrap_bound(st, { slot = "gate", payload = { q = "Q" } })
+
+        expect(req.slot).to.equal("gate")
+        expect(req.payload.q).to.equal("Q")
+        expect(req.payload._flow_token).to.equal(st._token_value)
+        expect(req._expect_slot).to.equal("gate")
+
+        -- Persisted in-memory state
+        expect(st.data._flow_req_gate._expect_token).to.equal(st._token_value)
+        -- Persisted via state.save
+        expect(store["p:id"].data._flow_req_gate._expect_slot).to.equal("gate")
+    end)
+
+    it("works with nil payload", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local req = flow.token_wrap_bound(st, { slot = "s" })
+        expect(req.payload._flow_slot).to.equal("s")
+        expect(st.data._flow_req_s).to_not.equal(nil)
+    end)
+
+    it("inherits wrap's reserved-key assertion", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function()
+            flow.token_wrap_bound(st, { slot = "s", payload = { _flow_token = "x" } })
+        end).to.fail()
+    end)
+
+    it("errors on missing / empty slot", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function() flow.token_wrap_bound(st, {}) end).to.fail()
+        expect(function() flow.token_wrap_bound(st, { slot = "" }) end).to.fail()
+    end)
+
+    it("survives a session-boundary resume", function()
+        -- Session 1: wrap_bound persists the req.
+        mock_alc_state()
+        local flow1 = require("flow")
+        local st1 = flow1.state_new({ key_prefix = "p", id = "id" })
+        local req1 = flow1.token_wrap_bound(st1, { slot = "gate" })
+
+        -- Simulate full session restart: reset modules but keep the
+        -- alc.state store. (reset() clears _G.alc, so preserve the store
+        -- manually to mimic a persistent backend across sessions.)
+        local preserved_key = "p:id"
+        local preserved_val = _G.alc.state.get(preserved_key)
+        reset()
+        local store2 = mock_alc_state()
+        store2[preserved_key] = preserved_val
+
+        local flow2 = require("flow")
+        local st2 = flow2.state_new({ key_prefix = "p", id = "id", resume = true })
+        expect(st2.data._flow_req_gate._expect_token).to.equal(req1._expect_token)
+    end)
+end)
+
+describe("flow.token: verify_bound", function()
+    lust.after(reset)
+
+    local function setup_bound()
+        local store = mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local req = flow.token_wrap_bound(st, { slot = "gate", payload = {} })
+        return flow, st, req, store
+    end
+
+    it("passes on matching echo and auto-deletes the record", function()
+        local flow, st, req = setup_bound()
+        local ok = flow.token_verify_bound(st, "gate", {
+            _flow_token = req._expect_token,
+            _flow_slot  = req._expect_slot,
+        })
+        expect(ok).to.equal(true)
+        expect(st.data._flow_req_gate).to.equal(nil)
+    end)
+
+    it("auto-delete survives through state.save (persisted record cleared)", function()
+        local flow, st, req, store = setup_bound()
+        flow.token_verify_bound(st, "gate", {
+            _flow_token = req._expect_token,
+            _flow_slot  = req._expect_slot,
+        })
+        expect(store["p:id"].data._flow_req_gate).to.equal(nil)
+    end)
+
+    it("fail-open (no echo) is treated as success and auto-deletes", function()
+        local flow, st = setup_bound()
+        local ok = flow.token_verify_bound(st, "gate", { other = "data" })
+        expect(ok).to.equal(true)
+        expect(st.data._flow_req_gate).to.equal(nil)
+    end)
+
+    it("opts.keep=true retains the record on success", function()
+        local flow, st, req = setup_bound()
+        local ok = flow.token_verify_bound(st, "gate", {
+            _flow_token = req._expect_token,
+            _flow_slot  = req._expect_slot,
+        }, { keep = true })
+        expect(ok).to.equal(true)
+        expect(st.data._flow_req_gate).to_not.equal(nil)
+    end)
+
+    it("returns false on mismatch and keeps the record", function()
+        local flow, st = setup_bound()
+        local ok = flow.token_verify_bound(st, "gate", { _flow_token = "wrong" })
+        expect(ok).to.equal(false)
+        expect(st.data._flow_req_gate).to_not.equal(nil)
+    end)
+
+    it("errors when no persisted record exists for slot", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function() flow.token_verify_bound(st, "missing", {}) end).to.fail()
+    end)
+
+    it("errors on empty slot", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function() flow.token_verify_bound(st, "", {}) end).to.fail()
+    end)
+end)
+
+-- ---------------------------------------------------------------------
 -- flow.llm
 -- ---------------------------------------------------------------------
 describe("flow.llm", function()
@@ -530,6 +687,122 @@ describe("flow.llm", function()
     end)
 end)
 
+describe("flow.llm_bound", function()
+    lust.after(reset)
+
+    it("persists _flow_req_<slot> BEFORE alc.llm runs", function()
+        mock_alc_state()
+        local observed_key
+        _G.alc = _G.alc or {}
+        -- Capture state snapshot at the moment alc.llm is called.
+        _G.alc.llm = function(prompt)
+            observed_key = _G.alc.state.get("p:id").data._flow_req_gate
+            return "out [flow_slot=gate]"  -- echo slot to avoid mismatch-path noise
+        end
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        flow.llm_bound(st, { slot = "gate", prompt = "hi" })
+        expect(observed_key).to_not.equal(nil)
+        expect(observed_key._expect_slot).to.equal("gate")
+    end)
+
+    it("auto-deletes _flow_req_<slot> on success", function()
+        local store = mock_alc_state()
+        mock_alc_llm(function() return "ok" end)  -- fail-open success
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        flow.llm_bound(st, { slot = "gate", prompt = "p" })
+        expect(st.data._flow_req_gate).to.equal(nil)
+        expect(store["p:id"].data._flow_req_gate).to.equal(nil)
+    end)
+
+    it("embeds flow_token + flow_slot tags in the prompt", function()
+        mock_alc_state()
+        local log = mock_alc_llm(function() return "out" end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        flow.llm_bound(st, { slot = "s1", prompt = "hello" })
+        local sent = log[1].prompt
+        expect(sent:find("[flow_token=" .. st._token_value .. "]", 1, true)).to_not.equal(nil)
+        expect(sent:find("[flow_slot=s1]", 1, true)).to_not.equal(nil)
+        expect(sent:find("hello", 1, true)).to_not.equal(nil)
+    end)
+
+    it("passes llm_opts through to alc.llm", function()
+        mock_alc_state()
+        local log = mock_alc_llm(function() return "out" end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        flow.llm_bound(st, {
+            slot     = "s",
+            prompt   = "p",
+            llm_opts = { system = "sys", max_tokens = 42 },
+        })
+        expect(log[1].opts.system).to.equal("sys")
+        expect(log[1].opts.max_tokens).to.equal(42)
+    end)
+
+    it("accepts matching echoed tags", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        mock_alc_llm(function()
+            return "answer [flow_token=" .. st._token_value .. "][flow_slot=s]"
+        end)
+        local out = flow.llm_bound(st, { slot = "s", prompt = "p" })
+        expect(out:find("answer", 1, true)).to_not.equal(nil)
+        expect(st.data._flow_req_s).to.equal(nil)
+    end)
+
+    it("rolls back and errors on token mismatch", function()
+        local store = mock_alc_state()
+        mock_alc_llm(function() return "[flow_token=wrongtok]" end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function()
+            flow.llm_bound(st, { slot = "s", prompt = "p" })
+        end).to.fail()
+        -- Auto-rollback: the persisted record must be cleared even on error.
+        expect(st.data._flow_req_s).to.equal(nil)
+        expect(store["p:id"].data._flow_req_s).to.equal(nil)
+    end)
+
+    it("rolls back and errors on slot mismatch", function()
+        local store = mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        mock_alc_llm(function()
+            return "[flow_token=" .. st._token_value .. "][flow_slot=other]"
+        end)
+        expect(function()
+            flow.llm_bound(st, { slot = "s", prompt = "p" })
+        end).to.fail()
+        expect(st.data._flow_req_s).to.equal(nil)
+        expect(store["p:id"].data._flow_req_s).to.equal(nil)
+    end)
+
+    it("fails open on missing echo and auto-deletes", function()
+        mock_alc_state()
+        mock_alc_llm(function() return "no echo here" end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local out = flow.llm_bound(st, { slot = "s", prompt = "p" })
+        expect(out).to.equal("no echo here")
+        expect(st.data._flow_req_s).to.equal(nil)
+    end)
+
+    it("errors on missing / invalid inputs", function()
+        mock_alc_state()
+        mock_alc_llm(function() return "" end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function() flow.llm_bound(st, {}) end).to.fail()
+        expect(function() flow.llm_bound(st, { slot = "" }) end).to.fail()
+        expect(function() flow.llm_bound(st, { slot = "s" }) end).to.fail()
+        expect(function() flow.llm_bound(st, { slot = "s", prompt = 123 }) end).to.fail()
+    end)
+end)
+
 -- ---------------------------------------------------------------------
 -- flow meta
 -- ---------------------------------------------------------------------
@@ -556,9 +829,16 @@ describe("flow: meta", function()
         for _, name in ipairs({
             "state_new", "state_key", "state_get", "state_set", "state_save",
             "token_issue", "token_wrap", "token_verify",
-            "llm",
+            "token_wrap_bound", "token_verify_bound",
+            "llm", "llm_bound",
         }) do
             expect(type(flow[name])).to.equal("function")
         end
+    end)
+
+    it("meta.version is 0.2.0 (session-spanning APIs added)", function()
+        mock_alc_state()
+        local flow = require("flow")
+        expect(flow.meta.version).to.equal("0.2.0")
     end)
 end)

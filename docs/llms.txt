@@ -175,7 +175,7 @@
 
 ## substrate
 
-- [flow](narrative/flow.md): Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code.
+- [flow](narrative/flow.md): Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.2 adds session-spanning bound APIs (...
 
 ## synthesis
 

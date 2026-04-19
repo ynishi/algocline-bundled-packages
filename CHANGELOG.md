@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **[flow](flow/) v0.2.0 — Session-spanning bound APIs**: `flow.token_wrap_bound(st, opts)` / `flow.token_verify_bound(st, slot, result, opts?)` / `flow.llm_bound(st, opts)`. State-lifecycle wrappers that persist the verify-side `req` under `state.data._flow_req_<slot>` so the call-and-verify cycle can straddle an `alc.llm` yield or a full session restart. Error semantics inherit from the underlying primitives (non-symmetric, matches design proposal §3.3): `wrap_bound` asserts on invalid input; `verify_bound` returns bool with auto-delete on success (opt-out via `opts.keep=true`) and retains the record on mismatch; `llm_bound` raises on token/slot echo mismatch with auto-rollback so a retry starts clean. Resume-friendly: a `wrap_bound` from session A is visible to a `verify_bound` in session B as long as the same FlowState id is resumed. Unit-tested end-to-end including session-boundary resume (73/73 tests pass, 26 new).
+
+### Fixed
+
+- **`tests/test_flow.lua` REPO resolution under worktree**: switched from `os.getenv("PWD") or "."` to the canonical `repo_root_from_package_path()` pattern (mirrors `tests/test_gen_docs.lua` §23–33). Under a worktree run, `mlua-probe-mcp` inherits the main-repo PWD, so the old PWD-based `REPO` silently shadowed worktree code with `main_repo/flow/init.lua` and produced false-green results for any new API added in the worktree. Same class of silent-drop bug flagged in the 2026-04-18 `tests/test_abm.lua` accident comment.
+
 ## [0.16.0] - 2026-04-19
 
 ### Added
