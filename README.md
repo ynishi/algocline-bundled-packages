@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (108)
+## Packages (107)
 
 ### Reasoning
 
@@ -205,6 +205,14 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[panel](panel/)** | Multi-role deliberation. Multiple roles discuss and a moderator synthesizes | — |
+
+### Substrate
+
+Primitives that other packages compose on top of. Substrate modules do NOT provide `M.run` — they expose low-level building blocks (state persistence, request tokens, LLM wrappers) and leave the driver loop to the caller (Functional Core / Imperative Shell).
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[flow](flow/)** | Flow Frame. FlowState (plain table persisted via `alc.state`) + ReqToken (random nonce echoed by downstream results) substrate for composing bundled algo pkg (ab_mcts / cascade / coevolve / ...) with one persistent checkpoint and slot-level verification. Light Frame: driver loop stays in user code. v1 contract (flow/doc/contract.md) for pkg opting in to strict echo verification | AMQP `correlation_id` RPC idiom (RabbitMQ) |
 
 ### Recipes
 

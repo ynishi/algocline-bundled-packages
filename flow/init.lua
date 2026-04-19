@@ -39,7 +39,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.1.0",
+    version     = "0.2.0",
     description = "Flow Frame — FlowState + ReqToken substrate for composing "
         .. "algo-based pkg (ab_mcts / cascade / coevolve / ...). "
         .. "Light Frame: driver loop stays in user code.",

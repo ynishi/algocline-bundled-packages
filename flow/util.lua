@@ -47,4 +47,22 @@ function M.shallow_copy(t)
     return out
 end
 
+--- Recursive structural equality. Handles nil, primitives, and nested
+--- tables with the same key set. Functions / userdata / thread are
+--- compared by reference (==). Metatables are NOT considered.
+---@param a any
+---@param b any
+---@return boolean
+function M.deep_equal(a, b)
+    if a == b then return true end
+    if type(a) ~= "table" or type(b) ~= "table" then return false end
+    for k, v in pairs(a) do
+        if not M.deep_equal(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
 return M

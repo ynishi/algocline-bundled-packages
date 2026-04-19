@@ -105,6 +105,53 @@ describe("flow.util: parse_tag", function()
     end)
 end)
 
+describe("flow.util: deep_equal", function()
+    lust.after(reset)
+
+    it("returns true for identical primitives", function()
+        local util = require("flow.util")
+        expect(util.deep_equal(1, 1)).to.equal(true)
+        expect(util.deep_equal("a", "a")).to.equal(true)
+        expect(util.deep_equal(nil, nil)).to.equal(true)
+        expect(util.deep_equal(true, true)).to.equal(true)
+    end)
+
+    it("returns false for different primitives or type mismatch", function()
+        local util = require("flow.util")
+        expect(util.deep_equal(1, 2)).to.equal(false)
+        expect(util.deep_equal("a", "b")).to.equal(false)
+        expect(util.deep_equal(1, "1")).to.equal(false)
+        expect(util.deep_equal({}, 1)).to.equal(false)
+    end)
+
+    it("returns true for structurally equal nested tables", function()
+        local util = require("flow.util")
+        expect(util.deep_equal(
+            { a = 1, b = { c = 2, d = { e = 3 } } },
+            { a = 1, b = { c = 2, d = { e = 3 } } }
+        )).to.equal(true)
+    end)
+
+    it("returns false when a subtree differs", function()
+        local util = require("flow.util")
+        expect(util.deep_equal(
+            { a = 1, b = { c = 2 } },
+            { a = 1, b = { c = 3 } }
+        )).to.equal(false)
+    end)
+
+    it("returns false when key sets differ", function()
+        local util = require("flow.util")
+        expect(util.deep_equal({ a = 1 }, { a = 1, b = 2 })).to.equal(false)
+        expect(util.deep_equal({ a = 1, b = 2 }, { a = 1 })).to.equal(false)
+    end)
+
+    it("treats two empty tables as equal", function()
+        local util = require("flow.util")
+        expect(util.deep_equal({}, {})).to.equal(true)
+    end)
+end)
+
 describe("flow.util: shallow_copy", function()
     lust.after(reset)
 
@@ -190,6 +237,67 @@ describe("flow.state: basics", function()
         local flow = require("flow")
         expect(function() flow.state_new({ key_prefix = "", id = "id" }) end).to.fail()
         expect(function() flow.state_new({ key_prefix = "p", id  = "" }) end).to.fail()
+    end)
+
+    it("state_save persists identity alongside data", function()
+        local store = mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({
+            key_prefix = "p", id = "id",
+            identity   = { K = 4, model = "m1" },
+        })
+        flow.state_set(st, "k", "v")
+        flow.state_save(st)
+        expect(store["p:id"].identity.K).to.equal(4)
+        expect(store["p:id"].identity.model).to.equal("m1")
+    end)
+
+    it("resume accepts matching identity", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st1 = flow.state_new({
+            key_prefix = "p", id = "id",
+            identity   = { K = 4, model = "m1" },
+        })
+        flow.state_set(st1, "phase", "done")
+        flow.state_save(st1)
+
+        local st2 = flow.state_new({
+            key_prefix = "p", id = "id",
+            identity   = { K = 4, model = "m1" },
+            resume     = true,
+        })
+        expect(flow.state_get(st2, "phase")).to.equal("done")
+    end)
+
+    it("resume errors on identity mismatch", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st1 = flow.state_new({
+            key_prefix = "p", id = "id",
+            identity   = { K = 4 },
+        })
+        flow.state_save(st1)
+        expect(function()
+            flow.state_new({
+                key_prefix = "p", id = "id",
+                identity   = { K = 8 },
+                resume     = true,
+            })
+        end).to.fail()
+    end)
+
+    it("resume accepts legacy checkpoint without persisted identity", function()
+        -- Simulate a pre-0.2.0 record: no identity field on the persisted table.
+        local store = mock_alc_state()
+        store["p:id"] = { data = { k = "legacy" }, _token_value = "tok" }
+        local flow = require("flow")
+        local st = flow.state_new({
+            key_prefix = "p", id = "id",
+            identity   = { K = 4 },
+            resume     = true,
+        })
+        expect(flow.state_get(st, "k")).to.equal("legacy")
     end)
 end)
 
