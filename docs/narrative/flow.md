@@ -1,6 +1,6 @@
 ---
 name: flow
-version: 0.2.0
+version: 0.1.0
 category: substrate
 description: "Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code."
 source: flow/init.lua

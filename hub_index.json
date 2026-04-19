@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-19T01:22:20Z",
+  "updated_at": "2026-04-19T01:35:52Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -434,7 +434,7 @@
     },
     {
       "name": "flow",
-      "version": "0.2.0",
+      "version": "0.1.0",
       "description": "Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code.",
       "category": "substrate",
       "source": "",

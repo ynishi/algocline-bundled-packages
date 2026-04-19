@@ -45,7 +45,7 @@ A plain Lua table persisted to `alc.state` under
 
 | API | behavior |
 |---|---|
-| `flow.state_new({ key_prefix, id, identity?, resume? })` | Create or restore. When `resume=true`, `data` and the internal token value are loaded from the persisted record. `identity` always comes from `opts` (never overwritten by the persisted record) **and, since v0.2.0, is compared by structural equality against the persisted `identity` on resume — a mismatch raises an error**. Legacy checkpoints written by flow 0.1.0 (no persisted `identity` field) are accepted with an `alc.log("warn", ...)` message for backward compatibility. |
+| `flow.state_new({ key_prefix, id, identity?, resume? })` | Create or restore. When `resume=true`, `data` and the internal token value are loaded from the persisted record. `identity` always comes from `opts` (never overwritten by the persisted record) and is compared by structural equality against the persisted `identity` on resume — a mismatch raises an error from `flow.state_new`, preventing silent parameter drift. |
 | `flow.state_key(state)` | Returns `key_prefix .. ":" .. id`. |
 | `flow.state_get(state, k)` | Read `state.data[k]`. |
 | `flow.state_set(state, k, v)` | Write `state.data[k]`. Does NOT persist. |

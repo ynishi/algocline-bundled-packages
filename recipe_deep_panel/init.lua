@@ -155,8 +155,8 @@ M.caveats = {
         .. "independently"
         .. " → treat resume as 'skip completed branches', not as "
         .. "'deterministic restart of the entire pipeline'.",
-    "Resume with changed run parameters is REJECTED by flow 0.2.0+: "
-        .. "the recipe passes identity = { task, n_branches, budget, "
+    "Resume with changed run parameters is REJECTED by flow: the "
+        .. "recipe passes identity = { task, n_branches, budget, "
         .. "max_depth } to flow.state_new, and flow compares it to the "
         .. "persisted checkpoint on resume. A mismatch raises an error "
         .. "from flow.state_new — no silent panel-parameter drift"
@@ -165,10 +165,7 @@ M.caveats = {
         .. "created. Note that ctx.approaches is intentionally NOT part "
         .. "of identity: each branch's approach is pinned into "
         .. "branches[bkey].approach when that branch runs, so approach "
-        .. "drift for not-yet-run branches is allowed. Legacy "
-        .. "checkpoints written by flow 0.1.0 (no persisted identity) "
-        .. "are accepted with a warning for one-migration-release "
-        .. "backward compatibility.",
+        .. "drift for not-yet-run branches is allowed.",
     "Stage 3b (ensemble_div.decompose) only fires when ctx.ground_truth "
         .. "is a number AND every branch answer parses as a number. For "
         .. "free-form text answers the decomposition has no sensible "

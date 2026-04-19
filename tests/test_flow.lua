@@ -210,19 +210,6 @@ describe("flow.state: basics", function()
         expect(st._token_value).to.equal("tok")
     end)
 
-    it("resume does not overwrite identity from opts", function()
-        local store = mock_alc_state()
-        store["p:id"] = { data = {} }
-        local flow = require("flow")
-        local st = flow.state_new({
-            key_prefix = "p",
-            id         = "id",
-            identity   = { agent = "planner" },
-            resume     = true,
-        })
-        expect(st.identity.agent).to.equal("planner")
-    end)
-
     it("state_set then state_save persists via alc.state.set", function()
         local store = mock_alc_state()
         local flow = require("flow")
@@ -287,17 +274,24 @@ describe("flow.state: basics", function()
         end).to.fail()
     end)
 
-    it("resume accepts legacy checkpoint without persisted identity", function()
-        -- Simulate a pre-0.2.0 record: no identity field on the persisted table.
+    it("resume treats a bare persisted record (no identity field) as empty identity", function()
+        -- Hand-crafted fixture without an identity field — the resume path
+        -- treats the missing field as `{}`. Matches when opts.identity is
+        -- absent or empty; errors when opts.identity is non-empty.
         local store = mock_alc_state()
-        store["p:id"] = { data = { k = "legacy" }, _token_value = "tok" }
+        store["p:id"] = { data = { k = "bare" }, _token_value = "tok" }
         local flow = require("flow")
-        local st = flow.state_new({
-            key_prefix = "p", id = "id",
-            identity   = { K = 4 },
-            resume     = true,
-        })
-        expect(flow.state_get(st, "k")).to.equal("legacy")
+
+        local st = flow.state_new({ key_prefix = "p", id = "id", resume = true })
+        expect(flow.state_get(st, "k")).to.equal("bare")
+
+        expect(function()
+            flow.state_new({
+                key_prefix = "p", id = "id",
+                identity   = { K = 4 },
+                resume     = true,
+            })
+        end).to.fail()
     end)
 end)
 

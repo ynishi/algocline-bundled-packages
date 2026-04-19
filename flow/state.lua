@@ -18,12 +18,10 @@ end
 --- value are restored; `identity` is taken from `opts` and not
 --- overwritten by the persisted record.
 ---
---- Since v0.2.0, on resume the caller-supplied `identity` is compared
---- against the persisted `identity` by structural equality. A mismatch
---- raises an error — this prevents silent parameter drift when the
---- same id is reused with different run parameters. Legacy checkpoints
---- written by flow 0.1.0 (no persisted `identity` field) are accepted
---- with a warning via `alc.log` for backward compatibility.
+--- On resume, the caller-supplied `identity` is compared by structural
+--- equality against the persisted `identity` to prevent silent
+--- parameter drift when the same id is reused with different run
+--- parameters. A mismatch raises an error from `flow.state_new`.
 ---@param opts { key_prefix: string, id: string, identity: table?, resume: boolean? }
 ---@return table
 function M.new(opts)
@@ -44,23 +42,13 @@ function M.new(opts)
     if opts.resume and type(alc) == "table" and alc.state and alc.state.get then
         local persisted = alc.state.get(M.key(state))
         if type(persisted) == "table" then
-            if persisted.identity ~= nil then
-                if not util.deep_equal(state.identity, persisted.identity) then
-                    error(string.format(
-                        "flow.state_new: identity mismatch on resume for key %q "
-                            .. "— the persisted checkpoint was written with a "
-                            .. "different identity. Either use a fresh id or "
-                            .. "pass the same identity as the original run.",
-                        M.key(state)), 2)
-                end
-            elseif type(alc.log) == "function" then
-                -- Legacy checkpoint (flow 0.1.0) — no persisted identity.
-                -- Accept for backward compatibility but surface a warning.
-                alc.log("warn", string.format(
-                    "flow.state_new: resuming legacy checkpoint for key %q "
-                        .. "(no persisted identity — identity validation "
-                        .. "skipped for this run)",
-                    M.key(state)))
+            if not util.deep_equal(state.identity, persisted.identity or {}) then
+                error(string.format(
+                    "flow.state_new: identity mismatch on resume for key %q "
+                        .. "— the persisted checkpoint was written with a "
+                        .. "different identity. Either use a fresh id or "
+                        .. "pass the same identity as the original run.",
+                    M.key(state)), 2)
             end
             state.data         = persisted.data or {}
             state._token_value = persisted._token_value
@@ -87,8 +75,8 @@ function M.set(state, k, v)
 end
 
 --- Persist data + identity + internal token to alc.state under the
---- state key. Since v0.2.0 identity is persisted so that a subsequent
---- resume can validate that run parameters match the original run.
+--- state key. `identity` is persisted so that a subsequent resume can
+--- validate that run parameters match the original run.
 ---@param state table
 function M.save(state)
     assert(type(alc) == "table" and alc.state and alc.state.set,

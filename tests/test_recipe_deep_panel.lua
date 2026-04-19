@@ -583,6 +583,10 @@ describe("recipe_deep_panel.run (resume)", function()
         local store = fresh_store()
         install_stubs(store)
         -- Seed state manually to simulate: 2 of 3 branches already done.
+        -- `identity` must match what deep_panel.run passes to
+        -- flow.state_new (task / n_branches / budget / max_depth);
+        -- flow.state_new compares structural equality on resume and
+        -- errors on mismatch.
         store["recipe_deep_panel:res2"] = {
             data = {
                 branches = {
@@ -592,6 +596,12 @@ describe("recipe_deep_panel.run (resume)", function()
                         best_score = 0.9 },
                 },
                 _token = "prev-token",
+            },
+            identity = {
+                task       = "t",
+                n_branches = 3,
+                budget     = 8,
+                max_depth  = 3,
             },
             _token = "prev-token",
         }
