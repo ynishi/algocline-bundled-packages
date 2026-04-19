@@ -32,10 +32,20 @@ For JSON prompts: return valid JSON.
 Be concise in the final report.]]
 
 --- Default agent.run parameters.
+---
+--- max_tokens は per-request の output cap (1 API call で Claude が返せる最大
+--- output token)。最終サマリ report が複雑 (per-case 表 + card_id + 診断) に
+--- なるケースが多いため 4096 を default にする。1024 では truncate する E2E
+--- が実測確認済み (recipe_quick_vote_eval run_id 2026-04-19_124616 → content
+--- 末尾 "1. **Wald" で切断、card_id emit 不能)。
+---
+--- max_tokens_budget は cumulative budget (全 turn 合計 input+output token)。
+--- nil で無制限。ReAct history が O(N²) に膨らむ件への早期 abort 用。
 M.DEFAULTS = {
     model = "claude-haiku-4-5-20251001",
-    max_tokens = 1024,
+    max_tokens = 4096,
     max_iterations = 20,
+    max_tokens_budget = nil,
     mcp_servers = {
         { name = "algocline", command = "alc", args = {} },
     },
@@ -119,7 +129,8 @@ end
 ---@field graders table[] — list of { name, check = function(result) -> passed, msg }
 ---@field system? string — override default system prompt
 ---@field model? string — override default model
----@field max_tokens? integer
+---@field max_tokens? integer — per-request output cap (default 4096)
+---@field max_tokens_budget? integer — cumulative budget across all turns (default nil = unlimited)
 ---@field max_iterations? integer
 ---@field mcp_servers? table[]
 ---@field params? table — arbitrary params to record alongside the result
@@ -142,6 +153,7 @@ function M.run(opts)
         system = opts.system or M.DEFAULT_SYSTEM,
         model = opts.model or M.DEFAULTS.model,
         max_tokens = opts.max_tokens or M.DEFAULTS.max_tokens,
+        max_tokens_budget = opts.max_tokens_budget or M.DEFAULTS.max_tokens_budget,
         max_iterations = opts.max_iterations or M.DEFAULTS.max_iterations,
         mcp_servers = opts.mcp_servers or M.DEFAULTS.mcp_servers,
         on_turn = function(info)

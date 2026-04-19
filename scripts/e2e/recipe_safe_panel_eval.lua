@@ -55,7 +55,11 @@ common.run({
     name = "recipe_safe_panel_eval",
     prompt = prompt,
     max_iterations = 150,
-    max_tokens = 1024,
+    -- multi-case eval は最終 report に per-case 表 + card_id + 複数診断
+    -- (anti_jury / needs_investigation / safety gate) を含めるため 1024
+    -- では truncate する実リスクがあり、事前に 4096 に引き上げ。
+    -- 実測で truncate したら 8192 まで更に引き上げる (quick_vote 前例)。
+    max_tokens = 4096,
     params = {
         strategy = "recipe_safe_panel",
         scenario = "math_basic",

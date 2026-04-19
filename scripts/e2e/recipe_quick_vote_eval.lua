@@ -71,9 +71,14 @@ common.run({
     name = "recipe_quick_vote_eval",
     prompt = prompt,
     max_iterations = 150,
-    -- 1024 だと最終レポート (per-case 表 + card_id) が途中切れする
-    -- (2026-04-19 実測)。report を完走させるため 4096 に拡張。
-    max_tokens = 4096,
+    -- 1024/4096 でも最終レポート (per-case 表 + card_id + 診断) が途中切れ
+    -- する (2026-04-19 実測: 4096 でも content 末尾 "1. **Wald" で truncate,
+    -- card_id が emit できず reports_card_id grader FAIL)。8192 まで拡張。
+    max_tokens = 8192,
+    -- Cumulative ReAct history が O(N²) で膨らむ件の保険 (ランナー側の
+    -- 早期 abort)。7 cases × ~16 calls × ~50K tokens/turn の実測 ~7M を
+    -- 超えたら止める。
+    max_tokens_budget = 8000000,
     params = {
         strategy = "recipe_quick_vote",
         scenario = "math_basic",
