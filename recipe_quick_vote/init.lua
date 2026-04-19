@@ -131,6 +131,21 @@ M.caveats = {
         .. "signal for 'not enough evidence at declared (α, β)'. Consumers "
         .. "should route truncated runs to recipe_safe_panel / "
         .. "recipe_deep_panel rather than retry with the same params.",
+    "outcome = 'rejected' is a CONCLUSIVE verdict (SPRT accepted H0 at "
+        .. "declared β), not a 'needs investigation' state. The leader "
+        .. "is statistically wrong under the test; the consumer should "
+        .. "re-enter with the plurality-leader from vote_counts or "
+        .. "escalate. needs_investigation fires only on 'truncated'.",
+    "DIVERSITY_HINTS currently has 7 entries and cycles via modulo when "
+        .. "max_n exceeds that length. For max_n > 7 the later samples "
+        .. "repeat earlier hints — diversity degrades. Keep max_n <= 7 "
+        .. "for strict diversity, or pass a larger custom hint set "
+        .. "through ctx (future extension point).",
+    "M.verified captures the LATEST verified configuration, not an "
+        .. "append-only history. Each re-verification replaces the prior "
+        .. "e2e_runs / alc_eval_runs payload. Treat it as a snapshot of "
+        .. "'what empirically passed on the current source' rather than "
+        .. "an accumulating log.",
 }
 
 --- Empirical verification status.
@@ -150,7 +165,7 @@ M.verified = {
             stage = 1,
             name = "sprt_primitive",
             status = "verified",
-            evidence = { "tests/test_sprt.lua:alpha_beta_grid" },
+            evidence = { "tests/test_sprt.lua::sprt Monte Carlo α/β verification" },
         },
         {
             stage = 2,
@@ -295,8 +310,73 @@ local function clean_answer(s)
     return t
 end
 
+--- canonicalize_numeric — BP from EleutherAI lm-evaluation-harness
+--- `minerva_math/utils.py` + hendrycks/math `math_equivalence.py`.
+---
+--- Applies three conservative passes to collapse "same value, different
+--- surface form" strings into one canonical representation:
+---
+---   (1) Strip thousands-separator commas ONLY when the whole string
+---       matches a thousands-grouping pattern ("^-?D{1,3}(,DDD)+($|.D+)$").
+---       This preserves the ambiguous "1,5" (a de_DE decimal literal)
+---       from being flattened to "15", per the locale-robust advice in
+---       `canonicalize_numeric` discussion.
+---
+---   (2) Fraction evaluation: "a/b" with integer a, b ≠ 0, a divisible
+---       by b → "a/b" as the quotient string. Non-divisible fractions
+---       are left untouched (so "1/3" stays "1/3", matching hendrycks
+---       math_equivalence which defers non-integer fractions to sympy).
+---
+---   (3) tonumber canonicalization: remove trailing ".0" / whitespace
+---       artefacts ("42.0" → "42") and normalize float display
+---       ("3.14" stays "3.14"). The `< 1e15` guard prevents
+---       `math.floor(n) == n` from firing spuriously on large floats
+---       where float precision equals integer representation.
+---
+--- Non-numeric strings fall through unchanged.
+local function canonicalize_numeric(s)
+    -- (1) Strip thousands commas when the string is a comma-grouped
+    --     integer or decimal. Pattern guards against locale ambiguity.
+    local candidate = s
+    if s:match("^%-?%d%d?%d?,%d%d%d[,%d]*$")
+        or s:match("^%-?%d%d?%d?,%d%d%d[,%d]*%.%d+$") then
+        candidate = s:gsub(",", "")
+    end
+
+    -- (2) Integer-divisible fraction evaluation. clean_answer has
+    --     already collapsed internal whitespace to single spaces, so
+    --     "144 / 12" arrives here as "144 / 12" and still matches.
+    local a, b = candidate:match("^(%-?%d+)%s*/%s*(%-?%d+)$")
+    if a and b then
+        local na, nb = tonumber(a), tonumber(b)
+        if nb and nb ~= 0 and na % nb == 0 then
+            return tostring(na // nb)
+        end
+    end
+
+    -- (3) tonumber pass. Silent fallback on non-numeric input.
+    local n = tonumber(candidate)
+    if n then
+        if n == math.floor(n) and math.abs(n) < 1e15 then
+            return tostring(math.floor(n))
+        end
+        return tostring(n)
+    end
+    return s
+end
+
+--- normalize — canonical key for agreement comparison.
+---
+--- Order: clean_answer → canonicalize_numeric → (if unchanged) lower.
+--- The numeric path returns a lowercase-stable string already (digits
+--- only), so the :lower() step is only reached when canonicalization
+--- declined to rewrite the value (non-numeric string answers like
+--- "Yes" / "No").
 local function normalize(s)
-    return clean_answer(s):lower()
+    local c = clean_answer(s)
+    local num = canonicalize_numeric(c)
+    if num ~= c then return num end
+    return c:lower()
 end
 
 local DIVERSITY_HINTS = {
@@ -447,7 +527,13 @@ function M.run(ctx)
             min_n = min_n, max_n = max_n,
         },
         total_llm_calls     = total_llm_calls,
-        needs_investigation = (outcome_label ~= "confirmed"),
+        -- needs_investigation is tied to 'truncated' specifically:
+        -- that is the SPRT-inconclusive branch where the consumer must
+        -- escalate (to recipe_safe_panel / recipe_deep_panel). 'rejected'
+        -- is NOT investigation-worthy — it is a conclusive statistical
+        -- verdict that the leader is wrong; the consumer should re-enter
+        -- with the plurality-leader from vote_counts (see caveats).
+        needs_investigation = (outcome_label == "truncated"),
     }
     return ctx
 end

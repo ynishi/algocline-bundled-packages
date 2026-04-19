@@ -3023,7 +3023,7 @@ Returns `quick_voted` shape:
 | `answer` | string | — | Leader answer from sample 1 (cleaned, not normalized) |
 | `leader_norm` | string | — | Normalized leader key used for agreement tests |
 | `n_samples` | number | — | Total samples drawn (1 leader + k agreement observations) |
-| `needs_investigation` | boolean | — | True unless outcome == 'confirmed' |
+| `needs_investigation` | boolean | — | True only when outcome == 'truncated' (evidence inconclusive at declared α/β). 'rejected' is a conclusive verdict and does NOT set this flag. |
 | `outcome` | one_of("confirmed", "rejected", "truncated") | — | Terminal state: confirmed=H1 accepted, rejected=H0 accepted, truncated=no verdict at max_n |
 | `params` | shape { alpha: number, beta: number, max_n: number, min_n: number, p0: number, p1: number } | — | Echoed parameter values |
 | `samples` | array of shape { answer: string, norm: string, reasoning: string } | — | Per-sample reasoning + extracted answer |

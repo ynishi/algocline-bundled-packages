@@ -314,7 +314,7 @@ M.quick_voted = T.shape({
     sprt        = quick_vote_sprt:describe("Final SPRT state snapshot"),
     params      = quick_vote_params:describe("Echoed parameter values"),
     total_llm_calls     = T.number:describe("2 × n_samples (reasoning + extract per sample)"),
-    needs_investigation = T.boolean:describe("True unless outcome == 'confirmed'"),
+    needs_investigation = T.boolean:describe("True only when outcome == 'truncated' (evidence inconclusive at declared α/β). 'rejected' is a conclusive verdict and does NOT set this flag."),
 }, { open = true })
 
 -- ── recipe_deep_panel shape ──────────────────────────────────────────

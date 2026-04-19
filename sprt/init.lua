@@ -159,6 +159,11 @@ local function validate_config(cfg)
             .. "hypotheses or choose a non-empty gap.",
             tostring(p0), tostring(p1)), 3)
     end
+    -- Practical cap: α, β < 0.5. SPRT theory admits any (α, β) in (0, 1),
+    -- but ≥ 0.5 drives one boundary toward zero (e.g. β = 0.5, α = 0.5
+    -- gives A = log(1) = 0, so the test accepts H1 at n = 1 on the first
+    -- favourable observation), which is almost never the intended design.
+    -- Relax this cap only with an explicit justification.
     if type(alpha) ~= "number" or alpha <= 0 or alpha >= 0.5 then
         error("sprt.new: alpha must be in (0, 0.5), got " .. tostring(alpha), 3)
     end
@@ -173,10 +178,6 @@ local function to_bernoulli(x)
     end
     if x == true or x == 1 then return 1 end
     if x == false or x == 0 then return 0 end
-    if type(x) == "number" then
-        if x == 1 then return 1 end
-        if x == 0 then return 0 end
-    end
     error("sprt.observe: outcome must be boolean or 0/1, got "
         .. tostring(x), 3)
 end
@@ -304,10 +305,15 @@ end
 --- Wald (1945) §3.4:
 ---     E[N | p] ≈ [ L(p)·B + (1 - L(p))·A ] / E[log λ | p]
 --- where E[log λ | p] = p·log(p1/p0) + (1-p)·log((1-p1)/(1-p0))
---- and L(p) ≈ operating characteristic (not computed here; we return
---- the simpler numerator-only envelope at p = p1 or p = p0).
+--- and L(p) ≈ operating characteristic (not computed here). The
+--- function accepts an arbitrary p ∈ [0, 1] — the caller decides
+--- which operating point to probe (p = p1 for power-side sizing, p =
+--- p0 for size-side sizing, or an intermediate p to inspect the worst
+--- case). Using A for ell > 0 and B for ell < 0 gives the matching-sign
+--- numerator-only envelope described above.
 ---@param cfg table { p0, p1, alpha, beta }
----@param p number true rate (typically p1 for power or p0 for size)
+---@param p number true rate in [0, 1]; typical choices: p1 for power,
+---            p0 for size, or any interior point to probe worst case
 ---@return number|nil expected_n
 function M.expected_n_envelope(cfg, p)
     validate_config(cfg)

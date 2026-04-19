@@ -79,7 +79,7 @@
 ---@field answer string @Leader answer from sample 1 (cleaned, not normalized)
 ---@field leader_norm string @Normalized leader key used for agreement tests
 ---@field n_samples number @Total samples drawn (1 leader + k agreement observations)
----@field needs_investigation boolean @True unless outcome == 'confirmed'
+---@field needs_investigation boolean @True only when outcome == 'truncated' (evidence inconclusive at declared α/β). 'rejected' is a conclusive verdict and does NOT set this flag.
 ---@field outcome "confirmed"|"rejected"|"truncated" @Terminal state: confirmed=H1 accepted, rejected=H0 accepted, truncated=no verdict at max_n
 ---@field params { alpha: number, beta: number, max_n: number, min_n: number, p0: number, p1: number } @Echoed parameter values
 ---@field samples { answer: string, norm: string, reasoning: string }[] @Per-sample reasoning + extracted answer

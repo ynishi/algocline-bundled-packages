@@ -122,6 +122,44 @@ describe("recipe_quick_vote._internal", function()
         expect(r._internal.normalize("Yes.")).to.equal("yes")
     end)
 
+    -- F4 lock-in: numeric canonicalization. These cases are why the
+    -- leader-vs-vote table needs a *canonical* representation — the
+    -- same integer written three different ways must collide.
+    it("normalize canonicalizes integer-valued floats", function()
+        mock_alc({})
+        local r = require("recipe_quick_vote")
+        expect(r._internal.normalize("42.0")).to.equal("42")
+        expect(r._internal.normalize("42.00")).to.equal("42")
+    end)
+
+    it("normalize strips thousands separators (digit-grouped only)", function()
+        mock_alc({})
+        local r = require("recipe_quick_vote")
+        expect(r._internal.normalize("1,000")).to.equal("1000")
+        expect(r._internal.normalize("1,234,567")).to.equal("1234567")
+        -- "1,5" is NOT a thousands-group pattern (regex requires 3-digit
+        -- groups after each comma), so it is left alone and falls back
+        -- to :lower() — guards against de_DE-style decimal-comma input
+        -- being silently coerced to 15 or 1.5.
+        expect(r._internal.normalize("1,5")).to.equal("1,5")
+    end)
+
+    it("normalize evaluates integer-divisible fractions", function()
+        mock_alc({})
+        local r = require("recipe_quick_vote")
+        expect(r._internal.normalize("144/12")).to.equal("12")
+        expect(r._internal.normalize("144 / 12")).to.equal("12")
+        -- 1/3 is NOT integer-divisible → left as-is (lowercased).
+        expect(r._internal.normalize("1/3")).to.equal("1/3")
+    end)
+
+    it("normalize leaves non-numeric strings to :lower()", function()
+        mock_alc({})
+        local r = require("recipe_quick_vote")
+        expect(r._internal.normalize("Hello World")).to.equal("hello world")
+        expect(r._internal.normalize("ABC")).to.equal("abc")
+    end)
+
     it("DIVERSITY_HINTS is a non-empty table", function()
         mock_alc({})
         local r = require("recipe_quick_vote")
@@ -250,7 +288,10 @@ describe("recipe_quick_vote rejected path", function()
         expect(ctx.result.verdict).to.equal("accept_h0")
         expect(ctx.result.n_samples).to.equal(4)
         expect(ctx.result.answer).to.equal("42")
-        expect(ctx.result.needs_investigation).to.equal(true)
+        -- 'rejected' is CONCLUSIVE (SPRT accepted H0), so the flag
+        -- does NOT fire — the consumer should re-enter with the
+        -- plurality-leader, not escalate to investigation.
+        expect(ctx.result.needs_investigation).to.equal(false)
         expect(ctx.result.total_llm_calls).to.equal(8)
     end)
 end)
@@ -259,12 +300,20 @@ describe("recipe_quick_vote truncated path", function()
     lust.after(reset)
 
     it("truncates at max_n when evidence is inconclusive", function()
+        -- Cumulative log_lr trace (per-trial increments: agree=+0.470,
+        -- disagree=-0.916; A ≈ +2.89, B ≈ -2.25):
+        --   leader                             log_lr = 0
+        --   sample 2: agree    0 + 0.470     = +0.470
+        --   sample 3: disagree 0.470 - 0.916 = -0.446
+        --   sample 4: agree    -0.446+ 0.470 = +0.024
+        --   sample 5: disagree 0.024 - 0.916 = -0.892
+        -- Neither A nor B is crossed → truncated at max_n = 5.
         mock_alc({
-            "42",   -- leader
-            "42",   -- agree  (log_lr ≈ +0.47)
-            "43",   -- disagree (-0.45)
-            "42",   -- agree  (+0.03)
-            "43",   -- disagree (-0.89)  — never crosses A or B
+            "42",   -- leader                     (log_lr = 0)
+            "42",   -- agree     (log_lr ≈ +0.47)
+            "43",   -- disagree  (log_lr ≈ -0.45)
+            "42",   -- agree     (log_lr ≈ +0.02)
+            "43",   -- disagree  (log_lr ≈ -0.89)  — never crosses A or B
         })
         local r = require("recipe_quick_vote")
         local ctx = r.run({
@@ -276,6 +325,8 @@ describe("recipe_quick_vote truncated path", function()
         expect(ctx.result.outcome).to.equal("truncated")
         expect(ctx.result.verdict).to.equal("continue")
         expect(ctx.result.n_samples).to.equal(5)
+        -- 'truncated' is the ONLY outcome that should fire
+        -- needs_investigation under the new semantic.
         expect(ctx.result.needs_investigation).to.equal(true)
         -- Vote counts should reflect the mix (3 × "42", 2 × "43").
         expect(ctx.result.vote_counts["42"]).to.equal(3)

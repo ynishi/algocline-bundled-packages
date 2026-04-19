@@ -376,4 +376,18 @@ describe("sprt.expected_n_envelope", function()
             { p0 = 0.55, p1 = 0.65, alpha = 0.05, beta = 0.05 }, 0.65)
         expect(narrow > wide).to.equal(true)
     end)
+
+    it("returns nil at the zero-drift point (E[log λ | p] = 0)", function()
+        -- Analytic zero of E[log λ | p] for the config below:
+        --   ell(p) = p·log(p1/p0) + (1-p)·log((1-p1)/(1-p0))
+        -- For p0=0.5, p1=0.8: log(1.6)=0.47000, log(0.4)=-0.91629
+        -- Solve ell=0 ⇒ p = 0.91629 / (0.47000 + 0.91629) ≈ 0.6611
+        local sprt = require("sprt")
+        local cfg = { p0 = 0.5, p1 = 0.8, alpha = 0.05, beta = 0.1 }
+        local log_p1_p0 = math.log(cfg.p1 / cfg.p0)
+        local log_1mp1_1mp0 = math.log((1 - cfg.p1) / (1 - cfg.p0))
+        local p_zero = -log_1mp1_1mp0 / (log_p1_p0 - log_1mp1_1mp0)
+        local env = sprt.expected_n_envelope(cfg, p_zero)
+        expect(env).to.equal(nil)
+    end)
 end)
