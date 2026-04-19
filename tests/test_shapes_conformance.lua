@@ -28,6 +28,7 @@ local DECLARED_PACKAGES = {
     { name = "pairwise_rank",          shape = "pairwise_ranked" },
     { name = "recipe_ranking_funnel",  shape = "funnel_ranked" },
     { name = "recipe_safe_panel",      shape = "safe_paneled" },
+    { name = "recipe_quick_vote",      shape = "quick_voted" },
 }
 
 local function resolve_shape_name(result)
@@ -356,11 +357,91 @@ describe("shape conformance: shape validation against mock data", function()
         expect(reason:match("shape violation")).to.exist()
     end)
 
+    it("quick_voted shape accepts confirmed result", function()
+        local mock = {
+            answer      = "42",
+            leader_norm = "42",
+            outcome     = "confirmed",
+            verdict     = "accept_h1",
+            n_samples   = 8,
+            vote_counts = { ["42"] = 8 },
+            samples     = {
+                { reasoning = "r1", answer = "42", norm = "42" },
+            },
+            sprt = { log_lr = 3.29, n = 7, a_bound = 2.89, b_bound = -2.25 },
+            params = {
+                p0 = 0.5, p1 = 0.8, alpha = 0.05, beta = 0.10,
+                min_n = 3, max_n = 10,
+            },
+            total_llm_calls     = 16,
+            needs_investigation = false,
+        }
+        expect(S.check(mock, S.quick_voted)).to.equal(true)
+    end)
+
+    it("quick_voted shape accepts rejected result", function()
+        local mock = {
+            answer      = "42",
+            leader_norm = "42",
+            outcome     = "rejected",
+            verdict     = "accept_h0",
+            n_samples   = 4,
+            vote_counts = { ["42"] = 1, ["43"] = 3 },
+            samples     = {},
+            sprt = { log_lr = -2.75, n = 3, a_bound = 2.89, b_bound = -2.25 },
+            params = {
+                p0 = 0.5, p1 = 0.8, alpha = 0.05, beta = 0.10,
+                min_n = 3, max_n = 10,
+            },
+            total_llm_calls     = 8,
+            needs_investigation = true,
+        }
+        expect(S.check(mock, S.quick_voted)).to.equal(true)
+    end)
+
+    it("quick_voted shape accepts truncated result", function()
+        local mock = {
+            answer      = "42",
+            leader_norm = "42",
+            outcome     = "truncated",
+            verdict     = "continue",
+            n_samples   = 5,
+            vote_counts = { ["42"] = 3, ["43"] = 2 },
+            samples     = {},
+            sprt = { log_lr = -0.89, n = 4, a_bound = 2.89, b_bound = -2.25 },
+            params = {
+                p0 = 0.5, p1 = 0.8, alpha = 0.05, beta = 0.10,
+                min_n = 3, max_n = 5,
+            },
+            total_llm_calls     = 10,
+            needs_investigation = true,
+        }
+        expect(S.check(mock, S.quick_voted)).to.equal(true)
+    end)
+
+    it("quick_voted rejects invalid outcome label", function()
+        local mock = {
+            answer = "42", leader_norm = "42",
+            outcome = "unknown",   -- not in the one_of set
+            verdict = "continue",
+            n_samples = 1, vote_counts = { ["42"] = 1 }, samples = {},
+            sprt = { log_lr = 0, n = 0, a_bound = 2.89, b_bound = -2.25 },
+            params = {
+                p0 = 0.5, p1 = 0.8, alpha = 0.05, beta = 0.10,
+                min_n = 3, max_n = 10,
+            },
+            total_llm_calls = 2, needs_investigation = true,
+        }
+        local ok, reason = S.check(mock, S.quick_voted)
+        expect(ok).to.equal(false)
+        expect(reason:match("expected one of")).to.exist()
+    end)
+
     it("all shapes tolerate extra fields (open=true)", function()
         local shapes = {
             S.voted, S.paneled, S.assessed, S.calibrated,
             S.tournament, S.listwise_ranked, S.pairwise_ranked,
-            S.funnel_ranked, S.safe_paneled,
+            S.funnel_ranked, S.safe_paneled, S.quick_voted,
         }
         for _, shape in ipairs(shapes) do
             expect(rawget(shape, "open")).to.equal(true)

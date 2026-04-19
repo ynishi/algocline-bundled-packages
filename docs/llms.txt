@@ -130,6 +130,7 @@
 ## recipe
 
 - [recipe_deep_panel](narrative/recipe_deep_panel.md): Deep-reasoning diverse panel — N × ab_mcts (Thompson Sampling tree search) fan-out via flow (resume-safe), followed by ensemble_div diversity diagnostic, condorcet expected-accuracy, and calibra...
+- [recipe_quick_vote](narrative/recipe_quick_vote.md): Adaptive-stop majority vote. sc-style sampler looped under SPRT gate. Exits as soon as declared (α, β) error rates permit, or truncates with an explicit verdict for consumer escalation. Fills the...
 - [recipe_ranking_funnel](narrative/recipe_ranking_funnel.md): Verified 3-stage ranking funnel — listwise screening, multi-axis scoring, pairwise final rank. -87% calls vs naive pairwise on N=8 (verified). Encodes known failure modes as caveats.
 - [recipe_safe_panel](narrative/recipe_safe_panel.md): Verified safe majority-vote panel — Condorcet-sized, Anti-Jury gated, inverse-U monitored, confidence-calibrated. Composes condorcet + sc + inverse_u + calibrate with known failure mode awareness.
 
@@ -188,4 +189,5 @@
 - [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring
 - [inverse_u](narrative/inverse_u.md): Inverse-U scaling detection — detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling (Chen et al. NeurIPS 2024, Theorem 2).
 - [negation](narrative/negation.md): Adversarial self-test — generate destruction conditions and verify answer survival
+- [sprt](narrative/sprt.md): Wald Sequential Probability Ratio Test — anytime 2-hypothesis stopping rule for Bernoulli streams with (α, β) error guarantees and Wald–Wolfowitz optimal E[N]. Complements cs_pruner (multi-ar...
 - [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.

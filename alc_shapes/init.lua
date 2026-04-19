@@ -275,6 +275,48 @@ M.safe_paneled = T.shape({
     stages             = T.array_of(safe_panel_stage):describe("Per-stage detail (discriminated by name)"),
 }, { open = true })
 
+-- ── recipe_quick_vote shape ──────────────────────────────────────────
+-- Adaptive-stop majority vote with SPRT gate. Three outcome branches
+-- ("confirmed" / "rejected" / "truncated") share the same result shape
+-- so consumers can read any field without branching on `outcome`.
+local quick_vote_sample = T.shape({
+    reasoning = T.string,
+    answer    = T.string,
+    norm      = T.string,
+}, { open = true })
+
+local quick_vote_sprt = T.shape({
+    log_lr  = T.number,
+    n       = T.number,
+    a_bound = T.number,
+    b_bound = T.number,
+}, { open = true })
+
+local quick_vote_params = T.shape({
+    p0    = T.number,
+    p1    = T.number,
+    alpha = T.number,
+    beta  = T.number,
+    min_n = T.number,
+    max_n = T.number,
+}, { open = true })
+
+M.quick_voted = T.shape({
+    answer      = T.string:describe("Leader answer from sample 1 (cleaned, not normalized)"),
+    leader_norm = T.string:describe("Normalized leader key used for agreement tests"),
+    outcome     = T.one_of({ "confirmed", "rejected", "truncated" })
+        :describe("Terminal state: confirmed=H1 accepted, rejected=H0 accepted, truncated=no verdict at max_n"),
+    verdict     = T.one_of({ "accept_h1", "accept_h0", "continue" })
+        :describe("Underlying SPRT verdict from the final decide()"),
+    n_samples   = T.number:describe("Total samples drawn (1 leader + k agreement observations)"),
+    vote_counts = T.map_of(T.string, T.number):describe("{ [norm] = count } tally across all samples"),
+    samples     = T.array_of(quick_vote_sample):describe("Per-sample reasoning + extracted answer"),
+    sprt        = quick_vote_sprt:describe("Final SPRT state snapshot"),
+    params      = quick_vote_params:describe("Echoed parameter values"),
+    total_llm_calls     = T.number:describe("2 × n_samples (reasoning + extract per sample)"),
+    needs_investigation = T.boolean:describe("True unless outcome == 'confirmed'"),
+}, { open = true })
+
 -- ── recipe_deep_panel shape ──────────────────────────────────────────
 -- Stages are heterogeneous per invocation (Stage 1 may be the abort
 -- branch; Stage 3's decomp is nullable; Stage 5 always present on

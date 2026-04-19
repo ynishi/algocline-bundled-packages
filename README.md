@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (107)
+## Packages (109)
 
 ### Reasoning
 
@@ -123,6 +123,7 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 | **[inverse_u](inverse_u/)** | Inverse-U scaling detection. Detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling — catches the peak and recommends early stopping | Chen et al. (NeurIPS 2024), Theorem 2 |
 | **[eval_guard](eval_guard/)** | Evaluation safety gates. Self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight checks before trusting any multi-agent evaluation result | Huang (ICLR 2024), Wang (ACL 2024), Zhu (EMNLP 2024) |
 | **[scoring_rule](scoring_rule/)** | Proper Scoring Rules. Brier, logarithmic, spherical scores + Expected Calibration Error (ECE) for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy. Strictly proper: honest reporting maximizes expected score | Brier (1950), Gneiting & Raftery (JASA 2007), Naeini (AAAI 2015) |
+| **[sprt](sprt/)** | Wald's Sequential Probability Ratio Test primitive. Streaming Bernoulli test with declared α/β error rates; Wald–Wolfowitz optimality (minimal expected N among tests with same error bounds). Substrate for adaptive-stop recipes that need to decide accept_h0 / accept_h1 / continue per observation | Wald (1945), Wald & Wolfowitz (1948) |
 
 ### Orchestration
 
@@ -223,6 +224,7 @@ End-to-end strategies that compose multiple packages into a single `run(ctx)` en
 | **[recipe_safe_panel](recipe_safe_panel/)** | Safety-first panel QA. Condorcet-sized panel → self-consistency → optional inverse-U scaling check → calibrated confidence. Anti-Jury / needs_investigation safety gates. math_basic pass_rate 1.0 (7/7) at 8 LLM calls/case (max_n=3) | condorcet, sc, inverse_u, calibrate |
 | **[recipe_ranking_funnel](recipe_ranking_funnel/)** | Listwise → pairwise ranking funnel. 8→3→3 funnel shape on population ranking yielded 7 LLM calls vs naive all-pairs 56 (87% savings), top-1 correct | listwise_rank, pairwise_rank |
 | **[recipe_deep_panel](recipe_deep_panel/)** | Deep-reasoning diverse panel with resume. Condorcet gate → N × ab_mcts fan-out via flow (checkpoint-per-branch) → ensemble_div diversity → Condorcet expected accuracy → calibrate meta-confidence. Heavy-compute counterpart of recipe_safe_panel (≈ N × (2·budget+1) + 1 LLM calls; 52 at N=3, budget=8) | flow, condorcet, ab_mcts, ensemble_div, calibrate |
+| **[recipe_quick_vote](recipe_quick_vote/)** | Adaptive-stop majority vote. Leader commits from sample 1, subsequent samples vote agree/disagree, Wald SPRT decides accept_h1 (confirmed) / accept_h0 (rejected) / continue until max_n (truncated). Fills the Quick slot between recipe_safe_panel (~8 fixed calls) and recipe_deep_panel (~52 heavy calls) with declared α/β error budget | sprt |
 
 #### Current limitations — recipe test coverage
 
@@ -242,6 +244,7 @@ Coverage at time of writing:
 | recipe_safe_panel | ✓ (22 tests) | ✓ (`scripts/e2e/recipe_safe_panel.lua`) | ✓ (`recipe_safe_panel_eval.lua`, math_basic 7/7) |
 | recipe_ranking_funnel | ✓ (19 tests) | ✓ (`scripts/e2e/recipe_ranking_funnel.lua`) | ✗ — **not yet authored** |
 | recipe_deep_panel | ✓ (41 tests, mocked `ab_mcts` / `calibrate` + real `flow` / `condorcet` / `ensemble_div`) | ✗ — **not yet authored** | ✗ — **not yet authored** |
+| recipe_quick_vote | ✓ (21 tests, mocked `_G.alc.llm`) | ✓ (`scripts/e2e/recipe_quick_vote.lua`, 17+25=42 → confirmed @ n=8, 16 calls, log_lr=3.29) | ✓ (`scripts/e2e/recipe_quick_vote_eval.lua` against math_basic, 7/7 pass_rate=1.0, 112 LLM calls, all confirmed @ n=8; card_id integration needs follow-up) |
 
 Gaps:
 
@@ -279,7 +282,7 @@ Manual `S.assert(value, "voted", hint)` is still available for ad-hoc
 validation of external data. Dev-mode checks activate under
 `ALC_SHAPE_CHECK=1`.
 
-9 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), discriminated unions (`T.discriminated`), and named references (`T.ref`).
+11 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`, `quick_voted`, `deep_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), discriminated unions (`T.discriminated`), and named references (`T.ref`).
 
 See [alc_shapes/README.md](alc_shapes/README.md) for the full API reference (combinators, validator, `M.spec.entries`, instrument, spec_resolver, reflection, codegen).
 
