@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-04-19
+
 ### Added
 
 - **[flow](flow/) Frame substrate** (v0.1.0 debut): Light Frame over `alc.state` exposing two primitives — `FlowState` (persistent KV with resume) and `ReqToken` (random-nonce request correlation, AMQP `correlation_id` idiom) — plus `flow.llm` sugar for LLM calls with slot+token echo verification. Module-level pure-function API (`state_new / state_key / state_get / state_set / state_save / token_issue / token_wrap / token_verify / llm`). No `M.run` by design: `flow` is a substrate, not an orchestrator — the driver loop stays in user code (Functional Core / Imperative Shell). Identity `deep_equal` check on resume prevents silent parameter drift. Fail-open token verification keeps existing bundled pkgs usable without rewrite; opt-in v1 contract (see `flow/doc/contract.md`) tightens per-call verification.
@@ -15,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`justfile` recipes** `gen-docs`, `gen-docs-lint`, `gen-docs-strict`: fills the gap where `CLAUDE.md` documented these commands but the justfile lacked them. Commit / release gates use `gen-docs-strict` to fail on V0 convention lint errors.
 - **Integration test suites** under `tests/flow/`: `test_integ_swarm_mcts.lua` (fan-out + consensus + commit), `test_integ_gate_scale.lua` (5-gate Coding-pipeline chain with retry + resume), `test_integ_ensemble_vote.lua` (bare `flow.llm` × N + pure-compute + regen loop-back). Each file documents the flow-scaling property it exercises in a header comment.
 - **Unit test suites** `tests/test_flow.lua` (51 assertions across util / state / token / llm / meta) and `tests/test_recipe_deep_panel.lua` (41 assertions across meta / ingredients / internal vote-tally / input validation / Stage 1 abort / main path / token tampering / resume). Full MCP run: 109/109 pass.
+- **[sprt](sprt/) Sequential Probability Ratio Test primitive** (v0.1.0 debut): Wald 1945 / Wald & Wolfowitz 1948 SPRT as a standalone observe/decide gate on any Bernoulli stream. `sprt.new(p0, p1, alpha, beta)` → `observe(outcome)` / `decide()` → `"accept_h0" | "accept_h1" | "continue"`. Auxiliary `sprt.expected_n_envelope(n_obs, p0, p1, alpha, beta)` documented as simplified numerator-only Wald form (not exact E[N]). Verified via alpha/beta grid Monte Carlo suite (`tests/test_sprt.lua`, 33 assertions).
+- **[recipe_quick_vote](recipe_quick_vote/) Recipe** (v0.1.0 debut): fills the Quick slot between `recipe_safe_panel` (fixed n≈8) and `recipe_deep_panel` (per-branch MCTS ≈52 calls). Loops sc-style samples under a Wald SPRT gate and exits as soon as the declared (α, β) error budget permits. Parameters `p0 / p1 / alpha / beta / min_n / max_n`. Minerva-style numeric normalize (`"42.0"` → `"42"`, `"1,000"` → `"1000"`, `"144/12"` → `"12"`, de_DE decimal guard preserves `"1,5"`). `needs_investigation` fires on `"truncated"` only (rejected is conclusive). Verified via 25 unit tests, E2E single-case (17+25=42, confirmed @ n=8, 16 calls, log_lr=3.29) and scenario-eval vs `math_basic` (7/7 pass_rate=1.0, 112 calls, all confirmed @ n=8).
+- **`AlcResultQuickVoted` shape** in `alc_shapes`: machine-contract for recipe_quick_vote result (`sprt_decision` / `log_lr` / `n_samples` / `outcome ∈ {confirmed, rejected, truncated}` among fields). LuaCATS projection in `types/alc_shapes.d.lua`.
 
 ### Fixed
 
@@ -23,10 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strict-review hardening C3 (`flow.token.wrap`)**: `_flow_token` / `_flow_slot` are reserved keys owned by flow — passing a payload that already contains either now raises an assert error instead of silently overwriting caller data.
 - **Strict-review hardening C4 (`flow.token.verify`)**: documented why the leading `_token` parameter is intentionally unused (API symmetry with `wrap`, reserved hook for future token rotation).
 - **Strict-review hardening C5 (`flow/doc/README.md`)**: added an explicit table contrasting `token_verify`'s boolean fail-open with `flow.llm`'s error-on-mismatch semantics, so the asymmetry is not read as an inconsistency.
+- **Strict-review hardening A-E on sprt / recipe_quick_vote**: (A) regenerate missing `AlcResultQuickVoted` in `types/alc_shapes.d.lua`; (B) `sprt.observe` now explicitly rejects `nil` outcome with a test lock-in; (C) `sprt.simulate` docstring warns about `math.random` global mutation; (D) `expected_n_envelope` describes simplified numerator-only Wald form, not exact E[N]; (E) `recipe_quick_vote.min_n` docstring disambiguates leader + k rule.
+- **Strict-review hardening F1-F10 on sprt / recipe_quick_vote**: (F1) `sprt.expected_n_envelope` docstring covers arbitrary-p acceptance; (F2) `stage_coverage` evidence label pinpoints Monte Carlo suite; (F3) `needs_investigation` fires only on `"truncated"` (rejected is conclusive); (F4) normalize canonicalizes `"42.0"` / `"1,000"` / `"144/12"` after minerva_math BP (EleutherAI lm-evaluation-harness 3-pass canonicalize); (F5) `DIVERSITY_HINTS` cycle behavior documented in caveats; (F6) dead `type(x) == "number"` branch in `to_bernoulli` removed; (F7) alpha/beta < 0.5 practical cap rationale inlined; (F8) zero-drift `p` yields `nil` from `expected_n_envelope` (test lock-in); (F9) truncated-path trace uses consistent `log_lr` labels; (F10) `M.verified` lifecycle policy documented.
+- **E2E runner stability (`scripts/e2e/common.lua`)**: wire `max_tokens_budget` through to `agent.run()` (previously silently dropped), bump default `max_tokens` 1024 → 4096 for multi-case final reports, lift `recipe_quick_vote_eval.max_tokens` 4096 → 8192 (4096 still truncated on real runs). Addresses the bundled side of the final-report truncation bug (symptom: `reports_card_id` grader FAIL on 2026-04-19_124616 run). Upstream agent-block ReAct O(N²) history growth is tracked separately in issue `1776571635-95433`.
 
 ### Changed
 
-- **Package count**: `README.md` "## Packages (105)" → "## Packages (107)" (flow + recipe_deep_panel added). `hub_index.json` / `docs/hub/index.json` package_count 106 → 108 (hub counts include `alc_shapes`, README count excludes it per established convention).
+- **Package count**: `README.md` "## Packages (105)" → "## Packages (109)" (flow + recipe_deep_panel + sprt + recipe_quick_vote added). `hub_index.json` / `docs/hub/index.json` package_count 106 → 110 (hub counts include `alc_shapes`, README count excludes it per established convention).
 
 ## [0.15.0] - 2026-04-19
 
