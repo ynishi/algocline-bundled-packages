@@ -92,4 +92,80 @@ function M.verify(_token, result, req)
     return true
 end
 
+-- ---------------------------------------------------------------------
+-- Session-spanning bound API
+-- ---------------------------------------------------------------------
+-- `wrap_bound` / `verify_bound` persist the verify-side req under
+-- `state.data._flow_req_<slot>` so that the call-and-verify cycle can
+-- straddle an alc.llm yield or a full session restart. They are thin
+-- state-lifecycle wrappers on top of `wrap` / `verify`; the Light Frame
+-- discipline means the driver loop still belongs to the caller, but the
+-- hand-off itself no longer requires the caller to juggle `req`
+-- in-memory across a yield boundary.
+--
+-- Error semantics (non-symmetric, matches proposal §3.3):
+--   wrap_bound   — assert on invalid input / reserved-key collision
+--                  (inherits from `wrap`).
+--   verify_bound — bool return, fail-open (inherits from `verify`).
+--                  On a TRUE result (match or no-echo) we auto-delete
+--                  `_flow_req_<slot>`; pass `opts.keep=true` to retain
+--                  it (e.g. for idempotent re-entry). On FALSE we keep
+--                  the record so callers can inspect / retry.
+--
+-- The `_flow_req_` prefix is sourced from `state.REQ_PREFIX` (SSoT)
+-- so wrap-side and verify-side cannot drift out of sync.
+
+--- Issue+wrap in one call, persisting the verify-side req under
+--- `state.data._flow_req_<slot>`. Returns the same shape as `wrap`.
+---
+--- Intended pairing: `wrap_bound` → (dispatch payload) →
+--- `verify_bound(st, slot, result)`. The persisted record survives a
+--- full session restart as long as the FlowState itself is resumed.
+---@param st table
+---@param opts { slot: string, payload: table? }
+---@return { slot: string, payload: table, _expect_token: string, _expect_slot: string }
+function M.wrap_bound(st, opts)
+    assert(type(st) == "table", "flow.token_wrap_bound: st must be a table")
+    assert(type(opts) == "table" and type(opts.slot) == "string" and opts.slot ~= "",
+        "flow.token_wrap_bound: opts.slot must be a non-empty string")
+
+    local tok = M.issue(st)
+    local req = M.wrap(tok, opts)
+    st.data[state.REQ_PREFIX .. opts.slot] = req
+    state.save(st)
+    return req
+end
+
+--- Verify a pkg result against the persisted req for `slot`. On a
+--- successful verify (match or fail-open), the persisted record is
+--- auto-deleted unless `opts.keep == true`. On mismatch (false), the
+--- record is retained so the caller can inspect / retry.
+---
+--- Raises when no persisted record exists for `slot` — this is a
+--- programmer error (verify_bound called without a prior wrap_bound /
+--- llm_bound), not a verify failure.
+---@param st table
+---@param slot string
+---@param result any
+---@param opts { keep: boolean? }?
+---@return boolean
+function M.verify_bound(st, slot, result, opts)
+    assert(type(st) == "table", "flow.token_verify_bound: st must be a table")
+    assert(type(slot) == "string" and slot ~= "",
+        "flow.token_verify_bound: slot must be a non-empty string")
+
+    local key = state.REQ_PREFIX .. slot
+    local req = st.data[key]
+    assert(req ~= nil,
+        "flow.token_verify_bound: no persisted req for slot '" .. slot .. "'")
+
+    local ok = M.verify(nil, result, req)
+    local keep = type(opts) == "table" and opts.keep == true
+    if ok and not keep then
+        st.data[key] = nil
+        state.save(st)
+    end
+    return ok
+end
+
 return M

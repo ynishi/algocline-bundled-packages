@@ -6,6 +6,15 @@ local util = require("flow.util")
 
 local M = {}
 
+--- Key prefix under `state.data` for persisted verify-side req
+--- records written by `flow.token_wrap_bound` / `flow.llm_bound` and
+--- consumed by `flow.token_verify_bound` / `flow.llm_bound`. Exposed
+--- as the SSoT so wrap-side and verify-side can never drift out of
+--- sync on a rename / namespace change. Not part of flow's public API
+--- (accessed via `state.REQ_PREFIX` from within flow internal modules
+--- only).
+M.REQ_PREFIX = "_flow_req_"
+
 --- Build the alc.state key for this state.
 ---@param state table
 ---@return string
