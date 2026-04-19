@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **[flow](flow/) Frame substrate** (v0.1.0 debut): Light Frame over `alc.state` exposing two primitives — `FlowState` (persistent KV with resume) and `ReqToken` (random-nonce request correlation, AMQP `correlation_id` idiom) — plus `flow.llm` sugar for LLM calls with slot+token echo verification. Module-level pure-function API (`state_new / state_key / state_get / state_set / state_save / token_issue / token_wrap / token_verify / llm`). No `M.run` by design: `flow` is a substrate, not an orchestrator — the driver loop stays in user code (Functional Core / Imperative Shell). Identity `deep_equal` check on resume prevents silent parameter drift. Fail-open token verification keeps existing bundled pkgs usable without rewrite; opt-in v1 contract (see `flow/doc/contract.md`) tightens per-call verification.
+- **[recipe_deep_panel](recipe_deep_panel/) Recipe** (v0.1.0 debut): production-grade 5-stage deep-reasoning pipeline composed on top of flow — `condorcet_gate` (Anti-Jury guard, p≥0.5) → fan-out of N × `ab_mcts` → `ensemble_div` (decomposition when ground_truth available) → `condorcet.prob_majority` plurality → `calibrate`. Inputs guarded: `p_estimate` required (no default), `n_branches` odd ≥3, `approaches` uniqueness. Identity = `{task, n_branches, budget, max_depth}` covers resume replay. Stage 1 abort path shares the unified result shape. `M.verified.stage_coverage` records per-stage verification status (2 stages verified with real LLM, 3 stages flagged `not_exercised` with `reason` + `to_verify` — no fabricated claims).
+- **`AlcResultDeepPaneled` shape** in `alc_shapes` (22 fields, `open=true`): machine-contract for recipe_deep_panel result. LuaCATS projection in `types/alc_shapes.d.lua`.
+- **`justfile` recipes** `gen-docs`, `gen-docs-lint`, `gen-docs-strict`: fills the gap where `CLAUDE.md` documented these commands but the justfile lacked them. Commit / release gates use `gen-docs-strict` to fail on V0 convention lint errors.
+- **Integration test suites** under `tests/flow/`: `test_integ_swarm_mcts.lua` (fan-out + consensus + commit), `test_integ_gate_scale.lua` (5-gate Coding-pipeline chain with retry + resume), `test_integ_ensemble_vote.lua` (bare `flow.llm` × N + pure-compute + regen loop-back). Each file documents the flow-scaling property it exercises in a header comment.
+- **Unit test suites** `tests/test_flow.lua` (51 assertions across util / state / token / llm / meta) and `tests/test_recipe_deep_panel.lua` (41 assertions across meta / ingredients / internal vote-tally / input validation / Stage 1 abort / main path / token tampering / resume). Full MCP run: 109/109 pass.
+
+### Fixed
+
+- **Strict-review hardening C1 (`flow.util.parse_tag`)**: switched from first-match (`text:match`) to LAST-match (`text:gmatch` drained to the last hit). `flow.llm` appends its `[flow_token][flow_slot]` pair to the prompt end, and prompts routinely embed a prior gate's output carrying its own echoed tags; first-match would hit the stale pair and raise a spurious mismatch against the real LLM.
+- **Strict-review hardening C2 (`flow.util` PRNG seed)**: fold 4 bytes from `/dev/urandom` (when available) into `math.randomseed` input. Prevents two independent processes starting within the same `os.time()` tick from colliding on near-zero `os.clock()` and emitting identical token streams. Windows native Lua retains the `time + clock` fallback.
+- **Strict-review hardening C3 (`flow.token.wrap`)**: `_flow_token` / `_flow_slot` are reserved keys owned by flow — passing a payload that already contains either now raises an assert error instead of silently overwriting caller data.
+- **Strict-review hardening C4 (`flow.token.verify`)**: documented why the leading `_token` parameter is intentionally unused (API symmetry with `wrap`, reserved hook for future token rotation).
+- **Strict-review hardening C5 (`flow/doc/README.md`)**: added an explicit table contrasting `token_verify`'s boolean fail-open with `flow.llm`'s error-on-mismatch semantics, so the asymmetry is not read as an inconsistency.
+
+### Changed
+
+- **Package count**: `README.md` "## Packages (105)" → "## Packages (107)" (flow + recipe_deep_panel added). `hub_index.json` / `docs/hub/index.json` package_count 106 → 108 (hub counts include `alc_shapes`, README count excludes it per established convention).
+
 ## [0.15.0] - 2026-04-19
 
 ### Added
