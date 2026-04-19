@@ -72,6 +72,19 @@ them to would break the "no existing pkg rewrite" property. Pkg authors
 opt into the stricter v1 contract (see `contract.md`) to get per-call
 verification; non-opt-in pkg still verify at the Frame boundary.
 
+**Two flavours of fail-open** (intentionally asymmetric):
+
+| Call site | echo missing | echo present + match | echo present + mismatch |
+|---|---|---|---|
+| `flow.token_verify(tok, result, req)` | returns `true` (caller decides) | returns `true` | returns `false` |
+| `flow.llm({...})` | silently passes through the body | passes through the body | raises `error()` |
+
+`token_verify` returns a boolean because the caller still holds `req` and
+may choose a retry / fallback path. `flow.llm` uses `error()` because
+there is no downstream receiver to inspect a boolean: a mismatched echo
+means the LLM response cannot be trusted to belong to this call site, so
+the exception is the only safe signal.
+
 ### flow.llm (sugar for direct LLM calls)
 
 ```lua

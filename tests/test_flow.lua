@@ -103,6 +103,18 @@ describe("flow.util: parse_tag", function()
         expect(util.parse_tag(nil, "t")).to.equal(nil)
         expect(util.parse_tag("[t=x]", nil)).to.equal(nil)
     end)
+
+    it("returns the LAST value when the same tag appears multiple times", function()
+        -- flow.llm appends its tag pair to the prompt end. Prompts often
+        -- carry an earlier gate's echoed tags embedded in prev_output,
+        -- so LAST-match is the correct semantics.
+        local util = require("flow.util")
+        expect(util.parse_tag("[t=first] middle [t=second]", "t")).to.equal("second")
+        expect(util.parse_tag(
+            "prev: [flow_slot=modeling_gen]\nnow [flow_slot=plan_gen]",
+            "flow_slot"
+        )).to.equal("plan_gen")
+    end)
 end)
 
 describe("flow.util: deep_equal", function()
@@ -367,6 +379,26 @@ describe("flow.token: wrap", function()
         local tok = flow.token_issue(st)
         local req = flow.token_wrap(tok, { slot = "s" })
         expect(req.payload._flow_token).to.equal(tok.value)
+    end)
+
+    it("errors when payload already contains _flow_token", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local tok = flow.token_issue(st)
+        expect(function()
+            flow.token_wrap(tok, { slot = "s", payload = { _flow_token = "x" } })
+        end).to.fail()
+    end)
+
+    it("errors when payload already contains _flow_slot", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local tok = flow.token_issue(st)
+        expect(function()
+            flow.token_wrap(tok, { slot = "s", payload = { _flow_slot = "x" } })
+        end).to.fail()
     end)
 end)
 
