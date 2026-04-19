@@ -13,6 +13,28 @@
 ---@field strategy "direct"|"retry"|"panel"|"ensemble"
 ---@field total_llm_calls number
 
+---@class AlcResultDeepPaneled
+---@field abort_reason? string @Abort reason (nil when not aborted)
+---@field aborted boolean @True if early-abort triggered
+---@field answer any @Plurality answer (nil on abort)
+---@field anti_jury boolean @Condorcet anti-jury detection at Stage 1
+---@field branches table @{ [bkey] = { approach, answer, best_score, tree_stats } }
+---@field confidence number @Meta-confidence estimate
+---@field decomp? table @ensemble_div.decompose output (nil if Stage 3b skipped)
+---@field diversity? table @{ n_distinct, distinctness, decomp_status }
+---@field expected_accuracy number @Condorcet expected majority accuracy
+---@field margin_gap number @(top - runner_up) / n
+---@field n_branches_completed number @Branches actually finished
+---@field n_distinct_answers number @Count of unique normalized answers
+---@field needs_investigation boolean @True if meta-confidence below threshold
+---@field panel_size number @Requested panel size
+---@field plurality_fraction number @Top-answer vote fraction
+---@field stages table[] @Per-stage detail (heterogeneous)
+---@field target_met boolean @Whether expected accuracy >= ctx.target_accuracy
+---@field total_llm_calls number
+---@field unanimous boolean @All normalized votes identical
+---@field vote_counts table<string, number> @{ [normalized_answer] = count } tally
+
 ---@class AlcResultFunnelRanked
 ---@field best string @Top-ranked text
 ---@field best_index number @Top-ranked original index (1-based)

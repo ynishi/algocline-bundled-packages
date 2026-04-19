@@ -16,7 +16,7 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
-## Packages (105)
+## Packages (107)
 
 ### Reasoning
 
@@ -206,6 +206,14 @@ When the repository root has no `init.lua`, `pkg_install` treats it as a Collect
 |---------|-------------|----------|
 | **[panel](panel/)** | Multi-role deliberation. Multiple roles discuss and a moderator synthesizes | — |
 
+### Substrate
+
+Primitives that other packages compose on top of. Substrate modules do NOT provide `M.run` — they expose low-level building blocks (state persistence, request tokens, LLM wrappers) and leave the driver loop to the caller (Functional Core / Imperative Shell).
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[flow](flow/)** | Flow Frame. FlowState (plain table persisted via `alc.state`) + ReqToken (random nonce echoed by downstream results) substrate for composing bundled algo pkg (ab_mcts / cascade / coevolve / ...) with one persistent checkpoint and slot-level verification. Light Frame: driver loop stays in user code. v1 contract (flow/doc/contract.md) for pkg opting in to strict echo verification | AMQP `correlation_id` RPC idiom (RabbitMQ) |
+
 ### Recipes
 
 End-to-end strategies that compose multiple packages into a single `run(ctx)` entry point, with recorded `M.verified` empirical results (measured runs only — no hand-wavy claims).
@@ -214,6 +222,7 @@ End-to-end strategies that compose multiple packages into a single `run(ctx)` en
 |---------|-------------|----------|
 | **[recipe_safe_panel](recipe_safe_panel/)** | Safety-first panel QA. Condorcet-sized panel → self-consistency → optional inverse-U scaling check → calibrated confidence. Anti-Jury / needs_investigation safety gates. math_basic pass_rate 1.0 (7/7) at 8 LLM calls/case (max_n=3) | condorcet, sc, inverse_u, calibrate |
 | **[recipe_ranking_funnel](recipe_ranking_funnel/)** | Listwise → pairwise ranking funnel. 8→3→3 funnel shape on population ranking yielded 7 LLM calls vs naive all-pairs 56 (87% savings), top-1 correct | listwise_rank, pairwise_rank |
+| **[recipe_deep_panel](recipe_deep_panel/)** | Deep-reasoning diverse panel with resume. Condorcet gate → N × ab_mcts fan-out via flow (checkpoint-per-branch) → ensemble_div diversity → Condorcet expected accuracy → calibrate meta-confidence. Heavy-compute counterpart of recipe_safe_panel (≈ N × (2·budget+1) + 1 LLM calls; 52 at N=3, budget=8) | flow, condorcet, ab_mcts, ensemble_div, calibrate |
 
 #### Current limitations — recipe test coverage
 
@@ -232,6 +241,7 @@ Coverage at time of writing:
 |---|---|---|---|
 | recipe_safe_panel | ✓ (22 tests) | ✓ (`scripts/e2e/recipe_safe_panel.lua`) | ✓ (`recipe_safe_panel_eval.lua`, math_basic 7/7) |
 | recipe_ranking_funnel | ✓ (19 tests) | ✓ (`scripts/e2e/recipe_ranking_funnel.lua`) | ✗ — **not yet authored** |
+| recipe_deep_panel | ✓ (41 tests, mocked `ab_mcts` / `calibrate` + real `flow` / `condorcet` / `ensemble_div`) | ✗ — **not yet authored** | ✗ — **not yet authored** |
 
 Gaps:
 
@@ -366,6 +376,14 @@ M.run = S.instrument(M, "run")
 
 return M
 ```
+
+### Named shape vs inline shape
+
+`M.spec.entries.run.result` (and `input`) accept either an **inline schema** (`T.shape({...})`) or a **named reference** (`"my_shape"`, coerced to `T.ref("my_shape")` against the `alc_shapes` registry).
+
+- **Default — inline.** A result used by only one package stays inline. No registry entry needed.
+- **Register a named shape when** (a) multiple packages share the same result contract (e.g. `sc` and `recipe_safe_panel` both depend on `voted`), or (b) you want a LuaCATS type alias exposed in [`types/alc_shapes.d.lua`](types/alc_shapes.d.lua). To register: add `M.<name> = T.shape({...}, { open = true })` to [`alc_shapes/init.lua`](alc_shapes/init.lua), then run `just gen-shapes` to refresh the LuaCATS projection.
+- The full DSL reference and the list of currently registered shapes live in [`alc_shapes/README.md`](alc_shapes/README.md) — see [DSL combinators](alc_shapes/README.md#dsl-combinators) and [Registered shapes](alc_shapes/README.md#registered-shapes).
 
 A single package is one repo with one `init.lua`. To bundle multiple packages, use a subdirectory layout like this repository (Collection).
 
