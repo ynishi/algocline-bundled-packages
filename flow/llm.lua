@@ -14,6 +14,21 @@ local state = require("flow.state")
 
 local M = {}
 
+--- Append the flow verification tags to a prompt. Private helper kept
+--- here so that `llm` and `llm_bound` cannot drift on tag shape — the
+--- exact byte-pattern is what `util.parse_tag` matches on the echo
+--- side, and a rename on one caller without the other would silently
+--- turn every call into a fail-open pass.
+---@param prompt string
+---@param token_value string
+---@param slot string
+---@return string
+local function append_flow_tags(prompt, token_value, slot)
+    return prompt
+        .. "\n\n[flow_token=" .. token_value .. "]"
+        .. "[flow_slot=" .. slot .. "]"
+end
+
 --- Issue a bare LLM call tied to a slot + token.
 --- `opts = { token = { value = ... }, slot = string, prompt = string, llm_opts = table? }`
 --- Passes `llm_opts` straight through to `alc.llm` (system / max_tokens / etc).
@@ -31,9 +46,7 @@ function M.llm(opts)
     assert(type(alc) == "table" and type(alc.llm) == "function",
         "flow.llm: alc.llm is not available")
 
-    local tagged_prompt = opts.prompt
-        .. "\n\n[flow_token=" .. opts.token.value .. "]"
-        .. "[flow_slot=" .. opts.slot .. "]"
+    local tagged_prompt = append_flow_tags(opts.prompt, opts.token.value, opts.slot)
 
     local out = alc.llm(tagged_prompt, opts.llm_opts)
 
@@ -69,6 +82,26 @@ end
 -- Error-on-mismatch (rather than bool) inherits `flow.llm` semantics:
 -- a present-but-wrong echo is a hard fail, not a recoverable condition.
 --
+-- Persist shape (intentionally asymmetric with `wrap_bound`):
+--   llm_bound   → { slot, _expect_token, _expect_slot }      (no prompt/payload)
+--   wrap_bound  → { slot, payload, _expect_token, _expect_slot }  (full req)
+-- Callers probing `state.data._flow_req_<slot>` after a crash must
+-- tolerate both shapes. Rationale: the prompt is supplied per
+-- llm_bound invocation and is not part of the verify contract —
+-- persisting it would double the state footprint without enabling
+-- any automatic retry (retry is driver-policy, not primitive).
+--
+-- Hard-error residue (distinct from auto-rollback):
+--   auto-rollback fires ONLY on echo mismatch. If `alc.llm` itself
+--   raises (e.g. network failure / rate-limit throw), the error is
+--   propagated verbatim and `_flow_req_<slot>` stays persisted. This
+--   is deliberate: a hard error from alc.llm is indistinguishable,
+--   from the caller's vantage, from a yield followed by a full
+--   session restart — and the driver's resume path owns the cleanup
+--   decision. Do NOT wrap `alc.llm` in `pcall` here; that would
+--   destroy the yield/restart signal and convert every crash into
+--   a silent rollback.
+--
 -- This is NOT a retry primitive. Higher-level policy (timeout, retry,
 -- circuit breaker) belongs in the driver loop.
 
@@ -102,9 +135,7 @@ function M.llm_bound(st, opts)
     }
     state.save(st)
 
-    local tagged_prompt = opts.prompt
-        .. "\n\n[flow_token=" .. tok.value .. "]"
-        .. "[flow_slot=" .. slot .. "]"
+    local tagged_prompt = append_flow_tags(opts.prompt, tok.value, slot)
 
     local out = alc.llm(tagged_prompt, opts.llm_opts)
 

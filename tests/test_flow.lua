@@ -534,6 +534,40 @@ describe("flow.token: wrap_bound", function()
         local st2 = flow2.state_new({ key_prefix = "p", id = "id", resume = true })
         expect(st2.data._flow_req_gate._expect_token).to.equal(req1._expect_token)
     end)
+
+    it("overwrites the persisted record on re-entry with the same slot", function()
+        -- Re-calling wrap_bound on the same slot replaces the payload
+        -- but preserves the state's token (token.issue is idempotent
+        -- once _token_value is set). This is the expected resume-retry
+        -- shape: after a mismatch/crash the driver may re-wrap the same
+        -- slot with a fresh payload without rotating tokens.
+        local store = mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        local req1 = flow.token_wrap_bound(st, { slot = "gate", payload = { v = 1 } })
+        local req2 = flow.token_wrap_bound(st, { slot = "gate", payload = { v = 2 } })
+        expect(req1._expect_token).to.equal(req2._expect_token)
+        expect(st.data._flow_req_gate.payload.v).to.equal(2)
+        expect(store["p:id"].data._flow_req_gate.payload.v).to.equal(2)
+    end)
+
+    it("keeps independent records per slot", function()
+        mock_alc_state()
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        flow.token_wrap_bound(st, { slot = "a", payload = { v = "A" } })
+        flow.token_wrap_bound(st, { slot = "b", payload = { v = "B" } })
+        expect(st.data._flow_req_a.payload.v).to.equal("A")
+        expect(st.data._flow_req_b.payload.v).to.equal("B")
+        -- Verifying one slot must not touch the other's record.
+        flow.token_verify_bound(st, "a", {
+            _flow_token = st.data._flow_req_a._expect_token,
+            _flow_slot  = "a",
+        })
+        expect(st.data._flow_req_a).to.equal(nil)
+        expect(st.data._flow_req_b).to_not.equal(nil)
+        expect(st.data._flow_req_b.payload.v).to.equal("B")
+    end)
 end)
 
 describe("flow.token: verify_bound", function()
@@ -800,6 +834,24 @@ describe("flow.llm_bound", function()
         expect(function() flow.llm_bound(st, { slot = "" }) end).to.fail()
         expect(function() flow.llm_bound(st, { slot = "s" }) end).to.fail()
         expect(function() flow.llm_bound(st, { slot = "s", prompt = 123 }) end).to.fail()
+    end)
+
+    it("leaves _flow_req_<slot> persisted when alc.llm raises (hard error)", function()
+        -- Hard error from alc.llm is distinct from echo mismatch: the
+        -- post-call cleanup never runs (error bubbles through the
+        -- bare function), so the persisted record survives for the
+        -- driver's resume path to clean up. This is documented
+        -- behaviour (see flow/llm.lua §Hard-error residue).
+        local store = mock_alc_state()
+        mock_alc_llm(function() error("network down") end)
+        local flow = require("flow")
+        local st = flow.state_new({ key_prefix = "p", id = "id" })
+        expect(function()
+            flow.llm_bound(st, { slot = "s", prompt = "p" })
+        end).to.fail()
+        expect(st.data._flow_req_s).to_not.equal(nil)
+        expect(st.data._flow_req_s._expect_slot).to.equal("s")
+        expect(store["p:id"].data._flow_req_s).to_not.equal(nil)
     end)
 end)
 
