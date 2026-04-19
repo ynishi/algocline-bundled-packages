@@ -58,3 +58,24 @@ gen-shapes:
 # [group('allow-agent')]
 verify-shapes:
     lua scripts/gen_shapes_luacats.lua | diff - types/alc_shapes.d.lua
+
+# Regenerate all pkg-source-derived doc artefacts (SSoT projection):
+#   docs/narrative/*.md, docs/hub/*.json, docs/llms.txt, docs/llms-full.txt,
+#   context7.json (repo root), .devin/wiki.json (repo root).
+# Does NOT regenerate hub_index.json / docs/hub/index.json — those require
+# the algocline MCP tool `alc_hub_reindex` (Claude Code session only).
+# [group('allow-agent')]
+gen-docs:
+    lua tools/gen_docs.lua --hub --context7 --devin . docs
+
+# Run the V0 docstring lint pass only (no file generation). Reports
+# W_FAKE_LABEL / E_RESULT_CONFLICT / E_PARAMETERS_CONFLICT violations.
+# [group('allow-agent')]
+gen-docs-lint:
+    lua tools/gen_docs.lua --lint-only
+
+# Regenerate docs and fail if any lint error is raised (--strict). Use
+# this before commit / release to block drift or convention violations.
+# [group('allow-agent')]
+gen-docs-strict:
+    lua tools/gen_docs.lua --hub --context7 --devin --strict . docs

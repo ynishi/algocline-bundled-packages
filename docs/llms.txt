@@ -129,6 +129,7 @@
 
 ## recipe
 
+- [recipe_deep_panel](narrative/recipe_deep_panel.md): Deep-reasoning diverse panel — N × ab_mcts (Thompson Sampling tree search) fan-out via flow (resume-safe), followed by ensemble_div diversity diagnostic, condorcet expected-accuracy, and calibra...
 - [recipe_ranking_funnel](narrative/recipe_ranking_funnel.md): Verified 3-stage ranking funnel — listwise screening, multi-axis scoring, pairwise final rank. -87% calls vs naive pairwise on N=8 (verified). Encodes known failure modes as caveats.
 - [recipe_safe_panel](narrative/recipe_safe_panel.md): Verified safe majority-vote panel — Condorcet-sized, Anti-Jury gated, inverse-U monitored, confidence-calibrated. Composes condorcet + sc + inverse_u + calibrate with known failure mode awareness.
 
@@ -170,6 +171,10 @@
 - [opinion_abm](narrative/opinion_abm.md): Hegselmann-Krause Bounded Confidence opinion dynamics — agents update opinions by averaging nearby opinions within threshold ε. Emergent consensus, polarization, or fragmentation.
 - [schelling_abm](narrative/schelling_abm.md): Schelling Segregation model — agents on a 2D grid relocate when local same-type fraction falls below tolerance threshold. Mild preferences produce strong emergent segregation.
 - [sugarscape_abm](narrative/sugarscape_abm.md): Sugarscape model — agents forage on a sugar landscape, emergent wealth inequality, Pareto-like distributions, and carrying capacity. Based on Epstein & Axtell (1996).
+
+## substrate
+
+- [flow](narrative/flow.md): Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code.
 
 ## synthesis
 

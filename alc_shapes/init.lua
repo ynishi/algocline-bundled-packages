@@ -275,6 +275,36 @@ M.safe_paneled = T.shape({
     stages             = T.array_of(safe_panel_stage):describe("Per-stage detail (discriminated by name)"),
 }, { open = true })
 
+-- ── recipe_deep_panel shape ──────────────────────────────────────────
+-- Stages are heterogeneous per invocation (Stage 1 may be the abort
+-- branch; Stage 3's decomp is nullable; Stage 5 always present on
+-- main path). Keep the per-stage sub-shape open-ended as T.table so
+-- the recipe can evolve per-stage fields without breaking consumers
+-- that don't inspect them. open = true at the top level allows
+-- forward-compat additions such as future Stage-specific diagnostics.
+M.deep_paneled = T.shape({
+    answer       = T.any:describe("Plurality answer (nil on abort)"),
+    confidence   = T.number:describe("Meta-confidence estimate"),
+    panel_size   = T.number:describe("Requested panel size"),
+    n_branches_completed = T.number:describe("Branches actually finished"),
+    plurality_fraction   = T.number:describe("Top-answer vote fraction"),
+    margin_gap           = T.number:describe("(top - runner_up) / n"),
+    vote_counts          = T.map_of(T.string, T.number):describe("{ [normalized_answer] = count } tally"),
+    n_distinct_answers   = T.number:describe("Count of unique normalized answers"),
+    branches             = T.table:describe("{ [bkey] = { approach, answer, best_score, tree_stats } }"),
+    expected_accuracy    = T.number:describe("Condorcet expected majority accuracy"),
+    target_met           = T.boolean:describe("Whether expected accuracy >= ctx.target_accuracy"),
+    anti_jury            = T.boolean:describe("Condorcet anti-jury detection at Stage 1"),
+    aborted              = T.boolean:describe("True if early-abort triggered"),
+    needs_investigation  = T.boolean:describe("True if meta-confidence below threshold"),
+    unanimous            = T.boolean:describe("All normalized votes identical"),
+    diversity            = T.table:is_optional():describe("{ n_distinct, distinctness, decomp_status }"),
+    decomp               = T.table:is_optional():describe("ensemble_div.decompose output (nil if Stage 3b skipped)"),
+    total_llm_calls      = T.number,
+    abort_reason         = T.string:is_optional():describe("Abort reason (nil when not aborted)"),
+    stages               = T.array_of(T.table):describe("Per-stage detail (heterogeneous)"),
+}, { open = true })
+
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check
 M.assert       = check.assert
