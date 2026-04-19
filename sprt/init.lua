@@ -107,7 +107,7 @@ M.spec = {
         observe = {
             args = {
                 sprt_state,
-                T.any:describe("Bernoulli outcome: boolean, 0, or 1"),
+                T.any:describe("Bernoulli outcome: boolean or 0/1 (nil rejected)"),
             },
             result = sprt_state,
         },
@@ -132,7 +132,10 @@ M.spec = {
             -- Returns nil when the drift E[log λ | p] is exactly zero
             -- (degenerate point). is_optional() permits that null return.
             result = T.number:is_optional():describe(
-                "Wald's envelope E[N]; nil at degenerate zero-drift points"),
+                "Simplified Wald E[N] envelope (numerator-only; no "
+                .. "OC-function correction — treat as an upper-bound "
+                .. "proxy, not exact expectation); nil at degenerate "
+                .. "zero-drift points"),
         },
     },
 }
@@ -165,8 +168,11 @@ local function validate_config(cfg)
 end
 
 local function to_bernoulli(x)
+    if x == nil then
+        error("sprt.observe: outcome must not be nil (pass boolean or 0/1)", 3)
+    end
     if x == true or x == 1 then return 1 end
-    if x == false or x == 0 or x == nil then return 0 end
+    if x == false or x == 0 then return 0 end
     if type(x) == "number" then
         if x == 1 then return 1 end
         if x == 0 then return 0 end
@@ -252,9 +258,13 @@ end
 --- Run SPRT to termination (or max_n) on a synthetic Bernoulli(p)
 --- stream. Used for α/β grid verification without live LLM cost.
 ---
---- NOTE: uses Lua's global math.random state — pass `seed` for
---- reproducibility. Monte Carlo callers should set up their own RNG
---- seeding schedule around this function.
+--- NOTE: this function uses the process-wide Lua `math.random`
+--- generator and **mutates its state** when `seed` is passed. Do not
+--- interleave with other code that relies on global RNG
+--- reproducibility. For parallel tests or sandboxed reproducibility,
+--- either save and restore the global seed at the caller, or batch all
+--- `sprt.simulate` calls inside a single deterministic seeding schedule
+--- (e.g. the Monte Carlo loop in `tests/test_sprt.lua`).
 ---
 ---@param cfg table { p0, p1, alpha, beta }
 ---@param p number true Bernoulli success rate in [0, 1]

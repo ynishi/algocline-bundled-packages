@@ -75,6 +75,19 @@
 ---@field arguments { role: string, text: string }[] @Per-role position statements
 ---@field synthesis string @Moderator synthesis
 
+---@class AlcResultQuickVoted
+---@field answer string @Leader answer from sample 1 (cleaned, not normalized)
+---@field leader_norm string @Normalized leader key used for agreement tests
+---@field n_samples number @Total samples drawn (1 leader + k agreement observations)
+---@field needs_investigation boolean @True unless outcome == 'confirmed'
+---@field outcome "confirmed"|"rejected"|"truncated" @Terminal state: confirmed=H1 accepted, rejected=H0 accepted, truncated=no verdict at max_n
+---@field params { alpha: number, beta: number, max_n: number, min_n: number, p0: number, p1: number } @Echoed parameter values
+---@field samples { answer: string, norm: string, reasoning: string }[] @Per-sample reasoning + extracted answer
+---@field sprt { a_bound: number, b_bound: number, log_lr: number, n: number } @Final SPRT state snapshot
+---@field total_llm_calls number @2 × n_samples (reasoning + extract per sample)
+---@field verdict "accept_h1"|"accept_h0"|"continue" @Underlying SPRT verdict from the final decide()
+---@field vote_counts table<string, number> @{ [norm] = count } tally across all samples
+
 ---@class AlcResultSafePaneled
 ---@field abort_reason? string @Abort reason (nil when not aborted)
 ---@field aborted boolean @True if early-abort triggered

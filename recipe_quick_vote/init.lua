@@ -73,7 +73,13 @@
 --- ctx.alpha (default 0.05): Type-I error rate (false confirm).
 --- ctx.beta  (default 0.10): Type-II error rate (false reject).
 --- ctx.max_n (default 10): Safety cap on sample count.
---- ctx.min_n (default 3):  Minimum samples before SPRT can fire.
+--- ctx.min_n (default 3):  Minimum total samples (leader + agreement
+---                          observations) before SPRT can fire. Must
+---                          be >= 2; SPRT consumes min_n - 1
+---                          observations before the first decide()
+---                          call. Example: min_n=3 ⇒ leader + 2
+---                          observations must accumulate before the
+---                          recipe inspects SPRT verdict.
 --- ctx.gen_tokens (default 400): Max tokens per reasoning path.
 
 local M = {}
