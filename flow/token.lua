@@ -111,8 +111,9 @@ end
 --                  `_flow_req_<slot>`; pass `opts.keep=true` to retain
 --                  it (e.g. for idempotent re-entry). On FALSE we keep
 --                  the record so callers can inspect / retry.
-
-local FLOW_REQ_PREFIX = "_flow_req_"
+--
+-- The `_flow_req_` prefix is sourced from `state.REQ_PREFIX` (SSoT)
+-- so wrap-side and verify-side cannot drift out of sync.
 
 --- Issue+wrap in one call, persisting the verify-side req under
 --- `state.data._flow_req_<slot>`. Returns the same shape as `wrap`.
@@ -130,7 +131,7 @@ function M.wrap_bound(st, opts)
 
     local tok = M.issue(st)
     local req = M.wrap(tok, opts)
-    st.data[FLOW_REQ_PREFIX .. opts.slot] = req
+    st.data[state.REQ_PREFIX .. opts.slot] = req
     state.save(st)
     return req
 end
@@ -153,7 +154,7 @@ function M.verify_bound(st, slot, result, opts)
     assert(type(slot) == "string" and slot ~= "",
         "flow.token_verify_bound: slot must be a non-empty string")
 
-    local key = FLOW_REQ_PREFIX .. slot
+    local key = state.REQ_PREFIX .. slot
     local req = st.data[key]
     assert(req ~= nil,
         "flow.token_verify_bound: no persisted req for slot '" .. slot .. "'")

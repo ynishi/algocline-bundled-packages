@@ -14,8 +14,6 @@ local state = require("flow.state")
 
 local M = {}
 
-local FLOW_REQ_PREFIX = "_flow_req_"
-
 --- Issue a bare LLM call tied to a slot + token.
 --- `opts = { token = { value = ... }, slot = string, prompt = string, llm_opts = table? }`
 --- Passes `llm_opts` straight through to `alc.llm` (system / max_tokens / etc).
@@ -95,7 +93,7 @@ function M.llm_bound(st, opts)
 
     local tok  = token.issue(st)
     local slot = opts.slot
-    local key  = FLOW_REQ_PREFIX .. slot
+    local key  = state.REQ_PREFIX .. slot
 
     st.data[key] = {
         slot          = slot,
