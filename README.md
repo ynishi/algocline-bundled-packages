@@ -16,6 +16,31 @@ alc pkg_install github.com/ynishi/algocline-bundled-packages
 
 When the repository root has no `init.lua`, `pkg_install` treats it as a Collection and installs each subdirectory containing `*/init.lua` as a separate package.
 
+## Architecture
+
+Every pkg plays **one of three architectural roles**. The role is determined by what the pkg *does*, not by which functional section it appears under in *Packages* below.
+
+| Role | What it does | Calls `alc.llm`? | I/O contract |
+|---|---|---|---|
+| **Strategy** | Produces an answer by orchestrating the LLM | Yes | ctx-threading — `M.spec.entries.run.input` + `M.run(ctx) → ctx.result` |
+| **Frame** | Hosts the execution of other pkgs / user code (state, scheduling, composition) | No | Sub-modules exposed as fields; no single `M.run` entry |
+| **Computation** | Self-contained calculation (statistics, voting theory, aggregation math). Pure functions, no LLM | No | direct-args — `M.spec.entries.*.args` (positional) per entry |
+
+The split is formalized in [`alc_shapes/spec_resolver.lua`](alc_shapes/spec_resolver.lua): within one entry, `input` (ctx-threading) and `args` (direct-args) are **mutually exclusive** — the resolver raises when both are set. `instrument` inspects `entry.args` to choose per-ctx wrapping vs per-argument wrapping.
+
+### Roster
+
+- **Frames** — [flow](flow/), [abm](abm/)
+- **Computation** — [bft](bft/), [condorcet](condorcet/), [cost_pareto](cost_pareto/), [ensemble_div](ensemble_div/), [eval_guard](eval_guard/), [inverse_u](inverse_u/), [kemeny](kemeny/), [mwu](mwu/), [scoring_rule](scoring_rule/), [shapley](shapley/), [sprt](sprt/)
+- **Schema engine** — [alc_shapes](alc_shapes/) (the type DSL and `spec_resolver` that power the contracts above)
+- **Strategy** — everything else in the *Packages* section below
+
+### Architecture axis vs Category axis
+
+The *Packages* section below groups pkgs by **functional category** (Reasoning / Selection / Aggregation / …), which is **orthogonal** to architectural role. A Computation pkg may live under Selection (e.g. `kemeny`, `condorcet`), Aggregation (`ensemble_div`), Attribution (`shapley`), Governance (`bft`), or Validation / Analysis (`sprt`, `scoring_rule`, `eval_guard`, `inverse_u`) — but its contract stays direct-args regardless of the section it appears in.
+
+**Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
+
 ## Packages (109)
 
 ### Reasoning
@@ -379,6 +404,56 @@ M.run = S.instrument(M, "run")
 
 return M
 ```
+
+### Direct-args mode (Computation packages)
+
+Pkgs that perform pure calculation — no `alc.llm` call, no `ctx` threading — declare **positional `args`** instead of `input` at each entry. This library-style shape (`M.new(cfg) → state`, `M.observe(state, x)`, `M.decide(state) → verdict`, …) fits streaming algorithms ([sprt](sprt/)), voting aggregators ([kemeny](kemeny/), [condorcet](condorcet/)), and scoring rules ([scoring_rule](scoring_rule/), [shapley](shapley/)).
+
+```lua
+-- init.lua  (Computation pkg)
+local S = require("alc_shapes")
+local T = S.T
+
+local M = {}
+
+M.meta = {
+    name = "my_calc",
+    version = "0.1.0",
+    description = "Pure calculation primitive",
+    category = "validation",
+}
+
+local cfg_shape   = T.shape({ alpha = T.number }, { open = true })
+local state_shape = T.shape({ alpha = T.number, n = T.number }, { open = true })
+
+M.spec = {
+    entries = {
+        new = {
+            args   = { cfg_shape },
+            result = state_shape,
+        },
+        observe = {
+            args   = { state_shape, T.number },
+            result = state_shape,
+        },
+    },
+}
+
+function M.new(cfg)       return { alpha = cfg.alpha, n = 0 } end
+function M.observe(st, x) st.n = st.n + x; return st end
+
+M.new     = S.instrument(M, "new")
+M.observe = S.instrument(M, "observe")
+
+return M
+```
+
+Rules:
+
+- `args` and `input` are **mutually exclusive** per entry (enforced by `spec_resolver`).
+- **Multiple entries are the norm** — a Computation pkg typically declares several (no single `run`). Each entry has its own `args` list.
+- `instrument` wraps each function **per argument** when it sees `args`, instead of per-ctx.
+- Canonical examples: [`sprt/init.lua`](sprt/init.lua) (streaming), [`kemeny/init.lua`](kemeny/init.lua) / [`condorcet/init.lua`](condorcet/init.lua) (voting), [`scoring_rule/init.lua`](scoring_rule/init.lua) (scoring).
 
 ### Named shape vs inline shape
 
