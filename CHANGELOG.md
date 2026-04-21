@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-04-21
+
+### Added
+
+- **`tests/test_gen_docs.lua`** (+16 tests): unit coverage for the new
+  `tools/docs/json.lua` decoder (RFC 8259 subset, `\uXXXX` transcoding,
+  `null` sentinel) and `tools/docs/list.lua` enumerator (schema_version
+  gate, dir-existence validation, error message shape).
+- **README.md — Architecture section**: codifies the three architectural
+  roles (Strategy / Frame / Computation) and their I/O contract split,
+  with a Roster enumerating current Frame and Computation pkgs.
+  Clarifies that architectural role is **orthogonal** to functional
+  category (a Computation pkg may appear under Selection / Aggregation /
+  Attribution / Governance / Validation sections but its contract stays
+  direct-args). Adds rule-of-thumb for new pkgs: `alc.llm` call →
+  Strategy (ctx-threading, `input`); pure calculation → Computation
+  (direct-args, positional `args`). Frames require explicit design review.
+- **README.md — Direct-args mode subsection**: documents the positional
+  `args` contract used by Computation pkgs (`sprt`, `kemeny`, `condorcet`,
+  `scoring_rule`, `shapley`, etc.) and its mutual exclusivity with
+  `input` per entry (enforced by `alc_shapes.spec_resolver`).
+
+### Changed
+
+- **`hub_index.json` / `docs/hub/index.json` schema**: regenerated with
+  algocline 0.25.0's typed `PackageSource`. The `source` field is now a
+  tagged object (`{"type":"unknown"}` / `{"type":"git","url":"...","rev":null}`
+  等) instead of a plain string. algocline 0.25.0+ has a read-compat
+  shim that accepts both forms, so older 0.24.x clients keep working
+  unchanged; the upgrade path for users is `alc init` to re-pull this
+  tag. This release is the synchronized counterpart to algocline 0.25.0,
+  which moves the on-disk `~/.algocline/installed.json` / `hub_index.json`
+  / `alc_hub_info` / `alc_hub_search` wire format to the same tagged
+  representation.
+- **`tools/gen_docs.lua` reframed as a publish-artifact generator over
+  `hub_index.json`**: package enumeration is now driven by
+  `hub_index.json.packages[].name` (via a minimal pure-Lua JSON decoder
+  at `tools/docs/json.lua` and an index reader at `tools/docs/list.lua`).
+  Filesystem walk (`ls {repo}/*/init.lua`) and the `[skip]` log path
+  for non-pkg directories are removed — non-pkg dirs like `alc_shapes`
+  are already excluded upstream by `alc_hub_reindex`, so gen_docs never
+  sees them. The tool is analogous to `cargo-dist`: it projects release-
+  facing artefacts from an upstream-produced manifest, it is not a
+  per-pkg API reference generator (for local pkg lookup use `alc_info`
+  / `alc_hub_search` or read the source). `--hub-index=PATH` flag added
+  to override the default `{repo_root}/hub_index.json`.
+
+### Removed
+
+- **`alc_shapes` silently excluded from `hub_index.json`** (110 → 109 pkg).
+  `alc_shapes` has no `M.meta.name` (it is a type-DSL library, not a
+  packaged strategy). Prior Rust indexes fell back to the directory name
+  (`name="alc_shapes"` with empty version/description/category); the
+  typed indexer drops the fallback so such dirs are skipped outright.
+  No user-visible count change — `README.md` and `docs/narrative/` were
+  already at 109, and `tools/gen_docs.lua` no longer sees non-pkg dirs
+  at all.
+- **`tools/gen_docs.lua` filesystem-scan and `[skip]` logging path**:
+  subsumed by the hub_index one-source model described above.
+
+### Fixed
+
+- **Stale/missing `hub_index.json` is now a hard error in gen_docs**:
+  previously a filesystem walk would silently produce partial docs if
+  new pkgs were added without reindexing; now `gen_docs.lua` requires
+  a fresh, well-formed `hub_index.json` with `schema_version` =
+  `"hub_index/v0"` and fails loudly on drift (index lists a pkg whose
+  `{pkg}/init.lua` has been removed). Prevents silent divergence
+  between the published catalogue and the generated narrative docs.
+
 ## [0.17.0] - 2026-04-19
 
 ### Added
@@ -28,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **[flow](flow/) Frame substrate** (v0.1.0 debut): Light Frame over `alc.state` exposing two primitives — `FlowState` (persistent KV with resume) and `ReqToken` (random-nonce request correlation, AMQP `correlation_id` idiom) — plus `flow.llm` sugar for LLM calls with slot+token echo verification. Module-level pure-function API (`state_new / state_key / state_get / state_set / state_save / token_issue / token_wrap / token_verify / llm`). No `M.run` by design: `flow` is a substrate, not an orchestrator — the driver loop stays in user code (Functional Core / Imperative Shell). Identity `deep_equal` check on resume prevents silent parameter drift. Fail-open token verification keeps existing bundled pkgs usable without rewrite; opt-in v1 contract (see `flow/doc/contract.md`) tightens per-call verification.
 - **[recipe_deep_panel](recipe_deep_panel/) Recipe** (v0.1.0 debut): production-grade 5-stage deep-reasoning pipeline composed on top of flow — `condorcet_gate` (Anti-Jury guard, p≥0.5) → fan-out of N × `ab_mcts` → `ensemble_div` (decomposition when ground_truth available) → `condorcet.prob_majority` plurality → `calibrate`. Inputs guarded: `p_estimate` required (no default), `n_branches` odd ≥3, `approaches` uniqueness. Identity = `{task, n_branches, budget, max_depth}` covers resume replay. Stage 1 abort path shares the unified result shape. `M.verified.stage_coverage` records per-stage verification status (2 stages verified with real LLM, 3 stages flagged `not_exercised` with `reason` + `to_verify` — no fabricated claims).
 - **`AlcResultDeepPaneled` shape** in `alc_shapes` (22 fields, `open=true`): machine-contract for recipe_deep_panel result. LuaCATS projection in `types/alc_shapes.d.lua`.
-- **`justfile` recipes** `gen-docs`, `gen-docs-lint`, `gen-docs-strict`: fills the gap where `CLAUDE.md` documented these commands but the justfile lacked them. Commit / release gates use `gen-docs-strict` to fail on V0 convention lint errors.
+- **`justfile` recipes** `gen-docs`, `gen-docs-lint`, `gen-docs-strict` added. Commit / release gates use `gen-docs-strict` to fail on V0 convention lint errors.
 - **Integration test suites** under `tests/flow/`: `test_integ_swarm_mcts.lua` (fan-out + consensus + commit), `test_integ_gate_scale.lua` (5-gate Coding-pipeline chain with retry + resume), `test_integ_ensemble_vote.lua` (bare `flow.llm` × N + pure-compute + regen loop-back). Each file documents the flow-scaling property it exercises in a header comment.
 - **Unit test suites** `tests/test_flow.lua` (51 assertions across util / state / token / llm / meta) and `tests/test_recipe_deep_panel.lua` (41 assertions across meta / ingredients / internal vote-tally / input validation / Stage 1 abort / main path / token tampering / resume). Full MCP run: 109/109 pass.
 - **[sprt](sprt/) Sequential Probability Ratio Test primitive** (v0.1.0 debut): Wald 1945 / Wald & Wolfowitz 1948 SPRT as a standalone observe/decide gate on any Bernoulli stream. `sprt.new(p0, p1, alpha, beta)` → `observe(outcome)` / `decide()` → `"accept_h0" | "accept_h1" | "continue"`. Auxiliary `sprt.expected_n_envelope(n_obs, p0, p1, alpha, beta)` documented as simplified numerator-only Wald form (not exact E[N]). Verified via alpha/beta grid Monte Carlo suite (`tests/test_sprt.lua`, 33 assertions).
@@ -111,7 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - other schemas → `{"kind":"primitive|array_of|map_of|one_of|discriminated",...}`
 
   `input_shape` and `result_shape` share the same discriminated wire format, so a single walker processes both. Role split preserved: `docs/hub/*.json` is the machine contract (structured); `docs/narrative/*.md` YAML frontmatter `result_shape:` remains a human-readable string.
-- **`alc_shapes.spec_resolver.run` ctx-threading**: aligned with `AlcCtx` convention (earlier prototype in `workspace/` diverged; migration preserved test fixtures).
+- **`alc_shapes.spec_resolver.run` ctx-threading**: aligned with `AlcCtx` convention.
 - **Reserved-name list**: extended with `instrument` and `spec_resolver` (shape-name shadow prevention).
 
 ### Fixed
