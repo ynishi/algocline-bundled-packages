@@ -73,6 +73,26 @@ M.calibrated = T.shape({
     fallback_detail = T.table:is_optional():describe("Fallback strategy result (voted/paneled)"),
 }, { open = true })
 
+-- conformal_vote (Wang et al. 2026, arXiv:2604.07667):
+-- linear opinion pool + split conformal prediction with the three-way
+-- decision rule (Proposition 3). `card_id` is populated only when the
+-- caller opts into Card emission via ctx.auto_card = true.
+M.conformal_decided = T.shape({
+    action         = T.one_of({ "commit", "escalate", "anomaly" })
+        :describe("Three-way decision per Proposition 3"),
+    selected       = T.string:is_optional()
+        :describe("Committed label (nil when action != 'commit')"),
+    prediction_set = T.array_of(T.string)
+        :describe("Labels y with P_social(y|x) >= tau"),
+    p_social       = T.map_of(T.string, T.number)
+        :describe("Linear opinion pool output { [label] = prob }"),
+    coverage_level = T.number:describe("1 - alpha (finite-sample guarantee)"),
+    q_hat          = T.number:describe("Calibration quantile of nonconformity scores"),
+    tau            = T.number:describe("1 - q_hat (prediction-set threshold)"),
+    card_id        = T.string:is_optional()
+        :describe("Emitted Card id (only when auto_card=true)"),
+}, { open = true })
+
 -- ── ranking shapes ───────────────────────────────────────────────────
 
 local ranked_item_3 = T.shape({

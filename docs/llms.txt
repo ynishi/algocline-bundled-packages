@@ -183,6 +183,7 @@
 
 ## validation
 
+- [conformal_vote](narrative/conformal_vote.md): Linear opinion pool + split conformal prediction gate for multi-agent deliberation. Emits a three-way decision (commit / escalate / anomaly) per Proposition 3, with a finite-sample coverage guarant...
 - [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual faithfulness verification — tests whether reasoning causally depends on inputs by simulating condition changes. Detects pattern-matching and unfaithful CoT.
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
 - [eval_guard](narrative/eval_guard.md): Evaluation safety gates for multi-agent systems — self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight che...

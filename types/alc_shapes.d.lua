@@ -13,6 +13,16 @@
 ---@field strategy "direct"|"retry"|"panel"|"ensemble"
 ---@field total_llm_calls number
 
+---@class AlcResultConformalDecided
+---@field action "commit"|"escalate"|"anomaly" @Three-way decision per Proposition 3
+---@field card_id? string @Emitted Card id (only when auto_card=true)
+---@field coverage_level number @1 - alpha (finite-sample guarantee)
+---@field p_social table<string, number> @Linear opinion pool output { [label] = prob }
+---@field prediction_set string[] @Labels y with P_social(y|x) >= tau
+---@field q_hat number @Calibration quantile of nonconformity scores
+---@field selected? string @Committed label (nil when action != 'commit')
+---@field tau number @1 - q_hat (prediction-set threshold)
+
 ---@class AlcResultDeepPaneled
 ---@field abort_reason? string @Abort reason (nil when not aborted)
 ---@field aborted boolean @True if early-abort triggered
