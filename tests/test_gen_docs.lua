@@ -38,6 +38,8 @@ for _, name in ipairs({
     "tools.docs.extract",
     "tools.docs.projections",
     "tools.docs.lint",
+    "tools.docs.json",
+    "tools.docs.list",
     "alc_shapes",
     "alc_shapes.t",
     "alc_shapes.check",
@@ -51,6 +53,8 @@ local PI          = require("tools.docs.pkg_info")
 local Extract     = require("tools.docs.extract")
 local Projections = require("tools.docs.projections")
 local Lint        = require("tools.docs.lint")
+local Json        = require("tools.docs.json")
+local List        = require("tools.docs.list")
 local S           = require("alc_shapes")
 local T           = S.T
 
@@ -1154,6 +1158,194 @@ describe("tools.docs.lint", function()
         local r = Lint.check(info, docstring, "cot")
         -- expected: 0 error and 0 warning on cot (the golden V0 fixture).
         expect(#r.violations).to.equal(0)
+    end)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 4.5 tools.docs.json — minimal JSON decoder
+-- ─────────────────────────────────────────────────────────────────────
+
+describe("tools.docs.json", function()
+    it("decodes simple types", function()
+        expect(Json.decode("42")).to.equal(42)
+        expect(Json.decode("3.14")).to.equal(3.14)
+        expect(Json.decode("-5")).to.equal(-5)
+        expect(Json.decode('"hello"')).to.equal("hello")
+        expect(Json.decode("true")).to.equal(true)
+        expect(Json.decode("false")).to.equal(false)
+    end)
+
+    it("decodes null as a sentinel distinct from nil", function()
+        local result = Json.decode("null")
+        expect(result).to.equal(Json.NULL)
+        expect(result ~= nil).to.equal(true)
+    end)
+
+    it("decodes arrays", function()
+        local arr = Json.decode('[1, 2, "three"]')
+        expect(#arr).to.equal(3)
+        expect(arr[1]).to.equal(1)
+        expect(arr[2]).to.equal(2)
+        expect(arr[3]).to.equal("three")
+    end)
+
+    it("decodes nested objects", function()
+        local obj = Json.decode('{"a": 1, "b": {"c": [true, false]}}')
+        expect(obj.a).to.equal(1)
+        expect(obj.b.c[1]).to.equal(true)
+        expect(obj.b.c[2]).to.equal(false)
+    end)
+
+    it("decodes common string escapes", function()
+        expect(Json.decode('"a\\nb"')).to.equal("a\nb")
+        expect(Json.decode('"a\\tb"')).to.equal("a\tb")
+        expect(Json.decode('"a\\\\b"')).to.equal("a\\b")
+        expect(Json.decode('"a\\"b"')).to.equal('a"b')
+        expect(Json.decode('"a\\/b"')).to.equal("a/b")
+    end)
+
+    it("decodes \\uXXXX to UTF-8", function()
+        expect(Json.decode('"\\u0041"')).to.equal("A")
+        -- é = U+00E9 → UTF-8 0xC3 0xA9
+        expect(Json.decode('"\\u00e9"')).to.equal("\xc3\xa9")
+    end)
+
+    it("errors on malformed input", function()
+        expect(pcall(Json.decode, "{")).to.equal(false)
+        expect(pcall(Json.decode, "")).to.equal(false)
+        expect(pcall(Json.decode, "{1: 2}")).to.equal(false)
+    end)
+
+    it("errors on trailing garbage", function()
+        expect(pcall(Json.decode, "1 2")).to.equal(false)
+    end)
+
+    it("parses a hub_index-shaped document", function()
+        local text = [[{
+            "schema_version": "hub_index/v0",
+            "updated_at": "2026-04-21T00:00:00Z",
+            "packages": [
+                {"name": "a", "source": {"type": "unknown"}, "card_count": 0},
+                {"name": "b", "source": {"type": "git", "url": "http://x", "rev": null}, "card_count": 3}
+            ]
+        }]]
+        local idx = Json.decode(text)
+        expect(idx.schema_version).to.equal("hub_index/v0")
+        expect(#idx.packages).to.equal(2)
+        expect(idx.packages[1].name).to.equal("a")
+        expect(idx.packages[1].source.type).to.equal("unknown")
+        expect(idx.packages[2].source.rev).to.equal(Json.NULL)
+    end)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 4.6 tools.docs.list — hub_index-driven pkg enumeration
+-- ─────────────────────────────────────────────────────────────────────
+
+describe("tools.docs.list", function()
+    math.randomseed(os.time())
+
+    local function tmpdir()
+        local path = string.format("/tmp/alc_test_list_%d_%d",
+            os.time(), math.random(100000, 999999))
+        os.execute(string.format("mkdir -p %q", path))
+        return path
+    end
+
+    local function write_file(path, content)
+        local f = assert(io.open(path, "w"))
+        f:write(content)
+        f:close()
+    end
+
+    local function rmtree(path)
+        os.execute(string.format("rm -rf %q", path))
+    end
+
+    local function setup_fixture(pkg_names, schema_version)
+        local d = tmpdir()
+        schema_version = schema_version or "hub_index/v0"
+        for _, name in ipairs(pkg_names) do
+            os.execute(string.format("mkdir -p %q", d .. "/" .. name))
+            write_file(d .. "/" .. name .. "/init.lua",
+                "local M = { meta = { name = '" .. name .. "' } }\nreturn M\n")
+        end
+        local entries = {}
+        for _, name in ipairs(pkg_names) do
+            entries[#entries + 1] = string.format(
+                '{"name": "%s", "source": {"type":"unknown"}}', name)
+        end
+        write_file(d .. "/hub_index.json", string.format(
+            '{"schema_version": "%s", "packages": [%s]}',
+            schema_version, table.concat(entries, ",")))
+        return d
+    end
+
+    it("enumerates packages sorted by name", function()
+        local d = setup_fixture({ "beta", "alpha", "gamma" })
+        local pkgs = List.list_pkgs(d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(#pkgs).to.equal(3)
+        expect(pkgs[1].name).to.equal("alpha")
+        expect(pkgs[2].name).to.equal("beta")
+        expect(pkgs[3].name).to.equal("gamma")
+        expect(pkgs[1].init_path:sub(-15)).to.equal("/alpha/init.lua")
+        expect(pkgs[1].source_path).to.equal("alpha/init.lua")
+    end)
+
+    it("returns an empty list when packages array is empty", function()
+        local d = setup_fixture({})
+        local pkgs = List.list_pkgs(d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(#pkgs).to.equal(0)
+    end)
+
+    it("errors when hub_index.json is missing", function()
+        local ok, err = pcall(List.list_pkgs,
+            "/nonexistent", "/nonexistent/hub_index.json")
+        expect(ok).to.equal(false)
+        expect(tostring(err):find("not found", 1, true) ~= nil).to.equal(true)
+    end)
+
+    it("errors on schema_version mismatch", function()
+        local d = setup_fixture({ "a" }, "hub_index/v99")
+        local ok, err = pcall(List.list_pkgs, d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(ok).to.equal(false)
+        expect(tostring(err):find("unsupported schema_version", 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("errors when index lists a pkg with no init.lua on disk", function()
+        local d = setup_fixture({ "a" })
+        os.remove(d .. "/a/init.lua")
+        local ok, err = pcall(List.list_pkgs, d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(ok).to.equal(false)
+        expect(tostring(err):find("does not exist", 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("errors when an entry has no non-empty name", function()
+        local d = tmpdir()
+        write_file(d .. "/hub_index.json",
+            '{"schema_version":"hub_index/v0","packages":[{"name":""}]}')
+        local ok, err = pcall(List.list_pkgs, d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(ok).to.equal(false)
+        expect(tostring(err):find("no `name`", 1, true) ~= nil)
+            .to.equal(true)
+    end)
+
+    it("errors when packages is not an array", function()
+        local d = tmpdir()
+        write_file(d .. "/hub_index.json",
+            '{"schema_version":"hub_index/v0","packages":"not an array"}')
+        local ok, err = pcall(List.list_pkgs, d, d .. "/hub_index.json")
+        rmtree(d)
+        expect(ok).to.equal(false)
+        expect(tostring(err):find("no `packages` array", 1, true) ~= nil)
+            .to.equal(true)
     end)
 end)
 

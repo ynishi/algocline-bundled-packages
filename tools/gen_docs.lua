@@ -1,11 +1,29 @@
 #!/usr/bin/env lua
---- tools/gen_docs.lua — docs pipeline CLI.
+--- tools/gen_docs.lua — publish-artifact generator for bundled-packages.
 ---
---- Iterates every pkg (top-level directory with init.lua + M.meta) and
---- writes:
----   {out_dir}/narrative/{pkg}.md
----   {out_dir}/llms.txt
----   {out_dir}/llms-full.txt
+--- Analogous to cargo-dist: projects release-facing artifacts from an
+--- upstream-produced manifest (`hub_index.json`), rather than generating
+--- per-package API reference. Rich per-package RustDoc-style output is
+--- intentionally out of scope — for local pkg lookup use `alc_info` /
+--- `alc_hub_search` or read the source.
+---
+--- Input: `hub_index.json` (produced by algocline MCP's
+--- `alc_hub_reindex`). Single source of truth for which pkgs exist.
+--- Non-pkg directories (e.g. `alc_shapes`, which has no `M.meta.name`)
+--- are already excluded by `alc_hub_reindex` in algocline 0.25.0+, so
+--- gen_docs never sees them.
+---
+--- Output (under {out_dir}):
+---   narrative/{pkg}.md                   — human-readable per pkg
+---   hub/{pkg}.json (if --hub)            — machine contract per pkg
+---   llms.txt / llms-full.txt             — LLM consumption index
+---   {repo_root}/context7.json            — Context7 manifest (--context7)
+---   {repo_root}/.devin/wiki.json         — DeepWiki manifest (--devin)
+---
+--- Preconditions:
+---   `hub_index.json` must exist and be fresh. Run `alc_hub_reindex`
+---   (algocline MCP tool) before `gen_docs`. A missing / unsupported
+---   / stale index is a hard error — not a warning.
 ---
 --- Usage:
 ---   lua tools/gen_docs.lua [options] [repo_root] [out_dir]
@@ -19,15 +37,11 @@
 ---   --hub          Additionally emit hub_entry JSON per pkg at
 ---                  {out_dir}/hub/{pkg}.json (pipeline-spec §7.4).
 ---   --context7     Additionally emit {repo_root}/context7.json for
----                  Context7 ingestion (pipeline-spec §7.6). The repo
----                  root is the primary target because Context7 reads
----                  the manifest from the repository root, not from
----                  the generated docs/ output.
+---                  Context7 ingestion (pipeline-spec §7.6).
 ---   --devin        Additionally emit {repo_root}/.devin/wiki.json for
----                  DeepWiki ingestion (pipeline-spec §7.6). DeepWiki
----                  auto-crawls the repository, so the manifest steers
----                  wiki generation via repo_notes rather than a
----                  folders filter.
+---                  DeepWiki ingestion (pipeline-spec §7.6).
+---   --hub-index=PATH  Override the path to hub_index.json. Default is
+---                  "{repo_root}/hub_index.json".
 ---
 --- Defaults: repo_root = ".", out_dir = "{repo_root}/docs"
 
@@ -45,6 +59,7 @@ local function parse_argv(argv)
     local opts = {
         lint = false, strict = false, lint_only = false,
         hub = false, context7 = false, devin = false,
+        hub_index = nil,
     }
     local positional = {}
     for i = 1, #argv do
@@ -63,6 +78,8 @@ local function parse_argv(argv)
             opts.context7 = true
         elseif a == "--devin" then
             opts.devin = true
+        elseif a:sub(1, 12) == "--hub-index=" then
+            opts.hub_index = a:sub(13)
         elseif a:sub(1, 2) == "--" then
             io.stderr:write("gen_docs: unknown option '" .. a .. "'\n")
             os.exit(2)
@@ -71,30 +88,6 @@ local function parse_argv(argv)
         end
     end
     return opts, positional
-end
-
--- ── directory listing ─────────────────────────────────────────────────
-
-local function list_pkgs(repo_root)
-    local cmd = string.format("ls -d %s/*/init.lua 2>/dev/null", repo_root)
-    local handle = io.popen(cmd)
-    if not handle then
-        error("gen_docs: io.popen failed for " .. cmd)
-    end
-    local pkgs = {}
-    for line in handle:lines() do
-        local pkg_name = line:match("([^/]+)/init%.lua$")
-        if pkg_name then
-            pkgs[#pkgs + 1] = {
-                name        = pkg_name,
-                init_path   = line,
-                source_path = pkg_name .. "/init.lua",
-            }
-        end
-    end
-    handle:close()
-    table.sort(pkgs, function(a, b) return a.name < b.name end)
-    return pkgs
 end
 
 -- ── file I/O ──────────────────────────────────────────────────────────
@@ -122,16 +115,20 @@ local function main(argv)
     local opts, positional = parse_argv(argv or {})
     local repo_root = positional[1] or "."
     local out_dir   = positional[2] or (repo_root .. "/docs")
+    local hub_index = opts.hub_index or (repo_root .. "/hub_index.json")
 
     setup_package_path(repo_root)
 
+    local List        = require("tools.docs.list")
     local Extract     = require("tools.docs.extract")
     local Projections = require("tools.docs.projections")
     local Lint        = opts.lint and require("tools.docs.lint") or nil
 
-    local pkgs = list_pkgs(repo_root)
+    local pkgs = List.list_pkgs(repo_root, hub_index)
     if #pkgs == 0 then
-        io.stderr:write("gen_docs: no pkg found under " .. repo_root .. "\n")
+        io.stderr:write(
+            "gen_docs: hub_index.json lists zero packages at "
+            .. hub_index .. "\n")
         os.exit(1)
     end
 
@@ -146,7 +143,6 @@ local function main(argv)
     local infos         = {}
     local entries       = {}
     local failures      = {}
-    local skipped       = {}
     local lint_errors   = 0
     local lint_warnings = 0
 
@@ -165,7 +161,7 @@ local function main(argv)
                         Projections.hub_entry(info))
                 end
             end
-            infos[#infos + 1]   = info
+            infos[#infos + 1]     = info
             entries[#entries + 1] = { name = p.name, narrative_md = md }
 
             if Lint then
@@ -185,14 +181,12 @@ local function main(argv)
 
             io.stdout:write(string.format("  [ok]   %s\n", p.name))
         else
+            -- hub_index listed this pkg but extraction failed. This is
+            -- drift between the indexer and our DSL evaluator — not
+            -- a soft skip. Fail loudly so the divergence surfaces.
             local msg = tostring(info_or_err)
-            if msg:find("no M.meta table", 1, true) then
-                skipped[#skipped + 1] = p.name
-                io.stdout:write(string.format("  [skip] %s (no M.meta)\n", p.name))
-            else
-                failures[#failures + 1] = { name = p.name, err = msg }
-                io.stderr:write(string.format("  [FAIL] %s: %s\n", p.name, msg))
-            end
+            failures[#failures + 1] = { name = p.name, err = msg }
+            io.stderr:write(string.format("  [FAIL] %s: %s\n", p.name, msg))
         end
     end
 
@@ -215,8 +209,8 @@ local function main(argv)
     end
 
     io.stdout:write(string.format(
-        "\ngen_docs: %d generated, %d skipped, %d failed",
-        #infos, #skipped, #failures))
+        "\ngen_docs: %d generated, %d failed",
+        #infos, #failures))
     if Lint then
         io.stdout:write(string.format(
             ", lint: %d error(s) / %d warning(s)",
