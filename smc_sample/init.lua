@@ -662,6 +662,35 @@ function M.run(ctx)
         error("smc_sample.run: ctx.reward_fn is required (function fn(answer, task) → number)", 2)
     end
 
+    -- v1: proposal_fn caller injection not yet supported (issue §13.5).
+    -- Warn (not error) so callers who pre-configure for v2 aren't hard-
+    -- rejected — their proposal_fn is simply ignored in v1. Fire the
+    -- warning BEFORE the strip below so we don't need a saved flag.
+    if ctx.proposal_fn ~= nil then
+        if type(alc) == "table" and type(alc.log) == "table"
+                and type(alc.log.warn) == "function" then
+            alc.log.warn(
+                "smc_sample.run: ctx.proposal_fn is ignored in v1 "
+                .. "(LLM-refine proposal is fixed). v2 will opt in.")
+        end
+    end
+
+    -- ─── Strip caller-injected Lua closures from ctx ───
+    -- Done BEFORE the rest of the body runs so that even if a later
+    -- validation or SMC step errors, the caller's ctx is still JSON-
+    -- serializable (e.g. for post-hoc debug logging at the MCP boundary).
+    -- All function-typed top-level fields are input contracts (reward_fn /
+    -- proposal_fn / future callbacks), never part of the strategy output.
+    -- The reward_fn local above keeps the captured closure usable for the
+    -- SMC loop. Regression: E2E 2026-04-22 run_id 122845.
+    --
+    -- Clearing during iteration is explicitly allowed by Lua 5.4 Reference
+    -- Manual §3.3.5 ("you may however modify existing fields ... in
+    -- particular, you may clear existing fields").
+    for k, v in pairs(ctx) do
+        if type(v) == "function" then ctx[k] = nil end
+    end
+
     -- ─── Resolve hyperparameters from ctx + M._defaults ───
     local N          = ctx.n_particles or M._defaults.n_particles
     local K          = ctx.n_iterations or M._defaults.n_iterations
@@ -684,18 +713,6 @@ function M.run(ctx)
     end
     if type(S_steps) ~= "number" or S_steps < 0 then
         error("smc_sample.run: rejuv_steps must be non-negative number, got " .. tostring(S_steps), 2)
-    end
-
-    -- v1: proposal_fn caller injection not yet supported (issue §13.5).
-    -- Warn (not error) so callers who pre-configure for v2 aren't hard-
-    -- rejected — their proposal_fn is simply ignored in v1.
-    if ctx.proposal_fn ~= nil then
-        if type(alc) == "table" and type(alc.log) == "table"
-                and type(alc.log.warn) == "function" then
-            alc.log.warn(
-                "smc_sample.run: ctx.proposal_fn is ignored in v1 "
-                .. "(LLM-refine proposal is fixed). v2 will opt in.")
-        end
     end
 
     -- ─── SMC initialization ───
@@ -832,15 +849,9 @@ function M.run(ctx)
         end
     end
 
-    -- Strip caller-injected Lua closures before returning so that MCP
-    -- boundaries (alc_run JSON encoding) can serialize ctx. `reward_fn` /
-    -- `proposal_fn` are input contracts, not part of the strategy output —
-    -- leaving them in `ctx` causes "function cannot be JSON-serialized"
-    -- errors at the algocline MCP response boundary (observed in E2E
-    -- 2026-04-22 run_id 122845). ctx.result is unaffected.
-    ctx.reward_fn = nil
-    ctx.proposal_fn = nil
-
+    -- ctx 中の関数は M.run 冒頭で strip 済み (error 経路でも clean を保証)。
+    -- ctx.result は auto_card 分岐を含めて pure data のみで組み立てるため
+    -- ここでの追加 strip は不要。
     return ctx
 end
 

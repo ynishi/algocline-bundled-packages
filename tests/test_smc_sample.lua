@@ -1164,4 +1164,24 @@ describe("smc_sample — serialization safety (MCP boundary)", function()
         end
         has_function(ctx.result, "ctx.result")
     end)
+
+    it("error path still strips functions (validation fails after strip)", function()
+        -- Regression: if M.run errors AFTER the early strip, caller's ctx
+        -- must still be JSON-serializable (no dangling reward_fn /
+        -- proposal_fn closures). n_particles=-1 trips validation after
+        -- the strip block at the top of M.run.
+        local stub, _counter = make_alc_stub({ fixtures = {} })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "sum",
+            reward_fn    = function(_a, _t) return 1.0 end,
+            proposal_fn  = function(_p, _t) return _p end,
+            n_particles  = -1,  -- invalid → validation error after strip
+        }
+        local ok, _err = pcall(smc.run, ctx)
+        expect(ok).to.equal(false)
+        expect(ctx.reward_fn).to.equal(nil)
+        expect(ctx.proposal_fn).to.equal(nil)
+    end)
 end)
