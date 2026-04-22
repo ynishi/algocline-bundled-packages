@@ -859,6 +859,35 @@ describe("smc_sample.run (M.run end-to-end, mocked alc)", function()
         expect(ctx.result.answer).to.equal("high")
     end)
 
+    it("argmax tiebreak: equal weights → higher-reward particle wins", function()
+        -- Fixture: 2 init answers, α=0 keeps weights uniformly 0.5 after
+        -- any number of iterations. Under pure weight-greater comparison
+        -- the first index would win arbitrarily; the reward tiebreak
+        -- forces the higher-reward answer regardless of enumeration order.
+        -- Regression for the "arbitrary index tiebreak" behavior in the
+        -- initial argmax loop (smc_sample/init.lua:800-804 before fix).
+        local stub, _c = make_alc_stub({
+            fixtures = { "low_r", "high_r" },
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "t",
+            reward_fn    = function(a, _t)
+                if a == "low_r"  then return 0.2 end
+                if a == "high_r" then return 0.8 end
+                return 0
+            end,
+            n_particles  = 2,
+            n_iterations = 0,
+            rejuv_steps  = 0,
+            alpha        = 0.0,  -- forces weights = 1/N = 0.5 each
+        }
+        smc.run(ctx)
+        -- Both weights are 0.5; reward tiebreak picks "high_r" (0.8 > 0.2).
+        expect(ctx.result.answer).to.equal("high_r")
+    end)
+
     it("fail-fast: reward_fn raising error halts M.run", function()
         local stub, _c = make_alc_stub()
         _G.alc = stub
@@ -989,6 +1018,38 @@ describe("smc_sample.run — Card emission (auto_card spy)", function()
         expect(#counter.card.last_list).to.equal(2)
         expect(counter.card.last_list[1].particle_idx).to.equal(1)
         expect(counter.card.last_list[2].particle_idx).to.equal(2)
+    end)
+
+    it("K=0 + auto_card=true → final_ess is a number (initial-weights fallback)", function()
+        -- Regression: K=0 leaves ess_trace empty, so ess_trace[#ess_trace]
+        -- was nil and flowed into card stats/smc_sample.final_ess,
+        -- producing a shape-invalid Card (or a nil where a number was
+        -- expected). emit_card now falls back to compute_ess(weights) so
+        -- the K=0 path still produces a meaningful ESS value.
+        local stub, counter = make_alc_stub({
+            fixtures = { "p1", "p2" },
+            with_card = true,
+            card_id = "stub_k0",
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "hello",
+            reward_fn    = function() return 0.5 end,
+            n_particles  = 2,
+            n_iterations = 0,
+            rejuv_steps  = 0,
+            alpha        = 4.0,
+            auto_card    = true,
+        }
+        smc.run(ctx)
+        expect(counter.card.create_calls).to.equal(1)
+        local args = counter.card.last_args
+        expect(type(args.stats.final_ess)).to.equal("number")
+        expect(type(args.smc_sample.final_ess)).to.equal("number")
+        -- With equal rewards (0.5 each) the initial weights are uniform,
+        -- so ESS == N == 2.
+        expect(args.stats.final_ess).to.equal(2)
     end)
 
     it("auto_card=false (default) → no card emission", function()

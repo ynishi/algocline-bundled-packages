@@ -405,11 +405,20 @@ local function init_particles(task, n, gen_tokens)
         return alc.llm(task, { max_tokens = gen_tokens })
     end)
 
+    -- history = 1-slot convention, diagnostic only:
+    --   * empty {}                               — never accepted a proposal
+    --   * { { answer, reward } }                 — last Accept's pre-swap state
+    -- Reject paths preserve the previous history unchanged, so a particle
+    -- that accepted on iteration k=2 and then rejected on k=3..K retains
+    -- the k=2 pre-swap state (not the k-1 particle state). This matches
+    -- the "last accept snapshot" semantics expected by diagnostic trace
+    -- consumers; callers needing a full accept/reject trace should use
+    -- Card samples (Tier 2 sidecar) instead.
     local particles = {}
     for i = 1, n do
         particles[i] = {
             answer  = tostring(answers[i] or ""),
-            history = {},  -- 1-slot convention: {prev_answer, prev_reward}
+            history = {},
         }
     end
     return particles
@@ -523,6 +532,12 @@ local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward
     -- ψ directly instead of the full (often un-normalizable) Π so the
     -- numerator / denominator cancel their shared base-model factor —
     -- this is precisely the Target I property paper §4.2 exploits.
+    -- ⚠ ALIASING: new_particles[i] = particles[i] on reject copies a
+    -- reference, not a deep copy. When upstream resample already aliased
+    -- particles[] across slots, rejects preserve that aliasing. Safe
+    -- today because Accept (below) replaces the slot with a freshly
+    -- built table, never mutates in place. Future mutation-based edits
+    -- must deep-copy first.
     local new_particles = {}
     local new_rewards = {}
     local n_rejected = 0
@@ -595,8 +610,17 @@ local function emit_card(ctx, result, per_particle_list)
     end
     local mean_reward = (#per_particle_list > 0) and (sum_r / #per_particle_list) or 0
 
+    -- ESS trace → final_ess. K=0 path leaves ess_trace empty (the main
+    -- loop never runs), so we fall back to computing ESS directly from
+    -- the final weights; if that is also unavailable, use 0 as a
+    -- "not-measured" sentinel. This keeps Card payloads shape-valid
+    -- regardless of the K value the caller supplied.
     local ess_trace = result.ess_trace or {}
     local final_ess = ess_trace[#ess_trace]
+    if final_ess == nil and type(result.weights) == "table" and #result.weights > 0 then
+        final_ess = compute_ess(result.weights)
+    end
+    final_ess = final_ess or 0
 
     local card = alc.card.create({
         pkg = { name = pkg_name },
@@ -740,6 +764,17 @@ function M.run(ctx)
         -- 1/N (paper §3.4 degeneracy reset). Rewards are re-indexed to
         -- the resampled particles so incremental_weight_update has a
         -- valid "prev" baseline on the next weight update.
+        --
+        -- ⚠ ALIASING: resample_multinomial copies particle table
+        -- references by design (multinomial with replacement). After
+        -- this block, new_particles[i] and new_particles[j] may point
+        -- to the same table when i and j drew the same index. Safe
+        -- today because mh_rejuvenate's Accept branch builds a fresh
+        -- { answer, history } table and replaces the slot atomically
+        -- rather than mutating in place, and the Reject branch is
+        -- read-only. Any future code that mutates particle fields
+        -- (e.g. appending to history) MUST deep-copy first or this
+        -- will corrupt every aliased slot.
         if ess < thr * N then
             -- Resample both particles and their rewards in lockstep
             -- using the same multinomial indices. We do this via a
@@ -795,11 +830,19 @@ function M.run(ctx)
     end
 
     -- ─── argmax selection ───
+    -- Primary key: weight (paper §4.3 dominance selection).
+    -- Tiebreak: higher reward wins (semantically preferred — equal-weight
+    -- particles are observationally indistinguishable under the tempered
+    -- potential ψ=exp(α·r), so we fall back to the raw reward signal
+    -- rather than the arbitrary particle-index ordering).
     local argmax_i = 1
     local argmax_w = weights[1]
+    local argmax_r = rewards[1]
     for i = 2, N do
-        if weights[i] > argmax_w then
-            argmax_w = weights[i]
+        local wi = weights[i]
+        if wi > argmax_w or (wi == argmax_w and rewards[i] > argmax_r) then
+            argmax_w = wi
+            argmax_r = rewards[i]
             argmax_i = i
         end
     end

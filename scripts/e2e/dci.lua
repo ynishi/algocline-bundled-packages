@@ -20,6 +20,69 @@
 package.path = "scripts/e2e/?.lua;" .. package.path
 local common = require("common")
 
+--- Search the agent's turn_history for a raw MCP tool_response that
+--- carries the dci decision_packet. Returns the matched response text
+--- (JSON-ish string) or nil.
+---
+--- Why: the agent's final `content` paraphrases pkg return values into
+--- human-readable markdown ("**Selected Option**"), which forces the
+--- text-match graders below into a snake_case ↔ title-case dual match
+--- that is still prone to false positives (e.g. the phrase "no
+--- minority report was included" would substring-match "minority
+--- report"). The raw tool_response from `alc_run` / `alc_advice`
+--- contains the dci shape verbatim in snake_case, which is both
+--- strict and unambiguous.
+---
+--- Heuristic: a response that mentions `decision_packet` *and* the 5
+--- required component keys is the one we want. If turn_history is
+--- missing (e.g. old run) the graders fall back to the text match.
+local function extract_decision_packet_raw(result)
+    local hist = result and result.turn_history
+    if type(hist) ~= "table" then return nil end
+    local REQUIRED = {
+        "decision_packet",
+        "selected_option",
+        "residual_objections",
+        "minority_report",
+        "next_actions",
+        "reopen_triggers",
+    }
+    for _, turn in ipairs(hist) do
+        local resps = turn.tool_responses
+        if type(resps) == "table" then
+            for _, r in ipairs(resps) do
+                local text
+                if type(r) == "string" then
+                    text = r
+                elseif type(r) == "table" then
+                    text = r.content or r.text or r.body
+                    -- Agent-block sometimes wraps content as a nested
+                    -- list of {type="text", text=...} entries.
+                    if type(text) == "table" then
+                        local parts = {}
+                        for _, sub in ipairs(text) do
+                            if type(sub) == "table" and type(sub.text) == "string" then
+                                parts[#parts + 1] = sub.text
+                            elseif type(sub) == "string" then
+                                parts[#parts + 1] = sub
+                            end
+                        end
+                        text = table.concat(parts, "\n")
+                    end
+                end
+                if type(text) == "string" then
+                    local all = true
+                    for _, key in ipairs(REQUIRED) do
+                        if not text:find(key, 1, true) then all = false; break end
+                    end
+                    if all then return text end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 local params = {
     task = "Should our team adopt event-sourcing for the order service?",
     max_rounds    = 2,
@@ -118,13 +181,35 @@ common.run({
             name = "decision_packet_complete",
             check = function(result)
                 if not result.ok then return false, "agent failed" end
+                -- Primary: inspect raw MCP tool_response (snake_case,
+                -- authoritative). This is the strict path — the raw
+                -- dci.run return value contains every shape key
+                -- verbatim, so a simple substring check against the
+                -- JSON-ish payload cannot be defeated by the agent
+                -- paraphrasing field names in its final summary.
+                local raw = extract_decision_packet_raw(result)
+                if raw then
+                    for _, key in ipairs({
+                        "selected_option",
+                        "residual_objections",
+                        "minority_report",
+                        "next_actions",
+                        "reopen_triggers",
+                    }) do
+                        if not raw:find(key, 1, true) then
+                            return false, "raw decision_packet missing: " .. key
+                        end
+                    end
+                    return true, nil
+                end
+                -- Fallback: text match against agent's content. Used
+                -- when turn_history is unavailable (older runs / agent
+                -- harness variants). Fragile against agent paraphrasing
+                -- and false-positive substring matches (e.g. "no
+                -- minority report was included" would still match
+                -- "minority report"). Accept snake_case *or* space-
+                -- separated form to absorb the most common paraphrase.
                 local c = (result.content or ""):lower()
-                -- Accept either snake_case (from the shape / JSON) or
-                -- human-readable markdown section headers (agents tend
-                -- to paraphrase field names into title-case English).
-                -- Regression for E2E 2026-04-22 run_id 122845 where
-                -- agent wrote "**Selected Option**" etc. and the
-                -- snake_case-only grader FAIL'd a correct decision.
                 local patterns = {
                     selected_option     = { "selected_option",     "selected option" },
                     residual_objections = { "residual_objections", "residual objections" },
@@ -141,7 +226,7 @@ common.run({
                         end
                     end
                     if not found then
-                        return false, "missing component: " .. key
+                        return false, "missing component (text fallback): " .. key
                     end
                 end
                 return true, nil
@@ -151,14 +236,36 @@ common.run({
             name = "minority_report_preserved",
             check = function(result)
                 if not result.ok then return false, "agent failed" end
+                -- Primary: raw tool_response. Require an actual
+                -- minority_report entry with at least one non-empty
+                -- member (the dci shape emits a list of {position,
+                -- rationale} pairs). Substring check for the shape
+                -- key + one of the expected inner field names is a
+                -- tight-enough approximation without a JSON parser.
+                local raw = extract_decision_packet_raw(result)
+                if raw then
+                    if not raw:find("minority_report", 1, true) then
+                        return false, "raw minority_report absent"
+                    end
+                    if raw:find("position", 1, true)
+                        or raw:find("rationale", 1, true)
+                        or raw:find("dissent", 1, true)
+                    then
+                        return true, nil
+                    end
+                    return false, "raw minority_report empty "
+                        .. "(no position/rationale/dissent)"
+                end
+                -- Fallback: content text. Same fragility caveat as
+                -- decision_packet_complete above — "no minority
+                -- report was included" would erroneously satisfy the
+                -- "mentions" check. Acceptable because this path only
+                -- fires when the authoritative turn_history is missing.
                 local c = (result.content or ""):lower()
-                -- Heuristic: the report mentions minority_report (or
-                -- its markdown-header form "minority report") AND
-                -- at least one alternative position / rationale marker.
                 local mentions = c:find("minority_report", 1, true)
                     or c:find("minority report", 1, true)
                 if not mentions then
-                    return false, "minority_report absent"
+                    return false, "minority_report absent (text fallback)"
                 end
                 if c:find("position", 1, true)
                     or c:find("rationale", 1, true)
@@ -166,7 +273,8 @@ common.run({
                 then
                     return true, nil
                 end
-                return false, "minority_report empty (no position/rationale/dissent)"
+                return false, "minority_report empty (text fallback: "
+                    .. "no position/rationale/dissent)"
             end,
         },
         {

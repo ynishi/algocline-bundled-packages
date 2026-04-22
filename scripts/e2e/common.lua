@@ -105,9 +105,10 @@ end
 
 --- Write agent result + grader report to JSON file.
 ---
---- `meta.turn_history` is a per-turn log captured by the `on_turn`
---- callback (tool_calls / tool_responses / usage). Persisting it into
---- the E2E result JSON lets post-hoc graders / humans inspect the exact
+--- `result.turn_history` is a per-turn log captured by the `on_turn`
+--- callback (tool_calls / tool_responses / usage) and attached to
+--- `result` by M.run before this function runs. Persisting it into the
+--- E2E result JSON lets post-hoc graders / humans inspect the exact
 --- MCP calls and their JSON bodies that `alc_run` etc. returned — the
 --- agent's final `content` text is only a human-readable summary and
 --- does not faithfully surface pkg return values (see issue
@@ -122,7 +123,7 @@ local function write_result(run_dir, name, result, grader_report, meta)
         error = result.error,
         num_turns = result.num_turns,
         usage = result.usage,
-        turn_history = meta.turn_history,
+        turn_history = result.turn_history,
         graders = grader_report,
         params = meta.params,
     }
@@ -229,7 +230,6 @@ function M.run(opts)
     local result_path = write_result(run_dir, opts.name, result, grader_report, {
         timestamp = ts,
         params = opts.params,
-        turn_history = turn_history,
     })
     log.info("Result saved: " .. result_path)
 
