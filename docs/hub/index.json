@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-21T00:58:20Z",
+  "updated_at": "2026-04-21T18:33:44Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -236,6 +236,18 @@
       "description": "Condorcet Jury Theorem — majority-vote probability, Anti-Jury detection, optimal panel sizing, and independence verification for multi-agent voting systems (Condorcet 1785, Dietrich-List 2008).",
       "category": "aggregation",
       "docstring": "condorcet — Condorcet Jury Theorem probability calculator\n\nPure-computation utility for majority-vote probability under\nindependent voters. Detects Anti-Jury conditions (p < 0.5),\nestimates required group size for target accuracy, and measures\ninter-agent correlation to verify the independence assumption.\n\nTheory:\nCondorcet, M. \"Essai sur l'application de l'analyse à la\nprobabilité des décisions rendues à la pluralité des voix\", 1785.\nModern formalization: Dietrich & List \"Jury Theorems\", SEP, 2008.\n\nCore formula:\nP(Maj_n) = SUM_{k=ceil(n/2)}^{n} C(n,k) * p^k * (1-p)^{n-k}\n\nJury Theorem: Under Uniform Independence (UI) and Uniform\nCompetence p > 0.5 (UC), P(Maj_n) → 1 as n → ∞.\nAnti-Jury: If p < 0.5, P(Maj_n) → 0 as n → ∞ — adding\nmore voters makes the group *worse*.\n\nMulti-Agent / Swarm context:\nThe Jury Theorem is the mathematical foundation for why\nmulti-agent voting (sc, panel, moa) can outperform single agents.\nIt also explains when it fails:\n\n- Panel sizing: optimal_n() computes the minimum number of\nagents needed to reach a target accuracy (e.g. 95%).\n- Anti-Jury detection: is_anti_jury() catches the dangerous\ncase where agents are worse than random (p < 0.5), meaning\nSelf-Consistency and majority vote will *degrade* with more\nagents. This validates the Chen NeurIPS 2024 finding\n(see inverse_u package).\n- Independence verification: correlation() measures pairwise\nPearson correlation between agent outputs. High correlation\n(same model/prompt) violates UI and weakens the theorem's\nguarantee — prompting strategy diversification.\n- Composable with sc, panel, moa, pbft as the theoretical\njustification for their majority-vote aggregation.\n\nUsage:\nlocal condorcet = require(\"condorcet\")\ncondorcet.prob_majority(5, 0.7)  -- => ~0.837\ncondorcet.is_anti_jury(0.4)      -- => true",
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "conformal_vote",
+      "version": "0.1.0",
+      "description": "Linear opinion pool + split conformal prediction gate for multi-agent deliberation. Emits a three-way decision (commit / escalate / anomaly) per Proposition 3, with a finite-sample coverage guarantee Pr[Y ∈ C(X)] ≥ 1-α (Theorem 2). Calibration and online rounds share aggregation weights so exchangeability is preserved.",
+      "category": "validation",
+      "docstring": "conformal_vote — Linear opinion pool + split conformal prediction\ngate for safe multi-agent deliberation.\n\nImplements the post-hoc decision layer from:\nWang, Xie, Wang, Gao, Yang, Li, Qiu, Han, Qiu, Huang, Zhu, Woo\n\"From Debate to Decision: Conformal Social Choice for Safe\nMulti-Agent Deliberation\" (arXiv:2604.07667, 2026-04-09)\n\nGiven N agents that each emit a verbalized probability distribution\nπ_i(y|x) over a fixed option set, the pkg performs:\n\nLinear opinion pool:       P_social(y|x) = Σ_i w_i · π_i(y|x)\nNonconformity score:       s_nc(x, y)    = 1 - P_social(y|x)\nFinite-sample quantile:    q̂ = sorted[⌈(n+1)(1-α)⌉]        (§4.3)\nPrediction set:            C(x) = { y : P_social(y|x) ≥ 1 - q̂ }\nThree-way decision (P. 3): |C|=1 ∧ p₁≥τ ∧ p₂<τ → commit\n|C|≥2 ∧ p₂≥τ        → escalate\n|C|=0 ∨ p₁<τ        → anomaly\n\nTheorem 2 guarantees Pr[Y ∈ C(X)] ≥ 1-α in finite samples whenever\ncalibration and online rounds share the same aggregation weights and\nthe data is exchangeable. The calibrate entry therefore *pins* the\nweights it used (defaulting to uniform 1/N) into its return value so\nM.run can replay them, never letting online aggregation drift from\nthe calibrated weights.\n\nEntry contract (see M.spec below):\ncalibrate   — pure, direct-args. returns { q_hat, tau, alpha, n, weights }\naggregate   — pure, direct-args. returns { [label] = p_social }\npredict_set — pure, direct-args. returns { labels, top1, top1_prob, top2, top2_prob }\ndecide      — pure, direct-args. returns { action, selected }\nrun         — Strategy, ctx-threading. queries N agents via alc.llm.\n\nCategory: validation (alongside sprt, eval_guard, inverse_u).\nThe paper's informal \"Governance\" label describes the role; the\nmachine-readable category string follows the existing sibling pkgs.",
       "source": {
         "type": "unknown"
       },

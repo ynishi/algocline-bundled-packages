@@ -31,7 +31,7 @@ The split is formalized in [`alc_shapes/spec_resolver.lua`](alc_shapes/spec_reso
 ### Roster
 
 - **Frames** — [flow](flow/), [abm](abm/)
-- **Computation** — [bft](bft/), [condorcet](condorcet/), [cost_pareto](cost_pareto/), [ensemble_div](ensemble_div/), [eval_guard](eval_guard/), [inverse_u](inverse_u/), [kemeny](kemeny/), [mwu](mwu/), [scoring_rule](scoring_rule/), [shapley](shapley/), [sprt](sprt/)
+- **Computation** — [bft](bft/), [condorcet](condorcet/), [conformal_vote](conformal_vote/), [cost_pareto](cost_pareto/), [ensemble_div](ensemble_div/), [eval_guard](eval_guard/), [inverse_u](inverse_u/), [kemeny](kemeny/), [mwu](mwu/), [scoring_rule](scoring_rule/), [shapley](shapley/), [sprt](sprt/)
 - **Schema engine** — [alc_shapes](alc_shapes/) (the type DSL and `spec_resolver` that power the contracts above)
 - **Strategy** — everything else in the *Packages* section below
 
@@ -41,7 +41,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (109)
+## Packages (110)
 
 ### Reasoning
 
@@ -149,6 +149,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[eval_guard](eval_guard/)** | Evaluation safety gates. Self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight checks before trusting any multi-agent evaluation result | Huang (ICLR 2024), Wang (ACL 2024), Zhu (EMNLP 2024) |
 | **[scoring_rule](scoring_rule/)** | Proper Scoring Rules. Brier, logarithmic, spherical scores + Expected Calibration Error (ECE) for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy. Strictly proper: honest reporting maximizes expected score | Brier (1950), Gneiting & Raftery (JASA 2007), Naeini (AAAI 2015) |
 | **[sprt](sprt/)** | Wald's Sequential Probability Ratio Test primitive. Streaming Bernoulli test with declared α/β error rates; Wald–Wolfowitz optimality (minimal expected N among tests with same error bounds). Substrate for adaptive-stop recipes that need to decide accept_h0 / accept_h1 / continue per observation | Wald (1945), Wald & Wolfowitz (1948) |
+| **[conformal_vote](conformal_vote/)** | Split conformal prediction gate for multi-agent deliberation. Linear opinion pool + finite-sample quantile (⌈(n+1)(1-α)⌉/n) + three-way decision (commit/escalate/anomaly) per Proposition 3. Pr[Y ∈ C(X)] ≥ 1-α (Theorem 2). Calibration pins aggregation weights so online runs preserve exchangeability | Wang et al. (arXiv:2604.07667, 2026) |
 
 ### Orchestration
 
