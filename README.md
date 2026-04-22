@@ -41,7 +41,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (110)
+## Packages (111)
 
 ### Reasoning
 
@@ -232,6 +232,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[panel](panel/)** | Multi-role deliberation. Multiple roles discuss and a moderator synthesizes | — |
+| **[dci](dci/)** | Deliberative Collective Intelligence (DCI-CF). 4 roles (Framer/Explorer/Challenger/Integrator) × 14 typed epistemic acts (6 classes) × 8-stage convergence algorithm. Forces a decision_packet (5 components) with first-class minority_report preservation even on fallback | Prakash (arXiv:2603.11781, 2026) |
 
 ### Substrate
 

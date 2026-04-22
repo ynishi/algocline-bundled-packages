@@ -45,6 +45,15 @@
 ---@field unanimous boolean @All normalized votes identical
 ---@field vote_counts table<string, number> @{ [normalized_answer] = count } tally
 
+---@class AlcResultDeliberated
+---@field answer string @Selected option's final answer text
+---@field card_id? string @Emitted Card id (only when auto_card=true)
+---@field convergence "dominance"|"no_blocking"|"fallback" @How the session converged
+---@field decision_packet { minority_report: { confidence: number, position: string, rationale: string }[], next_actions: string[], reopen_triggers: string[], residual_objections: string[], selected_option: { answer: string, evidence: string[], rationale: string } } @5-component decision packet; all 5 fields MUST be non-nil
+---@field history table[] @Per-stage typed-act log (14-act typed)
+---@field stats { options_count: number, rounds_used: number, total_acts: number, total_llm_calls: number } @Execution statistics
+---@field workspace { emerging_ideas: string[], key_frames: string[], next_actions: string[], problem_view: string, synthesis_in_progress: string, tensions: string[] } @Shared workspace 6 fields after finalization
+
 ---@class AlcResultFunnelRanked
 ---@field best string @Top-ranked text
 ---@field best_index number @Top-ranked original index (1-based)
