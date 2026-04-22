@@ -93,6 +93,55 @@ M.conformal_decided = T.shape({
         :describe("Emitted Card id (only when auto_card=true)"),
 }, { open = true })
 
+-- dci (Prakash 2026, arXiv:2603.11781):
+-- Deliberative Collective Intelligence (DCI-CF). 4 roles × 14 typed
+-- epistemic acts × 8-stage convergence, emitting a decision_packet with
+-- 5 non-nil components (selected_option / residual_objections /
+-- minority_report / next_actions / reopen_triggers). `card_id` is
+-- populated only when the caller opts into Card emission via
+-- ctx.auto_card = true.
+M.deliberated = T.shape({
+    answer          = T.string:describe("Selected option's final answer text"),
+    decision_packet = T.shape({
+        selected_option     = T.shape({
+            answer    = T.string,
+            rationale = T.string,
+            evidence  = T.array_of(T.string),
+        }, { open = true }):describe("Chosen option with rationale and cited evidence"),
+        residual_objections = T.array_of(T.string)
+            :describe("Objections not fully resolved (empty array allowed, nil禁止)"),
+        minority_report     = T.array_of(T.shape({
+            position   = T.string,
+            rationale  = T.string,
+            confidence = T.number,
+        }, { open = true }))
+            :describe("Dissenting positions with confidence (empty array allowed, nil禁止)"),
+        next_actions        = T.array_of(T.string)
+            :describe("Concrete follow-up actions (empty array allowed, nil禁止)"),
+        reopen_triggers     = T.array_of(T.string)
+            :describe("Conditions to reopen deliberation (empty array allowed, nil禁止)"),
+    }, { open = true }):describe("5-component decision packet; all 5 fields MUST be non-nil"),
+    workspace       = T.shape({
+        problem_view          = T.string,
+        key_frames            = T.array_of(T.string),
+        emerging_ideas        = T.array_of(T.string),
+        tensions              = T.array_of(T.string),
+        synthesis_in_progress = T.string,
+        next_actions          = T.array_of(T.string),
+    }, { open = true }):describe("Shared workspace 6 fields after finalization"),
+    history         = T.array_of(T.table):describe("Per-stage typed-act log (14-act typed)"),
+    convergence     = T.one_of({ "dominance", "no_blocking", "fallback" })
+        :describe("How the session converged"),
+    stats           = T.shape({
+        rounds_used     = T.number,
+        total_acts      = T.number,
+        options_count   = T.number,
+        total_llm_calls = T.number,
+    }, { open = true }):describe("Execution statistics"),
+    card_id         = T.string:is_optional()
+        :describe("Emitted Card id (only when auto_card=true)"),
+}, { open = true })
+
 -- ── ranking shapes ───────────────────────────────────────────────────
 
 local ranked_item_3 = T.shape({

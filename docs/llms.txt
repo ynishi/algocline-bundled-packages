@@ -179,6 +179,7 @@
 
 ## synthesis
 
+- [dci](narrative/dci.md): Deliberative Collective Intelligence (DCI-CF). 4 roles (Framer/Explorer/Challenger/Integrator) × 14 typed epistemic acts (6 classes) × shared workspace (6 fields) × 8-stage convergence algorithm...
 - [panel](narrative/panel.md): Multi-perspective deliberation — distinct roles engage, moderator synthesizes
 
 ## validation

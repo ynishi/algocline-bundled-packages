@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-21T18:33:44Z",
+  "updated_at": "2026-04-22T01:14:50Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -344,6 +344,18 @@
       "description": "Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation",
       "category": "reasoning",
       "docstring": "Cumulative — propose-verify-accumulate reasoning\nThree roles (proposer, verifier, reporter) collaborate in a loop.\nThe proposer generates new propositions, the verifier checks them,\nand verified propositions accumulate as established facts for the next round.\n\nBased on: Zhang et al., \"Cumulative Reasoning with Large Language Models\"\n(2024, arXiv:2308.04371)\n\nUsage:\nlocal cumulative = require(\"cumulative\")\nreturn cumulative.run(ctx)\n\nctx.task (required): The problem to solve\nctx.max_rounds: Maximum propose-verify cycles (default: 4)\nctx.propositions_per_round: Propositions to generate per round (default: 2)",
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "dci",
+      "version": "0.1.0",
+      "description": "Deliberative Collective Intelligence (DCI-CF). 4 roles (Framer/Explorer/Challenger/Integrator) × 14 typed epistemic acts (6 classes) × shared workspace (6 fields) × 8-stage convergence algorithm. Emits a decision_packet with 5 non-nil components (selected_option, residual_objections, minority_report, next_actions, reopen_triggers). Stage 7 fallback cascade (outranking → minimax → satisficing → Integrator arbitration) preserves minority_report even on forced convergence.",
+      "category": "synthesis",
+      "docstring": "dci — Deliberative Collective Intelligence (DCI-CF).\n\nImplements the 8-stage structured deliberation algorithm from:\nPrakash, Sunil\n\"From Debate to Deliberation: Structured Collective Reasoning\nwith Typed Epistemic Acts\" (arXiv:2603.11781, 2026-03-12)\n\n4 reasoning archetypes × 14 typed epistemic acts (6 classes) ×\nshared workspace (6 fields) + decision packet (5 components) +\nconvergence test + fallback cascade (outranking → minimax →\nsatisficing → Integrator arbitration). Forces the session to emit a\ndecision_packet with first-class minority_report preservation, even\non fallback.\n\n14 acts / 6 classes (issue §4.1):\nOrienting   : frame, clarify, reframe\nGenerative  : propose, extend, spawn       (spawn skeleton-only in v1)\nCritical    : ask, challenge\nIntegrative : bridge, synthesize, recall\nEpistemic   : ground, update\nDecisional  : recommend\n\n4 roles (fixed): framer / explorer / challenger / integrator.\n\nDCI-CF 8 stages:\nStage 0 init session\nStage 1 independent proposals (per-role act(s))\nStage 2 canonicalize & cluster options\nStages 3-6 (loop up to Rmax=2):\n3: collect challenges / evidence\n4: admit new hypotheses (cutoff)\n5: revise & compress options\n6: score against criteria + convergence test\n(dominance or no_blocking)\nStage 7 fallback cascade\nStage 8 finalize decision packet (5 components completeness)\n\nEntry contract:\nrun — Strategy, ctx-threading. ctx.task required; returns\nctx.result :: deliberated shape (alc_shapes).\n\nCategory: synthesis (panel-family).",
       "source": {
         "type": "unknown"
       },
