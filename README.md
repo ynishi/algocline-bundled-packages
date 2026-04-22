@@ -41,7 +41,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (111)
+## Packages (112)
 
 ### Reasoning
 
@@ -94,6 +94,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[f_race](f_race/)** | Friedman race partial-data pruner. Block-wise rank assignment over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman χ² + Conover post-hoc test. Designed for small N (≤10) × D (≤30) where Empirical-Bernstein CS cannot fire — uses ranks instead of raw scores so it discriminates gaps as small as 0.3 at B=20 blocks | Friedman (JASA 1937), Birattari et al. (GECCO 2002), Conover (1999) |
 | **[mwu](mwu/)** | Multiplicative Weights Update. Adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions. Doubling trick for unknown T, log-space computation for numerical stability | Littlestone & Warmuth (1994), Freund & Schapire (1997) |
 | **[cost_pareto](cost_pareto/)** | Multi-objective Pareto dominance. Frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs. HumanEval warming $2.45/93.2% dominates LATS $134.50/88.0% | Kapoor et al. "AI Agents That Matter" (2024) |
+| **[smc_sample](smc_sample/)** | Block-level Sequential Monte Carlo sampling for LLM quality. N particles with reward-weighted importance sampling, ESS-triggered multinomial resampling, and Metropolis-Hastings rejuvenation. Caller-injected `reward_fn` (unit-test / LLM judge / scoring rule) drives the Target I tempered potential ψ = exp(α·r). Encompasses sc (α=0) and mbr_select (similarity reward, 1 iteration) as special cases of the same probabilistic framework. Default (N=16, K=4, S=2) issues 208 LLM calls per run | Markovic-Voronov et al. (arXiv:2604.16453, 2026) |
 
 ### Aggregation
 
