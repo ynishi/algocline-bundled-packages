@@ -832,6 +832,15 @@ function M.run(ctx)
         end
     end
 
+    -- Strip caller-injected Lua closures before returning so that MCP
+    -- boundaries (alc_run JSON encoding) can serialize ctx. `reward_fn` /
+    -- `proposal_fn` are input contracts, not part of the strategy output —
+    -- leaving them in `ctx` causes "function cannot be JSON-serialized"
+    -- errors at the algocline MCP response boundary (observed in E2E
+    -- 2026-04-22 run_id 122845). ctx.result is unaffected.
+    ctx.reward_fn = nil
+    ctx.proposal_fn = nil
+
     return ctx
 end
 

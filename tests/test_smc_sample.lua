@@ -1082,3 +1082,86 @@ describe("smc_sample.run — Card emission (auto_card spy)", function()
         expect(counter.card.last_args.scenario.name).to.equal("unknown")
     end)
 end)
+
+-- Test 17: serialization safety — ctx must be JSON-serializable after run
+-- (reward_fn / proposal_fn closures must be stripped before return so that
+-- MCP boundaries can encode the response; regression for E2E 2026-04-22
+-- run_id 122845 where `alc_run` returned "function cannot be JSON-serializable"
+-- error because ctx.reward_fn stayed on the returned ctx table).
+describe("smc_sample — serialization safety (MCP boundary)", function()
+    lust.after(reset)
+
+    it("strips reward_fn from ctx after run", function()
+        local stub, _counter = make_alc_stub({
+            fixtures = {
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+            },
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "sum",
+            reward_fn    = function(ans, _task) return ans:match("return") and 1.0 or 0.0 end,
+            n_particles  = 2,
+            n_iterations = 1,
+            rejuv_steps  = 0,
+        }
+        local out = smc.run(ctx)
+        expect(out.reward_fn).to.equal(nil)
+        expect(ctx.reward_fn).to.equal(nil)
+    end)
+
+    it("strips proposal_fn from ctx after run (v2 forward-compat)", function()
+        local stub, _counter = make_alc_stub({
+            fixtures = { "def sum_list(xs): return sum(xs)", "def sum_list(xs): return sum(xs)" },
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "sum",
+            reward_fn    = function(_a, _t) return 1.0 end,
+            proposal_fn  = function(_p, _t) return _p end,  -- v1: ignored + stripped
+            n_particles  = 2,
+            n_iterations = 0,
+            rejuv_steps  = 0,
+        }
+        local out = smc.run(ctx)
+        expect(out.proposal_fn).to.equal(nil)
+    end)
+
+    it("ctx.result is fully JSON-serializable (no function values)", function()
+        local stub, _counter = make_alc_stub({
+            fixtures = {
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+                "def sum_list(xs): return sum(xs)",
+            },
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "sum",
+            reward_fn    = function(_a, _t) return 1.0 end,
+            n_particles  = 2,
+            n_iterations = 1,
+            rejuv_steps  = 0,
+        }
+        smc.run(ctx)
+        local function has_function(v, path)
+            local t = type(v)
+            if t == "function" then
+                error("non-serializable function at " .. path)
+            end
+            if t == "table" then
+                for k, sub in pairs(v) do
+                    has_function(sub, path .. "." .. tostring(k))
+                end
+            end
+        end
+        has_function(ctx.result, "ctx.result")
+    end)
+end)

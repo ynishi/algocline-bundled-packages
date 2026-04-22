@@ -119,16 +119,29 @@ common.run({
             check = function(result)
                 if not result.ok then return false, "agent failed" end
                 local c = (result.content or ""):lower()
-                local need = {
-                    "selected_option",
-                    "residual_objections",
-                    "minority_report",
-                    "next_actions",
-                    "reopen_triggers",
+                -- Accept either snake_case (from the shape / JSON) or
+                -- human-readable markdown section headers (agents tend
+                -- to paraphrase field names into title-case English).
+                -- Regression for E2E 2026-04-22 run_id 122845 where
+                -- agent wrote "**Selected Option**" etc. and the
+                -- snake_case-only grader FAIL'd a correct decision.
+                local patterns = {
+                    selected_option     = { "selected_option",     "selected option" },
+                    residual_objections = { "residual_objections", "residual objections" },
+                    minority_report     = { "minority_report",     "minority report" },
+                    next_actions        = { "next_actions",        "next actions" },
+                    reopen_triggers     = { "reopen_triggers",     "reopen triggers" },
                 }
-                for _, k in ipairs(need) do
-                    if not c:find(k, 1, true) then
-                        return false, "missing component: " .. k
+                for key, alts in pairs(patterns) do
+                    local found = false
+                    for _, pat in ipairs(alts) do
+                        if c:find(pat, 1, true) then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        return false, "missing component: " .. key
                     end
                 end
                 return true, nil
@@ -139,19 +152,21 @@ common.run({
             check = function(result)
                 if not result.ok then return false, "agent failed" end
                 local c = (result.content or ""):lower()
-                -- Heuristic: the report mentions minority_report AND
-                -- at least one alternative position text (not empty).
-                if not c:find("minority_report", 1, true) then
+                -- Heuristic: the report mentions minority_report (or
+                -- its markdown-header form "minority report") AND
+                -- at least one alternative position / rationale marker.
+                local mentions = c:find("minority_report", 1, true)
+                    or c:find("minority report", 1, true)
+                if not mentions then
                     return false, "minority_report absent"
                 end
-                -- Accept either "position" markers (from the shape) or
-                -- explicit rationale under minority_report.
                 if c:find("position", 1, true)
                     or c:find("rationale", 1, true)
+                    or c:find("dissent", 1, true)
                 then
                     return true, nil
                 end
-                return false, "minority_report empty (no position/rationale)"
+                return false, "minority_report empty (no position/rationale/dissent)"
             end,
         },
         {

@@ -104,6 +104,14 @@ local function run_graders(result, graders)
 end
 
 --- Write agent result + grader report to JSON file.
+---
+--- `meta.turn_history` is a per-turn log captured by the `on_turn`
+--- callback (tool_calls / tool_responses / usage). Persisting it into
+--- the E2E result JSON lets post-hoc graders / humans inspect the exact
+--- MCP calls and their JSON bodies that `alc_run` etc. returned — the
+--- agent's final `content` text is only a human-readable summary and
+--- does not faithfully surface pkg return values (see issue
+--- 1776828109-3402 for the text-match grader fragility this resolves).
 local function write_result(run_dir, name, result, grader_report, meta)
     local path = std.path.join(run_dir, name .. ".json")
     local payload = {
@@ -114,6 +122,7 @@ local function write_result(run_dir, name, result, grader_report, meta)
         error = result.error,
         num_turns = result.num_turns,
         usage = result.usage,
+        turn_history = meta.turn_history,
         graders = grader_report,
         params = meta.params,
     }
@@ -148,6 +157,13 @@ function M.run(opts)
 
     log.info(string.format("=== E2E: %s (run_id=%s) ===", opts.name, ts))
 
+    -- Per-turn capture: agent-block's `info.tool_calls` / `info.tool_responses`
+    -- are the ground-truth MCP payloads. Persisting them here lets post-hoc
+    -- graders (and humans) inspect what `alc_run` / `alc_advice` actually
+    -- returned, which the agent's text summary often paraphrases away (see
+    -- issue 1776828109-3402).
+    local turn_history = {}
+
     local agent_opts = {
         prompt = opts.prompt,
         system = opts.system or M.DEFAULT_SYSTEM,
@@ -164,6 +180,12 @@ function M.run(opts)
                 info.usage and info.usage.input_tokens or 0,
                 info.usage and info.usage.output_tokens or 0
             ))
+            turn_history[#turn_history + 1] = {
+                turn_number    = info.turn_number,
+                tool_calls     = info.tool_calls,
+                tool_responses = info.tool_responses,
+                usage          = info.usage,
+            }
         end,
     }
 
@@ -178,6 +200,11 @@ function M.run(opts)
         result.usage and result.usage.total_tokens or 0,
         elapsed_ms / 1000
     ))
+
+    -- Attach captured turn history so graders can inspect the raw MCP
+    -- tool_calls / tool_responses (e.g. to verify dci.run returned a
+    -- populated decision_packet, independent of the agent's text summary).
+    result.turn_history = turn_history
 
     local grader_report = run_graders(result, opts.graders)
 
@@ -202,6 +229,7 @@ function M.run(opts)
     local result_path = write_result(run_dir, opts.name, result, grader_report, {
         timestamp = ts,
         params = opts.params,
+        turn_history = turn_history,
     })
     log.info("Result saved: " .. result_path)
 
