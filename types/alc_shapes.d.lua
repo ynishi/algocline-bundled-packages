@@ -126,6 +126,16 @@
 ---@field unanimous boolean @All votes identical
 ---@field vote_counts table<string, number> @{ [normalized_answer] = count } tally
 
+---@class AlcResultSmcSampled
+---@field answer string @Argmax-weight particle's answer text
+---@field card_id? string @Emitted Card id (only when auto_card=true)
+---@field ess_trace number[] @ESS recorded at the start of each iteration (length K)
+---@field iterations number @K SMC rounds actually executed
+---@field particles { answer: string, history: table[], reward: number, weight: number }[] @All N particles in their final state
+---@field resample_count number @Number of iterations that triggered multinomial resample
+---@field stats { total_llm_calls: number, total_reward_calls: number } @Execution counters (open for diagnostics like mh_rejected)
+---@field weights number[] @Final normalized weights (Σ ≈ 1)
+
 ---@class AlcResultTournament
 ---@field best string @Winner text
 ---@field best_index number @Winner original index (1-based)

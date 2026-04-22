@@ -142,6 +142,36 @@ M.deliberated = T.shape({
         :describe("Emitted Card id (only when auto_card=true)"),
 }, { open = true })
 
+-- smc_sample (Markovic-Voronov et al. 2026, arXiv:2604.16453):
+-- Block-level Sequential Monte Carlo sampling (Target I specialization).
+-- Reward-weighted importance sampling with ESS-triggered multinomial
+-- resampling and Metropolis-Hastings rejuvenation. 1 particle = 1
+-- complete answer, ψ_t = exp(α · r(answer)) driven by a caller-injected
+-- reward_fn. `card_id` is populated only when the caller opts into
+-- Card emission via ctx.auto_card = true.
+M.smc_sampled = T.shape({
+    answer         = T.string:describe("Argmax-weight particle's answer text"),
+    particles      = T.array_of(T.shape({
+        answer  = T.string:describe("Particle answer text"),
+        weight  = T.number:describe("Final normalized importance weight"),
+        reward  = T.number:describe("Final reward under caller's reward_fn"),
+        history = T.array_of(T.table):describe("Per-iteration trace entries (1 slot in v1)"),
+    }, { open = true }))
+        :describe("All N particles in their final state"),
+    weights        = T.array_of(T.number)
+        :describe("Final normalized weights (Σ ≈ 1)"),
+    iterations     = T.number:describe("K SMC rounds actually executed"),
+    resample_count = T.number:describe("Number of iterations that triggered multinomial resample"),
+    ess_trace      = T.array_of(T.number)
+        :describe("ESS recorded at the start of each iteration (length K)"),
+    stats          = T.shape({
+        total_llm_calls    = T.number:describe("alc.llm invocations issued by the pkg"),
+        total_reward_calls = T.number:describe("reward_fn invocations (caller-provided)"),
+    }, { open = true }):describe("Execution counters (open for diagnostics like mh_rejected)"),
+    card_id        = T.string:is_optional()
+        :describe("Emitted Card id (only when auto_card=true)"),
+}, { open = true })
+
 -- ── ranking shapes ───────────────────────────────────────────────────
 
 local ranked_item_3 = T.shape({

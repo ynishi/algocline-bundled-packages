@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-04-22T01:14:50Z",
+  "updated_at": "2026-04-22T02:33:53Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -1196,6 +1196,18 @@
       "description": "Sketch-of-Thought — cognitive-inspired efficient reasoning. Routes to Conceptual Chaining, Chunked Symbolism, or Expert Lexicons based on task type. 60-84% token reduction vs standard CoT.",
       "category": "reasoning",
       "docstring": "sketch — Sketch-of-Thought: cognitive-inspired efficient reasoning\n\nSelects one of three cognitive paradigms based on task characteristics,\nthen generates compressed reasoning using that paradigm's notation.\nReduces reasoning tokens by 60-84% while maintaining or improving accuracy.\n\nThree paradigms (from cognitive science):\nConceptual Chaining  — key concepts linked with arrows (episodic memory)\nChunked Symbolism    — variables + equations (working memory chunking)\nExpert Lexicons      — domain notation + abbreviations (expert schemas)\n\nRouting: keyword heuristic first (0 LLM calls), LLM fallback if ambiguous.\n\nBased on: Aytes, Baek, Hwang, \"Sketch-of-Thought: Efficient LLM Reasoning\nwith Adaptive Cognitive-Inspired Sketching\" (EMNLP 2025, arXiv:2503.05179)\n\nPipeline (1-2 LLM calls):\nStep 1: Route    — select paradigm (keyword heuristic or LLM)\nStep 2: Sketch   — generate compressed reasoning + answer\n\nUsage:\nlocal sketch = require(\"sketch\")\nreturn sketch.run(ctx)\n\nctx.task (required): The problem to solve\nctx.paradigm: Force paradigm (default: nil → auto-route)\nctx.max_tokens: Max tokens for reasoning (default: 200)\nctx.routing_threshold: Keyword confidence threshold for LLM fallback (default: 0.4)",
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "smc_sample",
+      "version": "0.1.0",
+      "description": "Block-level Sequential Monte Carlo sampling for LLM quality (Markovic-Voronov et al. 2026, arXiv:2604.16453). Reward-weighted importance sampling with ESS-triggered multinomial resampling and Metropolis-Hastings rejuvenation. Caller-injected reward_fn (unit-test / LLM judge / scoring rule) drives the Target I tempered potential ψ=exp(α·r). Default (N=16,K=4,S=2) issues 208 LLM calls per run.",
+      "category": "selection",
+      "docstring": "smc_sample — Sequential Monte Carlo (block-SMC) sampling for LLM quality.\n\nBased on: Markovic-Voronov et al., \"Sampling for Quality: Training-Free\nReward-Guided LLM Decoding via Sequential Monte Carlo\"\n(arXiv:2604.16453v1, 2026-04-07).\n\nImplements the paper's Target I (prefix-only variant) of the reward-\naugmented target distribution\nΠ(x_{1:T} | q) ∝ ∏_t m_t(x_t | q, x_{<t}) · ∏_t ψ_t(x_{1:t}, q)\nabstracted to the BLOCK level so it is implementable on top of\nalgocline's block-granular `alc.llm` API (token logprobs are not\nexposed). Under this Target I specialization the incremental weights\ndepend only on the reward potentials ψ_t and the base-model\nlikelihood term cancels (paper §4.2-§4.3):\nw_i ← w_i · exp(α · (r_new - r_prev))\n\nblock-SMC abstraction:\n* 1 particle = 1 complete answer (`alc.llm` single call)\n* ψ_t       = exp(α · r(answer))   where r = caller-injected reward_fn\n* K rounds  = {weight-update, ESS resample, MH rejuvenation} repeated\n\n═══ COST WARNING ═══════════════════════════════════════════════════\nWith default hyperparameters (N=16, K=4, S=2) this pkg issues\n**208 LLM calls per run** (initial N + K · N · (1 + S)). This\nmatches the paper's HumanEval 87.8% setting (§4.1) but is heavier\nthan any existing selection pkg (e.g. `recipe_deep_panel` ~52 calls).\nLightweight callers should override `n_particles` / `n_iterations` /\n`rejuv_steps` (e.g. N=4, K=2, S=1 → 20 calls).\n═══════════════════════════════════════════════════════════════════\n\nUsage:\nlocal smc = require(\"smc_sample\")\nreturn smc.run({\ntask      = \"Write a Python function sum_list(xs).\",\nreward_fn = function(answer, task)\n-- caller-injected verifier: unit-test / LLM judge / scoring_rule\nreturn score_in_unit_interval\nend,\n-- all hyperparameters optional (M._defaults applies)\n})\n\nCategory: selection (alongside sc / usc / mbr_select / diverse /\nab_select / gumbel_search). Encompasses sc (α=0 equal-weight) and\nmbr_select (similarity reward, 1 iteration) as special cases of the\nsame probabilistic framework.",
       "source": {
         "type": "unknown"
       },
