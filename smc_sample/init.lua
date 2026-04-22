@@ -11,13 +11,13 @@
 --- algocline's block-granular `alc.llm` API (token logprobs are not
 --- exposed). Under this Target I specialization the incremental weights
 --- depend only on the reward potentials ψ_t and the base-model
---- likelihood term cancels (paper §4.2-§4.3):
----     w_i ← w_i · exp(α · (r_new - r_prev))
+--- likelihood term cancels (paper §3.3 / Appendix A.4 Lemma 4, Eq. 40):
+---     w_k = Ψ_k / Ψ_{k-1} = exp(α · (r_new - r_prev))
 ---
 --- block-SMC abstraction:
 ---   * 1 particle = 1 complete answer (`alc.llm` single call)
 ---   * ψ_t       = exp(α · r(answer))   where r = caller-injected reward_fn
----   * K rounds  = {weight-update, ESS resample, MH rejuvenation} repeated
+---   * K rounds  = {ESS resample, MH rejuvenation, weight-update} repeated
 ---
 --- ═══ COST WARNING ═══════════════════════════════════════════════════
 --- With default hyperparameters (N=16, K=4, S=2) this pkg issues
@@ -26,6 +26,55 @@
 --- than any existing selection pkg (e.g. `recipe_deep_panel` ~52 calls).
 --- Lightweight callers should override `n_particles` / `n_iterations` /
 --- `rejuv_steps` (e.g. N=4, K=2, S=1 → 20 calls).
+--- ═══════════════════════════════════════════════════════════════════
+---
+--- ═══ KNOWN LIMITATIONS vs paper Algorithm 1 ════════════════════════
+--- The implementation is paper-faithful on the numerical core
+--- (compute_weights / compute_ess / mh_accept / incremental_weight_
+--- update / resample_multinomial all follow paper §3 / §A). Three
+--- deliberate simplifications and deviations exist; optimizing callers
+--- should know which knobs are safe to tune.
+---
+---   L1. Weight-update ordering (paper §3.4 Algorithm 1)
+---       paper:       block-generate → weight → resample → MH (π-invariant move)
+---       implementation: resample → MH → weight
+---       We identify "MH rejuvenation" with "block k generation" under
+---       the 1-block-=-1-full-answer abstraction. Because our MH uses
+---       the ψ ratio directly in `mh_accept`, MH is π-invariant in
+---       expectation and the post-MH reweight applies a sample-level
+---       importance correction `exp(α·Δr)` rather than a distribution
+---       shift. ESS-triggered resampling + fixed α=4 keep the weight
+---       drift bounded across iterations. Full theoretical audit of
+---       this ordering's bias-variance trade-off is open — see
+---       `docs/narrative/smc_sample.md` if present or issue §13.5.
+---
+---   L2. Selective MH (paper §3.4 Algorithm 1 Lines 15-17)
+---       paper:       apply MH only to duplicated + low-reward
+---                    particles (D_k with R < τ_R filter)
+---       implementation: apply MH to every particle each iteration
+---       Conservative — correctness is preserved (MH on a valid
+---       particle cannot break the target invariance); cost is ~2×
+---       higher than paper's selective variant. Opting into selective
+---       MH is a pure cost optimization for future callers.
+---
+---   L3. α tempering schedule (paper §3.2)
+---       paper:       α fixed globally at 4.0 (§4.1 Setup)
+---       implementation: α fixed via `ctx.alpha` or `M._defaults.alpha`
+---       Matches paper. Callers who want an α-annealing schedule
+---       (unofficial extension) must call `M.run` multiple times and
+---       chain `ctx.result` — no in-run schedule is supported.
+---
+--- Injection points (stable across future versions):
+---   * `reward_fn`    — required, `(answer, task) → ℝ⁺ ∪ {0}`
+---   * `proposal_fn`  — v2 opt-in, will replace the fixed LLM-refine
+---                       proposal inside mh_rejuvenate (currently a
+---                       warning-then-ignore in v1)
+---
+--- Section references were corrected on 2026-04-22 after a Target I
+--- paper-verify round-trip (workspace/tasks/smc_sample-s_steps-verify/
+--- paper-verify.md). Earlier drafts cited "paper §4.2-§4.3" which
+--- does not exist in the arXiv v1 PDF — §4 contains only §4.1 Setup;
+--- the Target I formalism lives in §3.3 and Appendix A.4 Lemma 4.
 --- ═══════════════════════════════════════════════════════════════════
 ---
 --- Usage:
@@ -293,11 +342,12 @@ local function mh_accept(pi_x, pi_xprime, q_x_given_xprime, q_xprime_given_x)
     return math.random() < alpha
 end
 
---- incremental_weight_update — Target I SMC incremental weight (paper §4.3).
+--- incremental_weight_update — Target I SMC incremental weight
+--- (paper §3.3 / Appendix A.4 Lemma 4, Eq. 40).
 ---
----     w_i ← w_i · ψ_t / ψ_{t-1}
----     block-SMC: ψ_t = exp(α · r(answer_i))
----       ⇒ w_i ← w_i · exp(α · (r_new - r_prev))
+---     W_k = W_{k-1} · w_k
+---     w_k = Ψ_k / Ψ_{k-1} = exp(α · r_new) / exp(α · r_prev)
+---         = exp(α · (r_new - r_prev))
 ---
 --- Under Target I the base-model likelihood factor m_t cancels, so the
 --- update depends only on the reward potentials — this is exactly why
@@ -488,6 +538,16 @@ end
 --- NOT increment the LLM call counter (they didn't consume a successful
 --- generation).
 ---
+--- DEVIATION FROM PAPER §3.4 Algorithm 1 Lines 15-17 (selective MH):
+---   paper:          apply MH only to particles in D_k (duplicated from
+---                   resample) AND having R(x) < τ_R (below reward
+---                   threshold). This is a cost optimization.
+---   implementation: apply MH to every particle unconditionally.
+---   rationale:      conservative — MH on any valid particle preserves
+---                   the target invariance, so correctness is unchanged;
+---                   the cost is ~2× the paper's selective variant.
+---                   Selective MH is a future optimization knob.
+---
 --- Returns:
 ---   new_particles, new_rewards,
 ---   n_proposal_llm_calls (successful proposals only),
@@ -531,7 +591,7 @@ local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward
     -- π, which itself is the tempered potential ψ = exp(α·r). We pass
     -- ψ directly instead of the full (often un-normalizable) Π so the
     -- numerator / denominator cancel their shared base-model factor —
-    -- this is precisely the Target I property paper §4.2 exploits.
+    -- this is precisely the Target I property paper §3.3 / §A.4 exploits.
     -- ⚠ ALIASING: new_particles[i] = particles[i] on reject copies a
     -- reference, not a deep copy. When upstream resample already aliased
     -- particles[] across slots, rejects preserve that aliasing. Safe
@@ -667,7 +727,8 @@ local function emit_card(ctx, result, per_particle_list)
 end
 
 -- ═══════════════════════════════════════════════════════════════════
--- M.run — block-SMC orchestration (paper §4, Target I specialization)
+-- M.run — block-SMC orchestration (paper §3.3 / §3.4 Algorithm 1,
+-- Target I specialization)
 -- ═══════════════════════════════════════════════════════════════════
 
 ---@param ctx AlcCtx
@@ -811,8 +872,18 @@ function M.run(ctx)
             mh_rejected        = mh_rejected + n_rej
         end
 
-        -- Incremental Target I weight update (paper §4.3):
-        -- w_i ← w_i · exp(α · (r_new - r_prev)), then renormalize.
+        -- Incremental Target I weight update
+        -- (paper §3.3 / §A.4 Lemma 4, Eq. 40):
+        --   W_k = W_{k-1} · exp(α · (r_new - r_prev)), then renormalize.
+        --
+        -- Position vs paper: paper Algorithm 1 places the weight update
+        -- BEFORE resample + MH (Line 8-9, as part of block generation).
+        -- We run it AFTER MH because block-SMC reinterprets MH
+        -- rejuvenation as the per-iteration block generation step
+        -- (1 block = 1 full answer). r_prev is the reward snapshot
+        -- captured at line `local rewards_prev = rewards` above, taken
+        -- BEFORE all S_steps MH rejuvenation steps. r_new = rewards
+        -- AFTER all S_steps. See KNOWN LIMITATIONS L1 in the header.
         local unnorm = {}
         local sum = 0
         for i = 1, N do
@@ -830,7 +901,9 @@ function M.run(ctx)
     end
 
     -- ─── argmax selection ───
-    -- Primary key: weight (paper §4.3 dominance selection).
+    -- Primary key: weight (Target I dominance selection — paper §3.3
+    -- describes the reward-tilted posterior; argmax-weight on the
+    -- block-SMC output is the standard MAP-style reduction).
     -- Tiebreak: higher reward wins (semantically preferred — equal-weight
     -- particles are observationally indistinguishable under the tempered
     -- potential ψ=exp(α·r), so we fall back to the raw reward signal
