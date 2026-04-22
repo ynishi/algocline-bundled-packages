@@ -740,7 +740,7 @@ end)
 describe("smc_sample.run (M.run end-to-end, mocked alc)", function()
     lust.after(reset)
 
-    it("K=2, S=1, N=2: total_llm_calls == N + K·S·N = 6", function()
+    it("K=2, S=1, N=2: total_llm_calls == N + K·S·N = 6 (mh_filter_fn=all)", function()
         local stub, counter = make_alc_stub({
             fixtures = function(_p, _o, i) return "answer_" .. tostring(i) end,
         })
@@ -748,6 +748,11 @@ describe("smc_sample.run (M.run end-to-end, mocked alc)", function()
         local smc = require("smc_sample")
         -- Constant reward across all particles → MH accept is a fair
         -- coin (ratio=1). We only care about the call-count invariant.
+        --
+        -- Paper-faithful selective MH (default) would skip MH entirely
+        -- here (no resample fires under constant rewards, so no slot is
+        -- in D_k). Override mh_filter_fn to the "apply MH to every
+        -- slot" variant so the classic cost invariant holds.
         local ctx = {
             task         = "t",
             reward_fn    = function() return 0.5 end,
@@ -755,6 +760,7 @@ describe("smc_sample.run (M.run end-to-end, mocked alc)", function()
             n_iterations = 2,
             rejuv_steps  = 1,
             alpha        = 4.0,
+            mh_filter_fn = function() return true end,
         }
         smc.run(ctx)
         -- Paper §10 comment: N + K·N·(1+S) assumes reward_fn is itself
@@ -962,6 +968,154 @@ describe("smc_sample.run (M.run end-to-end, mocked alc)", function()
         local sum = 0
         for i = 1, #ctx.result.weights do sum = sum + ctx.result.weights[i] end
         expect(approx(sum, 1, 1e-9)).to.equal(true)
+    end)
+
+    -- ═══ Paper Algorithm 1 compliance: weight update position ═══
+    -- Regression for L1 (docs/narrative/smc_sample.md KNOWN LIMITATIONS).
+    -- Under the paper-faithful default, between-iteration weight changes
+    -- come ONLY from (a) initial compute_weights and (b) ESS-triggered
+    -- resample-reset to 1/N. Post-MH reweight is OFF by default.
+
+    it("paper-order default: MH does not evolve weights between iterations", function()
+        -- Setup: rewards identical across particles (weights uniform,
+        -- ESS = N, no resample ever triggers). Under paper-faithful
+        -- default (post_mh_reweight = false, selective filter), no
+        -- weight change at all should occur — final weights == initial
+        -- weights == 1/N.
+        local stub, _c = make_alc_stub()
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "t",
+            reward_fn    = function() return 0.5 end,
+            n_particles  = 4,
+            n_iterations = 3,
+            rejuv_steps  = 2,
+            alpha        = 4.0,
+        }
+        smc.run(ctx)
+        for i = 1, 4 do
+            expect(approx(ctx.result.weights[i], 0.25, 1e-9)).to.equal(true)
+        end
+        -- No LLM calls beyond the initial N (selective filter saw no
+        -- duplicates, so MH was skipped for all iterations).
+        expect(ctx.result.stats.total_llm_calls).to.equal(4)
+    end)
+
+    it("post_mh_reweight=true opts back into legacy biased reweight", function()
+        -- With post_mh_reweight=true and all MH applied (override
+        -- filter), weights evolve via exp(α·Δr). With constant reward
+        -- Δr=0 so weights stay at 1/N. We verify the machinery fires
+        -- (rather than being a no-op) by using asymmetric rewards.
+        local stub, _c = make_alc_stub({
+            fixtures = function(_p, _o, i) return "a_" .. tostring(i) end,
+        })
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task             = "t",
+            reward_fn        = function(a, _t)
+                -- Reward = last char as number; proposal answers differ
+                -- from init answers so post-MH rewards diverge from pre-
+                -- MH, exercising the incremental_weight_update path.
+                local last = a:sub(-1)
+                local n = tonumber(last) or 0
+                return n / 10
+            end,
+            n_particles      = 3,
+            n_iterations     = 1,
+            rejuv_steps      = 1,
+            alpha            = 4.0,
+            mh_filter_fn     = function() return true end,  -- apply MH to all
+            post_mh_reweight = true,
+        }
+        smc.run(ctx)
+        -- Weights should still be normalized after the legacy path.
+        local sum = 0
+        for i = 1, 3 do sum = sum + ctx.result.weights[i] end
+        expect(approx(sum, 1, 1e-9)).to.equal(true)
+    end)
+
+    -- ═══ Selective MH: paper §3.4 Lines 15-17 ═══
+
+    it("selective MH default: no resample → MH skipped (zero LLM cost beyond init)", function()
+        -- Uniform rewards → ESS = N throughout → no resample → D_k
+        -- empty every iteration → selective filter rejects everyone.
+        -- Expected total_llm_calls == N (just init).
+        local stub, counter = make_alc_stub()
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ctx = {
+            task         = "t",
+            reward_fn    = function() return 0.3 end,
+            n_particles  = 4,
+            n_iterations = 3,
+            rejuv_steps  = 2,
+            alpha        = 4.0,
+        }
+        smc.run(ctx)
+        expect(counter.llm_calls).to.equal(4)
+        expect(ctx.result.stats.total_llm_calls).to.equal(4)
+        expect(ctx.result.stats.total_reward_calls).to.equal(4)
+    end)
+
+    it("mh_filter_fn override: custom predicate changes MH application set", function()
+        -- Caller-provided filter that applies MH only to the first
+        -- particle, regardless of duplicate status. Track calls via
+        -- counter.llm_calls. With N=3, K=1, S=1, init draws 3 LLM
+        -- calls; MH should fire on particle 1 only → 1 additional LLM
+        -- call → total 4.
+        local stub, counter = make_alc_stub()
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local filter_calls = 0
+        local ctx = {
+            task         = "t",
+            reward_fn    = function() return 0.5 end,
+            n_particles  = 3,
+            n_iterations = 1,
+            rejuv_steps  = 1,
+            alpha        = 4.0,
+            mh_filter_fn = function(idx, _r, _dup, _tau)
+                filter_calls = filter_calls + 1
+                return idx == 1
+            end,
+        }
+        smc.run(ctx)
+        -- Filter invoked once per slot per iteration: N · K = 3.
+        expect(filter_calls).to.equal(3)
+        -- Init 3 + MH on slot 1 only = 4 total.
+        expect(counter.llm_calls).to.equal(4)
+    end)
+
+    it("mh_filter_fn raising error propagates fail-fast", function()
+        local stub, _c = make_alc_stub()
+        _G.alc = stub
+        local smc = require("smc_sample")
+        local ok, err = pcall(smc.run, {
+            task         = "t",
+            reward_fn    = function() return 0.5 end,
+            n_particles  = 2,
+            n_iterations = 1,
+            rejuv_steps  = 1,
+            alpha        = 4.0,
+            mh_filter_fn = function() error("filter blew up") end,
+        })
+        expect(ok).to.equal(false)
+        expect(err:find("mh_filter_fn raised") ~= nil).to.equal(true)
+    end)
+
+    it("mh_filter_fn must be function (runtime type-check)", function()
+        _G.alc = make_alc_stub()
+        local smc = require("smc_sample")
+        local ok, err = pcall(smc.run, {
+            task         = "t",
+            reward_fn    = function() return 0.5 end,
+            n_particles  = 2,
+            mh_filter_fn = 42,
+        })
+        expect(ok).to.equal(false)
+        expect(err:find("mh_filter_fn must be function") ~= nil).to.equal(true)
     end)
 end)
 

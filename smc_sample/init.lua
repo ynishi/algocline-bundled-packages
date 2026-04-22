@@ -28,53 +28,57 @@
 --- `rejuv_steps` (e.g. N=4, K=2, S=1 → 20 calls).
 --- ═══════════════════════════════════════════════════════════════════
 ---
---- ═══ KNOWN LIMITATIONS vs paper Algorithm 1 ════════════════════════
---- The implementation is paper-faithful on the numerical core
---- (compute_weights / compute_ess / mh_accept / incremental_weight_
---- update / resample_multinomial all follow paper §3 / §A). Three
---- deliberate simplifications and deviations exist; optimizing callers
---- should know which knobs are safe to tune.
+--- ═══ PAPER FIDELITY & INJECTION POINTS ════════════════════════════
+--- Implementation follows paper §3.4 Algorithm 1 under the block-SMC
+--- specialization of §A.4 (1 block = 1 complete answer). All
+--- deviations from the paper default are opt-in via explicit ctx
+--- knobs — the default path is paper-faithful. This prioritizes
+--- correctness over efficiency and keeps optimizations discoverable.
 ---
----   L1. Weight-update ordering (paper §3.4 Algorithm 1)
----       paper:       block-generate → weight → resample → MH (π-invariant move)
----       implementation: resample → MH → weight
----       We identify "MH rejuvenation" with "block k generation" under
----       the 1-block-=-1-full-answer abstraction. Because our MH uses
----       the ψ ratio directly in `mh_accept`, MH is π-invariant in
----       expectation and the post-MH reweight applies a sample-level
----       importance correction `exp(α·Δr)` rather than a distribution
----       shift. ESS-triggered resampling + fixed α=4 keep the weight
----       drift bounded across iterations. Full theoretical audit of
----       this ordering's bias-variance trade-off is open — see
----       `docs/narrative/smc_sample.md` if present or issue §13.5.
+--- Paper-faithful defaults:
+---   * Weight update (paper Alg. 1 Line 8-9) runs only at init
+---     (compute_weights) and on ESS-triggered resample-reset to 1/N.
+---     Between iterations, under fixed α the Target I incremental
+---     ratio is identically 1, so no between-iter reweight is applied.
+---   * MH rejuvenation is SELECTIVE per paper Alg. 1 Lines 15-17:
+---     a slot receives an MH proposal iff it is a duplicate from the
+---     most recent resample AND its reward is below τ_R.
+---   * α is fixed globally (paper §4.1 Setup).
 ---
----   L2. Selective MH (paper §3.4 Algorithm 1 Lines 15-17)
----       paper:       apply MH only to duplicated + low-reward
----                    particles (D_k with R < τ_R filter)
----       implementation: apply MH to every particle each iteration
----       Conservative — correctness is preserved (MH on a valid
----       particle cannot break the target invariance); cost is ~2×
----       higher than paper's selective variant. Opting into selective
----       MH is a pure cost optimization for future callers.
----
----   L3. α tempering schedule (paper §3.2)
----       paper:       α fixed globally at 4.0 (§4.1 Setup)
----       implementation: α fixed via `ctx.alpha` or `M._defaults.alpha`
----       Matches paper. Callers who want an α-annealing schedule
----       (unofficial extension) must call `M.run` multiple times and
----       chain `ctx.result` — no in-run schedule is supported.
----
---- Injection points (stable across future versions):
----   * `reward_fn`    — required, `(answer, task) → ℝ⁺ ∪ {0}`
----   * `proposal_fn`  — v2 opt-in, will replace the fixed LLM-refine
----                       proposal inside mh_rejuvenate (currently a
----                       warning-then-ignore in v1)
+--- Injection points (stable, documented caller overrides):
+---   * `reward_fn`          — REQUIRED. `(answer, task) → ℝ⁺ ∪ {0}`.
+---                             Caller's verifier (unit-test / LLM
+---                             judge / scoring rule).
+---   * `proposal_fn`        — v2 opt-in, will replace the fixed LLM-
+---                             refine proposal inside mh_rejuvenate
+---                             (currently warning-then-ignore in v1).
+---   * `mh_filter_fn`       — OPTIONAL. `(idx, reward, was_duplicated,
+---                             τ_R) → boolean`. Overrides the paper
+---                             selective predicate. Use
+---                             `function() return true end` to get
+---                             the legacy "MH every particle" variant
+---                             (higher cost, correctness-preserving).
+---   * `mh_reward_threshold` — OPTIONAL. τ_R cutoff for the default
+---                             selective filter. Default 0.5 (neutral
+---                             for rewards ∈ [0,1]); binary graders
+---                             (0/1) should set 1.0.
+---   * `post_mh_reweight`   — OPTIONAL. `true` to apply a legacy
+---                             exp(α·Δr) reweight after each
+---                             iteration's MH. NOT paper-faithful —
+---                             injects reward-gain bias. Kept only
+---                             for reproducing pre-0.2.0 runs.
 ---
 --- Section references were corrected on 2026-04-22 after a Target I
 --- paper-verify round-trip (workspace/tasks/smc_sample-s_steps-verify/
 --- paper-verify.md). Earlier drafts cited "paper §4.2-§4.3" which
 --- does not exist in the arXiv v1 PDF — §4 contains only §4.1 Setup;
 --- the Target I formalism lives in §3.3 and Appendix A.4 Lemma 4.
+---
+--- Cost note: paper-faithful selective MH (default) typically runs
+--- MH only on iterations where ESS-resample fires, so total_llm_calls
+--- is input-dependent and often ≪ the "N + K·N·(1+S)" worst-case.
+--- Callers that need the predictable worst-case cost (e.g. budget
+--- planning) should set `mh_filter_fn = function() return true end`.
 --- ═══════════════════════════════════════════════════════════════════
 ---
 --- Usage:
@@ -116,12 +120,24 @@ M.meta = {
 -- magic numbers here so no entry hard-codes its own copy — callers
 -- override individual knobs at runtime.
 M._defaults = {
-    n_particles   = 16,    -- N (paper §4.1)
-    n_iterations  = 4,     -- K SMC rounds
-    alpha         = 4.0,   -- tempering strength (ψ = exp(α · r))
-    ess_threshold = 0.5,   -- resample when ESS < threshold · N
-    rejuv_steps   = 2,     -- S Metropolis-Hastings rejuvenation steps
-    gen_tokens    = 600,   -- max tokens per LLM call (code-gen default)
+    n_particles         = 16,    -- N (paper §4.1)
+    n_iterations        = 4,     -- K SMC rounds
+    alpha               = 4.0,   -- tempering strength (ψ = exp(α · r))
+    ess_threshold       = 0.5,   -- resample when ESS < threshold · N
+    rejuv_steps         = 2,     -- S Metropolis-Hastings rejuvenation steps
+    gen_tokens          = 600,   -- max tokens per LLM call (code-gen default)
+    -- Paper §3.4 Line 17: MH targets duplicated + low-reward particles.
+    -- τ_R value is not numerically fixed in §4.1 Setup; 0.5 is a
+    -- neutral default for rewards normalized to [0, 1]. Callers with
+    -- unit-test graders (0/1) likely want τ_R = 1.0 (always eligible);
+    -- callers with continuous graders can tune.
+    mh_reward_threshold = 0.5,
+    -- Paper Algorithm 1 does NOT apply a post-MH reweight (weight
+    -- update is at Line 8-9, before resample + MH). Set true to opt
+    -- into the legacy exp(α·Δr) post-MH reweight — that path is NOT
+    -- paper-faithful and injects reward-gain bias; kept only as an
+    -- escape hatch for callers reproducing pre-0.2.0 smc_sample runs.
+    post_mh_reweight    = false,
 }
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -229,14 +245,21 @@ end
 --- resample_multinomial — Draw N particles with replacement proportional
 --- to `weights` via CDF (prefix-sum) sampling.
 ---
---- The returned array contains copies of `particles[k]` entries selected
---- by the multinomial draw. After resampling, caller should reset all
---- weights to 1/N (degeneracy reset per paper §3.4).
+--- Returns both the resampled particle list AND the list of original
+--- indices that each new slot was drawn from. `drawn_indices[i] = j`
+--- means `new_particles[i] == particles[j]`; when `j` appears more
+--- than once across slots the corresponding new slots are duplicates
+--- of each other (paper §3.4 D_k membership — used by selective MH).
+--- Back-compat: callers that only destructure the first return keep
+--- working; the second return is additive.
+---
+--- After resampling, caller should reset all weights to 1/N (degeneracy
+--- reset per paper §3.4).
 ---
 ---@param particles any[]
 ---@param weights number[]
 ---@param rng nil|fun():number  -- test injection; default math.random
----@return any[]
+---@return any[], integer[]  -- resampled particles, drawn_indices
 local function resample_multinomial(particles, weights, rng)
     if type(particles) ~= "table" then
         error("smc_sample.resample_multinomial: particles must be table, got " .. type(particles), 2)
@@ -272,6 +295,7 @@ local function resample_multinomial(particles, weights, rng)
     cdf[n] = 1.0
 
     local out = {}
+    local drawn = {}
     for i = 1, n do
         local u = draw()
         -- Linear scan is fine for typical N ∈ [4, 64]; binary search
@@ -282,13 +306,15 @@ local function resample_multinomial(particles, weights, rng)
             if u <= cdf[j] then idx = j; break end
         end
         out[i] = particles[idx]
+        drawn[i] = idx
     end
 
     -- Internal invariant: multinomial resample must preserve particle
     -- count. Violating this is a bug in the loop above, not a caller
     -- contract issue.
     assert(#out == n, "internal: resample must preserve N")
-    return out
+    assert(#drawn == n, "internal: drawn_indices must have length N")
+    return out, drawn
 end
 
 --- mh_accept — Metropolis-Hastings acceptance test (general 4-arg form).
@@ -398,6 +424,21 @@ local run_input_shape = T.shape({
     card_pkg      = T.string:is_optional():describe(
         "Card pkg.name override (default: 'smc_sample_<task_hash>')"),
     scenario_name = T.string:is_optional():describe("Explicit scenario name for the emitted Card"),
+    -- Injection points for paper-deviation overrides (see header
+    -- KNOWN LIMITATIONS / PAPER FIDELITY block).
+    mh_filter_fn        = T.any:is_optional():describe(
+        "Caller override for paper §3.4 Line 17 selective-MH "
+        .. "predicate. Signature: (idx, reward, was_duplicated, "
+        .. "τ_R) → boolean. Default: duplicated AND reward < τ_R. "
+        .. "Use `function() return true end` for the legacy "
+        .. "apply-MH-to-all variant (higher LLM cost)."),
+    mh_reward_threshold = T.number:is_optional():describe(
+        "τ_R cutoff for the default selective-MH predicate "
+        .. "(paper §3.4 Line 17). Default: 0.5."),
+    post_mh_reweight    = T.boolean:is_optional():describe(
+        "Opt into the legacy exp(α·Δr) post-MH reweight "
+        .. "(NOT paper-faithful — reward-gain bias). Default: "
+        .. "false. Kept only for pre-0.2.0 run reproduction."),
 }, { open = true })
 
 ---@type AlcSpec
@@ -538,26 +579,57 @@ end
 --- NOT increment the LLM call counter (they didn't consume a successful
 --- generation).
 ---
---- DEVIATION FROM PAPER §3.4 Algorithm 1 Lines 15-17 (selective MH):
----   paper:          apply MH only to particles in D_k (duplicated from
----                   resample) AND having R(x) < τ_R (below reward
----                   threshold). This is a cost optimization.
----   implementation: apply MH to every particle unconditionally.
----   rationale:      conservative — MH on any valid particle preserves
----                   the target invariance, so correctness is unchanged;
----                   the cost is ~2× the paper's selective variant.
----                   Selective MH is a future optimization knob.
+--- PAPER §3.4 Algorithm 1 Lines 15-17 (selective MH) compliance:
+---   Optional `filter` boolean array selects which particles get a MH
+---   proposal this call. Slots with `filter[i] == false` skip the LLM
+---   propose / reward-eval / accept-reject entirely — cost savings scale
+---   linearly with the filter-out count. When `filter == nil` MH is
+---   applied unconditionally (back-compat for callers that want the
+---   every-particle variant).
+---
+--- The selective predicate itself lives in M.run (default: duplicated
+--- via resample AND reward < τ_R, matching paper). Callers can
+--- override the predicate via `ctx.mh_filter_fn`.
 ---
 --- Returns:
 ---   new_particles, new_rewards,
 ---   n_proposal_llm_calls (successful proposals only),
 ---   n_reward_calls, n_rejected
-local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward_fn)
+---@param particles any[]
+---@param rewards number[]
+---@param alpha number
+---@param task string
+---@param gen_tokens integer
+---@param reward_fn fun(answer: string, task: string): number
+---@param filter boolean[]|nil   -- filter[i]=true → apply MH to slot i
+local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward_fn, filter)
     local n = #particles
 
-    -- Stage 1: propose (parallel LLM calls). Each entry is either a
-    -- string (successful proposal) or nil (failure → reject).
-    local proposals = map_or_serial(particles, function(p, _i)
+    -- Active slot index list: slots where MH proposes/evaluates/accepts.
+    -- nil filter means "all active" (back-compat).
+    local active = {}
+    for i = 1, n do
+        if filter == nil or filter[i] then
+            active[#active + 1] = i
+        end
+    end
+
+    local new_particles = {}
+    local new_rewards = {}
+    for i = 1, n do
+        new_particles[i] = particles[i]
+        new_rewards[i]   = rewards[i]
+    end
+
+    -- Fast exit: nothing selected → zero LLM/reward cost.
+    if #active == 0 then
+        return new_particles, new_rewards, 0, 0, 0
+    end
+
+    -- Stage 1: propose (parallel LLM calls) on active slots only.
+    local active_particles = {}
+    for j, i in ipairs(active) do active_particles[j] = particles[i] end
+    local proposals_active = map_or_serial(active_particles, function(p, _j)
         local ok, resp = pcall(alc.llm,
             build_refine_prompt(p.answer, task),
             { max_tokens = gen_tokens })
@@ -566,62 +638,58 @@ local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward
         return resp
     end)
 
-    -- Count successful proposal LLM calls. The pcall-failed entries
-    -- don't count because they represent failed invocations, not
-    -- successful LLM calls.
+    -- Count successful proposal LLM calls over active slots only.
     local n_proposal_llm_calls = 0
-    for i = 1, n do
-        if proposals[i] ~= nil then n_proposal_llm_calls = n_proposal_llm_calls + 1 end
+    for j = 1, #active do
+        if proposals_active[j] ~= nil then
+            n_proposal_llm_calls = n_proposal_llm_calls + 1
+        end
     end
 
-    -- Stage 2: reward-evaluate the (non-nil) proposals. We evaluate
-    -- every proposal that arrived, even if MH later rejects it — the
-    -- reward is needed for the acceptance ratio.
-    local prop_particles = {}
-    for i = 1, n do
-        prop_particles[i] = { answer = proposals[i] or particles[i].answer, history = {} }
+    -- Stage 2: reward-evaluate active slots. We evaluate every active
+    -- proposal that arrived (or the fallback current answer for failed
+    -- proposals), since reward is needed for the acceptance ratio.
+    local prop_particles_active = {}
+    for j, i in ipairs(active) do
+        prop_particles_active[j] = {
+            answer  = proposals_active[j] or particles[i].answer,
+            history = {},
+        }
     end
-    local prop_rewards = evaluate_rewards(prop_particles, task, reward_fn)
-    local n_reward_calls = n
+    local prop_rewards_active = evaluate_rewards(prop_particles_active, task, reward_fn)
+    local n_reward_calls = #active
 
-    -- Stage 3: acceptance test per particle.
+    -- Stage 3: acceptance test per ACTIVE slot.
     --
     -- Under v1 symmetric-q assumption (q(x|x') = q(x'|x) = 1.0), the
     -- 4-arg mh_accept collapses to a ratio test on the target density
-    -- π, which itself is the tempered potential ψ = exp(α·r). We pass
-    -- ψ directly instead of the full (often un-normalizable) Π so the
-    -- numerator / denominator cancel their shared base-model factor —
-    -- this is precisely the Target I property paper §3.3 / §A.4 exploits.
-    -- ⚠ ALIASING: new_particles[i] = particles[i] on reject copies a
-    -- reference, not a deep copy. When upstream resample already aliased
-    -- particles[] across slots, rejects preserve that aliasing. Safe
-    -- today because Accept (below) replaces the slot with a freshly
-    -- built table, never mutates in place. Future mutation-based edits
-    -- must deep-copy first.
-    local new_particles = {}
-    local new_rewards = {}
+    -- π = ψ = exp(α·r). Target I property paper §3.3 / §A.4.
+    --
+    -- ⚠ ALIASING: new_particles[i] = particles[i] on inactive / reject
+    -- copies a reference. Upstream resample may already alias particles
+    -- across slots; Accept builds a fresh table so safe today, any
+    -- future in-place mutation must deep-copy first.
     local n_rejected = 0
-    for i = 1, n do
-        if proposals[i] == nil then
+    for j, i in ipairs(active) do
+        if proposals_active[j] == nil then
             -- Failed proposal → retain current, count as reject.
-            new_particles[i] = particles[i]
-            new_rewards[i]   = rewards[i]
+            -- (new_particles[i] / new_rewards[i] already hold the
+            -- previous values from the init loop above.)
             n_rejected = n_rejected + 1
         else
             local psi_x      = math.exp(alpha * rewards[i])
-            local psi_xprime = math.exp(alpha * prop_rewards[i])
+            local psi_xprime = math.exp(alpha * prop_rewards_active[j])
             if mh_accept(psi_x, psi_xprime, 1.0, 1.0) then
                 -- Accept: keep a 1-slot history snapshot of the old
                 -- particle for diagnostic trace (Risks #5).
-                local new_p = {
-                    answer  = prop_particles[i].answer,
+                new_particles[i] = {
+                    answer  = prop_particles_active[j].answer,
                     history = { { answer = particles[i].answer, reward = rewards[i] } },
                 }
-                new_particles[i] = new_p
-                new_rewards[i]   = prop_rewards[i]
+                new_rewards[i] = prop_rewards_active[j]
             else
-                new_particles[i] = particles[i]
-                new_rewards[i]   = rewards[i]
+                -- Reject: new_particles[i] / new_rewards[i] already
+                -- hold prev values, just count the reject.
                 n_rejected = n_rejected + 1
             end
         end
@@ -747,6 +815,15 @@ function M.run(ctx)
         error("smc_sample.run: ctx.reward_fn is required (function fn(answer, task) → number)", 2)
     end
 
+    -- Capture INJECTABLE function-typed overrides BEFORE the strip block
+    -- below nils them out. mh_filter_fn is optional; when absent the
+    -- default paper §3.4 Line 17 predicate (duplicated AND R<τ_R) is
+    -- constructed inside the main loop below.
+    local mh_filter_fn = ctx.mh_filter_fn
+    if mh_filter_fn ~= nil and type(mh_filter_fn) ~= "function" then
+        error("smc_sample.run: ctx.mh_filter_fn must be function, got " .. type(mh_filter_fn), 2)
+    end
+
     -- v1: proposal_fn caller injection not yet supported (issue §13.5).
     -- Warn (not error) so callers who pre-configure for v2 aren't hard-
     -- rejected — their proposal_fn is simply ignored in v1. Fire the
@@ -784,6 +861,22 @@ function M.run(ctx)
     local S_steps    = ctx.rejuv_steps or M._defaults.rejuv_steps
     local gen_tokens = ctx.gen_tokens or M._defaults.gen_tokens
 
+    -- Selective MH knobs (paper §3.4 Lines 15-17).
+    local mh_reward_threshold = ctx.mh_reward_threshold
+        or M._defaults.mh_reward_threshold
+    -- Legacy non-paper post-MH reweight (default off, paper-faithful).
+    local post_mh_reweight = ctx.post_mh_reweight
+    if post_mh_reweight == nil then
+        post_mh_reweight = M._defaults.post_mh_reweight
+    end
+    -- Default filter: paper §3.4 Line 17 — slot i must be a duplicate
+    -- from resample AND have reward < τ_R to receive an MH proposal.
+    if mh_filter_fn == nil then
+        mh_filter_fn = function(_idx, r, was_dup, _tau_R)
+            return was_dup and r < mh_reward_threshold
+        end
+    end
+
     if type(N) ~= "number" or N < 1 then
         error("smc_sample.run: n_particles must be positive number, got " .. tostring(N), 2)
     end
@@ -816,15 +909,29 @@ function M.run(ctx)
 
     local weights = compute_weights(rewards, alpha)
 
-    -- ─── K-iteration SMC main loop ───
+    -- ─── K-iteration SMC main loop (paper §3.4 Algorithm 1) ──────────
+    -- Order per paper Algorithm 1:
+    --   1. (block-SMC w/ 1-block-=-1-answer: block was generated at
+    --      init_particles; there is no per-iteration base-model block
+    --      regeneration at this scale — LLM cost would be prohibitive)
+    --   2. ESS check → resample if degenerate (Lines 12-14)
+    --   3. Selective MH rejuvenation on duplicated + low-reward
+    --      particles (Lines 15-26)
+    --   4. Weight update is NOT applied between iterations — under a
+    --      fixed-α target and π-invariant MH, π_k = π_{k-1}, so the
+    --      Target I incremental weight ratio is identically 1. All
+    --      weight changes come from (a) initial compute_weights above
+    --      and (b) ESS-triggered resample-reset to 1/N.
+    --   Legacy exp(α·Δr) post-MH reweight is available via
+    --   `ctx.post_mh_reweight = true` (NOT paper-faithful; injects
+    --   reward-gain bias; kept only for backward-compat).
     for _k = 1, K do
         local ess = compute_ess(weights)
         ess_trace[#ess_trace + 1] = ess
 
         -- Resample trigger: ESS < thr · N. On fire, reset weights to
         -- 1/N (paper §3.4 degeneracy reset). Rewards are re-indexed to
-        -- the resampled particles so incremental_weight_update has a
-        -- valid "prev" baseline on the next weight update.
+        -- the resampled particles in lockstep.
         --
         -- ⚠ ALIASING: resample_multinomial copies particle table
         -- references by design (multinomial with replacement). After
@@ -836,18 +943,32 @@ function M.run(ctx)
         -- read-only. Any future code that mutates particle fields
         -- (e.g. appending to history) MUST deep-copy first or this
         -- will corrupt every aliased slot.
+        local duplicated = {}
+        for i = 1, N do duplicated[i] = false end
+
         if ess < thr * N then
             -- Resample both particles and their rewards in lockstep
             -- using the same multinomial indices. We do this via a
             -- paired array so mix-indexed sampling is impossible.
             local paired = {}
             for i = 1, N do paired[i] = { particle = particles[i], reward = rewards[i] } end
-            local new_paired = resample_multinomial(paired, weights)
+            local new_paired, drawn_indices = resample_multinomial(paired, weights)
+
+            -- D_k membership (paper §3.4 Line 15): a slot i is a
+            -- duplicate iff multiple new slots were drawn from the
+            -- same original particle index. Count draws per original
+            -- index, then mark any slot whose source was drawn >1 time.
+            local draw_count = {}
+            for _, idx in ipairs(drawn_indices) do
+                draw_count[idx] = (draw_count[idx] or 0) + 1
+            end
+
             local new_particles = {}
             local new_rewards   = {}
             for i = 1, N do
                 new_particles[i] = new_paired[i].particle
                 new_rewards[i]   = new_paired[i].reward
+                duplicated[i]    = (draw_count[drawn_indices[i]] > 1)
             end
             particles = new_particles
             rewards   = new_rewards
@@ -857,14 +978,24 @@ function M.run(ctx)
             resample_count = resample_count + 1
         end
 
-        -- MH rejuvenation: S steps, each step proposes + accepts/rejects
-        -- every particle. Rewards returned by mh_rejuvenate already
-        -- account for the accept/reject outcome (accepted proposals
-        -- get the proposal's reward, rejected particles keep theirs).
-        local rewards_prev = rewards
+        -- Build selective MH filter (paper §3.4 Line 17 default:
+        -- duplicated AND R < τ_R). Caller can replace via
+        -- ctx.mh_filter_fn. Predicate errors are fatal — the filter
+        -- decides cost, silent failure would mask bugs.
+        local filter = {}
+        for i = 1, N do
+            local ok, active = pcall(mh_filter_fn, i, rewards[i], duplicated[i], mh_reward_threshold)
+            if not ok then
+                error("smc_sample.run: ctx.mh_filter_fn raised: " .. tostring(active), 2)
+            end
+            filter[i] = (active == true)
+        end
+
+        -- MH rejuvenation: S steps, selectively applied per filter.
+        local rewards_prev = rewards  -- snapshot for optional post_mh_reweight
         for _s = 1, S_steps do
             local new_parts, new_rews, n_llm, n_rew, n_rej = mh_rejuvenate(
-                particles, rewards, alpha, task, gen_tokens, reward_fn)
+                particles, rewards, alpha, task, gen_tokens, reward_fn, filter)
             particles          = new_parts
             rewards            = new_rews
             total_llm_calls    = total_llm_calls + n_llm
@@ -872,31 +1003,24 @@ function M.run(ctx)
             mh_rejected        = mh_rejected + n_rej
         end
 
-        -- Incremental Target I weight update
-        -- (paper §3.3 / §A.4 Lemma 4, Eq. 40):
-        --   W_k = W_{k-1} · exp(α · (r_new - r_prev)), then renormalize.
-        --
-        -- Position vs paper: paper Algorithm 1 places the weight update
-        -- BEFORE resample + MH (Line 8-9, as part of block generation).
-        -- We run it AFTER MH because block-SMC reinterprets MH
-        -- rejuvenation as the per-iteration block generation step
-        -- (1 block = 1 full answer). r_prev is the reward snapshot
-        -- captured at line `local rewards_prev = rewards` above, taken
-        -- BEFORE all S_steps MH rejuvenation steps. r_new = rewards
-        -- AFTER all S_steps. See KNOWN LIMITATIONS L1 in the header.
-        local unnorm = {}
-        local sum = 0
-        for i = 1, N do
-            unnorm[i] = incremental_weight_update(weights[i], rewards[i], rewards_prev[i], alpha)
-            sum = sum + unnorm[i]
-        end
-        if sum > 0 then
-            for i = 1, N do weights[i] = unnorm[i] / sum end
-        else
-            -- Total-underflow fallback: if every unnormalized weight
-            -- underflowed, reset to uniform. Same reasoning as the
-            -- numerical guard in compute_weights.
-            for i = 1, N do weights[i] = 1 / N end
+        -- Optional INJECTABLE: legacy post-MH reweight (NOT paper-
+        -- faithful; paper Algorithm 1 has no Line between 26 and the
+        -- next iteration that rescales W). Enabled only when caller
+        -- explicitly sets ctx.post_mh_reweight = true; when set, apply
+        -- W_k ← W_{k-1} · exp(α · (r_post_S - r_pre_S)) and normalize.
+        if post_mh_reweight then
+            local unnorm = {}
+            local sum = 0
+            for i = 1, N do
+                unnorm[i] = incremental_weight_update(weights[i], rewards[i], rewards_prev[i], alpha)
+                sum = sum + unnorm[i]
+            end
+            if sum > 0 then
+                for i = 1, N do weights[i] = unnorm[i] / sum end
+            else
+                -- Total-underflow fallback: reset to uniform.
+                for i = 1, N do weights[i] = 1 / N end
+            end
         end
     end
 

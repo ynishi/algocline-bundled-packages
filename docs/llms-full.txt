@@ -3688,8 +3688,11 @@ Returns:
 | `ctx.card_pkg` | string | optional | Card pkg.name override (default: 'smc_sample_<task_hash>') |
 | `ctx.ess_threshold` | number | optional | ESS trigger ratio (default: 0.5) |
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600) |
+| `ctx.mh_filter_fn` | any | optional | Caller override for paper §3.4 Line 17 selective-MH predicate. Signature: (idx, reward, was_duplicated, τ_R) → boolean. Default: duplicated AND reward < τ_R. Use `function() return true end` for the legacy apply-MH-to-all variant (higher LLM cost). |
+| `ctx.mh_reward_threshold` | number | optional | τ_R cutoff for the default selective-MH predicate (paper §3.4 Line 17). Default: 0.5. |
 | `ctx.n_iterations` | number | optional | K SMC iterations (default: 4) |
 | `ctx.n_particles` | number | optional | N particles (default: 16, paper §4.1) |
+| `ctx.post_mh_reweight` | boolean | optional | Opt into the legacy exp(α·Δr) post-MH reweight (NOT paper-faithful — reward-gain bias). Default: false. Kept only for pre-0.2.0 run reproduction. |
 | `ctx.rejuv_steps` | number | optional | S MH rejuvenation steps (default: 2) |
 | `ctx.reward_fn` | any | **required** | Caller-injected fn(answer, task) → number ∈ [0, +∞). unit-test / LLM judge / scoring_rule. Runtime type-checked. |
 | `ctx.scenario_name` | string | optional | Explicit scenario name for the emitted Card |
