@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migration note — algocline v0.25.1: `alc_shapes` vendored into core.**
+  algocline's `alc_hub_dist` / `alc_hub_gendoc` now embed `alc_shapes/*.lua`
+  in-binary via `include_str!` since v0.25.1. This repo's `alc_shapes/`
+  directory remains the upstream source of truth (algocline core pulls
+  from here) and continues to back local dev tooling (lua-ls type
+  completion, standalone `lua tools/gen_docs.lua`). Runtime dist is
+  unaffected. No action required from package authors.
+
 ## [0.18.0] - 2026-04-21
 
 ### Added

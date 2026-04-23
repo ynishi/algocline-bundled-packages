@@ -35,6 +35,8 @@ The split is formalized in [`alc_shapes/spec_resolver.lua`](alc_shapes/spec_reso
 - **Schema engine** — [alc_shapes](alc_shapes/) (the type DSL and `spec_resolver` that power the contracts above)
 - **Strategy** — everything else in the *Packages* section below
 
+> **Note**: algocline v0.25.1+ vendors `alc_shapes/*.lua` into the `alc` binary via `include_str!`. This repo remains the upstream source of truth; changes land here first and are pulled into algocline core on cadence.
+
 ### Architecture axis vs Category axis
 
 The *Packages* section below groups pkgs by **functional category** (Reasoning / Selection / Aggregation / …), which is **orthogonal** to architectural role. A Computation pkg may live under Selection (e.g. `kemeny`, `condorcet`), Aggregation (`ensemble_div`), Attribution (`shapley`), Governance (`bft`), or Validation / Analysis (`sprt`, `scoring_rule`, `eval_guard`, `inverse_u`) — but its contract stays direct-args regardless of the section it appears in.
