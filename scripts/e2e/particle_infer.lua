@@ -32,7 +32,17 @@
 ---   * prm_or_orm_reported         — total_prm_calls / total_orm_calls
 ---                                    or the words "PRM" / "ORM"
 ---                                    surfaced in the report
----   * max_tokens(100000)          — cumulative budget guard
+---   * max_tokens(300000)          — cumulative budget guard. Set higher
+---                                    than smc_sample's 100000 because
+---                                    particle_infer's step-wise loop
+---                                    accumulates partial answer text
+---                                    in the ReAct history on every
+---                                    alc_continue turn (6 pauses × ~20K
+---                                    in-context tokens per turn).
+---                                    First live run measured 217245
+---                                    tokens across 11 turns (run_id
+---                                    2026-04-24_232816); 300K gives
+---                                    ~38% headroom.
 
 package.path = "scripts/e2e/?.lua;" .. package.path
 local common = require("common")
@@ -115,6 +125,12 @@ IMPORTANT:
   graders check those counts.
 - Use alc_continue consistently for each pause — do not try to batch
   responses across multiple alc.llm calls.
+- Do NOT call alc_status, alc_log_view, or any other diagnostic tool
+  during the run. After alc_run returns its final payload (status =
+  "ok", not "needs_response"), extract the report fields DIRECTLY
+  from that payload. Extra probe calls burn tokens on the cumulative
+  budget without adding information — the run payload already
+  contains everything listed in the report schema above.
 ]],
     params.expected,
     params.task,
@@ -131,7 +147,7 @@ common.run({
     max_iterations = 40,
     graders = {
         common.grader_agent_ok(),
-        common.grader_max_tokens(100000),
+        common.grader_max_tokens(300000),
         common.grader_content_contains(params.expected),
         {
             name = "particles_count",
