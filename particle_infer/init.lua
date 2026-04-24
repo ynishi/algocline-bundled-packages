@@ -653,6 +653,16 @@ end
 --- untouched. LLM failures / empty responses mark the particle active
 --- but append nothing — the particle's partial stays the same, giving
 --- the PRM a stable score target at the next step.
+---
+--- Pragmatic note (not a math bug): on empty LLM response, `partial`
+--- stays unchanged but `n_steps` still increments. The next
+--- `evaluate_prm` call scores the same (unchanged) partial, yielding
+--- the same r̂ as the prior step. Under log_linear / logit_replace,
+--- the softmax input for that particle is unchanged. No math invariant
+--- is violated (Theorem 1 / reference-impl parity both hold), but the
+--- particle consumes a `max_steps` slot without progress — callers on
+--- a tight `max_steps` budget may see fewer effective steps than
+--- expected when the LLM returns empties.
 local function advance_step(particles, task, gen_tokens, llm_temperature)
     local active_idx = {}
     for i = 1, #particles do
@@ -833,6 +843,13 @@ local function select_final(particles, weights, task, orm_fn, mode)
         return best, particles[best].partial, nil
     elseif mode == "weighted_vote" then
         -- NOT paper-faithful: bucket weights by answer text.
+        -- Pragmatic note (not a math bug): bucket key is Lua string
+        -- equality on `particles[i].partial`, so variants that differ
+        -- only by whitespace / casing / newlines split into separate
+        -- buckets and dilute their weight. The paper does not specify
+        -- a canonicalization scheme; callers wanting semantic equality
+        -- should post-process `partial` before `run()` or apply a
+        -- custom bucketing helper outside this mode.
         local buckets = {}
         local order   = {}  -- first-seen order for deterministic tiebreak
         for i = 1, n do
