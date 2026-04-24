@@ -461,7 +461,7 @@ M.is_schema    = T._internal.is_schema
 -- separate require).
 M.T = T
 
--- Codegen namespace (used by scripts/gen_shapes_luacats.lua).
+-- Codegen namespace (used by core's alc_hub_dist luacats projection).
 M.LuaCats = luacats
 
 -- Spec resolver namespace (routing / recipe layer uses this to treat

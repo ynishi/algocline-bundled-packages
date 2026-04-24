@@ -49,33 +49,45 @@ e2e-all:
 pkg-list:
     alc pkg list
 
-# Regenerate types/alc_shapes.d.lua from alc_shapes/init.lua (SSoT).
+# Publish reminder: regenerate hub_index.json + all doc projections
+# (hub / narrative / llms / context7 / devin / luacats) in a single
+# MCP call. This is the canonical pre-publish step.
+#
+# With algocline core >= 0.26, all docs / projection config is driven
+# by `alc.toml` at the repository root (`[hub]` / `[hub.context7]` /
+# `[hub.devin]`), so no `config_path` argument is required — the core
+# auto-explores `alc.toml` and merges it with the embedded default
+# rules / repo_notes. The previous `tools/gen_docs.lua` +
+# `tools/docs/{context7_config,devin_wiki_config}.lua` were retired
+# once the TOML-only path landed in core (Lua config files are rejected
+# as a typed error).
+#
+# Invoke the MCP tool from a Claude Code / rmcp session:
+#
+#   alc_hub_dist(
+#     source_dir   = ".",
+#     output_path  = "hub_index.json",
+#     out_dir      = "docs",
+#     projections  = ["hub", "narrative", "llms", "context7", "devin", "luacats"],
+#     lint_strict  = true,
+#   )
+#
+# This recipe does nothing on its own — it just prints the reminder so
+# publishing without running dist is harder to forget. Use `just
+# dist-auto` to run it headlessly via agent-block.
 # [group('allow-agent')]
-gen-shapes:
-    lua scripts/gen_shapes_luacats.lua > types/alc_shapes.d.lua
+dist:
+    @echo "Run via MCP:  alc_hub_dist source_dir=. output_path=hub_index.json \\"
+    @echo "               out_dir=docs \\"
+    @echo "               projections=[hub,narrative,llms,context7,devin,luacats] \\"
+    @echo "               lint_strict=true"
+    @echo ""
+    @echo "alc.toml at repo root is auto-explored for [hub] / [hub.context7] / [hub.devin]."
+    @echo ""
+    @echo "Or headless:  just dist-auto"
 
-# Verify types/alc_shapes.d.lua matches the current alc_shapes/init.lua (drift check).
+# Run `alc_hub_dist` headlessly by driving the `alc` MCP server through
+# agent-block (same harness used by E2E recipes). Requires ANTHROPIC_API_KEY.
 # [group('allow-agent')]
-verify-shapes:
-    lua scripts/gen_shapes_luacats.lua | diff - types/alc_shapes.d.lua
-
-# Regenerate all pkg-source-derived doc artefacts (SSoT projection):
-#   docs/narrative/*.md, docs/hub/*.json, docs/llms.txt, docs/llms-full.txt,
-#   context7.json (repo root), .devin/wiki.json (repo root).
-# Does NOT regenerate hub_index.json / docs/hub/index.json — those require
-# the algocline MCP tool `alc_hub_reindex` (Claude Code session only).
-# [group('allow-agent')]
-gen-docs:
-    lua tools/gen_docs.lua --hub --context7 --devin . docs
-
-# Run the V0 docstring lint pass only (no file generation). Reports
-# W_FAKE_LABEL / E_RESULT_CONFLICT / E_PARAMETERS_CONFLICT violations.
-# [group('allow-agent')]
-gen-docs-lint:
-    lua tools/gen_docs.lua --lint-only
-
-# Regenerate docs and fail if any lint error is raised (--strict). Use
-# this before commit / release to block drift or convention violations.
-# [group('allow-agent')]
-gen-docs-strict:
-    lua tools/gen_docs.lua --hub --context7 --devin --strict . docs
+dist-auto:
+    agent-block -s scripts/dist.lua -p .

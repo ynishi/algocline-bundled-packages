@@ -1,0 +1,39 @@
+## algocline hub configuration.
+##
+## Consumed by the `alc_hub_gendoc` / `alc_hub_dist` MCP tools
+## (algocline core >= 0.26). Only project-specific keys belong here —
+## generic rules / repo_notes are embedded in core's projection templates
+## and merged at gendoc time via the precedence chain documented in
+## `docs/hub-gendoc-config.md` (algocline core).
+##
+## Schema references:
+##   - context7: https://context7.com/schema/context7.json
+##   - devin deepwiki: https://docs.devin.ai/work-with-devin/deepwiki
+
+[hub]
+name        = "algocline"
+description = """\
+LLM amplification engine — Pure Lua strategies executed via \
+`alc.run(ctx)` that structurally enhance LLM reasoning \
+(CoT, Self-Consistency, CoVe, panel / ucb / cot / ... packages)."""
+
+  [hub.context7]
+  extra_rules = [
+      "Each package is a Pure Lua module with a top-level `M.meta` table for identity (name / version / category / description) and (for bundled packages) an `M.spec` table declaring entry-point I/O shapes via `alc_shapes.t` combinators — the primary entry is `M.spec.entries.run.{input, result}`.",
+      "Invoke a strategy through `alc.run(ctx)`; `ctx` is a plain Lua table shaped by the package's `M.spec.entries.run.input`.",
+      "An `alc.llm(prompt)` call inside a strategy pauses execution and resumes when the host provides the completion via `alc_continue`.",
+      "Package narratives live under `docs/narrative/{pkg}.md` and are generated deterministically by the algocline MCP tool `alc_hub_gendoc` from each package's `init.lua` docstring plus its `M.meta` and `M.spec`.",
+  ]
+
+  [hub.devin]
+  ## DeepWiki only recognises `repo_notes` and `pages` per
+  ## https://docs.devin.ai/work-with-devin/deepwiki (verified 2026-04-24).
+  ## `pages` is intentionally omitted — algocline ships 100+ packages, which
+  ## exceeds DeepWiki's 30-page limit for non-enterprise accounts. Leaving
+  ## `pages` unset lets DeepWiki apply its default cluster-based planning,
+  ## steered by the `extra_repo_notes` below.
+  extra_repo_notes = [
+      "algocline is an LLM amplification engine whose packages are Pure Lua modules executed via `alc.run(ctx)`. The authoritative per-package narrative lives at `docs/narrative/{pkg}.md` and is generated deterministically by the algocline MCP tool `alc_hub_gendoc` from each package's `init.lua` docstring plus its `M.meta` and `M.spec` tables. When generating wiki content, prefer these canonical narratives over re-deriving from the source files.",
+      "Each bundled package declares `M.spec.entries.run.input` (and often `M.spec.entries.run.result`) using the `alc_shapes.t` combinator DSL. This is the single source of truth for a package's I/O contract — the Parameters table in the narrative is a projection of that DSL, not separate documentation. Do not contradict the narrative's Parameters / result with freshly-derived schemas.",
+      "Strategies are invoked through `alc.run(ctx)` where `ctx` is a plain Lua table shaped by the package's `M.spec.entries.run.input`. An `alc.llm(prompt)` call inside a strategy pauses execution and resumes when the host provides the completion via `alc_continue`. Keep wiki pages aligned with this pause/resume execution model.",
+  ]
