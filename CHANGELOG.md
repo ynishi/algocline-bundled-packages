@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`particle_infer`** (Selection): step-wise Particle Filter
+  inference-time scaling per Puri, Sudalairaj, Xu, Xu, Srivastava 2025
+  ("A Probabilistic Inference Approach to Inference-Time Scaling of
+  LLMs using Particle-Based Monte Carlo Methods", arXiv:2502.01618).
+  State-Space Model formulation of LLM generation (§2 emission =
+  Bernoulli(r̂)). N particles advance one reasoning step at a time,
+  each scored by a caller-injected Process Reward Model (PRM), then
+  softmax-resampled every step (paper §3.1 Algorithm 1); a
+  caller-injected Outcome Reward Model (ORM) picks the final answer
+  (§3 end). Aggregation modes `product` / `min` / `last` / `model`
+  (§3.2). Pure-Lua helpers (softmax with max-shift, multinomial CDF
+  resample, ESS, `log_from_bern` / `logit_from_bern`) are exposed
+  under `M._internal` for test injection.
+- **`particle_infer` `weight_scheme` INJECT** (paper-faithful default):
+  - `weight_scheme = "log_linear"` (default): `w_t = log r̂_t`,
+    `softmax(w) = r̂/Σr̂` — matches paper §3.1 Algorithm 1 and
+    Theorem 1 target `∝ ∏_t r̂_t`.
+  - `weight_scheme = "logit_replace"` (opt-in, **NOT paper-faithful**):
+    `w_t = logit r̂_t`, `softmax(w) = odds/Σodds` — mirrors the
+    authors' reference implementation
+    (`github.com/Red-Hat-AI-Innovation-Team/its_hub`,
+    `particle_gibbs.py: _inv_sigmoid + _softmax(log_weights[-1])`).
+    Samples from an odds-normalized distribution; Theorem 1
+    unbiasedness proof does not cover this path. Produces sharper
+    "kill-the-runt" concentration via odds divergence at r̂→1.
+- **E2E script** `scripts/e2e/particle_infer.lua`: arithmetic CoT
+  (23+47=70) task, N=3 particles × max_steps=2, deterministic
+  pure-Lua PRM/ORM heuristics. `max_tokens(300000)` guard
+  accommodates `particle_infer`'s step-wise pause/continue loop
+  (6 pauses × ~20K in-context tokens per turn under agent-block's
+  ReAct full-history re-send). Prompt explicitly forbids
+  `alc_status` / `alc_log_view` diagnostic probes to avoid 3×19K
+  redundant context re-sends.
+
 ## [0.19.0] - 2026-04-24
 
 ### Added
