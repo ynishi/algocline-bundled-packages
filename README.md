@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (113)
+## Packages (114)
 
 ### Reasoning
 
@@ -97,6 +97,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[mwu](mwu/)** | Multiplicative Weights Update. Adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions. Doubling trick for unknown T, log-space computation for numerical stability | Littlestone & Warmuth (1994), Freund & Schapire (1997) |
 | **[cost_pareto](cost_pareto/)** | Multi-objective Pareto dominance. Frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs. HumanEval warming $2.45/93.2% dominates LATS $134.50/88.0% | Kapoor et al. "AI Agents That Matter" (2024) |
 | **[smc_sample](smc_sample/)** | Block-level Sequential Monte Carlo sampling for LLM quality. N particles with reward-weighted importance sampling, ESS-triggered multinomial resampling, and Metropolis-Hastings rejuvenation. Caller-injected `reward_fn` (unit-test / LLM judge / scoring rule) drives the Target I tempered potential ψ = exp(α·r). Encompasses sc (α=0) and mbr_select (similarity reward, 1 iteration) as special cases of the same probabilistic framework. Default (N=16, K=4, S=2) issues 208 LLM calls per run | Markovic-Voronov et al. (arXiv:2604.16453, 2026) |
+| **[particle_infer](particle_infer/)** | Particle-Filter inference-time scaling. State-Space formulation of LLM generation (paper §2): N step-wise rollouts advanced one reasoning step at a time, scored by a caller-injected Process Reward Model (PRM), softmax-resampled every step (paper §3.1 Alg.1), then selected by a caller-injected Outcome Reward Model (ORM). Aggregation ∈ {product/min/last/model} (§3.2). Complements sc (i.i.d. single-shot) and smc_sample (block-SMC, whole-answer reward) by occupying the step-wise trajectory tier with Theorem-1 unbiased posterior sampling. Qwen2.5-Math-1.5B + 4 particles > GPT-4o (§4.2) | Puri et al. (arXiv:2502.01618, 2025) |
 
 ### Aggregation
 

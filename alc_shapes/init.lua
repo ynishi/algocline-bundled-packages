@@ -499,6 +499,50 @@ M.isp_voted = T.shape({
     total_llm_calls     = T.number:describe("Total LLM calls issued by run"),
 }, { open = true })
 
+-- ── particle_infer shape ─────────────────────────────────────────────
+-- Puri et al. 2025 (arXiv:2502.01618) Particle-Filter inference-time
+-- scaling. N step-wise rollouts with PRM-guided every-step resample
+-- and ORM-based final selection. `card_id` populated only when
+-- ctx.auto_card = true. open = true for forward-compat additions
+-- (Alg.2/3 PG/PGPT fields land here without shape break).
+
+M.particle_inferred = T.shape({
+    answer          = T.string:describe("Selected particle's final answer text"),
+    selected_idx    = T.number:describe("1-based index into particles[] of the selected particle"),
+    particles       = T.array_of(T.shape({
+        answer      = T.string:describe("Particle's final partial/full answer"),
+        weight      = T.number:describe("Final normalized weight (post-softmax or post-resample 1/N)"),
+        step_scores = T.array_of(T.number)
+            :describe("Per-step PRM r̂_t sequence for this particle"),
+        aggregated  = T.number:describe("Scalar after aggregation mode reduction"),
+        orm_score   = T.number:is_optional()
+            :describe("ORM(final_answer) when final_selection='orm' and orm_fn provided"),
+        n_steps     = T.number:describe("Actual steps taken before stop / max_steps"),
+        active      = T.boolean:describe("True if particle was still running at termination"),
+    }, { open = true }))
+        :describe("All N particles in their final state"),
+    weights         = T.array_of(T.number):describe("Final normalized weights (Σ ≈ 1)"),
+    steps_executed  = T.number:describe("Steps the main loop actually completed"),
+    resample_count  = T.number:describe(
+        "Number of main-loop iterations that triggered multinomial resample. "
+            .. "= steps_executed under the paper-faithful every-step path "
+            .. "(ess_threshold=0); < steps_executed under the NOT paper-"
+            .. "faithful ESS-triggered INJECT."),
+    ess_trace       = T.array_of(T.number)
+        :describe("Pre-softmax ESS per step (diagnostic, length = steps_executed)"),
+    aggregation     = T.one_of({ "product", "min", "last", "model" })
+        :describe("PRM step→scalar reduction used (paper §3.2)"),
+    final_selection = T.one_of({ "orm", "argmax_weight", "weighted_vote" })
+        :describe("Selection rule used (paper §3 end = 'orm'; others are fallbacks)"),
+    stats           = T.shape({
+        total_llm_calls = T.number:describe("alc.llm invocations issued by the pkg"),
+        total_prm_calls = T.number:describe("prm_fn invocations (= Σ active-particle counts per step)"),
+        total_orm_calls = T.number:describe("orm_fn invocations (= N when final_selection='orm' and orm_fn provided, else 0)"),
+    }, { open = true }):describe("Execution counters (open for diagnostics)"),
+    card_id         = T.string:is_optional()
+        :describe("Emitted Card id (only when auto_card=true)"),
+}, { open = true })
+
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check
 M.assert       = check.assert

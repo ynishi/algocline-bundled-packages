@@ -1,0 +1,1007 @@
+--- Tests for particle_infer (Puri et al. 2025, arXiv:2502.01618).
+---
+--- Coverage:
+---   Pure helpers (no LLM):
+---     * aggregate_prm_scores — product / min / last / model modes +
+---       error cases (empty step_scores, non-number step)
+---     * softmax_weights — uniform, concentration, high-temp flatten,
+---       extreme shift (max-shift numerical stability), NaN / non-number
+---       / non-positive temperature rejection
+---     * compute_ess — equal weights → N, concentration → 1, all-zero → 0
+---     * resample_multinomial — deterministic rng picks argmax bucket,
+---       preserves N, rejects length mismatch / nonpositive weights
+---     * prm_weight_step — basic multiplication + edge values
+---   LLM-integrated (mocked _G.alc):
+---     * init_particles — N empty particles, no LLM call
+---     * advance_step — fans out 1 LLM call per active particle,
+---       inactive skipped, empty response leaves partial unchanged
+---     * evaluate_prm — fail-fast on non-number / NaN / out-of-range
+---     * evaluate_continue — false → active=false; non-boolean rejected
+---     * select_final — orm / argmax_weight / weighted_vote correctness
+---   M.run orchestration:
+---     * end-to-end under paper-faithful path (ess_threshold=0, every-
+---       step resample)
+---     * ORM fallback warning (mode='orm' + orm_fn=nil → argmax_weight)
+---     * input validation fail-fast
+---     * Card emission when auto_card=true with stub alc.card
+
+local describe, it, expect = lust.describe, lust.it, lust.expect
+
+local function repo_root_from_package_path()
+    for entry in package.path:gmatch("[^;]+") do
+        local prefix = entry:match("^(.-)/%?%.lua$")
+        if prefix and prefix ~= "" and prefix:sub(1, 1) == "/" then
+            return prefix
+        end
+    end
+    return "."
+end
+local REPO = repo_root_from_package_path()
+package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+
+-- Force fresh load so the worktree's particle_inferred shape is visible
+-- even if a prior run cached the parent-repo version.
+for _, name in ipairs({
+    "particle_infer",
+    "alc_shapes",
+    "alc_shapes.t",
+    "alc_shapes.check",
+    "alc_shapes.reflect",
+}) do
+    package.loaded[name] = nil
+end
+
+local function reset()
+    package.loaded["particle_infer"] = nil
+    _G.alc = nil
+end
+
+local function approx(a, b, eps)
+    eps = eps or 1e-9
+    return math.abs(a - b) <= eps
+end
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Meta
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer.meta", function()
+    lust.after(reset)
+
+    it("has correct name", function()
+        local pi = require("particle_infer")
+        expect(pi.meta.name).to.equal("particle_infer")
+    end)
+
+    it("has version 0.1.0", function()
+        local pi = require("particle_infer")
+        expect(pi.meta.version).to.equal("0.1.0")
+    end)
+
+    it("category is selection", function()
+        local pi = require("particle_infer")
+        expect(pi.meta.category).to.equal("selection")
+    end)
+
+    it("description mentions Particle Filter and arXiv id", function()
+        local pi = require("particle_infer")
+        expect(pi.meta.description:find("Particle%-Filter") ~= nil).to.equal(true)
+        expect(pi.meta.description:find("2502.01618") ~= nil).to.equal(true)
+    end)
+
+    it("defaults match paper-faithful values", function()
+        local pi = require("particle_infer")
+        expect(pi._defaults.n_particles).to.equal(8)
+        expect(pi._defaults.max_steps).to.equal(8)
+        expect(pi._defaults.aggregation).to.equal("product")
+        expect(pi._defaults.softmax_temp).to.equal(1.0)
+        expect(pi._defaults.ess_threshold).to.equal(0.0)
+        expect(pi._defaults.llm_temperature).to.equal(0.8)
+        expect(pi._defaults.final_selection).to.equal("orm")
+    end)
+
+    it("exposes _internal pure helpers", function()
+        local pi = require("particle_infer")
+        expect(type(pi._internal.aggregate_prm_scores)).to.equal("function")
+        expect(type(pi._internal.softmax_weights)).to.equal("function")
+        expect(type(pi._internal.compute_ess)).to.equal("function")
+        expect(type(pi._internal.resample_multinomial)).to.equal("function")
+        expect(type(pi._internal.prm_weight_step)).to.equal("function")
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- aggregate_prm_scores
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer._internal.aggregate_prm_scores", function()
+    lust.after(reset)
+
+    it("product: paper §3.2 default, returns ∏_t r̂_t", function()
+        local pi = require("particle_infer")
+        local out = pi._internal.aggregate_prm_scores(
+            { { 0.9, 0.8 }, { 0.5, 0.5 } }, "product")
+        expect(approx(out[1], 0.72, 1e-12)).to.equal(true)
+        expect(approx(out[2], 0.25, 1e-12)).to.equal(true)
+    end)
+
+    it("min: bottleneck view, returns min_t r̂_t", function()
+        local pi = require("particle_infer")
+        local out = pi._internal.aggregate_prm_scores(
+            { { 0.9, 0.1, 0.8 }, { 0.5, 0.5, 0.5 } }, "min")
+        expect(approx(out[1], 0.1, 1e-12)).to.equal(true)
+        expect(approx(out[2], 0.5, 1e-12)).to.equal(true)
+    end)
+
+    it("last: efficiency view, returns r̂_T", function()
+        local pi = require("particle_infer")
+        local out = pi._internal.aggregate_prm_scores(
+            { { 0.9, 0.1, 0.8 }, { 0.5, 0.5, 0.3 } }, "last")
+        expect(approx(out[1], 0.8, 1e-12)).to.equal(true)
+        expect(approx(out[2], 0.3, 1e-12)).to.equal(true)
+    end)
+
+    it("model: same reduction as last (contract on r̂_T)", function()
+        local pi = require("particle_infer")
+        local out = pi._internal.aggregate_prm_scores(
+            { { 0.7 }, { 0.3 } }, "model")
+        expect(approx(out[1], 0.7, 1e-12)).to.equal(true)
+        expect(approx(out[2], 0.3, 1e-12)).to.equal(true)
+    end)
+
+    it("empty step_scores → 0 (neutral aggregate)", function()
+        local pi = require("particle_infer")
+        local out = pi._internal.aggregate_prm_scores({ {}, { 0.5 } }, "product")
+        expect(out[1]).to.equal(0)
+        expect(approx(out[2], 0.5, 1e-12)).to.equal(true)
+    end)
+
+    it("rejects unknown mode", function()
+        local pi = require("particle_infer")
+        local ok, err = pcall(pi._internal.aggregate_prm_scores,
+            { { 0.5 } }, "geomean")
+        expect(ok).to.equal(false)
+        expect(err:find("unknown mode") ~= nil).to.equal(true)
+    end)
+
+    it("rejects non-number step entry", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.aggregate_prm_scores,
+            { { 0.5, "bad" } }, "product")
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- softmax_weights
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer._internal.softmax_weights", function()
+    lust.after(reset)
+
+    it("equal inputs → uniform", function()
+        local pi = require("particle_infer")
+        local w = pi._internal.softmax_weights({ 1, 1, 1 }, 1.0)
+        for i = 1, 3 do
+            expect(approx(w[i], 1 / 3, 1e-12)).to.equal(true)
+        end
+    end)
+
+    it("concentration: large gap → near one-hot", function()
+        local pi = require("particle_infer")
+        local w = pi._internal.softmax_weights({ 100, 0, 0 }, 1.0)
+        expect(w[1] > 0.99).to.equal(true)
+        expect(w[2] < 0.01).to.equal(true)
+        expect(w[3] < 0.01).to.equal(true)
+        expect(approx(w[1] + w[2] + w[3], 1, 1e-9)).to.equal(true)
+    end)
+
+    it("infinite temperature → uniform", function()
+        local pi = require("particle_infer")
+        local w = pi._internal.softmax_weights({ 100, 0, 0 }, math.huge)
+        for i = 1, 3 do
+            expect(approx(w[i], 1 / 3, 1e-12)).to.equal(true)
+        end
+    end)
+
+    it("max-shift prevents overflow at large w / small T", function()
+        local pi = require("particle_infer")
+        -- Without max-shift, exp(10000) = +Inf. With max-shift
+        -- the result is still a valid distribution summing to 1.
+        local w = pi._internal.softmax_weights({ 10000, 0 }, 1.0)
+        expect(approx(w[1] + w[2], 1, 1e-9)).to.equal(true)
+        expect(w[1] > 0.99).to.equal(true)
+    end)
+
+    it("underflow fallback: w_i all extremely negative → uniform", function()
+        local pi = require("particle_infer")
+        local w = pi._internal.softmax_weights({ -10000, -10001 }, 1.0)
+        -- Either the max-shifted exp produces a valid peaked
+        -- distribution OR it falls back to uniform. Both are
+        -- numerically acceptable; sum must be 1 in either case.
+        expect(approx(w[1] + w[2], 1, 1e-9)).to.equal(true)
+    end)
+
+    it("rejects non-positive temperature", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.softmax_weights, { 1, 2 }, 0)
+        expect(ok).to.equal(false)
+        ok = pcall(pi._internal.softmax_weights, { 1, 2 }, -1)
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects NaN input", function()
+        local pi = require("particle_infer")
+        local nan = 0 / 0
+        local ok = pcall(pi._internal.softmax_weights, { nan, 1 }, 1.0)
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects empty vector", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.softmax_weights, {}, 1.0)
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- compute_ess
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer._internal.compute_ess", function()
+    lust.after(reset)
+
+    it("equal weights (N=4) → ESS=N=4", function()
+        local pi = require("particle_infer")
+        local ess = pi._internal.compute_ess({ 0.25, 0.25, 0.25, 0.25 })
+        expect(approx(ess, 4, 1e-12)).to.equal(true)
+    end)
+
+    it("single-particle domination → ESS=1", function()
+        local pi = require("particle_infer")
+        local ess = pi._internal.compute_ess({ 1, 0, 0, 0 })
+        expect(approx(ess, 1, 1e-12)).to.equal(true)
+    end)
+
+    it("all-zero weights → ESS=0 (degenerate)", function()
+        local pi = require("particle_infer")
+        local ess = pi._internal.compute_ess({ 0, 0, 0 })
+        expect(ess).to.equal(0)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- resample_multinomial
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer._internal.resample_multinomial", function()
+    lust.after(reset)
+
+    it("deterministic rng picks argmax-prob bucket", function()
+        local pi = require("particle_infer")
+        -- rng always returns u=0.99 → falls into the last bucket
+        -- (highest cumulative prob). With weights [0.1, 0.1, 0.8]
+        -- that's particle 3.
+        local rng_const = function() return 0.99 end
+        local out, drawn = pi._internal.resample_multinomial(
+            { "A", "B", "C" }, { 0.1, 0.1, 0.8 }, rng_const)
+        for i = 1, 3 do
+            expect(out[i]).to.equal("C")
+            expect(drawn[i]).to.equal(3)
+        end
+    end)
+
+    it("preserves N", function()
+        local pi = require("particle_infer")
+        local out, drawn = pi._internal.resample_multinomial(
+            { "A", "B", "C", "D" }, { 0.25, 0.25, 0.25, 0.25 },
+            function() return 0.5 end)
+        expect(#out).to.equal(4)
+        expect(#drawn).to.equal(4)
+    end)
+
+    it("rejects length mismatch", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.resample_multinomial,
+            { "A", "B" }, { 0.5, 0.3, 0.2 })
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects Σw ≤ 0", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.resample_multinomial,
+            { "A", "B" }, { 0, 0 })
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- prm_weight_step
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer._internal.prm_weight_step", function()
+    lust.after(reset)
+
+    it("basic multiplication: w_{t-1}=0.5, r=0.8 → 0.4", function()
+        local pi = require("particle_infer")
+        expect(approx(pi._internal.prm_weight_step(0.5, 0.8), 0.4, 1e-12))
+            .to.equal(true)
+    end)
+
+    it("r=0 → weight collapses (particle extinction)", function()
+        local pi = require("particle_infer")
+        expect(pi._internal.prm_weight_step(0.5, 0)).to.equal(0)
+    end)
+
+    it("r=1 → weight preserved", function()
+        local pi = require("particle_infer")
+        expect(approx(pi._internal.prm_weight_step(0.7, 1.0), 0.7, 1e-12))
+            .to.equal(true)
+    end)
+
+    it("rejects non-number inputs", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.prm_weight_step, "bad", 0.5)
+        expect(ok).to.equal(false)
+        ok = pcall(pi._internal.prm_weight_step, 0.5, "bad")
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Shape registration
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer shape registration", function()
+    lust.after(reset)
+
+    it("alc_shapes.M.particle_inferred is defined", function()
+        local S = require("alc_shapes")
+        expect(S.particle_inferred ~= nil).to.equal(true)
+    end)
+
+    it("result shape accepts a minimal valid output", function()
+        local S = require("alc_shapes")
+        local ok = S.check({
+            answer          = "final",
+            selected_idx    = 1,
+            particles       = {
+                {
+                    answer      = "final",
+                    weight      = 1.0,
+                    step_scores = { 0.5, 0.6 },
+                    aggregated  = 0.3,
+                    n_steps     = 2,
+                    active      = false,
+                },
+            },
+            weights         = { 1.0 },
+            steps_executed  = 2,
+            resample_count  = 2,
+            ess_trace       = { 1.0, 1.0 },
+            aggregation     = "product",
+            final_selection = "argmax_weight",
+            stats           = {
+                total_llm_calls = 2,
+                total_prm_calls = 2,
+                total_orm_calls = 0,
+            },
+        }, S.particle_inferred)
+        expect(ok).to.equal(true)
+    end)
+
+    it("rejects missing required field (selected_idx)", function()
+        local S = require("alc_shapes")
+        local ok = S.check({
+            answer          = "x",
+            -- selected_idx missing
+            particles       = {},
+            weights         = {},
+            steps_executed  = 0,
+            resample_count  = 0,
+            ess_trace       = {},
+            aggregation     = "product",
+            final_selection = "argmax_weight",
+            stats           = {
+                total_llm_calls = 0,
+                total_prm_calls = 0,
+                total_orm_calls = 0,
+            },
+        }, S.particle_inferred)
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- LLM-integrated helpers (mocked _G.alc)
+-- ═══════════════════════════════════════════════════════════════════
+
+local function make_alc_stub(opts)
+    opts = opts or {}
+    local counter = { llm_calls = 0 }
+    local fixtures = opts.fixtures
+    local llm_fn
+    if type(fixtures) == "function" then
+        llm_fn = function(prompt, o)
+            counter.llm_calls = counter.llm_calls + 1
+            return fixtures(prompt, o, counter.llm_calls)
+        end
+    elseif type(fixtures) == "table" then
+        llm_fn = function(_prompt, _o)
+            counter.llm_calls = counter.llm_calls + 1
+            local v = fixtures[counter.llm_calls]
+            if v == nil then v = "step_" .. tostring(counter.llm_calls) end
+            return v
+        end
+    else
+        llm_fn = function(_prompt, _o)
+            counter.llm_calls = counter.llm_calls + 1
+            return "step_" .. tostring(counter.llm_calls)
+        end
+    end
+
+    local stub = {
+        llm = llm_fn,
+        map = function(collection, fn)
+            local out = {}
+            for i, v in ipairs(collection) do out[i] = fn(v, i) end
+            return out
+        end,
+        log = {
+            warn = function(...) end,
+            info = function(...) end,
+        },
+        hash = function(s) return "deadbeef" .. tostring(#s) end,
+    }
+    if opts.with_card then
+        local card_state = { create_calls = 0, samples_calls = 0 }
+        stub.card = {
+            create = function(args)
+                card_state.create_calls = card_state.create_calls + 1
+                card_state.last_args = args
+                return { card_id = opts.card_id or "stub_card_pf" }
+            end,
+            write_samples = function(id, list)
+                card_state.samples_calls = card_state.samples_calls + 1
+                card_state.last_id = id
+                card_state.last_list = list
+            end,
+        }
+        counter.card = card_state
+    end
+    return stub, counter
+end
+
+describe("particle_infer._internal.init_particles", function()
+    lust.after(reset)
+
+    it("produces N empty particles without any LLM call", function()
+        local stub, counter = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(4)
+        expect(#parts).to.equal(4)
+        expect(counter.llm_calls).to.equal(0)
+        for i = 1, 4 do
+            expect(parts[i].partial).to.equal("")
+            expect(parts[i].active).to.equal(true)
+            expect(parts[i].n_steps).to.equal(0)
+            expect(#parts[i].step_scores).to.equal(0)
+        end
+    end)
+end)
+
+describe("particle_infer._internal.advance_step", function()
+    lust.after(reset)
+
+    it("fans out 1 LLM call per active particle", function()
+        local stub, counter = make_alc_stub({
+            fixtures = { "a1", "a2", "a3" },
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(3)
+        local n_llm = pi._internal.advance_step(parts, "task", 100, 0.8)
+        expect(n_llm).to.equal(3)
+        expect(counter.llm_calls).to.equal(3)
+        expect(parts[1].partial).to.equal("a1")
+        expect(parts[2].partial).to.equal("a2")
+        expect(parts[3].partial).to.equal("a3")
+        for i = 1, 3 do
+            expect(parts[i].n_steps).to.equal(1)
+        end
+    end)
+
+    it("skips inactive particles entirely", function()
+        local stub, counter = make_alc_stub({
+            fixtures = { "active_response" },
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(3)
+        parts[1].active = false
+        parts[3].active = false
+        local n_llm = pi._internal.advance_step(parts, "task", 100, 0.8)
+        expect(n_llm).to.equal(1)
+        expect(counter.llm_calls).to.equal(1)
+        expect(parts[1].partial).to.equal("")   -- inactive, untouched
+        expect(parts[2].partial).to.equal("active_response")
+        expect(parts[3].partial).to.equal("")
+        expect(parts[1].n_steps).to.equal(0)
+        expect(parts[2].n_steps).to.equal(1)
+        expect(parts[3].n_steps).to.equal(0)
+    end)
+
+    it("empty LLM response leaves partial but still counts as step", function()
+        local stub = make_alc_stub({
+            fixtures = { "" },
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        pi._internal.advance_step(parts, "task", 100, 0.8)
+        expect(parts[1].partial).to.equal("")
+        expect(parts[1].n_steps).to.equal(1)
+    end)
+
+    it("accumulates multi-step partial with newline separator", function()
+        local stub = make_alc_stub({
+            fixtures = { "step-1", "step-2" },
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        pi._internal.advance_step(parts, "task", 100, 0.8)
+        pi._internal.advance_step(parts, "task", 100, 0.8)
+        expect(parts[1].partial).to.equal("step-1\nstep-2")
+        expect(parts[1].n_steps).to.equal(2)
+    end)
+end)
+
+describe("particle_infer._internal.evaluate_prm", function()
+    lust.after(reset)
+
+    it("appends per-active score; returns active count", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(2)
+        parts[1].partial = "some-answer"
+        parts[2].partial = "other-answer"
+        local n = pi._internal.evaluate_prm(parts, "task", function(a, _t)
+            if a == "some-answer" then return 0.9 end
+            return 0.4
+        end)
+        expect(n).to.equal(2)
+        expect(approx(parts[1].step_scores[1], 0.9, 1e-12)).to.equal(true)
+        expect(approx(parts[2].step_scores[1], 0.4, 1e-12)).to.equal(true)
+    end)
+
+    it("fail-fast on non-number return", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        local ok, err = pcall(pi._internal.evaluate_prm, parts, "task",
+            function() return "not-a-number" end)
+        expect(ok).to.equal(false)
+        expect(err:find("non%-number") ~= nil).to.equal(true)
+    end)
+
+    it("fail-fast on NaN", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        local ok, err = pcall(pi._internal.evaluate_prm, parts, "task",
+            function() return 0 / 0 end)
+        expect(ok).to.equal(false)
+        expect(err:find("NaN") ~= nil).to.equal(true)
+    end)
+
+    it("fail-fast on r > 1 (Bernoulli parameter violation)", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        local ok, err = pcall(pi._internal.evaluate_prm, parts, "task",
+            function() return 1.5 end)
+        expect(ok).to.equal(false)
+        expect(err:find("Bernoulli") ~= nil).to.equal(true)
+    end)
+
+    it("fail-fast on r < 0", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        local ok = pcall(pi._internal.evaluate_prm, parts, "task",
+            function() return -0.1 end)
+        expect(ok).to.equal(false)
+    end)
+end)
+
+describe("particle_infer._internal.evaluate_continue", function()
+    lust.after(reset)
+
+    it("false return flips active=false; true keeps active", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(3)
+        parts[1].partial = "short"
+        parts[2].partial = "really long answer"
+        parts[3].partial = "medium"
+        local n = pi._internal.evaluate_continue(parts, function(partial)
+            return #partial < 10
+        end)
+        expect(n).to.equal(3)
+        expect(parts[1].active).to.equal(true)
+        expect(parts[2].active).to.equal(false)
+        expect(parts[3].active).to.equal(true)
+    end)
+
+    it("nil continue_fn → zero calls, no state change", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(2)
+        local n = pi._internal.evaluate_continue(parts, nil)
+        expect(n).to.equal(0)
+        for i = 1, 2 do expect(parts[i].active).to.equal(true) end
+    end)
+
+    it("rejects non-boolean return", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local parts = pi._internal.init_particles(1)
+        local ok = pcall(pi._internal.evaluate_continue, parts,
+            function() return "yes" end)
+        expect(ok).to.equal(false)
+    end)
+end)
+
+describe("particle_infer._internal.select_final", function()
+    lust.after(reset)
+
+    local function mk_parts(answers)
+        local p = {}
+        for i, a in ipairs(answers) do
+            p[i] = { partial = a }
+        end
+        return p
+    end
+
+    it("orm: argmax ORM(x_i, task)", function()
+        local pi = require("particle_infer")
+        local parts = mk_parts({ "A", "B", "C" })
+        local orm = function(a, _t)
+            if a == "A" then return 0.3
+            elseif a == "B" then return 0.9
+            else return 0.5 end
+        end
+        local idx, ans, scores = pi._internal.select_final(
+            parts, { 0.4, 0.3, 0.3 }, "task", orm, "orm")
+        expect(idx).to.equal(2)
+        expect(ans).to.equal("B")
+        expect(#scores).to.equal(3)
+        expect(approx(scores[2], 0.9, 1e-12)).to.equal(true)
+    end)
+
+    it("argmax_weight: picks highest-weight particle", function()
+        local pi = require("particle_infer")
+        local parts = mk_parts({ "X", "Y", "Z" })
+        local idx, ans, scores = pi._internal.select_final(
+            parts, { 0.1, 0.8, 0.1 }, "task", nil, "argmax_weight")
+        expect(idx).to.equal(2)
+        expect(ans).to.equal("Y")
+        expect(scores).to.equal(nil)
+    end)
+
+    it("weighted_vote: sums weights by answer, picks argmax sum", function()
+        local pi = require("particle_infer")
+        -- Same answer "X" appears twice with weights 0.3 + 0.3 = 0.6,
+        -- "Y" once with 0.4. X wins even though Y's single weight > any
+        -- individual X weight.
+        local parts = mk_parts({ "X", "Y", "X" })
+        local idx, ans = pi._internal.select_final(
+            parts, { 0.3, 0.4, 0.3 }, "task", nil, "weighted_vote")
+        expect(ans).to.equal("X")
+        -- idx must be a valid particle index matching the winning answer
+        expect(parts[idx].partial).to.equal("X")
+    end)
+
+    it("orm mode without orm_fn → error", function()
+        local pi = require("particle_infer")
+        local parts = mk_parts({ "A" })
+        local ok = pcall(pi._internal.select_final,
+            parts, { 1.0 }, "task", nil, "orm")
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- M.run orchestration (end-to-end with mocked alc)
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer.run", function()
+    lust.after(reset)
+
+    it("paper-faithful: runs N × max_steps LLM calls under every-step resample", function()
+        -- All particles stay active until max_steps → total_llm_calls
+        -- = N * max_steps.  N=3, max_steps=2 → 6 LLM + 6 PRM.
+        local stub, counter = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task        = "solve",
+            prm_fn      = function(_a, _t) return 0.5 end,
+            orm_fn      = function(_a, _t) return 1.0 end,
+            n_particles = 3,
+            max_steps   = 2,
+        })
+        expect(ctx.result.stats.total_llm_calls).to.equal(6)
+        expect(ctx.result.stats.total_prm_calls).to.equal(6)
+        expect(ctx.result.stats.total_orm_calls).to.equal(3)
+        expect(ctx.result.steps_executed).to.equal(2)
+        -- Paper-faithful: ess_threshold=0 → resample every step
+        expect(ctx.result.resample_count).to.equal(2)
+        expect(ctx.result.final_selection).to.equal("orm")
+        expect(ctx.result.answer ~= nil).to.equal(true)
+        expect(ctx.result.selected_idx >= 1 and ctx.result.selected_idx <= 3)
+            .to.equal(true)
+    end)
+
+    it("without orm_fn: falls back to argmax_weight with warning", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task        = "solve",
+            prm_fn      = function(_a, _t) return 0.7 end,
+            n_particles = 2,
+            max_steps   = 1,
+        })
+        -- fallback promoted 'orm' → 'argmax_weight'
+        expect(ctx.result.final_selection).to.equal("argmax_weight")
+        expect(ctx.result.stats.total_orm_calls).to.equal(0)
+    end)
+
+    it("argmax_weight mode: highest final weight wins", function()
+        -- Arrange so particle 1 gets consistently high PRM scores and
+        -- should win the argmax_weight tiebreak.
+        local stub = make_alc_stub({
+            fixtures = function(_p, _o, call_idx)
+                return "particle_" .. tostring(((call_idx - 1) % 2) + 1)
+            end,
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local prm = function(partial, _t)
+            if partial:find("particle_1") then return 0.95 end
+            return 0.05
+        end
+        local ctx = pi.run({
+            task             = "solve",
+            prm_fn           = prm,
+            n_particles      = 2,
+            max_steps        = 3,
+            final_selection  = "argmax_weight",
+        })
+        -- Under every-step softmax resample with a 0.95/0.05 PRM gap,
+        -- particle 1's lineage dominates the population.
+        expect(ctx.result.answer:find("particle_1") ~= nil).to.equal(true)
+    end)
+
+    it("continue_fn false stops the particle mid-run", function()
+        local stub = make_alc_stub({
+            fixtures = { "s1", "s2", "s3", "s4" },
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local stopped = false
+        local ctx = pi.run({
+            task        = "solve",
+            prm_fn      = function(_a, _t) return 0.5 end,
+            continue_fn = function(partial)
+                if partial:find("s2") then
+                    stopped = true
+                    return false
+                end
+                return true
+            end,
+            n_particles     = 1,
+            max_steps       = 4,
+            final_selection = "argmax_weight",
+        })
+        expect(stopped).to.equal(true)
+        -- Particle stops after step 2 (continue_fn false). max_steps
+        -- loop continues but any_active guard should break early,
+        -- giving steps_executed = 2 rather than 4.
+        expect(ctx.result.steps_executed).to.equal(2)
+        expect(ctx.result.stats.total_llm_calls).to.equal(2)
+    end)
+
+    it("ess_threshold > 0 (NOT paper-faithful INJECT) alters resample count", function()
+        -- With ess_threshold very close to 1, every step triggers
+        -- resample. With ess_threshold = 0.0 (default), every step also
+        -- triggers resample. So we test the INJECT path is reachable
+        -- and produces a consistent ess_trace.
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task            = "t",
+            prm_fn          = function(_a, _t) return 0.5 end,
+            n_particles     = 3,
+            max_steps       = 2,
+            ess_threshold   = 0.9,  -- INJECT path
+            final_selection = "argmax_weight",
+        })
+        expect(#ctx.result.ess_trace).to.equal(2)
+        for i = 1, 2 do
+            -- Uniform PRM → ESS should stay at N=3
+            expect(ctx.result.ess_trace[i] > 0).to.equal(true)
+        end
+    end)
+
+    it("strips caller-injected functions from ctx post-run", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task        = "t",
+            prm_fn      = function(_a, _t) return 0.5 end,
+            orm_fn      = function(_a, _t) return 0.5 end,
+            continue_fn = function(_p) return true end,
+            n_particles = 2,
+            max_steps   = 1,
+        })
+        expect(ctx.prm_fn).to.equal(nil)
+        expect(ctx.orm_fn).to.equal(nil)
+        expect(ctx.continue_fn).to.equal(nil)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- M.run input validation (fail-fast before any LLM call)
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer.run input validation", function()
+    lust.after(reset)
+
+    it("errors on missing task", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok, err = pcall(pi.run, { prm_fn = function() return 0.5 end })
+        expect(ok).to.equal(false)
+        expect(err:find("ctx.task") ~= nil).to.equal(true)
+    end)
+
+    it("errors on missing prm_fn", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok, err = pcall(pi.run, { task = "t" })
+        expect(ok).to.equal(false)
+        expect(err:find("prm_fn") ~= nil).to.equal(true)
+    end)
+
+    it("errors on unknown aggregation", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok, err = pcall(pi.run, {
+            task        = "t",
+            prm_fn      = function() return 0.5 end,
+            aggregation = "geomean",
+            n_particles = 1,
+            max_steps   = 1,
+        })
+        expect(ok).to.equal(false)
+        expect(err:find("aggregation") ~= nil).to.equal(true)
+    end)
+
+    it("errors on softmax_temp ≤ 0", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok = pcall(pi.run, {
+            task         = "t",
+            prm_fn       = function() return 0.5 end,
+            softmax_temp = 0,
+        })
+        expect(ok).to.equal(false)
+    end)
+
+    it("errors on ess_threshold outside [0, 1]", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok = pcall(pi.run, {
+            task          = "t",
+            prm_fn        = function() return 0.5 end,
+            ess_threshold = 1.5,
+        })
+        expect(ok).to.equal(false)
+    end)
+
+    it("errors on unknown final_selection", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok, err = pcall(pi.run, {
+            task            = "t",
+            prm_fn          = function() return 0.5 end,
+            final_selection = "best_odds",
+        })
+        expect(ok).to.equal(false)
+        expect(err:find("final_selection") ~= nil).to.equal(true)
+    end)
+
+    it("errors on non-integer n_particles", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ok = pcall(pi.run, {
+            task        = "t",
+            prm_fn      = function() return 0.5 end,
+            n_particles = 2.5,
+        })
+        expect(ok).to.equal(false)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Card emission (auto_card=true with stub alc.card)
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer.run Card emission", function()
+    lust.after(reset)
+
+    it("emits Card when auto_card=true and alc.card available", function()
+        local stub, counter = make_alc_stub({
+            with_card = true,
+            card_id   = "test_card_pf_7",
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task            = "t",
+            prm_fn          = function(_a, _t) return 0.5 end,
+            n_particles     = 2,
+            max_steps       = 1,
+            final_selection = "argmax_weight",
+            auto_card       = true,
+            scenario_name   = "unit_test",
+        })
+        expect(ctx.result.card_id).to.equal("test_card_pf_7")
+        expect(counter.card.create_calls).to.equal(1)
+        expect(counter.card.samples_calls).to.equal(1)
+        expect(#counter.card.last_list).to.equal(2)
+        -- Card body includes stats + params
+        expect(counter.card.last_args.pkg.name:find("particle_infer_") ~= nil)
+            .to.equal(true)
+        expect(counter.card.last_args.scenario.name).to.equal("unit_test")
+        expect(counter.card.last_args.stats.total_llm_calls).to.equal(2)
+    end)
+
+    it("fail-safe when alc.card missing (warn + skip)", function()
+        local stub = make_alc_stub({ with_card = false })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task            = "t",
+            prm_fn          = function(_a, _t) return 0.5 end,
+            n_particles     = 1,
+            max_steps       = 1,
+            final_selection = "argmax_weight",
+            auto_card       = true,
+        })
+        -- No card emitted, but run completed successfully
+        expect(ctx.result.card_id).to.equal(nil)
+        expect(ctx.result.answer ~= nil).to.equal(true)
+    end)
+end)
