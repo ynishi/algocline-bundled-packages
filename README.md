@@ -106,7 +106,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[ensemble_div](ensemble_div/)** | Ambiguity Decomposition. Krogh-Vedelsby identity E = Ē − Ā — the ensemble always beats the weighted average of individuals when there is any disagreement. Quantifies how much agent diversity reduces ensemble error | Krogh & Vedelsby (NeurIPS 1995), Hong & Page (PNAS 2004) |
 | **[kemeny](kemeny/)** | Kemeny-Young rank aggregation. Axiomatically unique consensus ranking that minimizes total Kendall tau distance. Exact for m ≤ 8, Borda fallback for larger candidate sets. Condorcet-consistent | Kemeny (1959), Young & Levenglick (1978) |
 | **[pbft](pbft/)** | Practical Byzantine Fault Tolerance. 3-phase LLM consensus (propose → prepare → commit) with BFT quorum guarantees. Tolerates f Byzantine agents given n ≥ 3f+1 | Castro & Liskov (OSDI 1999) |
-| **[isp_aggregate](isp_aggregate/)** | Inverse Surprising Popularity aggregation. 2nd-order belief elicitation — each agent predicts others' vote distribution, ISP/OW scoring removes systematic majority-vote bias. Consistently outperforms majority vote by +2–5 pt on MMLU/ARC | Zhang et al. arXiv:2510.01499 (2025) |
+| **[isp_aggregate](isp_aggregate/)** | Paper-faithful ISP / OW / OW-I aggregation via an M×N calibration tensor (pairwise conditional `P̂(A_i=s\|A_j=a)` per §4.3). Pure-helper split mirrors conformal_vote (calibrate → run). Non-paper-faithful `meta_prompt_sp` INJECT for calibration-free settings (Prelec-Seung-McCoy 2017 style). MMLU: OW-L vs MV +1.05pt overall / +3.36pt disagreement subset (§5.4 Table 3) | Zhang et al. arXiv:2510.01499 (2025) |
 
 ### Attribution
 

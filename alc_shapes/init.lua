@@ -448,25 +448,55 @@ M.deep_paneled = T.shape({
     stages               = T.array_of(T.table):describe("Per-stage detail (heterogeneous)"),
 }, { open = true })
 
--- ── isp_aggregate shape ──────────────────────────────────────────────
--- Result of isp_aggregate.run — 2nd-order belief aggregation.
--- scores / c1 / c2_hat keyed by original option label (casing preserved).
--- paths[i] records per-agent 1st/2nd-order raw and parsed data.
+-- ── isp_aggregate shapes ─────────────────────────────────────────────
+-- Zhang et al. 2025 (arXiv:2510.01499) ISP / OW aggregation.
+-- Two shapes: M.isp_calibrated for the calibrate entry (pins the
+-- estimator derived from a reference tensor) and M.isp_voted for the
+-- run entry's online decision. Method set includes the paper-faithful
+-- {isp, ow, ow_l, ow_i} plus non-paper-faithful INJECT paths
+-- ("meta_prompt_sp" = SP 2017 style self-prediction aggregator).
 -- open = true for forward-compat additions.
+
+M.isp_calibrated = T.shape({
+    method       = T.one_of({ "isp", "ow_l", "ow_i" })
+        :describe("Estimator calibrated (matches run's method)"),
+    n_agents     = T.number:describe("N — agent count in the calibration tensor"),
+    n_samples    = T.number:describe("M — number of reference questions"),
+    options      = T.array_of(T.string):describe("Fixed option set (= K classes)"),
+    K            = T.number:describe("Class count (= #options)"),
+    x_estimated  = T.array_of(T.number):is_optional()
+        :describe("Per-agent accuracy estimates x_i ∈ [0,1]. Nil for pure ISP."),
+    s_isp_kernel = T.table:is_optional()
+        :describe("ISP: nested map { [i] = { [j] = { [a] = { [s] = P̂(A_i=s|A_j=a) } } } }. Nil for OW."),
+}, { open = true })
+
 M.isp_voted = T.shape({
-    answer          = T.string:is_optional():describe("Selected option (nil if all votes were invalid)"),
-    answer_norm     = T.string:is_optional():describe("Lowercase selected option"),
-    scores          = T.map_of(T.string, T.number):describe("Per-option ISP/OW score"),
-    c1              = T.map_of(T.string, T.number):describe("1st-order vote counts"),
-    c2_hat          = T.map_of(T.string, T.number):describe("2nd-order predicted probability mean"),
-    paths           = T.array_of(T.shape({
+    answer              = T.string:is_optional()
+        :describe("Winning option (nil if all votes were invalid / unparsed)"),
+    answer_norm         = T.string:is_optional():describe("Lowercase winning option"),
+    scores              = T.map_of(T.string, T.number)
+        :describe("Per-option aggregator score (sign / unit depends on method)"),
+    method              = T.one_of({ "isp", "ow", "ow_l", "ow_i", "meta_prompt_sp" })
+        :describe("Aggregation method used (meta_prompt_sp is NOT paper-faithful)"),
+    n_agents            = T.number:describe("Number of agents queried online"),
+    votes               = T.array_of(T.string)
+        :describe("Per-agent 1st-order answer (cleaned, preserves casing)"),
+    weights             = T.array_of(T.number):is_optional()
+        :describe("OW methods: ω_i = σ_K⁻¹(x_i). Nil for ISP / meta_prompt_sp"),
+    x_used              = T.array_of(T.number):is_optional()
+        :describe("Accuracy vector used to build weights (echoed from calibration or ctx.x_direct)"),
+    paths               = T.array_of(T.shape({
         first_order          = T.string,
-        second_order_raw     = T.string,
+        second_order_raw     = T.string:is_optional(),
         second_order_parsed  = T.table:is_optional(),
-    })):describe("Per-agent 1st and 2nd-order data"),
-    method          = T.one_of({ "isp", "ow" }):describe("Aggregation method used"),
-    n_sampled       = T.number:describe("Number of agents sampled"),
-    total_llm_calls = T.number:describe("Total LLM calls made (2 per agent)"),
+    })):describe("Per-agent raw records (second_order present only with meta_prompt_sp INJECT)"),
+    calibration_summary = T.shape({
+        method    = T.string,
+        n_agents  = T.number,
+        n_samples = T.number,
+    }, { open = true }):is_optional()
+        :describe("Echoed calibration metadata (nil for meta_prompt_sp / ow-direct)"),
+    total_llm_calls     = T.number:describe("Total LLM calls issued by run"),
 }, { open = true })
 
 -- ── public API re-export ─────────────────────────────────────────────
