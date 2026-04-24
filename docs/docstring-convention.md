@@ -2,8 +2,8 @@
 
 **Status**: V0 — single specification. No legacy / fallback modes.
 **Scope**: `{pkg}/init.lua` の先頭 `---` ブロック + `M.meta` 宣言
-**Generator**: `tools/gen_docs.lua` (Pure Lua)
-**Lint**: `tools/gen_docs.lua --lint-only` / `--strict`
+**Generator**: algocline MCP `alc_hub_gendoc` / `alc_hub_dist` (core >= 0.26 embeds the generator)
+**Lint**: `alc_hub_gendoc` with `lint_strict=true`
 
 ## 0. 思想
 
@@ -266,7 +266,7 @@ GitHub-style link:
 
 ## 13. Lint rule 一覧
 
-`tools/gen_docs.lua --lint-only` で検出。`--strict` で error を build 失敗化。
+algocline MCP `alc_hub_gendoc` が検出。`lint_strict=true` で error を build 失敗化。
 
 | Code | Severity | 内容 |
 |---|---|---|
@@ -332,4 +332,4 @@ function M.run(ctx) … end
 return M
 ```
 
-`tests/test_gen_docs.lua` が `cot/init.lua` を golden fixture として pin 留めしており、pipeline 改修時の回帰を即検知する。
+Pipeline regression check is maintained on the algocline core side (`tests/e2e.rs` `test_alc_hub_gendoc_*`).

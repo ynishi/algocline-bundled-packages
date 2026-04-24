@@ -7,15 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`alc.toml` at repo root** with `[hub]` / `[hub.context7]` /
+  `[hub.devin]` sections. Project-specific `extra_rules` (context7) and
+  `extra_repo_notes` (devin) migrated verbatim from the retired Lua
+  configs. Schema references and precedence rules are documented in
+  algocline core's `docs/hub-gendoc-config.md`.
+
 ### Changed
 
-- **Migration note — algocline v0.25.1: `alc_shapes` vendored into core.**
-  algocline's `alc_hub_dist` / `alc_hub_gendoc` now embed `alc_shapes/*.lua`
-  in-binary via `include_str!` since v0.25.1. This repo's `alc_shapes/`
-  directory remains the upstream source of truth (algocline core pulls
-  from here) and continues to back local dev tooling (lua-ls type
-  completion, standalone `lua tools/gen_docs.lua`). Runtime dist is
-  unaffected. No action required from package authors.
+- **Migration — switch doc generation to algocline core `alc_hub_dist`.**
+  With algocline core `>= 0.26` absorbing `narrative` / `llms` /
+  `context7` / `devin` / `luacats` projections and driving config via
+  `alc.toml`, bundled-side CLI generation is fully subsumed. The
+  canonical pre-publish flow is now a single MCP call:
+
+  ```
+  alc_hub_dist(
+    source_dir   = ".",
+    output_path  = "hub_index.json",
+    out_dir      = "docs",
+    projections  = ["hub", "narrative", "llms", "context7", "devin", "luacats"],
+    lint_strict  = true,
+  )
+  ```
+
+  `config_path` is no longer needed — core auto-explores `alc.toml` at
+  `source_dir` and merges `[hub] / [hub.context7] / [hub.devin]` with
+  its embedded default rules / repo_notes via the 3-tier precedence
+  chain documented in the core-side `docs/hub-gendoc-config.md`.
+
+  See `just dist` / `just dist-auto` for shell entry points.
+
+### Removed
+
+- **`tools/docs/context7_config.lua`** / **`tools/docs/devin_wiki_config.lua`**.
+  The Lua configuration files are retired per the v0.26 design
+  principle that hub-level `config_path` must be TOML (Lua files are
+  rejected as a typed error). The project-specific content is now
+  expressed declaratively in `alc.toml`.
+- **`tools/gen_docs.lua` + private helpers.** `tools/gen_docs.lua`,
+  `tools/docs/json.lua`, `tools/docs/lint.lua`, `tools/docs/list.lua`,
+  `tools/docs/projections.lua`, `scripts/gen_shapes_luacats.lua`, and
+  `tests/test_gen_docs.lua` are removed. Their responsibilities are
+  fully covered by algocline core's embedded generator. `tools/docs/`
+  retains `entity_schemas.lua`, `extract.lua`, and `pkg_info.lua`
+  (still consumed by tests / `alc_shapes`).
+- **`justfile` recipes** `gen-docs`, `gen-docs-lint`, `gen-shapes`,
+  `verify-shapes`, `gen-docs-strict` removed. `just dist` / `just
+  dist-auto` (core-driven) replace them.
 
 ## [0.18.0] - 2026-04-21
 

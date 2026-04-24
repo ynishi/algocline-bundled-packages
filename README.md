@@ -465,10 +465,41 @@ Rules:
 `M.spec.entries.run.result` (and `input`) accept either an **inline schema** (`T.shape({...})`) or a **named reference** (`"my_shape"`, coerced to `T.ref("my_shape")` against the `alc_shapes` registry).
 
 - **Default — inline.** A result used by only one package stays inline. No registry entry needed.
-- **Register a named shape when** (a) multiple packages share the same result contract (e.g. `sc` and `recipe_safe_panel` both depend on `voted`), or (b) you want a LuaCATS type alias exposed in [`types/alc_shapes.d.lua`](types/alc_shapes.d.lua). To register: add `M.<name> = T.shape({...}, { open = true })` to [`alc_shapes/init.lua`](alc_shapes/init.lua), then run `just gen-shapes` to refresh the LuaCATS projection.
+- **Register a named shape when** (a) multiple packages share the same result contract (e.g. `sc` and `recipe_safe_panel` both depend on `voted`), or (b) you want a LuaCATS type alias exposed in [`types/alc_shapes.d.lua`](types/alc_shapes.d.lua). To register: add `M.<name> = T.shape({...}, { open = true })` to [`alc_shapes/init.lua`](alc_shapes/init.lua), then regenerate the LuaCATS projection via the algocline MCP tool `alc_hub_dist` with `projections=["luacats"]` (embedded in core `>= 0.25.1`).
 - The full DSL reference and the list of currently registered shapes live in [`alc_shapes/README.md`](alc_shapes/README.md) — see [DSL combinators](alc_shapes/README.md#dsl-combinators) and [Registered shapes](alc_shapes/README.md#registered-shapes).
 
 A single package is one repo with one `init.lua`. To bundle multiple packages, use a subdirectory layout like this repository (Collection).
+
+### Scaffolding a new package
+
+Use the algocline MCP tool `alc_pkg_scaffold` to generate a minimal package skeleton under `<target_dir>/<name>/init.lua`:
+
+```
+alc_pkg_scaffold(
+  name        = "my_strategy",
+  target_dir  = ".",              # defaults to the algocline server's cwd
+  category    = "reasoning",      # optional — written into M.meta.category
+  description = "One-line desc.", # optional — written into M.meta.description
+)
+```
+
+The generated `init.lua` ships with:
+
+- `M.meta = { name, version = "0.1.0", alc_shapes_compat = ">=X.Y.0, <X.(Y+1)" }` — the compat range is pre-filled from the algocline core's embedded `alc_shapes` version
+- `M.spec.entries.run = { input = ..., result = ... }` TODO placeholders
+- `M.run(ctx)` stub with an `alc.llm(prompt)` example
+
+Typed errors surfaced via the MCP wire response: `NameInvalid` (name empty / wrong charset / too long), `AlreadyExists` (`<target_dir>/<name>/init.lua` already present), `IoError`.
+
+### `alc_shapes` compat contract
+
+Packages should declare the semver range of `alc_shapes` versions they are known to work with via `M.meta.alc_shapes_compat` (e.g. `">=0.25.0, <0.26"`). On load, the `alc_hub_dist` / `alc_hub_gendoc` path reads the declared range and:
+
+- Drops the package with a typed `ShapesCompatViolation { pkg_name, declared_range, actual_version, hint }` error if the embedded `alc_shapes` falls outside the range
+- Drops the package with a typed `ShapesCompatMalformed` error if the range itself is not parseable as semver
+- Continues loading with a warning when `alc_shapes_compat` is undeclared (backward compat; bundled-pkg migration is tracked separately)
+
+Drift between core and a patched downstream `alc_shapes` is resolved **declaratively** — pin your package to a known-good range and upstream / fork core rather than running a parallel mirror at runtime.
 
 ## Claude Code Integration (alc-runner Agent)
 

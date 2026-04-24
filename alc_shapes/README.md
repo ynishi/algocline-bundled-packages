@@ -38,7 +38,7 @@ This is why combinators return new tables (never mutate) and why reflection uses
 
 - **Layer contract (Runtime vs Entity)**: `T.shape` defaults to `open = true`. Runtime shapes (`ctx.result` etc.) stay open to preserve the pass-through culture — packages chain outputs through ctx and may attach trace / metrics / debug keys without invalidating downstream consumers. Entity shapes (boundary contracts, e.g. `tools/docs/entity_schemas.lua`) opt into strict mode (`open = false`) because their fields *are* the contract itself, and extra keys signal drift. The asymmetric default matches the layer semantics: Runtime = pass-through, Entity = closed.
 - **Existence checking**: validates that declared keys exist with the right primitive type. Does not normalize values or enforce strict typing on nested table contents beyond what the schema declares.
-- **SSoT**: `alc_shapes/init.lua` is the single source of truth. `types/alc_shapes.d.lua` is auto-generated via `just gen-shapes` — hand-editing is prohibited.
+- **SSoT**: `alc_shapes/init.lua` is the single source of truth. `types/alc_shapes.d.lua` is auto-generated via the `alc_hub_dist` MCP tool with `projections=["luacats"]` — hand-editing is prohibited.
 
 ## DSL combinators
 
@@ -158,12 +158,13 @@ S.walk(schema, function(node) ... end)
 
 ## LuaCATS codegen
 
-`types/alc_shapes.d.lua` is generated from `alc_shapes/init.lua`:
+`types/alc_shapes.d.lua` is generated from `alc_shapes/init.lua` via the algocline MCP tool `alc_hub_dist` (core `>= 0.25.1`):
 
-```bash
-just gen-shapes      # regenerate
-just verify-shapes   # CI drift check (diff against committed file)
 ```
+alc_hub_dist(source_dir=".", projections=["luacats"])
+```
+
+CI drift check: run the above, then `git diff --exit-code types/alc_shapes.d.lua` — the generator is deterministic, so a clean diff proves no drift.
 
 ### Type mappings
 
@@ -335,10 +336,7 @@ alc_shapes/
   README.md          # This file
 
 types/
-  alc_shapes.d.lua  # Auto-generated LuaCATS (hand-edit prohibited)
-
-scripts/
-  gen_shapes_luacats.lua  # Codegen runner (just gen-shapes)
+  alc_shapes.d.lua  # Auto-generated LuaCATS (alc_hub_dist projections=["luacats"])
 
 tests/
   test_alc_shapes_t.lua           # DSL combinator tests
