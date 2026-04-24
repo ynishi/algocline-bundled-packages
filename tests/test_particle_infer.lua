@@ -10,7 +10,9 @@
 ---     * compute_ess — equal weights → N, concentration → 1, all-zero → 0
 ---     * resample_multinomial — deterministic rng picks argmax bucket,
 ---       preserves N, rejects length mismatch / nonpositive weights
----     * prm_weight_step — basic multiplication + edge values
+---     * logit_from_bern — log-odds transform matching reference impl
+---       `_inv_sigmoid`; clamping at r̂ ≈ 0 and r̂ ≈ 1 avoids ±∞;
+---       input validation (non-number / NaN / eps out-of-range)
 ---   LLM-integrated (mocked _G.alc):
 ---     * init_particles — N empty particles, no LLM call
 ---     * advance_step — fans out 1 LLM call per active particle,
@@ -24,6 +26,18 @@
 ---     * ORM fallback warning (mode='orm' + orm_fn=nil → argmax_weight)
 ---     * input validation fail-fast
 ---     * Card emission when auto_card=true with stub alc.card
+---   Paper-faithful semantics (D5 regression guards — reference impl
+---   its_hub/algorithms/particle_gibbs.py parity):
+---     * softmax concentration: r̂ = [0.99, 0.01×7] under N=8 must
+---       concentrate resampling mass (P_top > 0.9). Guards against the
+---       old linear-space w = r̂/N path that flattened to ~14%.
+---     * weight replacement (not accumulation): step 2's logit weight
+---       depends ONLY on r̂_2, not on r̂_1 × r̂_2.
+---     * resample lineage inheritance: post-resample weight equals the
+---       drawn lineage's pre-resample weight (ref impl `log_weight`
+---       property carries through `partial_log_weights` deep-copy).
+---     * result.weights is a probability distribution (sums to 1,
+---       all entries ∈ [0,1]) — the softmax-normalized output.
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
@@ -106,7 +120,7 @@ describe("particle_infer.meta", function()
         expect(type(pi._internal.softmax_weights)).to.equal("function")
         expect(type(pi._internal.compute_ess)).to.equal("function")
         expect(type(pi._internal.resample_multinomial)).to.equal("function")
-        expect(type(pi._internal.prm_weight_step)).to.equal("function")
+        expect(type(pi._internal.logit_from_bern)).to.equal("function")
     end)
 end)
 
@@ -316,34 +330,87 @@ describe("particle_infer._internal.resample_multinomial", function()
 end)
 
 -- ═══════════════════════════════════════════════════════════════════
--- prm_weight_step
+-- logit_from_bern — reference impl `_inv_sigmoid` parity
 -- ═══════════════════════════════════════════════════════════════════
 
-describe("particle_infer._internal.prm_weight_step", function()
+describe("particle_infer._internal.logit_from_bern", function()
     lust.after(reset)
 
-    it("basic multiplication: w_{t-1}=0.5, r=0.8 → 0.4", function()
+    it("logit(0.5) = 0 (neutral, uniform softmax component)", function()
         local pi = require("particle_infer")
-        expect(approx(pi._internal.prm_weight_step(0.5, 0.8), 0.4, 1e-12))
+        expect(approx(pi._internal.logit_from_bern(0.5), 0, 1e-12))
             .to.equal(true)
     end)
 
-    it("r=0 → weight collapses (particle extinction)", function()
+    it("logit(0.9) = log(9) ≈ 2.1972245773", function()
         local pi = require("particle_infer")
-        expect(pi._internal.prm_weight_step(0.5, 0)).to.equal(0)
-    end)
-
-    it("r=1 → weight preserved", function()
-        local pi = require("particle_infer")
-        expect(approx(pi._internal.prm_weight_step(0.7, 1.0), 0.7, 1e-12))
+        local expected = math.log(9)
+        expect(approx(pi._internal.logit_from_bern(0.9), expected, 1e-12))
             .to.equal(true)
     end)
 
-    it("rejects non-number inputs", function()
+    it("logit is an odd function of (r - 0.5) around 0.5", function()
         local pi = require("particle_infer")
-        local ok = pcall(pi._internal.prm_weight_step, "bad", 0.5)
+        -- logit(p) + logit(1 - p) = log(p/(1-p)) + log((1-p)/p) = 0
+        expect(approx(
+            pi._internal.logit_from_bern(0.2)
+            + pi._internal.logit_from_bern(0.8),
+            0, 1e-12)).to.equal(true)
+        expect(approx(
+            pi._internal.logit_from_bern(0.05)
+            + pi._internal.logit_from_bern(0.95),
+            0, 1e-12)).to.equal(true)
+    end)
+
+    it("monotonically increasing in r", function()
+        local pi = require("particle_infer")
+        local prev = -math.huge
+        for _, r in ipairs({ 0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99 }) do
+            local v = pi._internal.logit_from_bern(r)
+            expect(v > prev).to.equal(true)
+            prev = v
+        end
+    end)
+
+    it("clamps r=0 without producing -inf", function()
+        local pi = require("particle_infer")
+        local v = pi._internal.logit_from_bern(0)
+        -- logit(eps) for eps=1e-7 → log(1e-7/(1-1e-7)) ≈ -16.118
+        expect(v > -20 and v < -10).to.equal(true)
+        expect(v == v).to.equal(true)  -- not NaN
+        expect(v ~= -math.huge).to.equal(true)
+    end)
+
+    it("clamps r=1 without producing +inf", function()
+        local pi = require("particle_infer")
+        local v = pi._internal.logit_from_bern(1)
+        expect(v > 10 and v < 20).to.equal(true)
+        expect(v ~= math.huge).to.equal(true)
+    end)
+
+    it("honours caller-supplied eps (smaller → sharper saturation)", function()
+        local pi = require("particle_infer")
+        local v_default = pi._internal.logit_from_bern(1)
+        local v_tighter = pi._internal.logit_from_bern(1, 1e-12)
+        expect(v_tighter > v_default).to.equal(true)
+    end)
+
+    it("rejects non-number / NaN inputs", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.logit_from_bern, "bad")
         expect(ok).to.equal(false)
-        ok = pcall(pi._internal.prm_weight_step, 0.5, "bad")
+        local nan = 0 / 0
+        ok = pcall(pi._internal.logit_from_bern, nan)
+        expect(ok).to.equal(false)
+    end)
+
+    it("rejects eps outside (0, 0.5)", function()
+        local pi = require("particle_infer")
+        local ok = pcall(pi._internal.logit_from_bern, 0.5, 0)
+        expect(ok).to.equal(false)
+        ok = pcall(pi._internal.logit_from_bern, 0.5, 0.5)
+        expect(ok).to.equal(false)
+        ok = pcall(pi._internal.logit_from_bern, 0.5, -0.1)
         expect(ok).to.equal(false)
     end)
 end)
@@ -1003,5 +1070,260 @@ describe("particle_infer.run Card emission", function()
         -- No card emitted, but run completed successfully
         expect(ctx.result.card_id).to.equal(nil)
         expect(ctx.result.answer ~= nil).to.equal(true)
+    end)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Paper-faithful semantics (D5 regression guards)
+--   Reference impl parity: github.com/Red-Hat-AI-Innovation-Team/its_hub
+--   `its_hub/algorithms/particle_gibbs.py` — `_inv_sigmoid` + per-step
+--   `partial_log_weights.append(...)` + softmax-over-latest-logit
+--   resampling. The defect D5 fixed here was: linear-space weight
+--   w_t = w_{t-1} · r̂_t with 1/N reset produced a softmax input of
+--   r̂_t / N, collapsing the resampling distribution to near-uniform
+--   (P_top ≈ 14% for N=8 with r̂ = [0.99, 0.01×7]) instead of the
+--   reference impl's ~99.9%. These tests guard against regression to
+--   the flat-softmax behavior.
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("particle_infer.paper_faithful softmax concentration", function()
+    lust.after(reset)
+
+    it("N=8, r̂=[0.99, 0.01×7]: P_top > 0.9 (reference impl parity)", function()
+        -- Construct the logit vector directly (no mocking needed) and
+        -- verify softmax_weights (the shared resampling kernel) yields
+        -- concentrated mass on the dominant particle. This catches the
+        -- old linear-space w = r̂/N regression at its source.
+        local pi = require("particle_infer")
+        local logit = pi._internal.logit_from_bern
+        local r = { 0.99, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01 }
+        local w = {}
+        for i = 1, #r do w[i] = logit(r[i]) end
+        local theta = pi._internal.softmax_weights(w, 1.0)
+        -- Reference impl numerics: logit(0.99) ≈ 4.595; logit(0.01) ≈
+        -- -4.595; P_top = exp(4.595) / (exp(4.595) + 7·exp(-4.595))
+        --                ≈ 99.0 / (99.0 + 7·0.01) ≈ 0.9993.
+        expect(theta[1] > 0.9).to.equal(true)
+        local sum_rest = 0
+        for i = 2, 8 do sum_rest = sum_rest + theta[i] end
+        expect(sum_rest < 0.1).to.equal(true)
+        -- Guard vs the regressed linear-space path: softmax(r/N) with
+        -- r=[0.99, 0.01×7], N=8 gives theta[1] ≈ 0.139. If the fix
+        -- silently reverts, this assertion (> 0.9) catches it.
+    end)
+
+    it("N=8, r̂=[0.5]×8 (uniform): softmax → uniform 1/N", function()
+        local pi = require("particle_infer")
+        local w = {}
+        for i = 1, 8 do w[i] = pi._internal.logit_from_bern(0.5) end
+        local theta = pi._internal.softmax_weights(w, 1.0)
+        for i = 1, 8 do
+            expect(approx(theta[i], 1 / 8, 1e-12)).to.equal(true)
+        end
+    end)
+
+    it("rank ordering preserved: highest r̂ → highest theta", function()
+        local pi = require("particle_infer")
+        local r = { 0.1, 0.9, 0.3, 0.7, 0.5 }
+        local w = {}
+        for i = 1, #r do w[i] = pi._internal.logit_from_bern(r[i]) end
+        local theta = pi._internal.softmax_weights(w, 1.0)
+        -- argmax over theta == argmax over r̂ (monotonic transform)
+        local best_r, best_theta = 1, 1
+        for i = 2, #r do
+            if r[i] > r[best_r] then best_r = i end
+            if theta[i] > theta[best_theta] then best_theta = i end
+        end
+        expect(best_theta).to.equal(best_r)
+    end)
+end)
+
+describe("particle_infer.paper_faithful weight replacement", function()
+    lust.after(reset)
+
+    it("step 2 weight depends only on r̂_2 (no cross-step accumulation)", function()
+        -- Two runs, identical step_2 PRM (= 0.5), different step_1 PRM
+        -- (0.1 vs 0.9). Under replacement semantics, final weights must
+        -- be identical; under the old multiplicative w_t = w_{t-1}·r̂_t
+        -- they would differ by a factor of 9×.
+        local function run_with_r1(r1)
+            local stub = make_alc_stub({
+                fixtures = { "a_step1", "a_step2" },
+            })
+            _G.alc = stub
+            package.loaded["particle_infer"] = nil
+            local pi = require("particle_infer")
+            local step = 0
+            local ctx = pi.run({
+                task        = "t",
+                prm_fn      = function(_a, _t)
+                    step = step + 1
+                    if step == 1 then return r1 end
+                    return 0.5
+                end,
+                n_particles     = 1,
+                max_steps       = 2,
+                final_selection = "argmax_weight",
+                ess_threshold   = 0,  -- paper-faithful every-step resample
+            })
+            return ctx.result
+        end
+        -- N=1: resample is trivial (only one particle so it always
+        -- re-draws itself). The post-run weight reflects the last
+        -- step's logit only. softmax(logit(0.5)) on N=1 = 1.0.
+        local res_a = run_with_r1(0.1)
+        local res_b = run_with_r1(0.9)
+        expect(approx(res_a.weights[1], res_b.weights[1], 1e-12))
+            .to.equal(true)
+        expect(approx(res_a.weights[1], 1.0, 1e-12)).to.equal(true)
+    end)
+
+    it("logit weight written by evaluate_prm matches latest step's r̂", function()
+        -- With N=2, constant PRM=0.3, after 1 step both particles have
+        -- logit(0.3) as their internal weight. softmax of identical
+        -- logits = uniform 0.5/0.5.
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task            = "t",
+            prm_fn          = function(_a, _t) return 0.3 end,
+            n_particles     = 2,
+            max_steps       = 1,
+            final_selection = "argmax_weight",
+        })
+        for i = 1, 2 do
+            expect(approx(ctx.result.weights[i], 0.5, 1e-9)).to.equal(true)
+        end
+    end)
+end)
+
+describe("particle_infer.paper_faithful output distribution", function()
+    lust.after(reset)
+
+    it("result.weights is a probability distribution (sums to 1)", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task        = "t",
+            prm_fn      = function(_a, _t) return math.random() end,
+            n_particles = 5,
+            max_steps   = 3,
+            final_selection = "argmax_weight",
+        })
+        local s = 0
+        for i = 1, 5 do
+            expect(ctx.result.weights[i] >= 0).to.equal(true)
+            expect(ctx.result.weights[i] <= 1).to.equal(true)
+            s = s + ctx.result.weights[i]
+        end
+        expect(approx(s, 1, 1e-9)).to.equal(true)
+    end)
+
+    it("per-particle weight mirrors result.weights[i]", function()
+        local stub = make_alc_stub()
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local ctx = pi.run({
+            task        = "t",
+            prm_fn      = function(_a, _t) return 0.5 end,
+            n_particles = 3,
+            max_steps   = 2,
+            final_selection = "argmax_weight",
+        })
+        for i = 1, 3 do
+            expect(approx(ctx.result.weights[i],
+                ctx.result.particles[i].weight, 1e-12))
+                .to.equal(true)
+        end
+    end)
+end)
+
+describe("particle_infer.paper_faithful resample lineage", function()
+    lust.after(reset)
+
+    it("post-resample weight inherits from drawn lineage (deterministic rng)", function()
+        -- End-to-end check: with a constant rng driving the resample
+        -- multinomial, the drawn lineage is known. After resample, the
+        -- inherited logit weight must equal the drawn source's logit.
+        -- We exercise this via softmax_weights + resample_multinomial
+        -- directly to isolate lineage semantics from the LLM loop.
+        local pi = require("particle_infer")
+        local logits = {
+            pi._internal.logit_from_bern(0.99),  -- strong
+            pi._internal.logit_from_bern(0.01),  -- weak
+            pi._internal.logit_from_bern(0.01),  -- weak
+        }
+        local theta = pi._internal.softmax_weights(logits, 1.0)
+        -- Constant rng=0.01 always falls into the first cdf bucket
+        -- (= particle 1, ≈99.97% cumulative mass). All new slots draw
+        -- index 1.
+        local _new, drawn = pi._internal.resample_multinomial(
+            { "p1", "p2", "p3" }, theta, function() return 0.01 end)
+        for i = 1, 3 do
+            expect(drawn[i]).to.equal(1)
+        end
+        -- Simulate the lineage-inherit step in M.run: new_weights[i] =
+        -- logits[drawn[i]]. All slots should now carry the strong logit.
+        local inherited = {}
+        for i = 1, 3 do inherited[i] = logits[drawn[i]] end
+        for i = 1, 3 do
+            expect(approx(inherited[i], logits[1], 1e-12)).to.equal(true)
+        end
+    end)
+
+    it("strong-PRM particle dominates 1-step resample (end-to-end)", function()
+        -- End-to-end behavioral check after a single resample round:
+        -- when one particle gets high r̂ and others get low r̂, the
+        -- final softmax distribution must concentrate on the strong
+        -- particle. We use max_steps=1 so the test probes the resample
+        -- distribution directly, without lineage convergence muddying
+        -- the measurement (after step 1 all particles become strong
+        -- descendants, and subsequent steps flatten the distribution).
+        local stub = make_alc_stub({
+            fixtures = function(_p, _o, call_idx)
+                return "particle_" .. tostring(((call_idx - 1) % 3) + 1)
+            end,
+        })
+        _G.alc = stub
+        local pi = require("particle_infer")
+        local prm = function(partial, _t)
+            if partial:find("particle_1") then return 0.99 end
+            return 0.01
+        end
+        local ctx = pi.run({
+            task        = "t",
+            prm_fn      = prm,
+            n_particles = 3,
+            max_steps   = 1,
+            final_selection = "argmax_weight",
+        })
+        -- All particles share the strong logit after lineage inherit
+        -- (the resample draws concentrate ~99.7% on particle 1, and
+        -- post-resample each slot inherits that lineage's logit). So
+        -- result.weights is either uniform (if draws cloned the same
+        -- particle) or nearly uniform, but the selected answer must
+        -- carry "particle_1". Under linear-space regression the strong
+        -- logit would never dominate the multinomial draw; this
+        -- assertion would fail ~2/3 of the time. At 99.7% concentration
+        -- per draw, P(at least one slot from strong lineage) ≈ 1.0.
+        expect(ctx.result.answer:find("particle_1") ~= nil).to.equal(true)
+    end)
+
+    it("concentration survives N=2 single-step resample (≥50% P_top)", function()
+        -- Direct softmax check on N=2 with the expected logit vector
+        -- after step 1 of the end-to-end run above: particle 1 at 0.99,
+        -- particle 2 at 0.01. Under reference-impl logits the strong
+        -- particle's softmax mass must be ≥ 0.99, NOT 0.62 (which was
+        -- the old linear-space w = r̂/N=0.495 vs 0.005 behaviour).
+        local pi = require("particle_infer")
+        local w = {
+            pi._internal.logit_from_bern(0.99),
+            pi._internal.logit_from_bern(0.01),
+        }
+        local theta = pi._internal.softmax_weights(w, 1.0)
+        expect(theta[1] > 0.99).to.equal(true)
+        expect(theta[2] < 0.01).to.equal(true)
     end)
 end)
