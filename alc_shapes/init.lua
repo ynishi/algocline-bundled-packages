@@ -448,6 +448,27 @@ M.deep_paneled = T.shape({
     stages               = T.array_of(T.table):describe("Per-stage detail (heterogeneous)"),
 }, { open = true })
 
+-- ── isp_aggregate shape ──────────────────────────────────────────────
+-- Result of isp_aggregate.run — 2nd-order belief aggregation.
+-- scores / c1 / c2_hat keyed by original option label (casing preserved).
+-- paths[i] records per-agent 1st/2nd-order raw and parsed data.
+-- open = true for forward-compat additions.
+M.isp_voted = T.shape({
+    answer          = T.string:is_optional():describe("Selected option (nil if all votes were invalid)"),
+    answer_norm     = T.string:is_optional():describe("Lowercase selected option"),
+    scores          = T.map_of(T.string, T.number):describe("Per-option ISP/OW score"),
+    c1              = T.map_of(T.string, T.number):describe("1st-order vote counts"),
+    c2_hat          = T.map_of(T.string, T.number):describe("2nd-order predicted probability mean"),
+    paths           = T.array_of(T.shape({
+        first_order          = T.string,
+        second_order_raw     = T.string,
+        second_order_parsed  = T.table:is_optional(),
+    })):describe("Per-agent 1st and 2nd-order data"),
+    method          = T.one_of({ "isp", "ow" }):describe("Aggregation method used"),
+    n_sampled       = T.number:describe("Number of agents sampled"),
+    total_llm_calls = T.number:describe("Total LLM calls made (2 per agent)"),
+}, { open = true })
+
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check
 M.assert       = check.assert

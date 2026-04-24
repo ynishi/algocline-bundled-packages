@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (112)
+## Packages (113)
 
 ### Reasoning
 
@@ -106,6 +106,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[ensemble_div](ensemble_div/)** | Ambiguity Decomposition. Krogh-Vedelsby identity E = Ē − Ā — the ensemble always beats the weighted average of individuals when there is any disagreement. Quantifies how much agent diversity reduces ensemble error | Krogh & Vedelsby (NeurIPS 1995), Hong & Page (PNAS 2004) |
 | **[kemeny](kemeny/)** | Kemeny-Young rank aggregation. Axiomatically unique consensus ranking that minimizes total Kendall tau distance. Exact for m ≤ 8, Borda fallback for larger candidate sets. Condorcet-consistent | Kemeny (1959), Young & Levenglick (1978) |
 | **[pbft](pbft/)** | Practical Byzantine Fault Tolerance. 3-phase LLM consensus (propose → prepare → commit) with BFT quorum guarantees. Tolerates f Byzantine agents given n ≥ 3f+1 | Castro & Liskov (OSDI 1999) |
+| **[isp_aggregate](isp_aggregate/)** | Inverse Surprising Popularity aggregation. 2nd-order belief elicitation — each agent predicts others' vote distribution, ISP/OW scoring removes systematic majority-vote bias. Consistently outperforms majority vote by +2–5 pt on MMLU/ARC | Zhang et al. arXiv:2510.01499 (2025) |
 
 ### Attribution
 
