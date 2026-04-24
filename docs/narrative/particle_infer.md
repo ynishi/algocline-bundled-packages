@@ -3,14 +3,14 @@ name: particle_infer
 version: 0.1.0
 category: selection
 result_shape: particle_inferred
-description: "Particle-Filter inference-time scaling (Puri et al. 2025, arXiv:2502.01618). State-Space formulation of LLM generation with PRM-guided every-step softmax resampling and ORM-based final selection. N step-wise rollouts; caller-injected prm_fn (Process Reward Model) and optional orm_fn (Outcome Reward Model) drive Theorem-1 unbiased posterior sampling. Qwen2.5-Math-1.5B + 4 particles > GPT-4o (paper §4.2). Default (N=8, max_steps=8) issues up to N·max_steps LLM calls and N·max_steps PRM calls."
+description: "Particle-Filter inference-time scaling (Puri et al. 2025, arXiv:2502.01618). State-Space formulation of LLM generation with PRM-guided every-step softmax resampling and ORM-based final selection. Default weight_scheme 'log_linear' (w_t = log r̂_t) matches paper §3.1 Algorithm 1 + Theorem 1 target ∝ ∏_t r̂_t. Opt-in 'logit_replace' mirrors the its_hub reference implementation (NOT paper-faithful: samples from odds-normalized distribution). Qwen2.5-Math-1.5B + 4 particles > GPT-4o (paper §4.2). Default (N=8, max_steps=8) issues up to N·max_steps LLM calls and N·max_steps PRM calls."
 source: particle_infer/init.lua
 generated: gen_docs (V0)
 ---
 
 # particle_infer — Particle-Filter inference-time scaling for LLMs.
 
-> Based on: Puri, Sudalairaj, Xu, Xu, Srivastava   "A Probabilistic Inference Approach to Inference-Time Scaling    of LLMs using Particle-Based Monte Carlo Methods"   (aka Rollout Roulette, arXiv:2502.01618, 2025-02).
+> Based on: Puri, Sudalairaj, Xu, Xu, Srivastava   "A Probabilistic Inference Approach to Inference-Time Scaling    of LLMs using Particle-Based Monte Carlo Methods"   (aka Rollout Roulette, arXiv:2502.01618v5, 2025-08).
 
 ## Contents
 
@@ -35,3 +35,4 @@ generated: gen_docs (V0)
 | `ctx.scenario_name` | string | optional | Explicit scenario name for emitted Card |
 | `ctx.softmax_temp` | number | optional | Softmax temperature T in softmax(w/T). Paper Alg.1 default 1.0. |
 | `ctx.task` | string | **required** | Problem statement fed to LLM + prm_fn + orm_fn |
+| `ctx.weight_scheme` | one_of("log_linear", "logit_replace") | optional | Per-step weight formula. 'log_linear' (default, paper-faithful): w_t = log(r̂_t), θ ∝ r̂_t (paper §3.1 Alg.1 + Theorem 1). 'logit_replace' (NOT paper-faithful, its_hub ref-impl compat): w_t = logit(r̂_t), θ ∝ r̂_t/(1-r̂_t). |

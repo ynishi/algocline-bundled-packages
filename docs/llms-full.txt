@@ -2792,7 +2792,7 @@ Returns `paneled` shape:
 
 # particle_infer — Particle-Filter inference-time scaling for LLMs.
 
-> Based on: Puri, Sudalairaj, Xu, Xu, Srivastava   "A Probabilistic Inference Approach to Inference-Time Scaling    of LLMs using Particle-Based Monte Carlo Methods"   (aka Rollout Roulette, arXiv:2502.01618, 2025-02).
+> Based on: Puri, Sudalairaj, Xu, Xu, Srivastava   "A Probabilistic Inference Approach to Inference-Time Scaling    of LLMs using Particle-Based Monte Carlo Methods"   (aka Rollout Roulette, arXiv:2502.01618v5, 2025-08).
 
 ## Contents
 
@@ -2817,6 +2817,7 @@ Returns `paneled` shape:
 | `ctx.scenario_name` | string | optional | Explicit scenario name for emitted Card |
 | `ctx.softmax_temp` | number | optional | Softmax temperature T in softmax(w/T). Paper Alg.1 default 1.0. |
 | `ctx.task` | string | **required** | Problem statement fed to LLM + prm_fn + orm_fn |
+| `ctx.weight_scheme` | one_of("log_linear", "logit_replace") | optional | Per-step weight formula. 'log_linear' (default, paper-faithful): w_t = log(r̂_t), θ ∝ r̂_t (paper §3.1 Alg.1 + Theorem 1). 'logit_replace' (NOT paper-faithful, its_hub ref-impl compat): w_t = logit(r̂_t), θ ∝ r̂_t/(1-r̂_t). |
 
 ---
 

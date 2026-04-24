@@ -3,7 +3,7 @@
 --- Based on: Puri, Sudalairaj, Xu, Xu, Srivastava
 ---   "A Probabilistic Inference Approach to Inference-Time Scaling
 ---    of LLMs using Particle-Based Monte Carlo Methods"
----   (aka Rollout Roulette, arXiv:2502.01618, 2025-02).
+---   (aka Rollout Roulette, arXiv:2502.01618v5, 2025-08).
 ---
 --- Implements the paper's §3.1 Algorithm 1 single-chain Particle
 --- Filter under a State-Space-Model formulation of LLM generation.
@@ -12,125 +12,114 @@
 --- particles are resampled at every step via softmax(w); an optional
 --- Outcome Reward Model (ORM) picks the final answer.
 ---
---- Core formulas (paper §3 text + reference impl `its_hub`):
+--- ── Paper-faithful core formulas (§2 + §3.1 Alg.1 + Theorem 1) ──
 ---
----   SSM posterior:
+---   SSM posterior (§2):
 ---     p̂_M(x_{1:T}, o_{1:T} | c)
----       ∝ ∏_t p_M(x_t | c, x_{<t}) · ∏_t p̂(o_t | c, x_{<t})          (§2)
----   Emission (Bernoulli, r̂ = PRM):
----     p̂(o_t | c, x_{<t}) = Bern(o_t; r̂(c, x_{<t}))                   (§2)
----   Weight (reference impl, per-step log-odds replacement):
----     w_t⁽ⁱ⁾ = logit(r̂(c, x_{1:t}⁽ⁱ⁾)) = log(r̂ / (1 − r̂))           (ref)
----   Resample (every step):
----     θ_t = softmax(w_t / T_softmax)                                  (Alg.1)
----     {j_t⁽ⁱ⁾} ~ Multinomial(θ_t);  particles ← {x_{1:t}⁽ʲₜ⁽ⁱ⁾⁾}
----   Final selection:
----     î = argmax_i ORM(x_{1:T}⁽ⁱ⁾, c);  answer = x⁽î⁾                 (§3 end)
+---       ∝ ∏_t p_M(x_t | c, x_{<t}) · ∏_t p̂(o_t | c, x_{<t})
+---   Emission (Bernoulli, r̂ = PRM, §2):
+---     p̂(o_t | c, x_{<t}) = Bern(o_t; r̂(c, x_{<t}))
+---   Weight (paper §3.1 Alg.1 — raw r̂, NOT logit):
+---     w = [r̂(x_{1:t}^(1)), …, r̂(x_{1:t}^(N))]
+---   Softmax (paper §3.1 Alg.1):
+---     θ_t = softmax(w)  =  r̂_i / Σ_j r̂_j   (w = log r̂ equivalent)
+---   Resample (paper §3.1 Alg.1, every step):
+---     {j_t⁽ⁱ⁾} ~ Multinomial(θ_t); particles ← {x_{1:t}⁽ʲₜ⁽ⁱ⁾⁾}
+---   Accumulated weight (paper §4.2 prose):
+---     w_t⁽ⁱ⁾ ∝ w_{t−1}⁽ⁱ⁾ · r̂(c, x_{<t}⁽ⁱ⁾)   (linear, not logit)
+---   Theorem 1 target (§3):
+---     p̂_M(x_{1:T}|c, o_{1:T}=1) ∝ ∏_t p_M(x_t|…) · ∏_t r̂_t
+---   Final selection (§3 end):
+---     î = argmax_i ORM(x_{1:T}⁽ⁱ⁾, c);  answer = x⁽î⁾
 ---
----   Theorem 1 (unbiasedness, §3): under the SSM emission model the
----   weighted particle average of any functional f(x) equals its
----   posterior expectation under o_{1:T}=1.
+--- ── Reference-impl (opt-in) formulas — NOT paper-faithful ────────
 ---
---- Note on the weight formula. Paper §4.2 states the accumulated form
----   w_t⁽ⁱ⁾ ∝ w_{t−1}⁽ⁱ⁾ · p̂(o_t|c,x_t)
---- but the authors' reference implementation
+---   The reference implementation (its_hub, particle_gibbs.py) uses:
+---     w_t⁽ⁱ⁾ = logit(r̂_t⁽ⁱ⁾) = log(r̂ / (1 − r̂))      (_inv_sigmoid)
+---     θ = softmax(logit(r̂)) = [r̂_i/(1-r̂_i)] / Σ_j [r̂_j/(1-r̂_j)]
+---   This is the odds-normalized distribution, NOT r̂/Σr̂. It is a
+---   different target distribution from Theorem 1's ∝ ∏_t r̂_t.
+---   Exposed as opt-in `weight_scheme = "logit_replace"`.
+---
+--- Note on the weight space choice. Paper §3.1 Alg.1 pseudo defines
+--- w = [r̂(...)] with θ = softmax(w), and §4.2 prose specifies
+---   w_t ∝ w_{t-1} · r̂_t
+--- (linear multiplicative accumulation). Under every-step resampling,
+--- weights are reset to uniform, reducing the accumulated form to
+--- w_t ∝ r̂_t — which under softmax(log r̂_t) gives θ_i = r̂_i / Σ_j r̂_j,
+--- matching Theorem 1's target p̂_M(x_{1:T}|c, o_{1:T}=1) ∝ ∏_t r̂_t.
+--- This is the default (`weight_scheme = "log_linear"`).
+---
+--- The reference implementation
 ---   github.com/Red-Hat-AI-Innovation-Team/its_hub
----   (`its_hub/algorithms/particle_gibbs.py`, `_inv_sigmoid` + per-
----    step `partial_log_weights.append(_inv_sigmoid(score))` +
----    resample using `log_weights[current_step - 1]`)
---- uses logit-of-the-latest-step (replacement, not accumulation). Under
---- every-step resampling the two are NOT numerically equivalent: the
---- linear-space accumulation with 1/N reset collapses softmax input
---- into the flat range [0, 1/N] (ratio exp(1/N) between max and min),
---- while the logit form spans ℝ and produces the "kill-the-runt"
---- concentration the paper demonstrates at N=4..128. This package
---- matches the reference implementation (logit replacement) as the
---- canonical paper-faithful path.
+---   (particle_gibbs.py: `_inv_sigmoid` + `partial_log_weights.append`
+---    + `_softmax(log_weights[current_step - 1])`)
+--- uses logit(r̂) = log(r̂/(1-r̂)) as the weight, giving softmax(logit(r̂)) =
+--- r̂/(1-r̂) / Σ — the odds-normalized distribution, NOT r̂/Σ. This is
+--- a different target distribution, and Theorem 1's unbiasedness
+--- proof does not cover it. The sharp "kill-the-runt" concentration
+--- that paper Figure 4 demonstrates at N=4..128 arises from the odds
+--- divergence (r̂ → 1 ⇒ logit → ∞), not from the SSM posterior.
+--- Exposed as opt-in `weight_scheme = "logit_replace"` for callers
+--- who want to match the reference-impl numerics exactly.
 ---
 --- ═══ PAPER FIDELITY & INJECTION POINTS ════════════════════════════
---- Implementation follows paper §3.1 Algorithm 1 as realized by the
---- authors' reference code. All deviations from the reference default
---- are opt-in via explicit ctx knobs. This prioritizes correctness
---- (matching the code that reproduces paper results) over the paper's
---- prose-level description, and keeps optimizations / non-paper
---- approximations discoverable.
 ---
---- Paper-faithful defaults (reference-impl aligned):
----   * Resampling: every step (paper §3.1 Alg.1; ref impl `ess_threshold`
----     default 0.5 is an opt-in annealing path, not the core every-
----     step contract). ESS-triggered resample here is a non-paper
----     INJECT; ess_threshold defaults to 0.0.
----   * Weight space: logit(r̂_t) of the latest step only (ref impl
----     `_inv_sigmoid`). No cross-step accumulation. No 1/N reset. A
----     particle inherits its lineage's current logit on resample and
----     overwrites it on the next PRM call.
----   * Aggregation: controls the REPORTED per-particle scalar
----     (result.particles[i].aggregated) via product/min/last/model.
----     Does NOT affect resampling — resampling always uses logit of
----     latest r̂ per the reference impl.
----   * Final selection: 'orm' when orm_fn is provided (paper §3 end);
----     'argmax_weight' fallback when orm_fn is nil. argmax runs over
----     the final softmax-normalized probability (monotonic in logit).
----   * Softmax temperature: T=1 (paper §3.1 Alg.1). T≠1 is Alg.3
----     (PGPT) territory, not supported in v1.
+--- Paper-faithful defaults (paper §3.1 Alg.1 direct):
+---   * Weight scheme: "log_linear" — w_t = log r̂_t, θ ∝ r̂_t (§3.1 Alg.1
+---     + Theorem 1). `softmax(log r̂)` = r̂/Σr̂ exactly.
+---   * Resampling: every step (paper §3.1 Alg.1; ess_threshold=0.0).
+---   * Softmax temperature: T=1 (paper §3.1 Alg.1).
 ---   * LLM temperature: 0.8 (paper §4.5 ablation default).
+---   * Aggregation: "product" — ∏_t r̂_t (paper §3.2 default).
+---   * Final selection: "orm" when orm_fn provided (paper §3 end).
 ---
 --- REQUIRED injection points:
 ---   * prm_fn        — Process Reward Model. Signature
 ---                      fn(partial_answer, task) → r ∈ [0, 1]
 ---                      (Bernoulli parameter, paper §2 emission).
 ---                      Called N × steps times. Non-number / NaN /
----                      out-of-range returns are fail-fast errors
----                      (the contract is the Bernoulli parameter,
----                      not an unnormalized score).
+---                      out-of-range returns are fail-fast errors.
 ---
 --- OPTIONAL paper-faithful injection points:
 ---   * orm_fn        — Outcome Reward Model for final selection
----                      (paper §3 end). Signature
----                      fn(final_answer, task) → ℝ.  Argmax over
----                      orm_fn(·) picks the returned answer. Absent:
----                      falls back to argmax-weight selection.
----   * continue_fn   — Per-particle stop predicate. Signature
+---                      (paper §3 end). fn(final_answer, task) → ℝ.
+---                      Absent: falls back to argmax-weight selection.
+---   * continue_fn   — Per-particle stop predicate.
 ---                      fn(partial_answer) → boolean. Default: stop
 ---                      when max_steps reached.
 ---   * aggregation   — {"product","min","last","model"} (paper §3.2).
 ---                      Affects the REPORTED `aggregated` scalar per
----                      particle (surfaced in the result and Card).
----                      Does NOT change resampling (which always uses
----                      logit of latest r̂, per ref impl). "model"
----                      requires the PRM to accept whole-prefix
----                      scoring.
+---                      particle. Does NOT change resampling. "model"
+---                      requires a full-prefix-capable PRM.
 ---   * llm_temperature / gen_tokens_step / n_particles /
----     max_steps — standard budget / stochasticity knobs. All paper-
----                      faithful; magnitudes match paper §4 setups.
+---     max_steps — budget / stochasticity knobs (paper §4 setups).
 ---
 --- OPTIONAL NOT paper-faithful injection points:
+---   * weight_scheme = "logit_replace" — its_hub ref-impl compatibility.
+---                      w_t = logit(r̂_t); softmax gives odds-normalized
+---                      distribution. Theorem 1 unbiasedness proof does
+---                      not cover this path. Produces "kill-the-runt"
+---                      concentration via odds divergence at r̂→1.
 ---   * ess_threshold > 0 — Switch from every-step resample to ESS-
----                      triggered resample (smc_sample pattern). Not
----                      in paper Alg.1. Trades resample overhead for
----                      higher importance-weight variance; the paper
----                      does not characterize this regime. Default
----                      0.0 = paper-faithful every-step path.
+---                      triggered resample. NOT in paper Alg.1 (ref
+---                      impl default 0.5 is an annealing opt-in).
+---                      Default 0.0 = paper-faithful every-step path.
 ---   * final_selection = "weighted_vote" — Paper uses ORM-argmax; this
----                      path aggregates weights across equal-answer
----                      particles, useful when orm_fn is absent and
----                      the caller wants a softer tiebreak than pure
----                      argmax-weight.
----   * softmax_temp ≠ 1 — Alg.1 uses T=1. Nonzero setting without the
----                      PGPT machinery is heuristic; kept as a knob
----                      for callers running manual temperature sweeps.
+---                      path aggregates weights by answer, useful when
+---                      orm_fn is absent and a softer tiebreak is wanted.
+---   * softmax_temp ≠ 1 — Alg.1 uses T=1; other values are heuristic.
 ---
 --- NOT IN v1 (documented shortfalls):
----   * Algorithm 2 (Particle Gibbs) — T outer iterations with a pinned
----     reference particle. Adds mh_accept reuse from smc_sample.
----   * Algorithm 3 (Particle Gibbs + Parallel Tempering) — M chains at
----     different temperatures, MH swap between adjacent chains. Adds
----     a chain-level schedule + PGPT acceptance ratio.
----   * Full-prefix PRM auto-detection — v1 delegates prefix-scoring
----     mechanics to the caller's prm_fn. Callers using aggregation=
----     "model" must ensure their prm_fn receives the whole partial
----     answer, not just the incremental chunk (the signature is the
----     same; only what the PRM does internally differs).
+---   * Algorithm 2 (Particle Gibbs) — outer iterations with a pinned
+---     reference particle.
+---   * Algorithm 3 (Particle Gibbs + Parallel Tempering) — M chains.
+---   * Full-prefix PRM auto-detection — delegated to caller's prm_fn.
+---
+--- Migration note (v0.1.0 breaking change): default weight_scheme
+---   changed from effective "logit_replace" (implicit) to "log_linear"
+---   (paper-faithful). Callers relying on its_hub reference-impl
+---   numerics must add `weight_scheme = "logit_replace"` explicitly.
 --- ═══════════════════════════════════════════════════════════════════
 ---
 --- Usage:
@@ -138,20 +127,17 @@
 ---   return pi.run({
 ---       task     = "Solve: ...",
 ---       prm_fn   = function(partial, task)
----           -- caller PRM: return Bernoulli prob of "on track"
----           return my_prm(partial, task)
+---           return my_prm(partial, task)  -- Bernoulli prob of "on track"
 ---       end,
 ---       orm_fn   = function(final, task)
----           -- caller ORM: return final-answer quality scalar
----           return my_orm(final, task)
+---           return my_orm(final, task)    -- final-answer quality scalar
 ---       end,
----       -- all hyperparameters optional (M._defaults applies)
+---       -- weight_scheme = "logit_replace"  -- opt-in for its_hub compat
 ---   })
 ---
 --- Category: selection (alongside sc / smc_sample / gumbel_search /
 --- mbr_select / ab_select). Complements smc_sample (whole-answer
---- block-SMC) by occupying the step-wise trajectory tier: sc is i.i.d.
---- single-shot, smc_sample is block-level, particle_infer is step-level.
+--- block-SMC) by occupying the step-wise trajectory tier.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -165,12 +151,13 @@ M.meta = {
     description = "Particle-Filter inference-time scaling (Puri et al. "
         .. "2025, arXiv:2502.01618). State-Space formulation of LLM "
         .. "generation with PRM-guided every-step softmax resampling "
-        .. "and ORM-based final selection. N step-wise rollouts; "
-        .. "caller-injected prm_fn (Process Reward Model) and optional "
-        .. "orm_fn (Outcome Reward Model) drive Theorem-1 unbiased "
-        .. "posterior sampling. Qwen2.5-Math-1.5B + 4 particles > "
-        .. "GPT-4o (paper §4.2). Default (N=8, max_steps=8) issues "
-        .. "up to N·max_steps LLM calls and N·max_steps PRM calls.",
+        .. "and ORM-based final selection. Default weight_scheme "
+        .. "'log_linear' (w_t = log r̂_t) matches paper §3.1 Algorithm 1 "
+        .. "+ Theorem 1 target ∝ ∏_t r̂_t. Opt-in 'logit_replace' mirrors "
+        .. "the its_hub reference implementation (NOT paper-faithful: "
+        .. "samples from odds-normalized distribution). Qwen2.5-Math-1.5B "
+        .. "+ 4 particles > GPT-4o (paper §4.2). Default (N=8, max_steps=8) "
+        .. "issues up to N·max_steps LLM calls and N·max_steps PRM calls.",
     category = "selection",
 }
 
@@ -198,6 +185,16 @@ M._defaults = {
     llm_temperature = 0.8,    -- paper §4.5 ablation default
     final_selection = "orm",  -- paper §3 end. Falls back to
                               -- "argmax_weight" when orm_fn is nil.
+    weight_scheme   = "log_linear",
+                              -- paper-faithful default. softmax(log r̂)
+                              -- gives θ ∝ r̂_t, matching paper §3.1
+                              -- Alg.1 (`w = [r̂(...)]`, θ = softmax(w))
+                              -- and Theorem 1 target ∝ ∏_t r̂_t under
+                              -- every-step resample weight reset.
+                              -- Set to "logit_replace" for its_hub
+                              -- reference-impl compatibility (NOT
+                              -- paper-faithful; samples from odds-
+                              -- normalized distribution).
 }
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -244,11 +241,20 @@ local function aggregate_prm_scores(step_scores, mode)
         end
         local L = #seq
         if L == 0 then
-            -- No steps scored → neutral aggregate = 0 (particle cannot
-            -- survive resample without having been scored at least once
-            -- under paper Alg.1, which scores every active particle
-            -- every step).
-            out[i] = 0
+            -- No steps scored — return the mode-specific neutral element:
+            --   product → 1.0  (multiplicative identity: ∏ over empty = 1)
+            --   min     → +∞   (min over empty set = +∞ by convention)
+            --   last / model → error (last element of empty sequence is
+            --                  undefined; caller contract violation)
+            if mode == "product" then
+                out[i] = 1.0
+            elseif mode == "min" then
+                out[i] = math.huge
+            else  -- "last" or "model"
+                error("particle_infer.aggregate_prm_scores: step_scores["
+                    .. i .. "] is empty; mode '" .. mode
+                    .. "' requires at least one scored step", 2)
+            end
         elseif mode == "product" then
             local p = 1.0
             for t = 1, L do
@@ -448,7 +454,7 @@ local function resample_multinomial(particles, weights, rng)
         local u = draw()
         local idx = n
         for j = 1, n do
-            if u <= cdf[j] then idx = j; break end
+            if u < cdf[j] then idx = j; break end
         end
         out[i] = particles[idx]
         drawn[i] = idx
@@ -464,12 +470,11 @@ end
 ---
 ---   logit(r̂) = log(r̂ / (1 − r̂))
 ---
---- This is the canonical paper-faithful particle weight per the
---- authors' code: the softmax over logits gives the "kill-the-runt"
---- concentration used for every-step resampling. Unlike a linear
---- r̂-only weight (w = r̂ / N after 1/N reset), logit(r̂) spans ℝ so
---- the softmax input range reflects the information content of the
---- PRM score rather than being bottle-necked by the Bernoulli domain.
+--- Reference-impl (its_hub) compatibility weight. **NOT paper-faithful**:
+--- maps r̂ to odds ratio r̂/(1-r̂), which under softmax gives a
+--- distribution proportional to odds, not to r̂. Use
+--- `weight_scheme='logit_replace'` to select this path. Paper-faithful
+--- path uses `log_from_bern` instead.
 ---
 ---@param r    number   -- PRM Bernoulli parameter ∈ [0, 1]
 ---@param eps  nil|number -- clamp floor / ceiling (default 1e-7)
@@ -496,6 +501,37 @@ local function logit_from_bern(r, eps)
         rc = r
     end
     return math.log(rc / (1 - rc))
+end
+
+--- log_from_bern — Convert a Bernoulli probability r̂ ∈ [0,1] to its
+--- natural log. This is the paper-faithful per-step particle weight:
+--- softmax(log r̂) gives θ_i = r̂_i / Σ_j r̂_j, matching paper §3.1
+--- Algorithm 1 (`w = [r̂(...)]`, θ = softmax(w)) and Theorem 1's
+--- target p̂_M(x_{1:T}|c, o_{1:T}=1) ∝ ∏_t r̂_t.
+---
+---   log(r̂) = ln(clamp(r̂, eps, 1))
+---
+--- Only the lower bound is clamped: log(1) = 0 is finite, so no upper
+--- clamp is needed. eps must be in (0, 1).
+---
+---@param r    number    -- PRM Bernoulli parameter ∈ [0, 1]
+---@param eps  nil|number -- lower clamp (default 1e-7); must be in (0, 1)
+---@return number          -- log(clamp(r, eps, 1))
+local function log_from_bern(r, eps)
+    if type(r) ~= "number" then
+        error("particle_infer.log_from_bern: r must be number, got "
+            .. type(r), 2)
+    end
+    if r ~= r then
+        error("particle_infer.log_from_bern: r is NaN", 2)
+    end
+    eps = eps or 1e-7
+    if type(eps) ~= "number" or eps <= 0 or eps >= 1 then
+        error("particle_infer.log_from_bern: eps must be in (0, 1), got "
+            .. tostring(eps), 2)
+    end
+    local rc = (r < eps) and eps or r
+    return math.log(rc)
 end
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -532,6 +568,11 @@ local run_input_shape = T.shape({
     llm_temperature = T.number:is_optional():describe("LLM sampling temperature (default 0.8)"),
     final_selection = T.one_of({ "orm", "argmax_weight", "weighted_vote" }):is_optional()
         :describe("Paper uses 'orm'. 'weighted_vote' is NOT paper-faithful."),
+    weight_scheme   = T.one_of({ "log_linear", "logit_replace" }):is_optional()
+        :describe("Per-step weight formula. 'log_linear' (default, paper-faithful): "
+            .. "w_t = log(r̂_t), θ ∝ r̂_t (paper §3.1 Alg.1 + Theorem 1). "
+            .. "'logit_replace' (NOT paper-faithful, its_hub ref-impl compat): "
+            .. "w_t = logit(r̂_t), θ ∝ r̂_t/(1-r̂_t)."),
     -- Card IF
     auto_card       = T.boolean:is_optional():describe("Emit a Card on completion (default false)"),
     card_pkg        = T.string:is_optional():describe(
@@ -937,6 +978,7 @@ function M.run(ctx)
     local ess_thr     = ctx.ess_threshold   or M._defaults.ess_threshold
     local llm_temp    = ctx.llm_temperature or M._defaults.llm_temperature
     local fs_mode     = ctx.final_selection or M._defaults.final_selection
+    local ws          = ctx.weight_scheme   or M._defaults.weight_scheme
 
     if type(N) ~= "number" or N < 1 or N ~= math.floor(N) then
         error("particle_infer.run: n_particles must be positive integer, got "
@@ -974,6 +1016,10 @@ function M.run(ctx)
             .. "'argmax_weight' / 'weighted_vote', got '"
             .. tostring(fs_mode) .. "'", 2)
     end
+    if ws ~= "log_linear" and ws ~= "logit_replace" then
+        error("particle_infer.run: weight_scheme must be 'log_linear' / "
+            .. "'logit_replace', got '" .. tostring(ws) .. "'", 2)
+    end
     -- Silent-downgrade: mode='orm' without orm_fn → fall back to
     -- argmax_weight with a warn. Paper §3 end recommends ORM; but
     -- callers may legitimately omit orm_fn and rely on PRM weights
@@ -997,21 +1043,22 @@ function M.run(ctx)
 
     local particles = init_particles(N)
     local weights = {}
-    -- Initialize logit weights at 0 = logit(0.5), so softmax yields
-    -- uniform 1/N before any PRM evidence is observed. Matches the ref
-    -- impl's behavior of softmax over the most recent logit (there is
-    -- no prior-step logit on the first iteration, so the softmax is
-    -- uniform until the first `evaluate_prm` call).
+    -- Initialize weights at 0. Under log_linear: log(1) = 0 is a
+    -- neutral constant; softmax over identical constants = uniform 1/N.
+    -- Under logit_replace: logit(0.5) = 0, same uniform result.
+    -- The first evaluate_prm call overwrites these before any resample,
+    -- so the initial value is arbitrary (softmax-cancelled by uniformity).
     for i = 1, N do weights[i] = 0 end
 
-    -- ─── Main loop (paper §3.1 Algorithm 1 via reference impl) ───
+    -- ─── Main loop (paper §3.1 Algorithm 1) ───
     -- Per step t = 1..T_max:
     --   1. advance_step: 1 LLM call per active particle (block of tokens)
     --   2. evaluate_prm: PRM scores each active particle's new partial
-    --   3. logit weight: w_t = logit(r̂_t), replacement (ref impl
-    --      `_inv_sigmoid` + latest-only resample semantics)
+    --   3. weight update: w_t = weight_fn(r̂_t), replacement semantics.
+    --      weight_fn = log_from_bern  (default, paper-faithful log_linear)
+    --               or logit_from_bern (opt-in logit_replace, ref-impl compat)
     --   4. softmax → multinomial resample (every step unless ess_thr > 0);
-    --      drawn particles inherit their lineage's logit for the output
+    --      drawn particles inherit their lineage's weight for the output
     --      distribution
     --   5. evaluate_continue: flip stop flags for particles that finished
     local steps_executed = 0
@@ -1032,38 +1079,38 @@ function M.run(ctx)
         local n_prm = evaluate_prm(particles, task, prm_fn)
         total_prm_calls = total_prm_calls + n_prm
 
-        -- 3. Per-step weight update — replace, not accumulate. Per the
-        --    reference impl (its_hub `_inv_sigmoid` + append to
-        --    partial_log_weights; resample uses `log_weights[current_step
-        --    - 1]`), only the latest step's logit drives resampling.
-        --    Inactive particles keep their prior logit unchanged (no new
+        -- 3. Per-step weight update — replace, not accumulate. Only the
+        --    latest step's score drives resampling (replacement semantics).
+        --    Inactive particles keep their prior weight unchanged (no new
         --    step scored → no information to overwrite with).
+        --    weight_fn dispatch:
+        --      "log_linear"    (default, paper-faithful): w_t = log(r̂_t)
+        --        softmax(log r̂) = r̂/Σr̂, matching paper §3.1 Alg.1 +
+        --        Theorem 1 target ∝ ∏_t r̂_t.
+        --      "logit_replace" (NOT paper-faithful, its_hub ref-impl):
+        --        w_t = logit(r̂_t) = log(r̂/(1-r̂))
+        --        softmax(logit r̂) = odds-normalized, NOT r̂/Σr̂.
+        local weight_fn = (ws == "logit_replace")
+            and logit_from_bern or log_from_bern
         for i = 1, N do
             if particles[i].active then
                 local last_r = particles[i].step_scores[#particles[i].step_scores]
-                weights[i] = logit_from_bern(last_r)
+                weights[i] = weight_fn(last_r)
             end
-        end
-
-        -- ESS trace (diagnostic). ESS is a quantity of a probability
-        -- distribution, so compute it on the softmax-normalized
-        -- probabilities used for resampling — NOT on raw logits (which
-        -- can be negative and sum to zero under a uniform r̂=0.5).
-        do
-            ess_trace[#ess_trace + 1] = compute_ess(
-                softmax_weights(weights, soft_temp))
         end
 
         -- 4. softmax(w / T) → multinomial resample.
         --    Paper-faithful: resample EVERY step (ess_thr = 0.0 default).
         --    ESS-triggered path: resample iff ESS < ess_thr · N.
+        --    ESS trace (diagnostic): computed on the same theta so we
+        --    call softmax_weights once and reuse the result for both.
         local theta = softmax_weights(weights, soft_temp)
+        ess_trace[#ess_trace + 1] = compute_ess(theta)
         local do_resample
         if ess_thr <= 0 then
             do_resample = true
         else
-            local ess_now = compute_ess(theta)
-            do_resample = (ess_now < ess_thr * N)
+            do_resample = (ess_trace[#ess_trace] < ess_thr * N)
         end
         if do_resample then
             local new_parts, drawn = resample_multinomial(particles, theta)
@@ -1197,6 +1244,7 @@ M._internal = {
     compute_ess          = compute_ess,
     resample_multinomial = resample_multinomial,
     logit_from_bern      = logit_from_bern,
+    log_from_bern        = log_from_bern,
     -- LLM-integrated helpers (mockable via _G.alc stub)
     init_particles       = init_particles,
     advance_step         = advance_step,
