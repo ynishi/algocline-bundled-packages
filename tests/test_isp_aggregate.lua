@@ -374,6 +374,34 @@ describe("isp_aggregate._internal.aggregate_isp", function()
             "first_in_options")
         expect(best2).to.equal("B")
     end)
+
+    it("skips S_ISP inner term when a_j is unrecognized (§4.2 Eq.5 requires a_j ∈ S)", function()
+        -- 3 agents on {A, B}. Middle agent returns "Z" ∉ S.
+        -- Paper's formula requires a_j ∈ S; the impl must skip j for
+        -- which a_vec[j] is nil so `a' ≠ a_j` does NOT collapse to
+        -- "all K options" (which would violate the 1/(K-1) denominator).
+        local tensor = {
+            { "A", "A", "A" }, { "A", "A", "A" }, { "A", "A", "A" },
+            { "B", "B", "B" }, { "B", "B", "B" },
+        }
+        local kernel = compute_kernel(tensor, { "A", "B" })
+        local best, scores = aggregate_isp({ "A", "Z", "A" }, kernel,
+            { "A", "B" }, "first_in_options")
+        -- Result must be a valid option.
+        expect(best == "A" or best == "B").to.equal(true)
+        -- Scores must be finite (no NaN / Inf from count-off denom).
+        for _, s in pairs(scores) do
+            expect(s == s).to.equal(true)
+            expect(s < math.huge and s > -math.huge).to.equal(true)
+        end
+        -- Domain check: c1(A) = 2, c1(B) = 0 (Z not in options → not counted).
+        -- After nil-skip, S_ISP(s, 1) averages only j=3 (a_j=A);
+        -- S_ISP(s, 3) averages only j=1 (a_j=A). i=2 is skipped by
+        -- aggregate_isp itself. So score(A) - score(B) ≥ 2 -
+        -- 2*max(S_ISP(A,·)) + 2*min(S_ISP(B,·)); with the all-A-dominant
+        -- tensor the margin keeps A as the winner.
+        expect(best).to.equal("A")
+    end)
 end)
 
 -- ─── estimate_accuracy_owi ────────────────────────────────────────────────

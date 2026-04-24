@@ -84,13 +84,19 @@
 ---   * `method = "meta_prompt_sp"`  — **NOT paper-faithful**.
 ---       Uses per-agent 2nd-order meta-prompt ("predict other agents'
 ---       answer distribution") to produce a marginal predicted
----       frequency, then aggregates with Prelec-Seung-McCoy 2017
----       Surprisingly Popular scoring:  c1(s) - N · mean_i π_i(s).
----       This is the SP 2017 algorithm, *not* Zhang 2025 ISP. Use when
----       (a) no calibration tensor is available, and (b) you accept a
----       single-query heuristic instead of finite-sample guarantees.
----       See NOT IN v1 below for why Zhang 2025's ISP cannot be
----       correctly computed from a single online query.
+---       frequency, then aggregates with a LINEAR (additive)
+---       Surprisingly-Popular extension inspired by Prelec-Seung-McCoy
+---       2017:  score(s) = c1(s) − Σ_i π_i(s).
+---       Note: Prelec 2017 originally scores via a LOG-RATIO form
+---       log(vote_share(s) / predict_share(s)). This impl substitutes
+---       the linear/additive variant because it is scale-stable for
+---       small N and does not need per-option log arithmetic. So this
+---       is SP-*inspired*, not Prelec 2017 verbatim, and explicitly not
+---       Zhang 2025 ISP. Use when (a) no calibration tensor is
+---       available, and (b) you accept a single-query heuristic
+---       instead of finite-sample guarantees. See NOT IN v1 below for
+---       why Zhang 2025's ISP cannot be correctly computed from a
+---       single online query.
 ---
 --- NOT IN v1 (documented shortfalls):
 ---   * `method = "ow_l"` is STUB. The §5.2 Eq.(7) expanded parametric
@@ -358,9 +364,14 @@ local function s_isp_value(i, s, a_vec, kernel, options)
     local count_j = 0
     for j = 1, N do
         if j ~= i then
+            local a_j = a_vec[j]
             local kij = kernel[i] and kernel[i][j]
-            if kij then
-                local a_j = a_vec[j]
+            -- Paper §4.2 Eq.5 requires a_j ∈ S; when a_j is nil
+            -- (caller-provided unrecognized option), `a' ≠ a_j` would
+            -- evaluate true for all K options and produce a K-term sum
+            -- instead of the paper-required K-1. Skip such j entirely
+            -- so count_j reflects only paper-valid outer terms.
+            if kij and a_j ~= nil then
                 local inner_acc = 0
                 local inner_count = 0
                 for _, a_prime in ipairs(options) do
@@ -527,6 +538,12 @@ end
 --   x̂_i = #{ m : f_ISP(tensor[m]) = tensor[m][i] } / M
 -- Note: this is NOT isotonic regression despite the "I" name; it is a
 -- self-labeling accuracy count using ISP's output as the pseudo-label.
+-- Data-reuse caveat: the S_ISP kernel passed in here is built from
+-- the same tensor that we now evaluate f_ISP on, so each x̂_i
+-- inherits a "training-set self-evaluation" bias (the pseudo-label
+-- was informed by row m itself). Paper §5.2 Eq.(7) does not define
+-- a leave-one-out variant and we stay paper-faithful here, but the
+-- resulting x̂_i should not be read as a held-out accuracy estimate.
 local function estimate_accuracy_owi(tensor, kernel, options, tie_break)
     local M_ = #tensor
     local N = #tensor[1]
@@ -1084,9 +1101,11 @@ function M.run(ctx)
                 c2[opt] = c2[opt] + parsed[opt]
             end
         end
-        -- SP 2017 linear extension: score(s) = c1(s) - N · mean_i π_i(s)
-        -- = c1(s) - Σ_i π_i(s). Written as subtraction so ties reduce
-        -- to MV behavior (when π is uniform).
+        -- SP-inspired LINEAR extension (NOT Prelec 2017 verbatim):
+        --   score(s) = c1(s) - N · mean_i π_i(s) = c1(s) - Σ_i π_i(s).
+        -- Prelec 2017 original uses log(vote_share/predict_share);
+        -- linear/additive form is used here for small-N scale stability.
+        -- Ties reduce to MV behavior when π is uniform.
         local counts = count_votes(votes, ctx.options)
         scores = {}
         for _, opt in ipairs(ctx.options) do
