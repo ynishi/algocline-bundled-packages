@@ -5,10 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.19.0] - 2026-04-24
 
 ### Added
 
+- **`conformal_vote`** (Governance / Selection): conformal social
+  choice decision gate applying distribution-free prediction sets to
+  ensemble votes for calibrated abstention.
+- **`dci`** (Deliberation): Deliberative Collective Intelligence
+  pkg implementing the DCI-CF 8-stage protocol.
+- **`smc_sample`** (Decoding / Selection): block-SMC reward-guided
+  LLM decoding with paper-faithful weight-update ordering, selective
+  MH moves, and INJECTABLE overrides for transition / reward kernels.
+- **`alc_shapes.M.VERSION`**: declared semver string used by algocline
+  core `>= 0.25.1`'s `alc_hub_dist` resolver to drive the
+  `M.meta.alc_shapes_compat` range check.
 - **`alc.toml` at repo root** with `[hub]` / `[hub.context7]` /
   `[hub.devin]` sections. Project-specific `extra_rules` (context7) and
   `extra_repo_notes` (devin) migrated verbatim from the retired Lua
