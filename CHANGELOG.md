@@ -66,6 +66,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lambda`, `integer_method`, `rescale_method`, `rescaled`,
   `is_sc_fallback`, `raw`).
 
+### Changed
+
+- **slm_mux**: `inference_select` result now includes `tie_break_used`
+  field exposing which tie-break path actually ran (`no_tie` /
+  `validation_accuracy` / `first_found` / `lexicographic_on_indices` /
+  `first_found_fallback_no_validation_accuracy`). Removes silent
+  degradation of paper §3.1 Algorithm 1 when tied candidates lack
+  `validation_accuracy`.
+- **slm_mux**: `partial_coverage = "treat_as_wrong"` no longer surfaces
+  the literal string `"<missing>"` as a stand-in answer; an internal
+  `missing` flag now drives `is_correct` / `is_consistently_wrong`.
+- **slm_mux** (docs): `subset_tie_break = "smaller_K"` is documented as
+  a no-op in fixed-K `select_subset` enumeration; preserved in the
+  enum for future variable-K APIs.
+- **solve_verify_split (BREAKING)**:
+  - `score_split.result.predicted_sr` renamed →
+    `power_law_score_proxy`. The field is the `S^a · V^b` proxy, not
+    a paper-§5.2 SR estimate. Now `nil` when `V == 0` (SC pure path)
+    to remove the V→0⁺ discontinuity; callers must use
+    `compare_paths.delta_*` / observed accuracy for cross-path
+    comparison.
+  - `compare_paths.result.advantage` removed; replaced by explicit
+    `delta_v_opt` and `cost_ratio` fields. The paper-§5.1 cross-over
+    judgment is verifier-quality and model-dependent, so a single
+    boolean / enum field cannot capture it.
+  - All entries now require `B >= 1` (paper §3.1 cost unit is
+    inference call / token).
+  - `check_params_for_optimal` rejects `exponent_solve` /
+    `exponent_verify` outside `(0, 1)` per paper §5.2 + Appendix J
+    observed range.
+
 ## [0.20.0] - 2026-04-25
 
 ### Added

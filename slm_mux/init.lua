@@ -64,6 +64,10 @@
 ---                             "first_found" (default) | "smaller_K"
 ---                             | "lexicographic_on_indices". Paper §3.2
 ---                             does not specify.
+---                             NOTE: select_subset enumerates fixed K
+---                             only, so "smaller_K" is a no-op in the
+---                             current API; preserved in the enum for
+---                             consistency with future variable-K APIs.
 ---   * s_tie_break           — s_i tie at inference: "validation_accuracy"
 ---                             (default, paper-faithful) is the only safe
 ---                             value; any other choice breaks Algorithm 1.
@@ -227,6 +231,14 @@ local inference_select_result_shape = T.shape({
     selected_y         = T.string,
     s                  = T.number:describe("s_{selected} value at selection time"),
     tie_size           = T.number:describe("|I*| (= 1 when no tie)"),
+    tie_break_used     = T.string
+        :describe("Which tie-break path actually ran: 'no_tie' "
+            .. "(|I*|=1) | 'validation_accuracy' (paper §3.1 Algorithm 1) "
+            .. "| 'first_found' | 'lexicographic_on_indices' "
+            .. "| 'first_found_fallback_no_validation_accuracy' "
+            .. "(s_tb='validation_accuracy' but no tied candidate has "
+            .. "validation_accuracy — paper guarantee not met; caller "
+            .. "should provide validation_accuracy to recover)"),
 }, { open = true })
 
 local run_opts_shape = T.shape({
@@ -507,14 +519,16 @@ local function confidence_of(samples, opts, entry)
 end
 
 -- Compute most-common answer for profile p at question m.
--- Returns y_star, s (= confidence), or nil for "skip_missing".
+-- Returns (y_star, s, missing) where missing=true only when
+-- partial_coverage="treat_as_wrong" and the entry was absent.
+-- Returns (nil, nil, false) for "skip_missing" path.
 local function profile_y_star(profile, m, tie_break, rng, partial_coverage, entry)
     local samples_m = profile.samples[m]
     if type(samples_m) ~= "table" or array_length(samples_m) == 0 then
         if partial_coverage == "skip_missing" then
-            return nil, nil
+            return nil, nil, false
         elseif partial_coverage == "treat_as_wrong" then
-            return "<missing>", 0
+            return nil, 0, true   -- missing = true; no magic string
         else  -- "error"
             error(string.format(
                 "slm_mux.%s: profile.samples[%d] missing or empty (use opts.partial_coverage to override)",
@@ -525,14 +539,15 @@ local function profile_y_star(profile, m, tie_break, rng, partial_coverage, entr
     -- assume already validated as string array at higher level for run paths
     local freq = frequencies(samples_m, n)
     local y_star, max_count = argmax_y(freq, samples_m, n, tie_break, rng)
-    return y_star, max_count / n
+    return y_star, max_count / n, false
 end
 
 -- §3.2 indicator: model m correct on question x.
 -- "m(x) is correct" ≡ argmax_y f_m(y) = correct[x].
 local function is_correct(profile, m, tie_break, rng, partial_coverage, entry)
-    local y_star, _ = profile_y_star(profile, m, tie_break, rng, partial_coverage, entry)
-    if y_star == nil then return nil end       -- skipped
+    local y_star, _, missing = profile_y_star(profile, m, tie_break, rng, partial_coverage, entry)
+    if missing then return false end           -- treat_as_wrong path
+    if y_star == nil then return nil end       -- skip_missing path
     return y_star == profile.correct[m]
 end
 
@@ -540,8 +555,9 @@ end
 -- Default (paper-faithful, threshold = 0): y_star ≠ correct.
 -- Threshold > 0 (NOT paper-faithful): also require s ≥ threshold.
 local function is_consistently_wrong(profile, m, tie_break, rng, threshold, partial_coverage, entry)
-    local y_star, s = profile_y_star(profile, m, tie_break, rng, partial_coverage, entry)
-    if y_star == nil then return nil end       -- skipped
+    local y_star, s, missing = profile_y_star(profile, m, tie_break, rng, partial_coverage, entry)
+    if missing then return true end            -- treat_as_wrong → consistently wrong
+    if y_star == nil then return nil end       -- skip_missing path
     if y_star == profile.correct[m] then return false end
     if (threshold or 0) > 0 and (s or 0) < threshold then
         return false
@@ -894,27 +910,47 @@ function M.inference_select(per_model_confidences, opts)
         end
     end
     local pick_idx
+    local tie_break_used
     if #idx_winners == 1 then
         pick_idx = idx_winners[1]
+        tie_break_used = "no_tie"
     elseif s_tb == "validation_accuracy" then
-        local best_a = -math.huge
+        local any_a = false
         for _, i in ipairs(idx_winners) do
-            local a = per_model_confidences[i].validation_accuracy or 0
-            if a > best_a then
-                best_a = a
-                pick_idx = i
+            if type(per_model_confidences[i].validation_accuracy) == "number" then
+                any_a = true
+                break
             end
+        end
+        if not any_a then
+            -- Paper §3.1 Algorithm 1 assumes a_i is available at tie time.
+            -- Surface the fallback explicitly instead of silent degradation.
+            pick_idx = idx_winners[1]
+            tie_break_used = "first_found_fallback_no_validation_accuracy"
+        else
+            local best_a = -math.huge
+            for _, i in ipairs(idx_winners) do
+                local a = per_model_confidences[i].validation_accuracy or 0
+                if a > best_a then
+                    best_a = a
+                    pick_idx = i
+                end
+            end
+            tie_break_used = "validation_accuracy"
         end
     elseif s_tb == "lexicographic_on_indices" then
         pick_idx = idx_winners[1]    -- already smallest by enumeration order
+        tie_break_used = "lexicographic_on_indices"
     else  -- "first_found"
         pick_idx = idx_winners[1]
+        tie_break_used = "first_found"
     end
     return {
         selected_model_idx = pick_idx,
         selected_y         = per_model_confidences[pick_idx].y_star,
         s                  = per_model_confidences[pick_idx].s,
         tie_size           = #idx_winners,
+        tie_break_used     = tie_break_used,
     }
 end
 

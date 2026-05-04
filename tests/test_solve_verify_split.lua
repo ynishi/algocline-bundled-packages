@@ -142,7 +142,7 @@ describe("solve_verify_split.score_split positive", function()
         local svs = require("solve_verify_split")
         local r = svs.score_split(4, 3, { lambda = 1.0 })
         expect(r.cost).to.equal(16)
-        expect(r.predicted_sr).to_not.exist()
+        expect(r.power_law_score_proxy).to_not.exist()
     end)
 
     it("includes is_within when budget given", function()
@@ -153,11 +153,17 @@ describe("solve_verify_split.score_split positive", function()
         expect(r2.is_within).to.equal(false)
     end)
 
-    it("includes predicted_sr when full params given", function()
+    it("includes power_law_score_proxy when full params given (V > 0)", function()
         local svs = require("solve_verify_split")
         local r = svs.score_split(4, 3, PAPER_PARAMS())
-        expect(type(r.predicted_sr)).to.equal("number")
-        expect(r.predicted_sr > 0).to.equal(true)
+        expect(type(r.power_law_score_proxy)).to.equal("number")
+        expect(r.power_law_score_proxy > 0).to.equal(true)
+    end)
+
+    it("power_law_score_proxy is nil when V = 0 (SC pure path)", function()
+        local svs = require("solve_verify_split")
+        local r = svs.score_split(4, 0, PAPER_PARAMS())
+        expect(r.power_law_score_proxy).to_not.exist()
     end)
 end)
 
@@ -274,6 +280,23 @@ describe("solve_verify_split.optimal_split errors", function()
         expect(function() svs.optimal_split(-1, PAPER_PARAMS()) end).to.fail()
     end)
 
+    it("B = 0.5 errors (B must be >= 1)", function()
+        local svs = require("solve_verify_split")
+        expect(function() svs.optimal_split(0.5, PAPER_PARAMS()) end).to.fail()
+    end)
+
+    it("exponent_solve >= 1 errors (must satisfy 0 < a < 1)", function()
+        local svs = require("solve_verify_split")
+        local p = {
+            lambda = 1.0,
+            exponent_solve = 5.7,
+            exponent_verify = 0.4,
+            prefactor_solve = 1.0,
+            prefactor_verify = 1.0,
+        }
+        expect(function() svs.optimal_split(100, p) end).to.fail()
+    end)
+
     it("missing prefactor_solve errors (caller-fit required)", function()
         local svs = require("solve_verify_split")
         local p = PAPER_PARAMS()
@@ -373,14 +396,14 @@ end)
 describe("solve_verify_split.compare_paths", function()
     lust.after(reset)
 
-    it("returns sc + genrm + delta_s_opt + advantage", function()
+    it("returns sc + genrm + delta_s_opt + delta_v_opt + cost_ratio", function()
         local svs = require("solve_verify_split")
         local r = svs.compare_paths(100, PAPER_PARAMS())
         expect(type(r.sc)).to.equal("table")
         expect(type(r.genrm)).to.equal("table")
         expect(type(r.delta_s_opt)).to.equal("number")
-        expect(r.advantage == "sc" or r.advantage == "genrm" or r.advantage == "tie")
-            .to.equal(true)
+        expect(type(r.delta_v_opt)).to.equal("number")
+        expect(type(r.cost_ratio)).to.equal("number")
     end)
 
     it("sc.s_opt = round(B), v_opt = 0", function()
@@ -394,6 +417,18 @@ describe("solve_verify_split.compare_paths", function()
         local svs = require("solve_verify_split")
         local r = svs.compare_paths(100, PAPER_PARAMS())
         expect(r.delta_s_opt).to.equal(r.genrm.s_opt - r.sc.s_opt)
+    end)
+
+    it("delta_v_opt = genrm.v_opt - sc.v_opt (sc.v_opt always 0)", function()
+        local svs = require("solve_verify_split")
+        local r = svs.compare_paths(100, PAPER_PARAMS())
+        expect(r.delta_v_opt).to.equal(r.genrm.v_opt - r.sc.v_opt)
+    end)
+
+    it("cost_ratio = genrm.cost_used / sc.cost_used", function()
+        local svs = require("solve_verify_split")
+        local r = svs.compare_paths(100, PAPER_PARAMS())
+        expect(approx_eq(r.cost_ratio, r.genrm.cost_used / r.sc.cost_used)).to.equal(true)
     end)
 end)
 

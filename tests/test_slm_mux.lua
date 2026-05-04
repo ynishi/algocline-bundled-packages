@@ -442,6 +442,7 @@ describe("slm_mux.inference_select positive", function()
         expect(r.selected_model_idx).to.equal(1)
         expect(r.selected_y).to.equal("A")
         expect(r.tie_size).to.equal(1)
+        expect(r.tie_break_used).to.equal("no_tie")
     end)
 
     it("s tie → argmax validation_accuracy wins (paper §3.1)", function()
@@ -454,15 +455,17 @@ describe("slm_mux.inference_select positive", function()
         expect(r.selected_model_idx).to.equal(2)
         expect(r.selected_y).to.equal("Y")
         expect(r.tie_size).to.equal(3)
+        expect(r.tie_break_used).to.equal("validation_accuracy")
     end)
 
-    it("complete tie (s + a_i) → first_found", function()
+    it("complete tie (s + a_i) → first_found (validation_accuracy path)", function()
         local mux = require("slm_mux")
         local r = mux.inference_select({
             { y_star = "X", s = 0.5, validation_accuracy = 0.5 },
             { y_star = "Y", s = 0.5, validation_accuracy = 0.5 },
         })
         expect(r.selected_model_idx).to.equal(1)
+        expect(r.tie_break_used).to.equal("validation_accuracy")
     end)
 
     it("missing validation_accuracy treated as 0", function()
@@ -472,6 +475,19 @@ describe("slm_mux.inference_select positive", function()
             { y_star = "B", s = 0.66, validation_accuracy = 0.1 },
         })
         expect(r.selected_model_idx).to.equal(2)
+        expect(r.tie_break_used).to.equal("validation_accuracy")
+    end)
+
+    it("s tie + all validation_accuracy nil → first_found_fallback_no_validation_accuracy", function()
+        local mux = require("slm_mux")
+        local r = mux.inference_select({
+            { y_star = "X", s = 0.66 },
+            { y_star = "Y", s = 0.66 },
+            { y_star = "Z", s = 0.66 },
+        })
+        expect(r.tie_break_used).to.equal("first_found_fallback_no_validation_accuracy")
+        expect(r.selected_model_idx).to.equal(1)
+        expect(r.tie_size).to.equal(3)
     end)
 end)
 

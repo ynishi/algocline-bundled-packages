@@ -155,7 +155,7 @@ M._defaults = {
     exponent_solve          = 0.57,
     exponent_verify         = 0.39,
     -- Paper has NO numeric prefactor values (§3.2 Step 5 = caller fit).
-    -- nil ⇒ optimal_split / score_split (with predicted_sr) errors out
+    -- nil ⇒ optimal_split / score_split (with power_law_score_proxy) errors out
     -- when caller does not supply.
     prefactor_solve         = nil,
     prefactor_verify        = nil,
@@ -178,10 +178,10 @@ local params_shape = T.shape({
         :describe("b in V_opt ∝ C^b (paper §5.2). Required by optimal_split."),
     prefactor_solve  = T.number:is_optional()
         :describe("α_S in S_opt = α_S · C^a (paper §3.2 Step 5; caller-fit). "
-            .. "Required by optimal_split and by score_split when predicted_sr is requested."),
+            .. "Required by optimal_split and by score_split when power_law_score_proxy is requested."),
     prefactor_verify = T.number:is_optional()
         :describe("α_V in V_opt = α_V · C^b (paper §3.2 Step 5; caller-fit). "
-            .. "Required by optimal_split and by score_split when predicted_sr is requested."),
+            .. "Required by optimal_split and by score_split when power_law_score_proxy is requested."),
 }, { open = true })
 
 local optimal_split_opts_shape = T.shape({
@@ -205,11 +205,14 @@ local score_split_opts_shape = T.shape({
 }, { open = true })
 
 local score_split_result_shape = T.shape({
-    cost          = T.number:describe("S · (1 + λ·V)"),
-    is_within     = T.boolean:is_optional()
+    cost                  = T.number:describe("S · (1 + λ·V)"),
+    is_within             = T.boolean:is_optional()
         :describe("cost ≤ budget when opts.budget is provided"),
-    predicted_sr  = T.number:is_optional()
-        :describe("Power-law projection (only when params.prefactor_*/exponent_* are full)"),
+    power_law_score_proxy = T.number:is_optional()
+        :describe("S^a · V^b proxy (paper §5.2 power-law direction). "
+            .. "NOT a paper-§5.2 SR estimate; valid only as a "
+            .. "relative-comparison value within the same (a, b) regime. "
+            .. "nil when V <= 0 (SC pure path — proxy is undefined)."),
 }, { open = true })
 
 local sc_pure_opts_shape = T.shape({
@@ -224,11 +227,19 @@ local sc_pure_result_shape = T.shape({
 }, { open = true })
 
 local compare_paths_result_shape = T.shape({
-    sc            = sc_pure_result_shape,
-    genrm         = T.ref("compute_optimal_split"),
-    delta_s_opt   = T.number:describe("genrm.s_opt - sc.s_opt"),
-    advantage     = T.one_of({ "sc", "genrm", "tie" })
-        :describe("Coarse comparison based on s_opt; not a paper-§5.1 cross-over judgement"),
+    sc           = sc_pure_result_shape,
+    genrm        = T.ref("compute_optimal_split"),
+    delta_s_opt  = T.number
+        :describe("genrm.s_opt - sc.s_opt (positive when GenRM "
+            .. "allocator picks more solutions than SC pure)"),
+    delta_v_opt  = T.number
+        :describe("genrm.v_opt - sc.v_opt (sc.v_opt is always 0)"),
+    cost_ratio   = T.number
+        :describe("genrm.cost_used / sc.cost_used (≈ 1 when both "
+            .. "saturate the budget). NOTE: paper §5.1 cross-over "
+            .. "(8× / 4× / 64×) is verifier-quality and "
+            .. "model-dependent — not derivable from (S, V) alone. "
+            .. "Caller must compare on observed accuracy."),
 }, { open = true })
 
 ---@type AlcSpec
@@ -269,6 +280,21 @@ local function check_positive_number(x, name, entry)
         error(string.format(
             "solve_verify_split.%s: %s must be > 0, got %s",
             entry, name, tostring(x)), 3)
+    end
+end
+
+local function check_budget(B, entry)
+    if type(B) ~= "number" then
+        error(string.format(
+            "solve_verify_split.%s: B must be a number, got %s",
+            entry, type(B)), 3)
+    end
+    if B < 1 then
+        error(string.format(
+            "solve_verify_split.%s: B must be >= 1 "
+            .. "(paper §3.1 cost is in inference-call / token units; "
+            .. "got %s)",
+            entry, tostring(B)), 3)
     end
 end
 
@@ -319,6 +345,20 @@ local function check_params_for_optimal(params, entry)
             .. "(paper §5.2 b). Use 0.39 (Llama-8B/GenRM-FT/MATH default) — "
             .. "got %s",
             entry, type(params.exponent_verify)), 3)
+    end
+    if not (params.exponent_solve > 0 and params.exponent_solve < 1) then
+        error(string.format(
+            "solve_verify_split.%s: params.exponent_solve must satisfy "
+            .. "0 < a < 1 (paper §5.2 + Appendix J observed range "
+            .. "a ∈ [0.57, 0.75]); got %s",
+            entry, tostring(params.exponent_solve)), 3)
+    end
+    if not (params.exponent_verify > 0 and params.exponent_verify < 1) then
+        error(string.format(
+            "solve_verify_split.%s: params.exponent_verify must satisfy "
+            .. "0 < b < 1 (paper §5.2 + Appendix J observed range "
+            .. "b ∈ [0.32, 0.43]); got %s",
+            entry, tostring(params.exponent_verify)), 3)
     end
     if type(params.prefactor_solve) ~= "number" or params.prefactor_solve <= 0 then
         error(string.format(
@@ -430,8 +470,14 @@ local function predicted_sr_proxy(S_, V, params)
         return nil
     end
     if S_ <= 0 then return 0 end
+    -- V=0 (SC pure path) breaks the V^b factor (V→0+ gives proxy→0
+    -- but V=0 is intentionally undefined here). Return nil so callers
+    -- cannot accidentally compare SC vs GenRM via this single field.
+    -- Use compare_paths.delta_* / observed accuracy for cross-path
+    -- comparison.
+    if V <= 0 then return nil end
     local s_term = S_ ^ params.exponent_solve
-    local v_term = (V > 0) and (V ^ params.exponent_verify) or 1
+    local v_term = V ^ params.exponent_verify
     return s_term * v_term
 end
 
@@ -459,15 +505,15 @@ function M.score_split(S_, V, params, opts)
     if type(opts.budget) == "number" then
         result.is_within = (c <= opts.budget)
     end
-    -- predicted_sr only when both exponents are present
+    -- power_law_score_proxy only when both exponents are present
     if type(params.exponent_solve) == "number" and type(params.exponent_verify) == "number" then
-        result.predicted_sr = predicted_sr_proxy(S_, V, params)
+        result.power_law_score_proxy = predicted_sr_proxy(S_, V, params)
     end
     return result
 end
 
 function M.optimal_split(B, params, opts)
-    check_positive_number(B, "B", "optimal_split")
+    check_budget(B, "optimal_split")
     check_params_for_optimal(params, "optimal_split")
     opts = opts or {}
     local integer_method = opts.integer_method or M._defaults.integer_method
@@ -555,7 +601,7 @@ function M.optimal_split(B, params, opts)
 end
 
 function M.sc_pure(B, opts)
-    check_positive_number(B, "B", "sc_pure")
+    check_budget(B, "sc_pure")
     opts = opts or {}
     local integer_method = opts.integer_method or M._defaults.integer_method
     if integer_method ~= "round" and integer_method ~= "floor" and integer_method ~= "ceil" then
@@ -573,27 +619,17 @@ function M.sc_pure(B, opts)
 end
 
 function M.compare_paths(B, params, opts)
-    check_positive_number(B, "B", "compare_paths")
+    check_budget(B, "compare_paths")
     check_params_for_optimal(params, "compare_paths")
     opts = opts or {}
     local sc = M.sc_pure(B, { integer_method = opts.integer_method })
     local genrm = M.optimal_split(B, params, opts)
-    local delta = genrm.s_opt - sc.s_opt
-    -- Coarse advantage based on s_opt only (caller can override using
-    -- predicted_sr from score_split).
-    local advantage
-    if delta > 0 then
-        advantage = "genrm"
-    elseif delta < 0 then
-        advantage = "sc"
-    else
-        advantage = "tie"
-    end
     return {
-        sc          = sc,
-        genrm       = genrm,
-        delta_s_opt = delta,
-        advantage   = advantage,
+        sc           = sc,
+        genrm        = genrm,
+        delta_s_opt  = genrm.s_opt - sc.s_opt,
+        delta_v_opt  = genrm.v_opt - sc.v_opt,
+        cost_ratio   = genrm.cost_used / sc.cost_used,
     }
 end
 
