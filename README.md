@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (114)
+## Packages (116)
 
 ### Reasoning
 
@@ -98,6 +98,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[cost_pareto](cost_pareto/)** | Multi-objective Pareto dominance. Frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs. HumanEval warming $2.45/93.2% dominates LATS $134.50/88.0% | Kapoor et al. "AI Agents That Matter" (2024) |
 | **[smc_sample](smc_sample/)** | Block-level Sequential Monte Carlo sampling for LLM quality. N particles with reward-weighted importance sampling, ESS-triggered multinomial resampling, and Metropolis-Hastings rejuvenation. Caller-injected `reward_fn` (unit-test / LLM judge / scoring rule) drives the Target I tempered potential ψ = exp(α·r). Encompasses sc (α=0) and mbr_select (similarity reward, 1 iteration) as special cases of the same probabilistic framework. Default (N=16, K=4, S=2) issues 208 LLM calls per run | Markovic-Voronov et al. (arXiv:2604.16453, 2026) |
 | **[particle_infer](particle_infer/)** | Particle-Filter inference-time scaling. State-Space formulation of LLM generation (paper §2): N step-wise rollouts advanced one reasoning step at a time, scored by a caller-injected Process Reward Model (PRM), softmax-resampled every step (paper §3.1 Alg.1), then selected by a caller-injected Outcome Reward Model (ORM). Aggregation ∈ {product/min/last/model} (§3.2). Default `weight_scheme='log_linear'` (w_t = log r̂_t, θ ∝ r̂/Σr̂) matches paper §3.1 Alg.1 + Theorem 1 target ∝ ∏_t r̂_t; opt-in `'logit_replace'` mirrors the its_hub reference implementation (odds-normalized, NOT paper-faithful). Complements sc (i.i.d. single-shot) and smc_sample (block-SMC, whole-answer reward) by occupying the step-wise trajectory tier. Qwen2.5-Math-1.5B + 4 particles > GPT-4o (§4.2) | Puri et al. (arXiv:2502.01618, 2025) |
+| **[slm_mux](slm_mux/)** | Pure Computation N→K subset selection over a pool of small language models, optimising the complementarity objective `𝒪(S) = UnionAcc(S) − λ · Contradiction(S)` (paper §3.2) by exhaustive search over `C(N,K)` subsets. Five direct-args entries: `confidence` (paper §3.1 Algorithm 1 single-model `f_i / s_i / y_i*`), `score_subset` (𝒪 evaluation for one subset), `select_subset` (paper-faithful exhaustive K-search; opt-in **NOT paper-faithful** `greedy_forward` / `greedy_backward` for large N), `inference_select` (Algorithm 1 end: argmax `s_i` with `validation_accuracy` tie-break), `run`. Fills the selection-axis gap not covered by `cascade` / `router_*` (single-best routing) or `ab_select` / `mbr_select` (single-best selection): subset complementarity over a pre-computed calibration tensor. Tipping Point evidence (Table 4): SLM 2-pair vs Qwen 2.5 72B — GPQA +5.0pt, GSM8K +3.3pt, MATH ≈ −0.4pt | Wang et al. "SLM-MUX" (ICLR 2026 Poster, arXiv:2510.05077) |
 
 ### Aggregation
 
@@ -166,6 +167,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[orch_nver](orch_nver/)** | N-version programming. Execute N parallel variants, evaluate each, select best | Agentic SE Roadmap (arXiv:2509.06216) |
 | **[orch_escalate](orch_escalate/)** | Cascade escalation from light to heavy strategies. Minimizes cost for easy tasks | Microsoft + DAAO |
 | **[compute_alloc](compute_alloc/)** | Compute-optimal test-time scaling allocation. Dynamically selects reasoning paradigm (single/parallel/sequential/hybrid) and budget based on problem difficulty. Key insight: optimal method changes with difficulty — easy=direct, medium=SC, hard=reflect+verify. "Small model + optimal TTS > 14× larger model" | Snell et al. (ICLR 2025), TTS Survey (2025) |
+| **[solve_verify_split](solve_verify_split/)** | Pure Computation allocator that splits a fixed inference budget between solution generation (Self-Consistency) and generative verification (GenRM). Implements paper §3.1 cost model `C(S,V) = S·(1+λV)` (per-solution verification, λ=T_V/T_S) and §5.2 power-law `S_opt ∝ C^a, V_opt ∝ C^b` (defaults `a=0.57, b=0.39` for Llama-3.1-8B + GenRM-FT + MATH; Appendix J alternates for Qwen-2.5-7B / Llama-3.3-70B). Five direct-args entries: `cost`, `score_split`, `optimal_split`, `sc_pure`, `compare_paths`. Prefactors `α_S, α_V` have no numeric value in the paper and must be caller-fit (§3.2 Step 5). Fills the gap not covered by `compute_alloc` (paradigm choice) or `gumbel_search`/`ab_mcts` (search depth-vs-width): intra-paradigm S↔V split. Cross-over multiplier (§5.1: 4×–64× model-dependent) is not hardcoded | Singhi et al. "When To Solve, When To Verify" (COLM 2025, arXiv:2504.01005) |
 
 ### Routing
 
@@ -314,7 +316,7 @@ Manual `S.assert(value, "voted", hint)` is still available for ad-hoc
 validation of external data. Dev-mode checks activate under
 `ALC_SHAPE_CHECK=1`.
 
-11 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`, `quick_voted`, `deep_paneled`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), discriminated unions (`T.discriminated`), and named references (`T.ref`).
+19 shapes are currently registered: `voted`, `paneled`, `assessed`, `calibrated`, `tournament`, `listwise_ranked`, `pairwise_ranked`, `funnel_ranked`, `safe_paneled`, `quick_voted`, `deep_paneled`, `conformal_decided`, `deliberated`, `smc_sampled`, `isp_calibrated`, `isp_voted`, `particle_inferred`, `slm_muxed`, `compute_optimal_split`. The DSL supports primitives, arrays, enums, maps (`T.map_of`), discriminated unions (`T.discriminated`), and named references (`T.ref`).
 
 See [alc_shapes/README.md](alc_shapes/README.md) for the full API reference (combinators, validator, `M.spec.entries`, instrument, spec_resolver, reflection, codegen).
 

@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`slm_mux`** (Selection): Pure Computation pkg implementing
+  Wang, Wan, Kang, Chen, Xie, Krishna, Reddi, Du
+  "SLM-MUX: Orchestrating Small Language Models for Reasoning"
+  (arXiv:2510.05077, ICLR 2026 Poster). Confidence-based per-model
+  selection (paper §3.1 Algorithm 1: `f_i / s_i / y_i*` + tie-break by
+  validation accuracy) plus complementarity-driven K-subset selection
+  (paper §3.2: `𝒪(S) = UnionAcc(S) − λ · Contradiction(S)` via
+  exhaustive search over `C(N, K)` subsets). Five direct-args entries:
+  `confidence`, `score_subset`, `select_subset`, `inference_select`,
+  `run`. Paper-faithful defaults (`λ = 1.0`, `search_method = "exhaustive"`,
+  `consistency_threshold = 0.0`, `s_tie_break = "validation_accuracy"`).
+  Opt-in **NOT paper-faithful** `search_method ∈ {"greedy_forward",
+  "greedy_backward"}` for large `N` (loses globally-optimal guarantee
+  on `𝒪`); opt-in `consistency_threshold > 0.0` strengthens the
+  Contradiction predicate (departs from §3.2 formal definition).
+  Pure Lua — no `alc.llm` calls; caller drives test-time inference
+  with `sc` / `panel` / `smc_sample` / `particle_infer` etc. Fills the
+  selection-axis gap not covered by `cascade` / `router_*` (single-best
+  routing) or `ab_select` / `mbr_select` (single-best selection):
+  N→K subset complementarity over a pre-computed calibration tensor.
+- **`alc_shapes.M.slm_muxed`** result shape registered (open shape with
+  `selected_indices`, `objective`, `union_acc`, `contradiction`,
+  `lambda`, `search_method`, `search_log`).
+- **`solve_verify_split`** (Orchestration): Pure Computation pkg
+  implementing Singhi, Bansal, Hosseini, Grover, Chang, Rohrbach,
+  Rohrbach "When To Solve, When To Verify: Compute-Optimal Problem
+  Solving and Generative Verification for LLM Reasoning"
+  (arXiv:2504.01005, COLM 2025). §3.1 cost model
+  `C(S,V) = S · (1 + λ · V)` (per-solution verification,
+  `λ = T_V / T_S`) plus §5.2 power-law allocator
+  `S_opt ∝ C^a, V_opt ∝ C^b` reconstructed via the §3.2 6-step
+  procedure. Five direct-args entries: `cost`, `score_split`,
+  `optimal_split`, `sc_pure`, `compare_paths`. Paper-faithful default
+  exponents (`a = 0.57, b = 0.39`) from §5.2 Llama-3.1-8B + GenRM-FT
+  + MATH; Appendix J alternates (Qwen-2.5-7B `0.75/0.32`,
+  Llama-3.3-70B `0.69/0.43`) referenced in docstring as transferred
+  defaults. Prefactors `α_S, α_V` have no numeric value in the paper
+  (§3.2 Step 5) — caller-fit required and runtime-asserted. Three
+  rescale strategies for integer-rounding overflow:
+  `"scale_proportional"` (default), `"prefer_solve"`, `"prefer_verify"`
+  (paper not fixed). SC pure path automatically engages when `V_int`
+  rounds to 0 (§3.1 V=0 degenerate case); opt-out via
+  `sc_fallback_when_v_zero = false`. Opt-in **NOT paper-faithful**
+  `cost_model = "independent"` reserved at the API surface but
+  rejected at runtime in v1 (per-solution structure is paper-faithful
+  contract). Pure Lua — no `alc.llm` calls; caller drives test-time
+  inference with `sc` / `step_verify` / `cove`. Fills the
+  orchestration-axis gap not covered by `compute_alloc` (paradigm
+  choice) or `gumbel_search` / `ab_mcts` (search depth-vs-width):
+  intra-paradigm S↔V split under a fixed inference budget. The §5.1
+  cross-over multipliers (4× / 8× / 64× — verifier-quality and
+  model-dependent observations, Appendix E) are NOT hardcoded.
+- **`alc_shapes.M.compute_optimal_split`** result shape registered
+  (open shape with `s_opt`, `v_opt`, `cost_used`, `cost_budget`,
+  `lambda`, `integer_method`, `rescale_method`, `rescaled`,
+  `is_sc_fallback`, `raw`).
+
 ## [0.20.0] - 2026-04-25
 
 ### Added

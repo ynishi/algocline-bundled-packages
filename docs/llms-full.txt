@@ -3730,6 +3730,15 @@ Returns:
 
 ---
 
+<!-- ── slm_mux.md ── -->
+
+
+# slm_mux — Pure Computation pkg for orchestrating Small Language
+
+> Models via complementarity-driven K-subset selection.
+
+---
+
 <!-- ── smc_sample.md ── -->
 
 
@@ -3775,6 +3784,15 @@ Returns `smc_sampled` shape:
 | `resample_count` | number | — | Number of iterations that triggered multinomial resample |
 | `stats` | shape { total_llm_calls: number, total_reward_calls: number } | — | Execution counters (open for diagnostics like mh_rejected) |
 | `weights` | array of number | — | Final normalized weights (Σ ≈ 1) |
+
+---
+
+<!-- ── solve_verify_split.md ── -->
+
+
+# solve_verify_split — Compute-optimal split between solution
+
+> generation (Self-Consistency) and generative verification (GenRM) under a fixed inference compute budget. Pure Computation pkg.
 
 ---
 

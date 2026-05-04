@@ -543,6 +543,71 @@ M.particle_inferred = T.shape({
         :describe("Emitted Card id (only when auto_card=true)"),
 }, { open = true })
 
+-- ── slm_mux shape ────────────────────────────────────────────────────
+-- Wang et al. 2026 (arXiv:2510.05077) "SLM-MUX: Orchestrating Small
+-- Language Models for Reasoning" (ICLR 2026 Poster). Pure Computation
+-- pkg result: K-subset selection from N model profiles by maximising
+-- 𝒪(S) = UnionAcc(S) − λ · Contradiction(S) (paper §3.2). search_log
+-- preserves all evaluated subsets under exhaustive (paper-faithful) or
+-- the visited path under greedy (NOT paper-faithful) search.
+
+M.slm_muxed = T.shape({
+    selected_indices = T.array_of(T.number)
+        :describe("1-based indices of the selected K-subset (length K)"),
+    objective        = T.number
+        :describe("𝒪(S) = UnionAcc(S) − λ · Contradiction(S), paper §3.2"),
+    union_acc        = T.number
+        :describe("UnionAcc(S) ∈ [0,1] for the selected subset"),
+    contradiction    = T.number
+        :describe("Contradiction(S) ∈ [0,1] for the selected subset"),
+    lambda           = T.number
+        :describe("λ used at the time of selection (paper §4.3 default 1.0)"),
+    search_method    = T.one_of({ "exhaustive", "greedy_forward", "greedy_backward" })
+        :describe("'exhaustive' is paper-faithful (§3.2); greedy variants are NOT paper-faithful"),
+    search_log       = T.array_of(T.shape({
+        subset_indices = T.array_of(T.number),
+        objective      = T.number,
+        union_acc      = T.number,
+        contradiction  = T.number,
+    }, { open = true }))
+        :describe("All evaluated subsets (exhaustive) or the visited path (greedy)"),
+}, { open = true })
+
+-- ── solve_verify_split shape ─────────────────────────────────────────
+-- Singhi et al. 2025 (arXiv:2504.01005) "When To Solve, When To Verify"
+-- (COLM 2025). Pure Computation pkg result: compute-optimal split
+-- (S, V) for a fixed inference budget B under §3.1 cost model
+-- C(S,V) = S·(1+λV) and §5.2 power-law S_opt ∝ C^a, V_opt ∝ C^b.
+-- `rescaled` flips when integer-rounded (S, V) overflowed B and the
+-- chosen rescale_method shrunk them. `is_sc_fallback` is true when
+-- V rounded to 0 and the SC pure path took over.
+
+M.compute_optimal_split = T.shape({
+    s_opt              = T.number
+        :describe("Optimal solution count S (integer)"),
+    v_opt              = T.number
+        :describe("Optimal verifications per solution V (integer)"),
+    cost_used          = T.number
+        :describe("Actual cost C(S,V) = S · (1 + λ·V), guaranteed ≤ B"),
+    cost_budget        = T.number
+        :describe("Input budget B (echoed)"),
+    lambda             = T.number
+        :describe("Cost ratio T_V / T_S used in §3.1 cost formula"),
+    integer_method     = T.one_of({ "round", "floor", "ceil" })
+        :describe("How power-law raw values were integer-rounded"),
+    rescale_method     = T.one_of({ "scale_proportional", "prefer_solve", "prefer_verify" })
+        :describe("Strategy used when integer-rounded (S, V) overflowed B (paper §3.2 not fixed)"),
+    rescaled           = T.boolean
+        :describe("True if Step 4 rescale fired"),
+    is_sc_fallback     = T.boolean
+        :describe("True when V_int=0 forced the SC pure path"),
+    raw                = T.shape({
+        s_raw = T.number:describe("α_S · B^a (pre-integer)"),
+        v_raw = T.number:describe("α_V · B^b (pre-integer)"),
+    }, { open = true })
+        :describe("Power-law raw values before integer rounding"),
+}, { open = true })
+
 -- ── public API re-export ─────────────────────────────────────────────
 M.check        = check.check
 M.assert       = check.assert
