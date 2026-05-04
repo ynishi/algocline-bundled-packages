@@ -12,12 +12,12 @@
 ---
 --- Core formulas (paper §3.1, §3.2):
 ---
----   Per-model confidence (Algorithm 1, Lines 6-12):
+---   Per-model confidence (Algorithm 1, Lines 6-7):
 ---     f_i(y) = (1/k) · Σ_{j=1}^{k} 𝟙(y_i^(j) = y)
 ---     y_i*   = argmax_y f_i(y)
 ---     s_i    = f_i(y_i*)
 ---
----   Inference-time selection (Algorithm 1, end):
+---   Inference-time selection (Algorithm 1, Lines 9-13):
 ---     S_max = max_{i ∈ S} s_i
 ---     I*    = { i ∈ S : s_i = S_max }
 ---     return y_{i*}*  where i* = (|I*|=1 ? unique : argmax_{i ∈ I*} a_i)
@@ -31,12 +31,17 @@
 ---   K-subset selection (§3.2):
 ---     argmax_{S ⊆ pool, |S|=K} 𝒪(S)  via exhaustive enumeration.
 ---
----   Hoeffding bound on inference selection (§5):
+---   Inference-time confidence concentration (out-of-paper reference;
+---   not stated in arXiv:2510.05077, derived from standard Hoeffding
+---   union bound on Bernoulli sample-mean concentration of s_i):
 ---     Pr( î = i* ) ≥ 1 − 2(K−1) · exp( −N · γ² / 2 )
----     where γ = p_{i*} − max_{j ≠ i*} p_j > 0.
----     This bound applies to Algorithm 1 (test-time selection). slm_mux
----     provides the primitives; the test-time inference loop is the
----     caller's responsibility.
+---     where N = sample count per model used to estimate s_i,
+---           K = subset size,
+---           p_i = population argmax frequency of model i
+---                 (s_i is its sample-based estimate),
+---           γ = p_{i*} − max_{j ≠ i*} p_j > 0  (true confidence gap).
+---     Sample-size guidance reference only — the paper itself does not
+---     derive a concentration bound on Algorithm 1's selection event.
 ---
 --- ═══ PAPER FIDELITY & INJECTION POINTS ═══════════════════════════════
 --- Paper-faithful defaults:
@@ -80,6 +85,9 @@
 ---                         exhaustive search. Loses globally-optimal
 ---                         guarantee on 𝒪(S). Practical fallback when
 ---                         C(N, K) becomes prohibitive (caller's call).
+---                         Per-step 𝒪 ties are resolved via the same
+---                         `subset_tie_break` mode as exhaustive search,
+---                         under eps-tolerant comparison.
 ---   * consistency_threshold > 0.0
 ---                       — Treat m as "consistently wrong" only when its
 ---                         most-common-wrong answer dominates with
@@ -95,8 +103,8 @@
 ---                         knobs.
 ---
 --- NOT IN v1 (documented shortfalls):
----   * Online inference orchestration (the §5 Hoeffding-bound test-time
----     flow that wires Algorithm 1 to a real LLM). slm_mux exposes
+---   * Online inference orchestration (the test-time inference loop
+---     that wires Algorithm 1 to a real LLM). slm_mux exposes
 ---     subset selection and per-model confidence as pure primitives;
 ---     callers drive test-time inference with sc / panel / smc_sample /
 ---     particle_infer, etc.
@@ -436,6 +444,19 @@ end
 
 -- ─── Pure helpers (paper §3.1, §3.2) ───
 
+-- Floating-point eps for 𝒪(S) tie collection. Subsets with objectives
+-- closer than this are treated as a tie (deterministic enumeration of
+-- the §3.2 argmax set under bit-rounding noise).
+local OBJ_EPS = 1e-12
+
+local function obj_eq(a, b)
+    return math.abs(a - b) <= OBJ_EPS
+end
+
+local function obj_gt(a, b)
+    return (a - b) > OBJ_EPS
+end
+
 -- frequency table: (samples, n) → { [string] = count }, n_unique
 local function frequencies(samples, n)
     local freq = {}
@@ -636,7 +657,15 @@ local function contradiction(profiles, subset_indices, opts, entry)
         end
     end
     if effective_M == 0 then
-        return 0, 0
+        -- Symmetric with union_acc: if no calibration question has any
+        -- observed sample (after partial_coverage filter), the §3.2
+        -- Contradiction rate is undefined. Fail-fast instead of
+        -- silently returning 0 (the public path always reaches
+        -- union_acc first, which raises the same way; this guards the
+        -- _internal.contradiction test hook against silent 0).
+        error(string.format(
+            "slm_mux.%s: no calibration question has any observed sample after partial_coverage filter",
+            entry), 3)
     end
     return hits / effective_M, effective_M
 end
@@ -722,14 +751,21 @@ end
 
 -- Forward-greedy K-subset search (NOT paper-faithful).
 -- Start empty, add the index that maximises 𝒪(S ∪ {i}) at each step.
+-- Per-step ties on the incremental 𝒪 are resolved with the same
+-- subset_tie_break mode used by exhaustive search; passing through eps-
+-- tolerant comparison so caller-visible behaviour matches the
+-- exhaustive path on degenerate fixtures.
 local function greedy_forward_search(profiles, k, opts)
     local n = array_length(profiles)
     local selected = {}
     local available = {}
     for i = 1, n do available[i] = true end
+    local subset_tb = (opts and opts.subset_tie_break) or M._defaults.subset_tie_break
     local search_log = {}
     while #selected < k do
-        local best_i, best_obj, best_struct = nil, -math.huge, nil
+        local best_obj = -math.huge
+        local ties = {}
+        local trials_by_i = {}    -- struct keyed by candidate i (for available[] update)
         for i = 1, n do
             if available[i] then
                 local trial = {}
@@ -737,28 +773,38 @@ local function greedy_forward_search(profiles, k, opts)
                 trial[#trial + 1] = i
                 table.sort(trial)
                 local r = objective_of(profiles, trial, opts, "select_subset")
-                if r.objective > best_obj then
+                local entry_struct = {
+                    subset_indices = trial, objective = r.objective,
+                    union_acc = r.union_acc, contradiction = r.contradiction,
+                    _added = i,
+                }
+                if obj_gt(r.objective, best_obj) then
                     best_obj = r.objective
-                    best_i = i
-                    best_struct = { subset_indices = trial, objective = r.objective,
-                        union_acc = r.union_acc, contradiction = r.contradiction }
+                    ties = { entry_struct }
+                elseif obj_eq(r.objective, best_obj) then
+                    ties[#ties + 1] = entry_struct
                 end
+                trials_by_i[i] = entry_struct
             end
         end
-        if best_i == nil then break end
-        selected = best_struct.subset_indices
-        available[best_i] = false
-        search_log[#search_log + 1] = best_struct
+        if #ties == 0 then break end
+        local picked = tie_break_subset(ties, subset_tb)
+        selected = picked.subset_indices
+        available[picked._added] = false
+        picked._added = nil
+        search_log[#search_log + 1] = picked
     end
     return search_log[#search_log], search_log
 end
 
 -- Backward-greedy K-subset search (NOT paper-faithful).
 -- Start with all N, remove the index whose removal maximises 𝒪 until K remain.
+-- Per-step ties on 𝒪 after removal use the same subset_tie_break mode.
 local function greedy_backward_search(profiles, k, opts)
     local n = array_length(profiles)
     local current = {}
     for i = 1, n do current[i] = i end
+    local subset_tb = (opts and opts.subset_tie_break) or M._defaults.subset_tie_break
     local search_log = {}
     -- log initial
     local r0 = objective_of(profiles, current, opts, "select_subset")
@@ -768,24 +814,28 @@ local function greedy_backward_search(profiles, k, opts)
         objective = r0.objective, union_acc = r0.union_acc, contradiction = r0.contradiction }
     while #current > k do
         local best_obj = -math.huge
-        local best_struct = nil
-        local best_remove_pos = nil
+        local ties = {}
         for pos = 1, #current do
             local trial = {}
             for i = 1, #current do
                 if i ~= pos then trial[#trial + 1] = current[i] end
             end
             local r = objective_of(profiles, trial, opts, "select_subset")
-            if r.objective > best_obj then
+            local entry_struct = {
+                subset_indices = trial, objective = r.objective,
+                union_acc = r.union_acc, contradiction = r.contradiction,
+            }
+            if obj_gt(r.objective, best_obj) then
                 best_obj = r.objective
-                best_remove_pos = pos
-                best_struct = { subset_indices = trial, objective = r.objective,
-                    union_acc = r.union_acc, contradiction = r.contradiction }
+                ties = { entry_struct }
+            elseif obj_eq(r.objective, best_obj) then
+                ties[#ties + 1] = entry_struct
             end
         end
-        if best_remove_pos == nil then break end
-        current = best_struct.subset_indices
-        search_log[#search_log + 1] = best_struct
+        if #ties == 0 then break end
+        local picked = tie_break_subset(ties, subset_tb)
+        current = picked.subset_indices
+        search_log[#search_log + 1] = picked
     end
     return search_log[#search_log], search_log
 end
@@ -852,10 +902,10 @@ function M.select_subset(profiles, k, opts)
                 union_acc = r.union_acc, contradiction = r.contradiction,
             }
             search_log[#search_log + 1] = entry_struct
-            if r.objective > best_obj then
+            if obj_gt(r.objective, best_obj) then
                 best_obj = r.objective
                 ties = { entry_struct }
-            elseif r.objective == best_obj then
+            elseif obj_eq(r.objective, best_obj) then
                 ties[#ties + 1] = entry_struct
             end
         end
@@ -901,6 +951,17 @@ function M.inference_select(per_model_confidences, opts)
             error(string.format(
                 "slm_mux.inference_select: per_model_confidences[%d] must have numeric s and string y_star",
                 i), 2)
+        end
+        if c.validation_accuracy ~= nil then
+            if type(c.validation_accuracy) ~= "number"
+                or c.validation_accuracy ~= c.validation_accuracy   -- NaN
+                or c.validation_accuracy < 0
+                or c.validation_accuracy > 1 then
+                error(string.format(
+                    "slm_mux.inference_select: per_model_confidences[%d].validation_accuracy "
+                    .. "must satisfy a_i ∈ [0, 1] (paper §3.1 Algorithm 1), got %s",
+                    i, tostring(c.validation_accuracy)), 2)
+            end
         end
         if c.s > s_max then
             s_max = c.s

@@ -97,6 +97,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `exponent_verify` outside `(0, 1)` per paper §5.2 + Appendix J
     observed range.
 
+### Fixed
+
+- **slm_mux** (math-strict review):
+  - Removed misattribution of the inference-time concentration bound to
+    paper §5: arXiv:2510.05077 §5 contains no Hoeffding inequality.
+    The bound `Pr(î = i*) ≥ 1 − 2(K−1)·exp(−N·γ²/2)` is now labelled
+    *out-of-paper*, derived from the standard Hoeffding union bound on
+    Bernoulli sample-mean concentration of `s_i`, with `p_i` (population
+    argmax frequency) explicitly defined alongside `s_i` (sample
+    estimate). NOT-IN-v1 docstring no longer claims a §5 flow.
+  - `Per-model confidence` and `Inference-time selection` paragraphs now
+    cite the correct Algorithm 1 line ranges (`Lines 6-7` / `Lines 9-13`).
+  - Subset enumeration tie collection switched to eps-tolerant comparison
+    (`|a − b| ≤ 1e-12`) to keep the §3.2 argmax set deterministic under
+    bit-rounding noise on `𝒪(S) = UnionAcc(S) − λ · Contradiction(S)`.
+  - `subset_tie_break` is now honoured in greedy paths
+    (`greedy_forward` / `greedy_backward`): each greedy step collects
+    ties with the same eps and routes them through the same
+    `tie_break_subset` mode used by exhaustive search. Previously these
+    options were silently ignored on greedy.
+  - `inference_select` rejects `validation_accuracy ∉ [0, 1]` and NaN
+    (paper §3.1 Algorithm 1 invariant `a_i ∈ [0,1]`) with a typed error
+    instead of silently using out-of-range values for tie-break.
+  - `_internal.contradiction` raises a typed error when no calibration
+    question has any observed sample under the `partial_coverage`
+    filter, symmetric with `_internal.union_acc`. Removes a silent `0`
+    return when the helper is invoked directly via the test hook.
+- **solve_verify_split** (math-strict review):
+  - `optimal_split` now validates `opts.s_cap` / `opts.v_cap` as finite
+    integers with floors (`s_cap ≥ 1` per paper §3.1 implication that
+    at least one solution is needed; `v_cap ≥ 0`). Previously `s_cap = 0`,
+    `v_cap = -1`, and fractional caps such as `0.5` were silently
+    accepted and propagated to `s_opt` / `v_opt` / `cost_used`.
+  - All numeric inputs (`B`, `lambda`, `exponent_*`, `prefactor_*`, caps)
+    now reject NaN and ±Inf via explicit `x ~= x` and `±math.huge`
+    detection. IEEE 754 NaN comparisons that previously slipped through
+    `B < 1` / `lambda <= 0` checks now error out as `"must be a finite
+    number, got NaN"`.
+  - `is_sc_fallback` semantics unified between the two `optimal_split`
+    code paths: post-rescale `v_final == 0` always sets the flag,
+    independent of whether `sc_path(B)` strictly increases `s_final`.
+    Previously the flag's value depended on `B` for the same allocator
+    (`B = 1 → false`, `B = 3 → true`), making caller routing on
+    `is_sc_fallback` unreliable.
+  - `score_split.power_law_score_proxy` is now `nil` for both `S <= 0`
+    and `V <= 0` (previously `S <= 0` returned `0` while `V <= 0`
+    returned `nil`). Symmetric on the two axes; the proxy is undefined
+    whenever either factor is non-positive.
+  - Allocator algorithm docstring renamed away from "§3.2 procedure
+    reconstructed" to clarify that paper §3.2 is a 6-step regression
+    procedure ending at log-linear fit (Step 5), not a runtime
+    allocator. The 5-step rounding/rescale algorithm in this pkg runs
+    *after* the caller has fitted `(α, a, b)` per §3.2 Step 5.
+  - Domain note added: paper §3.1 implies `S ≥ 1` and `V ≥ 0`;
+    `optimal_split` now always returns `s_opt ≥ 1`.
+  - `apply_rescale` (`scale_proportional`) carries an explicit
+    termination-guarantee comment (factor < 1 plus integer no-progress
+    fallback bounds the loop by `S_int + V_int`).
+
 ## [0.20.0] - 2026-04-25
 
 ### Added

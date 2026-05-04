@@ -31,12 +31,21 @@
 ---     α_S, α_V have NO numeric value in the paper — caller MUST fit
 ---     these from a (S, V) grid via §3.2 Step 5 (log-linear regression).
 ---
----   §3.2 procedure reconstructed (paper has no Algorithm box):
+---   Allocator algorithm (this pkg's; paper §3.2 fits (a, b, α_S, α_V)
+---   as a 6-step procedure ending at log-linear regression — Step 5 — but
+---   has no allocator pseudocode for given (α, a, b). The 5 steps below
+---   are this pkg's rounding/rescale allocator after the caller has
+---   completed §3.2 Step 5):
 ---     Step 1: S_raw = α_S · B^a,    V_raw = α_V · B^b
 ---     Step 2: S_int = round(S_raw), V_int = round(V_raw)        (INJECT #A)
 ---     Step 3: C_actual = S_int · (1 + λ · V_int)
 ---     Step 4: if C_actual > B then rescale (S_int, V_int) within B (#B)
 ---     Step 5: if V_int == 0 then SC pure path: S = round(B), V = 0  (#C)
+---
+---   Domain: paper §3.1 implies S ≥ 1 (need at least one solution to
+---   verify) and V ≥ 0 (V=0 is the SC degenerate case). The pure
+---   `cost(S, V, λ)` entry accepts S ≥ 0 / V ≥ 0 for caller flexibility
+---   but `optimal_split` always returns S_opt ≥ 1.
 ---
 --- Cross-over observations (paper §5.1 — observations, NOT a constant):
 ---   * Llama-3.1-8B + GenRM-FT + MATH: GenRM matches SC at 8× compute,
@@ -212,7 +221,8 @@ local score_split_result_shape = T.shape({
         :describe("S^a · V^b proxy (paper §5.2 power-law direction). "
             .. "NOT a paper-§5.2 SR estimate; valid only as a "
             .. "relative-comparison value within the same (a, b) regime. "
-            .. "nil when V <= 0 (SC pure path — proxy is undefined)."),
+            .. "nil when either S <= 0 or V <= 0 — the proxy is "
+            .. "undefined on both axes (SC pure path included)."),
 }, { open = true })
 
 local sc_pure_opts_shape = T.shape({
@@ -270,12 +280,29 @@ M.spec = {
 
 -- ─── Validation helpers ───
 
-local function check_positive_number(x, name, entry)
+-- IEEE 754 NaN / Inf detection. NaN comparison always returns false
+-- (`x ~= x` is the canonical NaN test in Lua), so default range checks
+-- like `B < 1` silently let NaN through; these helpers must run first.
+local function check_finite_number(x, name, entry)
     if type(x) ~= "number" then
         error(string.format(
             "solve_verify_split.%s: %s must be a number, got %s",
             entry, name, type(x)), 3)
     end
+    if x ~= x then
+        error(string.format(
+            "solve_verify_split.%s: %s must be a finite number, got NaN",
+            entry, name), 3)
+    end
+    if x == math.huge or x == -math.huge then
+        error(string.format(
+            "solve_verify_split.%s: %s must be a finite number, got %s",
+            entry, name, tostring(x)), 3)
+    end
+end
+
+local function check_positive_number(x, name, entry)
+    check_finite_number(x, name, entry)
     if x <= 0 then
         error(string.format(
             "solve_verify_split.%s: %s must be > 0, got %s",
@@ -284,11 +311,7 @@ local function check_positive_number(x, name, entry)
 end
 
 local function check_budget(B, entry)
-    if type(B) ~= "number" then
-        error(string.format(
-            "solve_verify_split.%s: B must be a number, got %s",
-            entry, type(B)), 3)
-    end
+    check_finite_number(B, "B", entry)
     if B < 1 then
         error(string.format(
             "solve_verify_split.%s: B must be >= 1 "
@@ -304,6 +327,16 @@ local function check_nonneg_integer_like(x, name, entry)
             "solve_verify_split.%s: %s must be a number, got %s",
             entry, name, type(x)), 3)
     end
+    if x ~= x then
+        error(string.format(
+            "solve_verify_split.%s: %s must be a finite number, got NaN",
+            entry, name), 3)
+    end
+    if x == math.huge or x == -math.huge then
+        error(string.format(
+            "solve_verify_split.%s: %s must be a finite number, got %s",
+            entry, name, tostring(x)), 3)
+    end
     if x < 0 then
         error(string.format(
             "solve_verify_split.%s: %s must be >= 0, got %s",
@@ -311,12 +344,40 @@ local function check_nonneg_integer_like(x, name, entry)
     end
 end
 
-local function check_lambda(lambda, entry)
-    if type(lambda) ~= "number" then
+-- v_cap / s_cap validation. Caps are inference-call counts so they
+-- must be finite non-negative integers. `min_value` lets the caller
+-- enforce a floor (e.g. s_cap >= 1 because paper §3.1 implies S >= 1).
+local function check_integer_cap(x, name, entry, min_value)
+    if type(x) ~= "number" then
         error(string.format(
-            "solve_verify_split.%s: lambda must be a number, got %s",
-            entry, type(lambda)), 3)
+            "solve_verify_split.%s: opts.%s must be a number, got %s",
+            entry, name, type(x)), 3)
     end
+    if x ~= x then
+        error(string.format(
+            "solve_verify_split.%s: opts.%s must be a finite number, got NaN",
+            entry, name), 3)
+    end
+    if x == math.huge or x == -math.huge then
+        error(string.format(
+            "solve_verify_split.%s: opts.%s must be a finite number, got %s",
+            entry, name, tostring(x)), 3)
+    end
+    if x ~= math.floor(x) then
+        error(string.format(
+            "solve_verify_split.%s: opts.%s must be an integer "
+            .. "(inference-call count), got %s",
+            entry, name, tostring(x)), 3)
+    end
+    if x < min_value then
+        error(string.format(
+            "solve_verify_split.%s: opts.%s must be >= %d, got %s",
+            entry, name, min_value, tostring(x)), 3)
+    end
+end
+
+local function check_lambda(lambda, entry)
+    check_finite_number(lambda, "lambda", entry)
     if lambda <= 0 then
         error(string.format(
             "solve_verify_split.%s: lambda must be > 0 (got %s); "
@@ -346,6 +407,8 @@ local function check_params_for_optimal(params, entry)
             .. "got %s",
             entry, type(params.exponent_verify)), 3)
     end
+    check_finite_number(params.exponent_solve, "params.exponent_solve", entry)
+    check_finite_number(params.exponent_verify, "params.exponent_verify", entry)
     if not (params.exponent_solve > 0 and params.exponent_solve < 1) then
         error(string.format(
             "solve_verify_split.%s: params.exponent_solve must satisfy "
@@ -360,15 +423,19 @@ local function check_params_for_optimal(params, entry)
             .. "b ∈ [0.32, 0.43]); got %s",
             entry, tostring(params.exponent_verify)), 3)
     end
-    if type(params.prefactor_solve) ~= "number" or params.prefactor_solve <= 0 then
+    if type(params.prefactor_solve) ~= "number" or params.prefactor_solve ~= params.prefactor_solve
+        or params.prefactor_solve == math.huge or params.prefactor_solve == -math.huge
+        or params.prefactor_solve <= 0 then
         error(string.format(
-            "solve_verify_split.%s: params.prefactor_solve must be a positive number "
+            "solve_verify_split.%s: params.prefactor_solve must be a finite positive number "
             .. "(paper has NO numeric value; §3.2 Step 5 caller-fit required) — got %s",
             entry, tostring(params.prefactor_solve)), 3)
     end
-    if type(params.prefactor_verify) ~= "number" or params.prefactor_verify <= 0 then
+    if type(params.prefactor_verify) ~= "number" or params.prefactor_verify ~= params.prefactor_verify
+        or params.prefactor_verify == math.huge or params.prefactor_verify == -math.huge
+        or params.prefactor_verify <= 0 then
         error(string.format(
-            "solve_verify_split.%s: params.prefactor_verify must be a positive number "
+            "solve_verify_split.%s: params.prefactor_verify must be a finite positive number "
             .. "(paper has NO numeric value; §3.2 Step 5 caller-fit required) — got %s",
             entry, tostring(params.prefactor_verify)), 3)
     end
@@ -433,6 +500,12 @@ local function apply_rescale(S_int, V_int, B, lambda, method)
         return s, V_int, true
     else  -- "scale_proportional"
         -- Iteratively shrink S and V together preserving (V/S) ratio.
+        -- Termination guarantee: each iteration strictly decreases at
+        -- least one of (s, v) — either via factor = sqrt(B/cur_C) < 1
+        -- (which floors at least one of them down by ≥ 1 when cur_C > B)
+        -- or via the no-progress fallback that drops V then S by 1.
+        -- Loop guard `s > 1 or v > 0` plus integer monotone descent
+        -- bound the iteration count by S_int + V_int.
         local s, v = S_int, V_int
         while cost_of(s, v, lambda) > B and (s > 1 or v > 0) do
             local cur_C = cost_of(s, v, lambda)
@@ -464,18 +537,17 @@ end
 -- We expose only the power-law-implied compute scaling: SR_proxy(S,V) = S^a · V^b
 -- which is monotonic in both (matches §5.2 power-law direction). This is
 -- a NOT paper-faithful proxy when used as an absolute SR estimate; we only
--- expose it as a relative-comparison value (used by compare_paths advantage).
+-- expose it as a relative-comparison value within the same (a, b) regime.
+-- The proxy is undefined whenever either factor is non-positive (S^a or
+-- V^b is zero/imaginary); both `S <= 0` and `V <= 0` return nil so the
+-- field is symmetric on the two axes and callers cannot accidentally
+-- compare SC vs GenRM via this single field. Use compare_paths.delta_* /
+-- observed accuracy for cross-path comparison.
 local function predicted_sr_proxy(S_, V, params)
     if type(params.exponent_solve) ~= "number" or type(params.exponent_verify) ~= "number" then
         return nil
     end
-    if S_ <= 0 then return 0 end
-    -- V=0 (SC pure path) breaks the V^b factor (V→0+ gives proxy→0
-    -- but V=0 is intentionally undefined here). Return nil so callers
-    -- cannot accidentally compare SC vs GenRM via this single field.
-    -- Use compare_paths.delta_* / observed accuracy for cross-path
-    -- comparison.
-    if V <= 0 then return nil end
+    if S_ <= 0 or V <= 0 then return nil end
     local s_term = S_ ^ params.exponent_solve
     local v_term = V ^ params.exponent_verify
     return s_term * v_term
@@ -538,6 +610,12 @@ function M.optimal_split(B, params, opts)
             .. "(only 'per_solution' is supported per paper §3.1)",
             tostring(opts.cost_model)), 2)
     end
+    if opts.s_cap ~= nil then
+        check_integer_cap(opts.s_cap, "s_cap", "optimal_split", 1)
+    end
+    if opts.v_cap ~= nil then
+        check_integer_cap(opts.v_cap, "v_cap", "optimal_split", 0)
+    end
     local sc_fallback = opts.sc_fallback_when_v_zero
     if sc_fallback == nil then sc_fallback = M._defaults.sc_fallback_when_v_zero end
 
@@ -577,12 +655,18 @@ function M.optimal_split(B, params, opts)
     -- Step 3-4: cost check + rescale
     local s_final, v_final, rescaled = apply_rescale(s_int, v_int, B, params.lambda, rescale_method)
 
-    -- Post-rescale: if V dropped to 0 and SC fallback enabled, prefer SC pure
+    -- Post-rescale: if V dropped to 0 and SC fallback enabled, mark
+    -- the result as a SC takeover (consistent with the Step 5
+    -- short-circuit above; caller can route on `is_sc_fallback` to
+    -- treat this output as SC pure rather than GenRM allocation).
+    -- s_final is upgraded to sc_path(B) only when that yields a
+    -- strictly larger S — re-rounding under proportional shrink can
+    -- leave s_final < B even when V=0.
     if v_final == 0 and sc_fallback then
+        is_sc_fallback = true
         local sc_s, _ = sc_path(B, integer_method)
         if sc_s > s_final then
             s_final = sc_s
-            is_sc_fallback = true
         end
     end
 

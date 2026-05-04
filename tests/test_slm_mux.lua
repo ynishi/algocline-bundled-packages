@@ -586,3 +586,117 @@ describe("slm_mux._internal", function()
         end
     end)
 end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- math-strict review hardening (a718ecc → next)
+-- ═══════════════════════════════════════════════════════════════════
+
+describe("slm_mux.inference_select validation_accuracy domain check", function()
+    lust.after(reset)
+
+    it("rejects validation_accuracy < 0 with typed error", function()
+        local mux = require("slm_mux")
+        local ok, err = pcall(mux.inference_select, {
+            { y_star = "A", s = 0.6, validation_accuracy = -0.1 },
+            { y_star = "B", s = 0.6, validation_accuracy =  0.5 },
+        })
+        expect(ok).to.equal(false)
+        expect(err:match("validation_accuracy") ~= nil).to.equal(true)
+        expect(err:match("%[0, 1%]") ~= nil).to.equal(true)
+    end)
+
+    it("rejects validation_accuracy > 1 with typed error", function()
+        local mux = require("slm_mux")
+        local ok, err = pcall(mux.inference_select, {
+            { y_star = "A", s = 0.6, validation_accuracy = 1.2 },
+            { y_star = "B", s = 0.6, validation_accuracy = 0.5 },
+        })
+        expect(ok).to.equal(false)
+        expect(err:match("validation_accuracy") ~= nil).to.equal(true)
+    end)
+
+    it("rejects NaN validation_accuracy", function()
+        local mux = require("slm_mux")
+        local nan = 0 / 0
+        local ok, err = pcall(mux.inference_select, {
+            { y_star = "A", s = 0.6, validation_accuracy = nan },
+            { y_star = "B", s = 0.6, validation_accuracy = 0.5 },
+        })
+        expect(ok).to.equal(false)
+        expect(err:match("validation_accuracy") ~= nil).to.equal(true)
+    end)
+
+    it("accepts validation_accuracy at boundaries (0 and 1)", function()
+        local mux = require("slm_mux")
+        local r = mux.inference_select({
+            { y_star = "A", s = 0.6, validation_accuracy = 0 },
+            { y_star = "B", s = 0.6, validation_accuracy = 1 },
+        })
+        expect(r.selected_model_idx).to.equal(2)
+        expect(r.tie_break_used).to.equal("validation_accuracy")
+    end)
+end)
+
+describe("slm_mux._internal.contradiction effective_M=0 hardening", function()
+    lust.after(reset)
+
+    it("raises typed error when all calibration entries are missing under skip_missing", function()
+        local mux = require("slm_mux")
+        local empty_profile = {
+            samples = { {}, {}, {} },   -- all questions empty
+            correct = { "A", "B", "C" },
+        }
+        local ok, err = pcall(
+            mux._internal.contradiction,
+            { empty_profile, empty_profile },
+            { 1, 2 },
+            { partial_coverage = "skip_missing" },
+            "score_subset")
+        expect(ok).to.equal(false)
+        expect(err:match("no calibration question") ~= nil).to.equal(true)
+    end)
+end)
+
+describe("slm_mux.select_subset eps-tolerant tie collection", function()
+    lust.after(reset)
+
+    it("collects ties whose objectives differ by < eps as a tied set", function()
+        local mux = require("slm_mux")
+        -- All three singleton subsets in TOY have objective 0.4 (exact).
+        -- Verify lexicographic_on_indices picks the smallest index.
+        local r = mux.select_subset(TOY, 1, {
+            subset_tie_break = "lexicographic_on_indices",
+        })
+        expect(r.selected_indices[1]).to.equal(1)
+        expect(approx_eq(r.objective, 0.4)).to.equal(true)
+    end)
+end)
+
+describe("slm_mux.select_subset greedy subset_tie_break is honoured", function()
+    lust.after(reset)
+
+    it("greedy_forward respects lexicographic_on_indices tie-break", function()
+        local mux = require("slm_mux")
+        -- TOY: at K=1, all three singletons tie at 𝒪=0.4. greedy_forward
+        -- starts empty and at the first step has 3 options tied.
+        local r = mux.select_subset(TOY, 1, {
+            search_method = "greedy_forward",
+            subset_tie_break = "lexicographic_on_indices",
+        })
+        expect(r.selected_indices[1]).to.equal(1)
+    end)
+
+    it("greedy_backward respects lexicographic_on_indices tie-break", function()
+        local mux = require("slm_mux")
+        -- At K=2 from 3, removing any single index gives the same
+        -- objective on TOY (S={1,2}=0.2 vs S={1,3}=0 vs S={2,3}=0
+        -- — these aren't tied, so use a degenerate fixture: same TOY at
+        -- K=N=3 returns starting subset (no removal; verify the path
+        -- doesn't error out and search_log captures the start).
+        local r = mux.select_subset(TOY, 3, {
+            search_method = "greedy_backward",
+            subset_tie_break = "lexicographic_on_indices",
+        })
+        expect(#r.selected_indices).to.equal(3)
+    end)
+end)

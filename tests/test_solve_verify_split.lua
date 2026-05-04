@@ -474,3 +474,164 @@ describe("solve_verify_split._internal", function()
         expect(v).to.equal(1)
     end)
 end)
+
+-- ═══════════════════════════════════════════════════════════════════
+-- math-strict review hardening (a718ecc → next)
+-- ═══════════════════════════════════════════════════════════════════
+
+local function default_params()
+    return {
+        lambda           = 1.0,
+        exponent_solve   = 0.57,
+        exponent_verify  = 0.39,
+        prefactor_solve  = 1.0,
+        prefactor_verify = 0.5,
+    }
+end
+
+describe("solve_verify_split.optimal_split cap domain checks (H1)", function()
+    lust.after(reset)
+
+    it("rejects v_cap = -1", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, 100, default_params(), { v_cap = -1 })
+        expect(ok).to.equal(false)
+        expect(err:match("v_cap") ~= nil).to.equal(true)
+        expect(err:match(">= 0") ~= nil).to.equal(true)
+    end)
+
+    it("rejects s_cap = 0", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, 100, default_params(), { s_cap = 0 })
+        expect(ok).to.equal(false)
+        expect(err:match("s_cap") ~= nil).to.equal(true)
+        expect(err:match(">= 1") ~= nil).to.equal(true)
+    end)
+
+    it("rejects s_cap = 0.5 (non-integer)", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, 100, default_params(), { s_cap = 0.5 })
+        expect(ok).to.equal(false)
+        expect(err:match("integer") ~= nil).to.equal(true)
+    end)
+
+    it("rejects v_cap = 0.5 (non-integer)", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, 100, default_params(), { v_cap = 0.5 })
+        expect(ok).to.equal(false)
+        expect(err:match("integer") ~= nil).to.equal(true)
+    end)
+
+    it("accepts v_cap = 0 (valid: forces SC fallback path)", function()
+        local svs = require("solve_verify_split")
+        local r = svs.optimal_split(100, default_params(), { v_cap = 0 })
+        expect(r.v_opt).to.equal(0)
+        expect(r.is_sc_fallback).to.equal(true)
+    end)
+
+    it("accepts s_cap = 1 (paper minimum)", function()
+        local svs = require("solve_verify_split")
+        local r = svs.optimal_split(100, default_params(), { s_cap = 1 })
+        expect(r.s_opt).to.equal(1)
+    end)
+end)
+
+describe("solve_verify_split NaN/Inf rejection (H3)", function()
+    lust.after(reset)
+    local nan = 0 / 0
+    local pos_inf = math.huge
+    local neg_inf = -math.huge
+
+    it("rejects NaN budget", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, nan, default_params())
+        expect(ok).to.equal(false)
+        expect(err:match("NaN") ~= nil).to.equal(true)
+    end)
+
+    it("rejects +Inf budget", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.optimal_split, pos_inf, default_params())
+        expect(ok).to.equal(false)
+        expect(err:match("finite") ~= nil).to.equal(true)
+    end)
+
+    it("rejects NaN lambda", function()
+        local svs = require("solve_verify_split")
+        local p = default_params()
+        p.lambda = nan
+        local ok, err = pcall(svs.optimal_split, 100, p)
+        expect(ok).to.equal(false)
+        expect(err:match("NaN") ~= nil).to.equal(true)
+    end)
+
+    it("rejects -Inf lambda via cost entry", function()
+        local svs = require("solve_verify_split")
+        local ok, err = pcall(svs.cost, 4, 1, neg_inf)
+        expect(ok).to.equal(false)
+        expect(err:match("finite") ~= nil).to.equal(true)
+    end)
+
+    it("rejects NaN exponent_solve", function()
+        local svs = require("solve_verify_split")
+        local p = default_params()
+        p.exponent_solve = nan
+        local ok, err = pcall(svs.optimal_split, 100, p)
+        expect(ok).to.equal(false)
+        expect(err:match("NaN") ~= nil).to.equal(true)
+    end)
+
+    it("rejects NaN prefactor_solve", function()
+        local svs = require("solve_verify_split")
+        local p = default_params()
+        p.prefactor_solve = nan
+        local ok, err = pcall(svs.optimal_split, 100, p)
+        expect(ok).to.equal(false)
+        expect(err:match("prefactor_solve") ~= nil).to.equal(true)
+    end)
+end)
+
+describe("solve_verify_split is_sc_fallback semantic consistency (H2)", function()
+    lust.after(reset)
+
+    it("v_cap=0 forces SC takeover at any budget", function()
+        local svs = require("solve_verify_split")
+        for _, B in ipairs({ 1, 3, 10, 100 }) do
+            local r = svs.optimal_split(B, default_params(), { v_cap = 0 })
+            expect(r.v_opt).to.equal(0)
+            expect(r.is_sc_fallback).to.equal(true)
+        end
+    end)
+
+    it("V_int=0 short-circuit sets is_sc_fallback=true (Path 1)", function()
+        local svs = require("solve_verify_split")
+        local p = default_params()
+        p.prefactor_verify = 0.0001       -- V_raw → ~0 → V_int = 0
+        local r = svs.optimal_split(2, p)
+        expect(r.v_opt).to.equal(0)
+        expect(r.is_sc_fallback).to.equal(true)
+    end)
+end)
+
+describe("solve_verify_split.score_split proxy symmetry (M1)", function()
+    lust.after(reset)
+
+    it("S=0 returns nil (not 0) — symmetric with V=0", function()
+        local svs = require("solve_verify_split")
+        local r = svs.score_split(0, 4, default_params())
+        expect(r.power_law_score_proxy).to.equal(nil)
+    end)
+
+    it("V=0 returns nil — SC pure path proxy undefined", function()
+        local svs = require("solve_verify_split")
+        local r = svs.score_split(8, 0, default_params())
+        expect(r.power_law_score_proxy).to.equal(nil)
+    end)
+
+    it("S>0 and V>0 returns numeric proxy", function()
+        local svs = require("solve_verify_split")
+        local r = svs.score_split(8, 4, default_params())
+        expect(type(r.power_law_score_proxy)).to.equal("number")
+        expect(r.power_law_score_proxy > 0).to.equal(true)
+    end)
+end)
