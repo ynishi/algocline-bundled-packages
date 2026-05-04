@@ -156,6 +156,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     termination-guarantee comment (factor < 1 plus integer no-progress
     fallback bounds the loop by `S_int + V_int`).
 
+### Documentation
+
+- **slm_mux** (round 3, docstring-only — no logic change):
+  - `partial_coverage = "skip_missing"` now carries an explicit caveat
+    that UnionAcc / Contradiction are normalised by `effective_M`,
+    which can differ across subsets when profiles cover different
+    questions, so `𝒪(S₁) vs 𝒪(S₂)` comparison under this mode is only
+    an approximation (paper §3.2 `|𝒟|` is fixed and shared across `S`).
+    `"treat_as_wrong"` keeps `|𝒟|` fixed and preserves cross-subset
+    comparability.
+  - `OBJ_EPS = 1e-12` (𝒪 tie collection eps) gains a scale-assumption
+    comment: granularity is `1 / |effective_M|`, paper §4.3 uses
+    `|𝒟| = 500` (granularity 2e-3), eps is safe up to
+    `|effective_M| ≲ 10¹⁰` and should be tightened proportionally for
+    larger calibration sets.
+- **solve_verify_split** (round 3, docstring-only — no logic change):
+  - `power_law_score_proxy` shape descriptor and internal helper
+    comment now state explicitly that paper §5.2 specifies the
+    *scaling* of the optimal allocation `S_opt(C), V_opt(C)`, not a
+    closed-form `SR(S, V)` surface. Treating `S^a · V^b` as a ranking
+    function over arbitrary `(S, V)` pairs is a caller-defined
+    heuristic — monotonicity (direction) does not imply order-preserving
+    rank vs. true accuracy. Use as a tiebreaker / sanity check, not an
+    SR estimator; prefer `compare_paths.delta_*` or observed accuracy
+    for cross-path comparison.
+
 ## [0.20.0] - 2026-04-25
 
 ### Added

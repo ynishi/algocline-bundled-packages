@@ -101,6 +101,16 @@
 ---                         full coverage). "skip_missing" /
 ---                         "treat_as_wrong" are NOT paper-faithful research
 ---                         knobs.
+---                         CAVEAT (skip_missing only): UnionAcc / Contradiction
+---                         are normalised by `effective_M` (= number of
+---                         calibration questions with at least one observed
+---                         model in the subset), which can differ across
+---                         subsets when different profiles cover different
+---                         questions. 𝒪(S₁) vs 𝒪(S₂) comparison is therefore
+---                         only an approximation under this mode — the
+---                         paper §3.2 |𝒟| is fixed and shared across S.
+---                         "treat_as_wrong" keeps |𝒟| fixed (missing →
+---                         wrong) and preserves cross-subset comparability.
 ---
 --- NOT IN v1 (documented shortfalls):
 ---   * Online inference orchestration (the test-time inference loop
@@ -447,6 +457,13 @@ end
 -- Floating-point eps for 𝒪(S) tie collection. Subsets with objectives
 -- closer than this are treated as a tie (deterministic enumeration of
 -- the §3.2 argmax set under bit-rounding noise).
+--
+-- Scale assumption: UnionAcc / Contradiction live in [0, 1] with
+-- granularity 1/|effective_M|. Paper §4.3 uses |𝒟|=500 (granularity
+-- 2e-3), so 1e-12 is ~9 orders of magnitude safer than the smallest
+-- meaningful difference. Safe up to |effective_M| ≲ 10¹⁰; beyond that
+-- (extremely large calibration sets) genuine differences would be
+-- collapsed as ties and OBJ_EPS should be tightened proportionally.
 local OBJ_EPS = 1e-12
 
 local function obj_eq(a, b)

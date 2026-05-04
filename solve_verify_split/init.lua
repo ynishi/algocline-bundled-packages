@@ -218,9 +218,17 @@ local score_split_result_shape = T.shape({
     is_within             = T.boolean:is_optional()
         :describe("cost ≤ budget when opts.budget is provided"),
     power_law_score_proxy = T.number:is_optional()
-        :describe("S^a · V^b proxy (paper §5.2 power-law direction). "
-            .. "NOT a paper-§5.2 SR estimate; valid only as a "
-            .. "relative-comparison value within the same (a, b) regime. "
+        :describe("S^a · V^b proxy (monotonic in both axes; matches "
+            .. "paper §5.2 power-law direction). "
+            .. "NOT a paper-§5.2 SR estimate. Paper §5.2 specifies the "
+            .. "scaling of the optimal allocation S_opt(C), V_opt(C) "
+            .. "but does NOT give a closed-form SR(S, V) surface; "
+            .. "treating S^a · V^b as a ranking function over (S, V) "
+            .. "is a caller-defined heuristic with no formal guarantee "
+            .. "from the paper that ranking matches accuracy ranking. "
+            .. "Use only as a relative-comparison value within the same "
+            .. "(a, b) regime, and prefer compare_paths.delta_* / "
+            .. "observed accuracy for cross-path comparison. "
             .. "nil when either S <= 0 or V <= 0 — the proxy is "
             .. "undefined on both axes (SC pure path included)."),
 }, { open = true })
@@ -538,6 +546,14 @@ end
 -- which is monotonic in both (matches §5.2 power-law direction). This is
 -- a NOT paper-faithful proxy when used as an absolute SR estimate; we only
 -- expose it as a relative-comparison value within the same (a, b) regime.
+--
+-- Caveat on relative ranking: paper §5.2 gives the *scaling* of the
+-- optimal allocation, not a closed-form SR(S, V) surface. Using
+-- S^a · V^b as a ranking function over arbitrary (S, V) pairs is a
+-- caller-defined heuristic — monotonicity (direction) does not imply
+-- order-preserving rank vs. true accuracy. Treat as a tiebreaker /
+-- sanity check, not an SR estimator.
+--
 -- The proxy is undefined whenever either factor is non-positive (S^a or
 -- V^b is zero/imaginary); both `S <= 0` and `V <= 0` return nil so the
 -- field is symmetric on the two axes and callers cannot accidentally
