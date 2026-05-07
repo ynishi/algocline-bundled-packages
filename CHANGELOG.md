@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **README Runtime API table**: `alc.map(list, fn)` was previously
+  documented as "Parallel map execution", which is misleading.
+  `alc.map` is implemented as a plain sequential `for ipairs` loop
+  in `algocline-engine/src/prelude.lua:89-95`; LLM calls placed
+  inside its callback run **sequentially** (N round-trips, not
+  batch-parallel). The table is corrected to label `alc.map` as
+  Sequential, and `alc.parallel(items, prompt_fn, opts)` /
+  `alc.llm_batch(items)` are now documented as the true
+  batch-parallel primitives (single round-trip via Rust-side
+  `coroutine.yield` + `await all` in `bridge/llm.rs`). `alc.reduce`
+  is also surfaced for completeness. **Behavior unchanged**: this
+  is a documentation-only correction. Per-pkg docstring claims
+  ("parallel" wording) and `alc.map` → `alc.parallel` migration
+  for the 24 pkg currently using `alc.map` for multi-LLM-call
+  flows are tracked separately as follow-up issues — each pkg
+  needs individual triage on whether sequential / parallel /
+  caller-selectable is the right contract (post_fn dependency,
+  inter-iteration state, paper-faithful semantics). See issue
+  `1778144244-78327`.
+
 ### Added
 
 - **`crdt_doc`** (Collaboration): Frame role substrate (no `M.run`,

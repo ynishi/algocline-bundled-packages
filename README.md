@@ -371,8 +371,11 @@ Each package uses the following algocline runtime APIs:
 
 | API | Description |
 |-----|-------------|
-| `alc.llm(prompt, opts)` | LLM call |
-| `alc.map(list, fn)` | Parallel map execution |
+| `alc.llm(prompt, opts)` | Single LLM call |
+| `alc.llm_batch(items)` | Batch LLM call: all items dispatched as a single round-trip, awaited concurrently |
+| `alc.parallel(items, prompt_fn, opts)` | Batch-parallel helper: builds prompts via `prompt_fn`, then 1 round-trip via `alc.llm_batch`. Use this for true parallel multi-agent / map-reduce flows |
+| `alc.map(list, fn)` | **Sequential** map (plain `for ipairs` loop). Despite the name, LLM calls inside `fn` run sequentially — use `alc.parallel` for batch-parallel LLM dispatch |
+| `alc.reduce(items, fn, init?)` | Sequential reduce |
 | `alc.chunk(text, opts)` | Text chunking |
 | `alc.log(level, msg)` | Logging |
 | `alc.stats.record(key, val)` | Metrics recording |
