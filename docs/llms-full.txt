@@ -861,6 +861,15 @@ Returns:
 
 ---
 
+<!-- ── crdt_doc.md ── -->
+
+
+# crdt_doc — CRDT-backed shared document substrate
+
+> Frame role substrate (no M.run, no LLM). Provides Doc + Op + Merge primitives that external collaboration Frames can compose to build multi-agent shared state with mathematical conflict-free merge (commutative / associative / idempotent).
+
+---
+
 <!-- ── critic.md ── -->
 
 

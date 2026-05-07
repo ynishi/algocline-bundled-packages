@@ -21,6 +21,10 @@
 - [claim_trace](narrative/claim_trace.md): Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance
 - [shapley](narrative/shapley.md): Shapley Value — axiomatically unique agent contribution attribution via exact O(2^n) computation or Monte Carlo permutation sampling. Identifies essential, redundant, and harmful agents in multi-...
 
+## collaboration
+
+- [crdt_doc](narrative/crdt_doc.md): CRDT-backed shared document substrate — OR-Map + LWW-Register primitives with mathematical conflict-free merge (commutative / associative / idempotent). Frame role: no M.run, no LLM. External col...
+
 ## combinator
 
 - [deliberate](narrative/deliberate.md): Structured deliberation — abstract principles, expert consultation, debate, ranked decision
