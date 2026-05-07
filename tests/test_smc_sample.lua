@@ -500,6 +500,40 @@ local function make_alc_stub(opts)
         },
         hash = function(s) return "deadbeef" .. tostring(#s) end,
     }
+    stub.llm_batch = function(items)
+        local results = {}
+        for i, item in ipairs(items) do
+            results[i] = llm_fn(item.prompt, {
+                system     = item.system,
+                max_tokens = item.max_tokens,
+            })
+        end
+        return results
+    end
+    stub.parallel = function(items, prompt_fn, popts)
+        popts = popts or {}
+        local batch = {}
+        for i, item in ipairs(items) do
+            local p = prompt_fn(item, i)
+            if type(p) == "string" then
+                local entry = { prompt = p }
+                if popts.system     then entry.system     = popts.system     end
+                if popts.max_tokens then entry.max_tokens = popts.max_tokens end
+                batch[i] = entry
+            else
+                batch[i] = p
+            end
+        end
+        local responses = stub.llm_batch(batch)
+        if popts.post_fn then
+            local results = {}
+            for i = 1, #items do
+                results[i] = popts.post_fn(responses[i], items[i], i)
+            end
+            return results
+        end
+        return responses
+    end
     if opts.with_card then
         local card_state = { create_calls = 0, samples_calls = 0 }
         stub.card = {
@@ -546,19 +580,42 @@ describe("smc_sample._internal.init_particles (mocked alc.llm)", function()
         -- Fixture function returns nil on the first call so we can
         -- verify init_particles coerces nil → "" via tostring(... or "").
         local call = 0
-        local stub = {
-            llm = function()
-                call = call + 1
-                if call == 1 then return nil end
-                return "ok"
-            end,
-            map = function(coll, fn)
-                local out = {}
-                for i, v in ipairs(coll) do out[i] = fn(v, i) end
-                return out
-            end,
-            log = { warn = function() end, info = function() end },
-        }
+        local stub = {}
+        stub.llm = function()
+            call = call + 1
+            if call == 1 then return nil end
+            return "ok"
+        end
+        stub.map = function(coll, fn)
+            local out = {}
+            for i, v in ipairs(coll) do out[i] = fn(v, i) end
+            return out
+        end
+        stub.llm_batch = function(items)
+            local results = {}
+            for i, item in ipairs(items) do
+                results[i] = stub.llm(item.prompt, { max_tokens = item.max_tokens })
+            end
+            return results
+        end
+        stub.parallel = function(items, prompt_fn, popts)
+            popts = popts or {}
+            local batch = {}
+            for i, item in ipairs(items) do
+                local p = prompt_fn(item, i)
+                batch[i] = type(p) == "string" and { prompt = p } or p
+            end
+            local responses = stub.llm_batch(batch)
+            if popts.post_fn then
+                local results = {}
+                for i = 1, #items do
+                    results[i] = popts.post_fn(responses[i], items[i], i)
+                end
+                return results
+            end
+            return responses
+        end
+        stub.log = { warn = function() end, info = function() end }
         _G.alc = stub
         local smc = require("smc_sample")
         local particles = smc._internal.init_particles("t", 2, 100)
@@ -691,20 +748,46 @@ describe("smc_sample._internal.mh_rejuvenate (one MH step)", function()
 
     it("LLM failure on proposal → that slot is rejected (kept prev)", function()
         -- First LLM call fails (error), second returns an answer.
+        -- alc.parallel mock: llm_batch captures per-item errors as nil so that
+        -- post_fn can treat them as failed proposals (reject path).
         local call = 0
-        local stub = {
-            llm = function()
-                call = call + 1
-                if call == 1 then error("llm down") end
-                return "refined_ok"
-            end,
-            map = function(coll, fn)
-                local out = {}
-                for i, v in ipairs(coll) do out[i] = fn(v, i) end
-                return out
-            end,
-            log = { warn = function() end, info = function() end },
-        }
+        local stub = {}
+        stub.llm = function()
+            call = call + 1
+            if call == 1 then error("llm down") end
+            return "refined_ok"
+        end
+        stub.map = function(coll, fn)
+            local out = {}
+            for i, v in ipairs(coll) do out[i] = fn(v, i) end
+            return out
+        end
+        stub.llm_batch = function(items)
+            local results = {}
+            for i, item in ipairs(items) do
+                local ok, resp = pcall(stub.llm, item.prompt, { max_tokens = item.max_tokens })
+                results[i] = ok and resp or nil
+            end
+            return results
+        end
+        stub.parallel = function(items, prompt_fn, popts)
+            popts = popts or {}
+            local batch = {}
+            for i, item in ipairs(items) do
+                local p = prompt_fn(item, i)
+                batch[i] = type(p) == "string" and { prompt = p } or p
+            end
+            local responses = stub.llm_batch(batch)
+            if popts.post_fn then
+                local results = {}
+                for i = 1, #items do
+                    results[i] = popts.post_fn(responses[i], items[i], i)
+                end
+                return results
+            end
+            return responses
+        end
+        stub.log = { warn = function() end, info = function() end }
         _G.alc = stub
         local smc = require("smc_sample")
         local particles = {

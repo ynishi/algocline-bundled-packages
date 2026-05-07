@@ -455,9 +455,16 @@ M.spec = {
 -- LLM integration helpers (testable with alc stub)
 -- ═══════════════════════════════════════════════════════════════════
 
---- map_or_serial — alc.map when available, serial for-loop otherwise.
---- Same fallback convention as sc / mbr_select.
-local function map_or_serial(collection, fn)
+--- pure_fan_out — fan-out helper for **LLM-non-dependent** callbacks.
+--- Uses alc.map when available (sequential under current core),
+--- otherwise serial for-loop (semantically identical).
+---
+--- For LLM-dependent callbacks, use alc.parallel directly to get
+--- true batch-parallel execution via alc.llm_batch (1 round-trip).
+--- This helper is intentionally retained for callbacks that pcall
+--- caller-injected functions (e.g. prm_fn / reward_fn) where the
+--- alc.parallel API (LLM batch only) does not apply.
+local function pure_fan_out(collection, fn)
     if type(alc) == "table" and type(alc.map) == "function" then
         return alc.map(collection, fn)
     end
@@ -483,8 +490,8 @@ end
 --- init_particles — Parallel draw of N independent answers.
 ---
 --- Each particle is a table `{ answer, history = {} }`. reward / weight
---- are filled in later. `alc.map` is used when available to fan out the
---- N LLM calls in parallel; serial fallback is semantically identical.
+--- are filled in later. `alc.parallel` fans out the N LLM calls in a
+--- single round-trip via alc.llm_batch.
 ---
 --- Returns the particles list. LLM call count = N (all draws are
 --- mandatory; there is no early termination).
@@ -492,8 +499,8 @@ local function init_particles(task, n, gen_tokens)
     local indices = {}
     for i = 1, n do indices[i] = i end
 
-    local answers = map_or_serial(indices, function(_i)
-        return alc.llm(task, { max_tokens = gen_tokens })
+    local answers = alc.parallel(indices, function(_i)
+        return { prompt = task, max_tokens = gen_tokens }
     end)
 
     -- history = 1-slot convention, diagnostic only:
@@ -527,12 +534,11 @@ end
 --- reward_fn invocations actually made, for total_reward_calls book-
 --- keeping).
 local function evaluate_rewards(particles, task, reward_fn)
-    -- alc.map cannot abort partway through, so we use the map helper
-    -- for parallelism benefit only when every reward_fn succeeds; any
-    -- failure is re-raised outside the map via the first entry with
-    -- ok=false. We record per-particle ok/value pairs and surface the
-    -- first failure.
-    local results = map_or_serial(particles, function(p, _i)
+    -- pure_fan_out fans out reward_fn (non-LLM caller-injected function)
+    -- over each particle; any failure is re-raised outside the fan-out
+    -- via the first entry with ok=false. We record per-particle ok/value
+    -- pairs and surface the first failure.
+    local results = pure_fan_out(particles, function(p, _i)
         local ok, r = pcall(reward_fn, p.answer, task)
         return { ok = ok, val = r }
     end)
@@ -629,14 +635,14 @@ local function mh_rejuvenate(particles, rewards, alpha, task, gen_tokens, reward
     -- Stage 1: propose (parallel LLM calls) on active slots only.
     local active_particles = {}
     for j, i in ipairs(active) do active_particles[j] = particles[i] end
-    local proposals_active = map_or_serial(active_particles, function(p, _j)
-        local ok, resp = pcall(alc.llm,
-            build_refine_prompt(p.answer, task),
-            { max_tokens = gen_tokens })
-        if not ok then return nil end
-        if type(resp) ~= "string" or resp == "" then return nil end
-        return resp
-    end)
+    local proposals_active = alc.parallel(active_particles, function(p, _j)
+        return { prompt = build_refine_prompt(p.answer, task), max_tokens = gen_tokens }
+    end, {
+        post_fn = function(resp, _p, _j)
+            if type(resp) ~= "string" or resp == "" then return nil end
+            return resp
+        end,
+    })
 
     -- Count successful proposal LLM calls over active slots only.
     local n_proposal_llm_calls = 0

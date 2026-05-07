@@ -594,9 +594,16 @@ M.spec = {
 -- LLM integration helpers (testable with alc stub)
 -- ═══════════════════════════════════════════════════════════════════
 
---- map_or_serial — alc.map when available, serial for-loop otherwise.
---- Same fallback convention as sc / smc_sample / mbr_select.
-local function map_or_serial(collection, fn)
+--- pure_fan_out — fan-out helper for **LLM-non-dependent** callbacks.
+--- Uses alc.map when available (sequential under current core),
+--- otherwise serial for-loop (semantically identical).
+---
+--- For LLM-dependent callbacks, use alc.parallel directly to get
+--- true batch-parallel execution via alc.llm_batch (1 round-trip).
+--- This helper is intentionally retained for callbacks that pcall
+--- caller-injected functions (e.g. prm_fn / reward_fn) where the
+--- alc.parallel API (LLM batch only) does not apply.
+local function pure_fan_out(collection, fn)
     if type(alc) == "table" and type(alc.map) == "function" then
         return alc.map(collection, fn)
     end
@@ -675,15 +682,14 @@ local function advance_step(particles, task, gen_tokens, llm_temperature)
         prompts[j] = build_step_prompt(task, particles[i].partial)
     end
 
-    local responses = map_or_serial(prompts, function(prompt, _j)
-        local ok, resp = pcall(alc.llm, prompt, {
-            max_tokens  = gen_tokens,
-            temperature = llm_temperature,
-        })
-        if not ok then return "" end
-        if type(resp) ~= "string" then return "" end
-        return resp
-    end)
+    local responses = alc.parallel(prompts, function(prompt, _j)
+        return { prompt = prompt, max_tokens = gen_tokens, temperature = llm_temperature }
+    end, {
+        post_fn = function(resp, _prompt, _j)
+            if type(resp) ~= "string" then return "" end
+            return resp
+        end,
+    })
 
     for j, i in ipairs(active_idx) do
         local resp = responses[j]
@@ -717,7 +723,7 @@ local function evaluate_prm(particles, task, prm_fn)
     local active_particles = {}
     for j, i in ipairs(active_idx) do active_particles[j] = particles[i] end
 
-    local results = map_or_serial(active_particles, function(p, _j)
+    local results = pure_fan_out(active_particles, function(p, _j)
         local ok, r = pcall(prm_fn, p.partial, task)
         return { ok = ok, val = r }
     end)

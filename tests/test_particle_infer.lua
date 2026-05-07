@@ -630,6 +630,40 @@ local function make_alc_stub(opts)
         },
         hash = function(s) return "deadbeef" .. tostring(#s) end,
     }
+    stub.llm_batch = function(items)
+        local results = {}
+        for i, item in ipairs(items) do
+            results[i] = llm_fn(item.prompt, {
+                system     = item.system,
+                max_tokens = item.max_tokens,
+            })
+        end
+        return results
+    end
+    stub.parallel = function(items, prompt_fn, popts)
+        popts = popts or {}
+        local batch = {}
+        for i, item in ipairs(items) do
+            local p = prompt_fn(item, i)
+            if type(p) == "string" then
+                local entry = { prompt = p }
+                if popts.system     then entry.system     = popts.system     end
+                if popts.max_tokens then entry.max_tokens = popts.max_tokens end
+                batch[i] = entry
+            else
+                batch[i] = p
+            end
+        end
+        local responses = stub.llm_batch(batch)
+        if popts.post_fn then
+            local results = {}
+            for i = 1, #items do
+                results[i] = popts.post_fn(responses[i], items[i], i)
+            end
+            return results
+        end
+        return responses
+    end
     if opts.with_card then
         local card_state = { create_calls = 0, samples_calls = 0 }
         stub.card = {

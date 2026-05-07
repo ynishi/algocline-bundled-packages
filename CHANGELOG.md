@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`particle_infer` / `smc_sample`** (Sampling): migrated 3 LLM
+  call-sites from the sequential `map_or_serial` helper to the true
+  batch-parallel `alc.parallel(items, prompt_fn, opts)` primitive.
+  The shared `map_or_serial` helper is renamed to `pure_fan_out`
+  in both packages and its docstring is updated to clarify that it
+  is now intentionally retained **only** for caller-injected
+  non-LLM callbacks (`prm_fn` / `reward_fn` in `evaluate_prm` /
+  `evaluate_rewards`) where the LLM-batch-only `alc.parallel` API
+  does not apply. Migrated call-sites: `particle_infer.advance_step`
+  (was 1 LLM call per active particle, now 1 round-trip via
+  `alc.llm_batch`), `smc_sample.init_particles` (N independent
+  draws), `smc_sample.mh_rejuvenate` Stage 1 propose (LLM calls on
+  active slots). Behavior is mathematically equivalent to the
+  previous sequential implementation; original `pcall` / type / nil
+  guards are preserved via `opts.post_fn` since `alc.llm_batch` is
+  all-or-nothing rather than per-element pcall-able. Performance:
+  N round-trips → 1 round-trip per migrated call-site (latency × N
+  → × 1, token cost unchanged). Paper-faithful default is preserved
+  (arXiv:2502.01618 §3.1 Algorithm 1 / arXiv:2604.16453 §3
+  Algorithm 1 explicitly permit but do not mandate parallel
+  execution; `caller-selectable` opt-in was deliberately not added
+  since neither paper requires sequential semantics). Test mocks
+  in `tests/test_particle_infer.lua` and `tests/test_smc_sample.lua`
+  gain `alc.parallel` / `alc.llm_batch` stubs that delegate to the
+  existing `alc.llm` fixture mechanism so the existing
+  `counter.llm_calls` accounting and fixture-order assertions
+  remain valid. Closes child issues `1778160761-86331`
+  (particle_infer) and `1778160839-87823` (smc_sample) under the
+  parent migration tracker `1778144244-78327`. Tests:
+  particle_infer 98/98 pass, smc_sample 77/77 pass.
+
 ### Fixed
 
 - **README Runtime API table**: `alc.map(list, fn)` was previously
