@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`crdt_doc`** (Collaboration): Frame role substrate (no `M.run`,
+  no LLM, sub-modules exposed as fields) implementing
+  Shapiro, Preguiça, Baquero, Zawirski "A comprehensive study of
+  Convergent and Commutative Replicated Data Types" (INRIA RR-7506,
+  2011). Provides Doc + Op + Merge primitives that **external
+  collaboration Frames** (state-rich orchestrators that live outside
+  bundled-packages) compose to build multi-agent shared state with
+  mathematical conflict-free merge. Initial lineup: OR-Map
+  (Observed-Remove Map, §3.3.5) + LWW-Register (Last-Writer-Wins,
+  §3.4.1). Public API: `M.doc.{new,snapshot,clone,delta}`,
+  `M.op.{set_add,set_remove,lww_set,is_valid}`, `M.merge(doc, op)`,
+  `M.merge_docs(d1, d2)`. Op kind is declarative (`set_add` /
+  `set_remove` / `lww_set`) with boundary validation via
+  `M.op.is_valid`; ordered mutations are rejected at the entry rather
+  than detected at runtime. Merge is commutative / associative /
+  idempotent by construction (Shapiro 2011 Theorem 2.1) — exercised
+  via property-based tests across both CRDT types. `M.doc.delta(doc,
+  prev)` is the quiescence-detection primitive for external
+  orchestrators implementing `max_rounds + quiescence` termination.
+  Pure Lua, no native dep — Y.Text-compatible sequence CRDT (RGA /
+  Logoot) is reserved for a future v2. New **Collaboration**
+  Packages section introduced (Category-axis), reserved for future
+  primitives in this layer; Orch-side LLM-peer logic
+  (`crdt_peers`-shaped) is intentionally outside bundled-packages
+  (issue 1778147830-21936 follow-up).
+- **Frames Roster** updated: `crdt_doc` joins `flow` and `abm` as
+  the third Frame-role pkg (README §Roster).
+
 ## [0.21.0] - 2026-05-04
 
 ### Added

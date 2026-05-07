@@ -30,7 +30,7 @@ The split is formalized in [`alc_shapes/spec_resolver.lua`](alc_shapes/spec_reso
 
 ### Roster
 
-- **Frames** — [flow](flow/), [abm](abm/)
+- **Frames** — [flow](flow/), [abm](abm/), [crdt_doc](crdt_doc/)
 - **Computation** — [bft](bft/), [condorcet](condorcet/), [conformal_vote](conformal_vote/), [cost_pareto](cost_pareto/), [ensemble_div](ensemble_div/), [eval_guard](eval_guard/), [inverse_u](inverse_u/), [kemeny](kemeny/), [mwu](mwu/), [scoring_rule](scoring_rule/), [shapley](shapley/), [sprt](sprt/)
 - **Schema engine** — [alc_shapes](alc_shapes/) (the type DSL and `spec_resolver` that power the contracts above)
 - **Strategy** — everything else in the *Packages* section below
@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (116)
+## Packages (117)
 
 ### Reasoning
 
@@ -248,6 +248,14 @@ Primitives that other packages compose on top of. Substrate modules do NOT provi
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[flow](flow/)** | Flow Frame. FlowState (plain table persisted via `alc.state`) + ReqToken (random nonce echoed by downstream results) substrate for composing bundled algo pkg (ab_mcts / cascade / coevolve / ...) with one persistent checkpoint and slot-level verification. Light Frame: driver loop stays in user code. v1 contract (flow/doc/contract.md) for pkg opting in to strict echo verification | AMQP `correlation_id` RPC idiom (RabbitMQ) |
+
+### Collaboration
+
+Substrate primitives that **external collaboration Frames** compose to build multi-agent shared state. The orchestration layer (peer spawn / termination / LLM round trips) lives outside bundled — these pkgs only provide the primitive math.
+
+| Package | Description | Based On |
+|---------|-------------|----------|
+| **[crdt_doc](crdt_doc/)** | CRDT-backed shared document substrate. OR-Map (Observed-Remove Map) + LWW-Register (Last-Writer-Wins) primitives with mathematical conflict-free merge (commutative / associative / idempotent). Frame role: no `M.run`, no LLM. External collaboration Frames compose this substrate to build multi-agent shared state | Shapiro et al. "A comprehensive study of Convergent and Commutative Replicated Data Types" (INRIA RR-7506, 2011) |
 
 ### Recipes
 
