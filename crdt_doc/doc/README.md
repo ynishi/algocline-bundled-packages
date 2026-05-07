@@ -1,0 +1,115 @@
+# crdt_doc — CRDT-backed shared document substrate
+
+CRDT (Conflict-free Replicated Data Type) primitive over `alc.state`. Frame role
+substrate: provides `Doc + Op + Merge` for **external collaboration Frames**
+(state-rich orchestrators that live outside bundled-packages, per the design
+philosophy `[実測: bundled-packages/README.md:1-5,44]` 「bundled は research-backed
+reasoning strategy + Frame は rare、Orch 系は意図的に外部に分離」). **Substrate, not
+orchestrator** — no `M.run` entry, no LLM call, sub-modules exposed as fields.
+
+```lua
+local crdt = require("crdt_doc")
+
+local doc = crdt.doc.new({ id = "canvas-1" })
+local op_a = { kind = "set_add", agent = "a", key = "title", value = "draft" }
+local op_b = { kind = "lww_set", agent = "b", key = "title", value = "final",
+               lamport = 7 }
+
+crdt.merge(doc, op_a)
+crdt.merge(doc, op_b)
+local snapshot = crdt.doc.snapshot(doc)  -- { title = "final" }
+```
+
+## When to use
+
+Use `crdt_doc` when multiple agents (LLM call peers / Strategy peers) edit a
+shared state independently, and the merge must converge **mathematically**
+(commutative + associative + idempotent) without an aggregator.
+
+Do **not** use `crdt_doc` for:
+
+- single-agent state (use `alc.state` directly)
+- aggregator-based merge with judge / synthesizer (use `panel` / `triad` / `pbft`)
+- semantic-level integration (`agent A 「太字」+ agent B 「削除」` の意味整合) —
+  CRDT は構造的整合のみ保証。意味検査は将来 `semantic_validator` pkg の領分
+
+## Initial lineup (Issue Open Q1)
+
+Pure Lua 実装、native dep なし。`[理論値: Shapiro et al. 2011, §3.3-3.5]`
+
+| Type | Source | Use case |
+|---|---|---|
+| **OR-Map** (Observed-Remove Map) | §3.3.5 | key-value store with concurrent add/remove |
+| **LWW-Register** (Last-Writer-Wins) | §3.4.1 | single value with timestamp tiebreak |
+
+Y.Text 互換 sequence CRDT (RGA / Logoot) は v2。理由: pure Lua 実装 600+ 行
+規模、Y.js binding は C bridge 必要 (no native dep 規約と衝突)。
+
+## Op kind (declarative, Issue Open Q2)
+
+各 op は kind を declarative 宣言。順序 dependency を持つ op は入口で reject
+し runtime 検出は v2。`[実測: Issue 提案 §設計で詰めるべき open question Q2]`
+
+```lua
+-- OR-Map
+{ kind = "set_add",    agent = "a", key = "k", value = v, tag = "a:42" }
+{ kind = "set_remove", agent = "a", key = "k", remove_tag = "a:42" }
+
+-- LWW-Register
+{ kind = "lww_set",    agent = "a", key = "k", value = v, lamport = 7 }
+```
+
+Each op carries `agent` + (`tag` for OR-Set elements / `lamport` for LWW
+ordering). `crdt.op.is_valid(op)` returns false for missing fields, ordered
+mutations, or non-CRDT kinds.
+
+## Merge invariants `[理論値: Shapiro 2011 §2.3, Theorem 2.1]`
+
+State-based CRDT (CvRDT) requires the merge function `⊔` to satisfy:
+
+- **Commutative**: `s1 ⊔ s2 = s2 ⊔ s1`
+- **Associative**: `(s1 ⊔ s2) ⊔ s3 = s1 ⊔ (s2 ⊔ s3)`
+- **Idempotent**: `s ⊔ s = s`
+
+These are enforced by construction (OR-Map = ∪ of (key, value, tag) tuples, with
+remove via tombstone; LWW-Register = max by lamport, lexicographic agent
+tiebreak). `tests/test_crdt_doc.lua` will cover all three properties as
+property-based tests on random op sequences.
+
+## alc_shapes contract (Frame role)
+
+`crdt_doc` is a Frame `[実測: bundled-packages/README.md:20-29]`. Therefore:
+
+- **No `M.run` entry**. Sub-modules exposed as fields:
+  - `M.doc` — document lifecycle (`new` / `snapshot` / `clone`)
+  - `M.op`  — op factory + validator (`set_add` / `set_remove` / `lww_set` / `is_valid`)
+  - `M.merge` — pure merge function `(doc, op) → doc'`
+- **No `alc.llm` call**. Pure Lua data structure operations only.
+- `M.spec` declares per-entry input/result schemas via `alc_shapes`.
+- `M.meta.category = "collaboration"` (Issue Q6 Human 決定済)
+
+## Termination guidance (Issue Open Q4)
+
+`crdt_doc` itself は無限に op を蓄積し続ける。termination 条件は caller
+(`crdt_peers` 等 recipe 側) の責務。推奨 pattern:
+
+- `max_rounds` 上限
+- `quiescence_window`: 連続 N round で `crdt.doc.delta(doc, prev) == 0` なら終了
+
+`crdt.doc.delta(doc, prev)` を提供して quiescence 判定を可能にする。
+
+## Future work
+
+- v2: Y.Text 互換 sequence CRDT (RGA), causal consistency layer (vector clock
+  embedding), persistence (`alc.state`)
+- 外部 Frame として: collaboration orch (LLM peers as CRDT participants、
+  termination state 込み、alc.parallel で N peers 並列発行)。本 substrate の
+  consumer になる予定だが bundled の外側で設計される (issue 別途起票予定)
+
+## Reference
+
+- Shapiro, M., Preguiça, N., Baquero, C., Zawirski, M. "A comprehensive study
+  of Convergent and Commutative Replicated Data Types." INRIA Research Report
+  RR-7506, 2011. https://hal.inria.fr/inria-00555588
+- Nicolaescu, P. et al. "Near Real-Time Peer-to-Peer Shared Editing on
+  Extensible Data Types." GROUP 2016. (Yjs / Y.Doc base)
