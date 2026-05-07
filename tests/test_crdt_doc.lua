@@ -14,8 +14,11 @@
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
-local REPO = os.getenv("PWD") or "."
-package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+-- Per README §"Adding a new test file" and tests/test_abm.lua:7-10:
+-- `package.path` is set by the MCP harness via `search_paths=[REPO]`. Do NOT
+-- prepend os.getenv("PWD") here — in worktree context PWD points at the
+-- parent repo, which silently shadows the worktree's code and produces
+-- false-green pass reports (2026-04-19 silent-drop accident, see CLAUDE.md).
 
 local crdt   = require("crdt_doc")
 local or_map = require("crdt_doc.or_map")
@@ -266,6 +269,41 @@ describe("doc", function()
         crdt.merge(d, crdt.op.set_add("a", "k", "v", "a:1"))
         crdt.merge(d, crdt.op.lww_set("a", "title", "v", 1))
         expect(crdt.doc.delta(d, prev)).to.equal(2)
+    end)
+
+    it("op_count starts at 0 and bumps on every merge", function()
+        local d = crdt.doc.new({ id = "x" })
+        expect(d.op_count).to.equal(0)
+        crdt.merge(d, crdt.op.set_add("a", "k", "v", "a:1"))
+        expect(d.op_count).to.equal(1)
+        -- LWW write that loses the tiebreak still counts as a merged op
+        -- (op_diff must catch it for true quiescence).
+        crdt.merge(d, crdt.op.lww_set("a", "title", "final", 7))
+        crdt.merge(d, crdt.op.lww_set("b", "title", "draft", 1))  -- loses
+        expect(d.op_count).to.equal(3)
+    end)
+
+    it("op_diff detects size-stable mutations that delta misses", function()
+        -- Reproduces the false-positive quiescence path called out in the
+        -- M.doc.delta docstring: add tag b:1 + remove tag a:1 keeps the
+        -- live count at 1 (delta == 0) but op_diff > 0.
+        local d = crdt.doc.new({ id = "x" })
+        crdt.merge(d, crdt.op.set_add("a", "k", "v_a", "a:1"))
+        local prev = crdt.doc.clone(d)
+        crdt.merge(d, crdt.op.set_add("b", "k", "v_b", "b:1"))
+        crdt.merge(d, crdt.op.set_remove("c", "a:1"))
+        expect(crdt.doc.delta(d, prev)).to.equal(0)   -- size proxy fooled
+        expect(crdt.doc.op_diff(d, prev)).to.equal(2) -- truth
+    end)
+
+    it("clone preserves op_count for use as quiescence baseline", function()
+        local d = crdt.doc.new({ id = "x" })
+        crdt.merge(d, crdt.op.set_add("a", "k", "v", "a:1"))
+        local snap = crdt.doc.clone(d)
+        expect(snap.op_count).to.equal(1)
+        -- A no-op round (same op replayed): op_count still bumps.
+        crdt.merge(d, crdt.op.set_add("a", "k", "v", "a:1"))
+        expect(crdt.doc.op_diff(d, snap)).to.equal(1)
     end)
 end)
 

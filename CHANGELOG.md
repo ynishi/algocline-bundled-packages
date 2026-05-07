@@ -17,17 +17,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   collaboration Frames** (state-rich orchestrators that live outside
   bundled-packages) compose to build multi-agent shared state with
   mathematical conflict-free merge. Initial lineup: OR-Map
-  (Observed-Remove Map, §3.3.5) + LWW-Register (Last-Writer-Wins,
-  §3.4.1). Public API: `M.doc.{new,snapshot,clone,delta}`,
+  (tag-level primitive INSPIRED BY §3.3.5 Specification 15;
+  element-level remove is a caller-side composition of tag-level
+  removes — see module docstring) + LWW-Register (Last-Writer-Wins,
+  §3.4.1). Public API: `M.doc.{new,snapshot,clone,delta,op_diff}`,
   `M.op.{set_add,set_remove,lww_set,is_valid}`, `M.merge(doc, op)`,
   `M.merge_docs(d1, d2)`. Op kind is declarative (`set_add` /
   `set_remove` / `lww_set`) with boundary validation via
   `M.op.is_valid`; ordered mutations are rejected at the entry rather
   than detected at runtime. Merge is commutative / associative /
   idempotent by construction (Shapiro 2011 Theorem 2.1) — exercised
-  via property-based tests across both CRDT types. `M.doc.delta(doc,
-  prev)` is the quiescence-detection primitive for external
-  orchestrators implementing `max_rounds + quiescence` termination.
+  via fixed-order convergence tests across both CRDT types
+  (random-sequence property testing is reserved for future work).
+  Caller contract (tag uniqueness, lamport monotonicity, stable
+  agent identity) is documented in the module-level `INJECTION
+  POINTS` section; violations degrade convergence silently.
+  `M.doc.op_diff(doc, prev)` is the quiescence-detection primitive
+  (monotonic `doc.op_count` field), backed by every merged op
+  including idempotent / losing-tiebreak writes. `M.doc.delta` is
+  retained as a cheap SIZE proxy but is NOT a faithful quiescence
+  detector (size-stable mutations report `delta == 0`).
   Pure Lua, no native dep — Y.Text-compatible sequence CRDT (RGA /
   Logoot) is reserved for a future v2. New **Collaboration**
   Packages section introduced (Category-axis), reserved for future

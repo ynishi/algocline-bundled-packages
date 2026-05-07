@@ -39,8 +39,14 @@ Pure Lua 実装、native dep なし。`[理論値: Shapiro et al. 2011, §3.3-3.
 
 | Type | Source | Use case |
 |---|---|---|
-| **OR-Map** (Observed-Remove Map) | §3.3.5 | key-value store with concurrent add/remove |
-| **LWW-Register** (Last-Writer-Wins) | §3.4.1 | single value with timestamp tiebreak |
+| **OR-Map** (tag-level primitive INSPIRED BY §3.3.5 Specification 15) | §3.3.5 | key-value store with concurrent add/remove |
+| **LWW-Register** (Last-Writer-Wins, §3.4.1 Specification 9) | §3.4.1 | single value with timestamp tiebreak |
+
+OR-Map は **tag-level primitive** で、論文 Specification 15 の `remove(e)`
+(element-level) とは API が異なる。element-level remove は caller が
+`doc.or_map.entries` を enumerate して観測 tag ごとに `set_remove` を発行
+する責務 (詳細は `crdt_doc/or_map.lua` module docstring)。CvRDT merge 不変量
+(commutative / associative / idempotent, Theorem 2.1) は tag 粒度で保たれる。
 
 Y.Text 互換 sequence CRDT (RGA / Logoot) は v2。理由: pure Lua 実装 600+ 行
 規模、Y.js binding は C bridge 必要 (no native dep 規約と衝突)。
@@ -73,8 +79,25 @@ State-based CRDT (CvRDT) requires the merge function `⊔` to satisfy:
 
 These are enforced by construction (OR-Map = ∪ of (key, value, tag) tuples, with
 remove via tombstone; LWW-Register = max by lamport, lexicographic agent
-tiebreak). `tests/test_crdt_doc.lua` will cover all three properties as
-property-based tests on random op sequences.
+tiebreak). `tests/test_crdt_doc.lua` exercises all three invariants on
+hand-crafted op sets per CRDT type, plus a 3-agent integration test that
+checks convergence across 3 distinct arrival orderings (fixed-order
+convergence tests; random-sequence property testing is future work).
+
+## Caller contract (must hold for convergence)
+
+The substrate is intentionally minimal — three caller obligations are
+NOT enforced inside the module and degrade convergence silently when
+violated. See `crdt_doc/init.lua` `INJECTION POINTS` for the full text.
+
+1. **Tag uniqueness (OR-Map)** — `op.tag` MUST be globally unique across
+   all replicas. Convention: `agent_id .. ":" .. local_counter`. Reusing a
+   tag yields non-deterministic merge.
+2. **Lamport monotonicity (LWW)** — `op.lamport` MUST come from a
+   per-replica monotonically-increasing clock. Same lamport from same
+   replica with different values is undefined behaviour.
+3. **Stable agent identity** — `agent` MUST be stable per replica and
+   unique across replicas (used for LWW lex tiebreak + OR-Map provenance).
 
 ## alc_shapes contract (Frame role)
 
@@ -94,9 +117,14 @@ property-based tests on random op sequences.
 (`crdt_peers` 等 recipe 側) の責務。推奨 pattern:
 
 - `max_rounds` 上限
-- `quiescence_window`: 連続 N round で `crdt.doc.delta(doc, prev) == 0` なら終了
+- `quiescence_window`: 連続 N round で `crdt.doc.op_diff(doc, prev) == 0`
+  なら終了
 
-`crdt.doc.delta(doc, prev)` を提供して quiescence 判定を可能にする。
+`crdt.doc.delta(doc, prev)` は **size proxy** で、size-stable mutations
+(例: `add tag b:1` + `remove tag a:1` 同 key 内、LWW tiebreak 敗北 write)
+を見逃す **false-positive 源**。quiescence 判定には必ず
+`crdt.doc.op_diff(doc, prev)` を使う (monotonic `doc.op_count` フィールド
+ベース、idempotent / 敗北 write 含む全 merge を数える)。
 
 ## Future work
 
