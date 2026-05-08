@@ -95,26 +95,23 @@ function M.run(ctx)
     -- ─── Step 1 & 2: Generate two independent reasoning paths (parallel) ───
     alc.log("info", "rstar: generating two independent reasoning paths")
 
-    local paths = alc.map({ "A", "B" }, function(label)
+    local paths = alc.parallel({ "A", "B" }, function(label)
         local approach_hint = label == "A"
             and "Start from first principles and build up systematically."
             or "Consider the problem from multiple angles before converging."
 
-        return alc.llm(
-            string.format(
-                "Task: %s\n\n"
-                    .. "%s\n"
-                    .. "Show your complete reasoning step by step. "
-                    .. "End with a clear conclusion.",
-                task, approach_hint
-            ),
-            {
-                system = "You are a rigorous problem solver. Reason carefully "
-                    .. "and show all steps. State your conclusion explicitly.",
-                max_tokens = gen_tokens,
-            }
+        return string.format(
+            "Task: %s\n\n"
+                .. "%s\n"
+                .. "Show your complete reasoning step by step. "
+                .. "End with a clear conclusion.",
+            task, approach_hint
         )
-    end)
+    end, {
+        system = "You are a rigorous problem solver. Reason carefully "
+            .. "and show all steps. State your conclusion explicitly.",
+        max_tokens = gen_tokens,
+    })
 
     local path_a = paths[1]
     local path_b = paths[2]
@@ -126,7 +123,7 @@ function M.run(ctx)
 
     -- ─── Step 3: Cross-verify (parallel) ───
     -- A verifies B's reasoning, B verifies A's reasoning
-    local verifications = alc.map({ "A_checks_B", "B_checks_A" }, function(direction)
+    local verifications = alc.parallel({ "A_checks_B", "B_checks_A" }, function(direction)
         local checker_path, target_path, checker_label, target_label
         if direction == "A_checks_B" then
             checker_path = path_a
@@ -140,29 +137,26 @@ function M.run(ctx)
             target_label = "A"
         end
 
-        return alc.llm(
-            string.format(
-                "Task: %s\n\n"
-                    .. "Your reasoning (Path %s):\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Another solver's reasoning (Path %s):\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Verify Path %s's reasoning:\n"
-                    .. "1. Are there any logical errors or incorrect steps?\n"
-                    .. "2. Does the conclusion follow from the reasoning?\n"
-                    .. "3. Did they miss anything important?\n\n"
-                    .. "Then state:\n"
-                    .. "VERDICT: AGREE (their conclusion is correct) or "
-                    .. "DISAGREE (their conclusion has errors)\n"
-                    .. "If DISAGREE, explain the specific error.",
-                task, checker_label, checker_path,
-                target_label, target_path, target_label
-            ),
-            {
-                system = "You are a rigorous verifier. Check each step for "
-                    .. "correctness. Be specific about any errors found.",
-                max_tokens = verify_tokens,
-            }
+        return string.format(
+            "Task: %s\n\n"
+                .. "Your reasoning (Path %s):\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Another solver's reasoning (Path %s):\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Verify Path %s's reasoning:\n"
+                .. "1. Are there any logical errors or incorrect steps?\n"
+                .. "2. Does the conclusion follow from the reasoning?\n"
+                .. "3. Did they miss anything important?\n\n"
+                .. "Then state:\n"
+                .. "VERDICT: AGREE (their conclusion is correct) or "
+                .. "DISAGREE (their conclusion has errors)\n"
+                .. "If DISAGREE, explain the specific error.",
+            task, checker_label, checker_path,
+            target_label, target_path, target_label
         )
-    end)
+    end, {
+        system = "You are a rigorous verifier. Check each step for "
+            .. "correctness. Be specific about any errors found.",
+        max_tokens = verify_tokens,
+    })
 
     local a_checks_b = verifications[1]
     local b_checks_a = verifications[2]

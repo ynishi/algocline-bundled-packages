@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rstar`** (Reasoning): migrated both `alc.map` call-sites to
+  `alc.parallel` — Phase 1+2 (`:98` two independent reasoning paths,
+  N=2) and Phase 3 (`:129` cross-verification, N=2). Phase 3's
+  callback closure-captures the awaited `path_a` / `path_b` results
+  from Phase 1+2; this pattern is preserved unchanged because Lua's
+  synchronous function semantics guarantee both locals are
+  fully-resolved values by the time Phase 3 starts (identical to the
+  `alc.map` upvalue capture semantics). This commit serves as the
+  reference implementation for the **await-confluence pattern** —
+  Multi-callsite packages where one phase consumes the awaited result
+  of a previous phase via closure capture. Validated against the
+  existing rstar test cases in `tests/test_new_packages.lua` (mutual
+  disagreement / partial agreement cases). Closes child issue
+  `1778160807-86996` under parent migration tracker
+  `1778144244-78327`. Tests: `tests/test_new_packages.lua` 32/32
+  pass (no regression across all suites).
+
 - **Simple 12 batch — `alc.map` → `alc.parallel`**: migrated 13
   call-sites across 12 Simple-structured packages from the sequential
   `alc.map` to the true batch-parallel `alc.parallel` primitive
