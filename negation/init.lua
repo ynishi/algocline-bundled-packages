@@ -186,30 +186,27 @@ function M.run(ctx)
         "negation: %d destruction conditions generated", #conditions
     ))
 
-    -- ─── Step 3: Verify each condition ───
-    local verifications = alc.map(conditions, function(condition)
-        return alc.llm(
-            string.format(
-                "Task: %s\n\n"
-                    .. "Proposed answer:\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Destruction condition:\n\"%s\"\n\n"
-                    .. "Does this destruction condition actually hold? "
-                    .. "Is it factually true that this condition exists?\n\n"
-                    .. "Analyze carefully, then respond:\n"
-                    .. "VERDICT: HOLDS (condition is true, answer may be wrong) "
-                    .. "or REFUTED (condition is false, answer survives)\n"
-                    .. "REASONING: [your analysis]",
-                task, answer, condition
-            ),
-            {
-                system = "You are an impartial fact-checker. Evaluate whether "
-                    .. "the destruction condition actually holds. Be rigorous: "
-                    .. "HOLDS only if you are confident the condition is true. "
-                    .. "REFUTED if the condition is false or unsupported.",
-                max_tokens = verify_tokens,
-            }
+    -- ─── Step 3: Verify each condition in parallel (1 round-trip via alc.llm_batch) ───
+    local verifications = alc.parallel(conditions, function(condition)
+        return string.format(
+            "Task: %s\n\n"
+                .. "Proposed answer:\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Destruction condition:\n\"%s\"\n\n"
+                .. "Does this destruction condition actually hold? "
+                .. "Is it factually true that this condition exists?\n\n"
+                .. "Analyze carefully, then respond:\n"
+                .. "VERDICT: HOLDS (condition is true, answer may be wrong) "
+                .. "or REFUTED (condition is false, answer survives)\n"
+                .. "REASONING: [your analysis]",
+            task, answer, condition
         )
-    end)
+    end, {
+        system = "You are an impartial fact-checker. Evaluate whether "
+            .. "the destruction condition actually holds. Be rigorous: "
+            .. "HOLDS only if you are confident the condition is true. "
+            .. "REFUTED if the condition is false or unsupported.",
+        max_tokens = verify_tokens,
+    })
 
     -- Parse results
     local condition_results = {}

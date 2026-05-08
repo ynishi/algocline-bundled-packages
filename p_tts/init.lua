@@ -218,25 +218,23 @@ function M.run(ctx)
             #constraints, attempt
         ))
 
-        local verifications = alc.map(constraints, function(constraint)
-            return alc.llm(
-                string.format(
-                    "Task: %s\n\n"
-                        .. "Answer:\n\"\"\"\n%s\n\"\"\"\n\n"
-                        .. "Constraint: \"%s\"\n\n"
-                        .. "Does this answer satisfy this constraint?\n"
-                        .. "VERDICT: PASS or FAIL\n"
-                        .. "REASON: [brief explanation]",
-                    task, current_answer, constraint
-                ),
-                {
-                    system = "You are a strict test checker. Evaluate whether "
-                        .. "the answer satisfies the given constraint. Be rigorous: "
-                        .. "PASS only if clearly satisfied. FAIL if violated or unclear.",
-                    max_tokens = verify_tokens,
-                }
+        -- Verify each constraint in parallel (1 round-trip via alc.llm_batch)
+        local verifications = alc.parallel(constraints, function(constraint)
+            return string.format(
+                "Task: %s\n\n"
+                    .. "Answer:\n\"\"\"\n%s\n\"\"\"\n\n"
+                    .. "Constraint: \"%s\"\n\n"
+                    .. "Does this answer satisfy this constraint?\n"
+                    .. "VERDICT: PASS or FAIL\n"
+                    .. "REASON: [brief explanation]",
+                task, current_answer, constraint
             )
-        end)
+        end, {
+            system = "You are a strict test checker. Evaluate whether "
+                .. "the answer satisfies the given constraint. Be rigorous: "
+                .. "PASS only if clearly satisfied. FAIL if violated or unclear.",
+            max_tokens = verify_tokens,
+        })
 
         -- Parse verification results
         local results = {}

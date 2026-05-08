@@ -190,23 +190,21 @@ local function level_ensemble(task, gen_tokens, verify_tokens)
         "critical thinker who considers edge cases and counterexamples",
     }
 
-    -- Generate from multiple perspectives
-    local responses = alc.map(perspectives, function(perspective)
-        return alc.llm(
-            string.format(
+    -- Generate from multiple perspectives in parallel (1 round-trip via alc.llm_batch)
+    local responses = alc.parallel(perspectives, function(perspective)
+        return {
+            prompt = string.format(
                 "Task: %s\n\n"
                     .. "Provide a thorough, well-reasoned answer.",
                 task
             ),
-            {
-                system = string.format(
-                    "You are an %s. Give your best answer "
-                        .. "from your specialized viewpoint.",
-                    perspective
-                ),
-                max_tokens = gen_tokens,
-            }
-        )
+            system = string.format(
+                "You are an %s. Give your best answer "
+                    .. "from your specialized viewpoint.",
+                perspective
+            ),
+            max_tokens = gen_tokens,
+        }
     end)
 
     -- Synthesize and select best

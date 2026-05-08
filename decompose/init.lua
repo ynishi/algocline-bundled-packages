@@ -97,23 +97,20 @@ function M.run(ctx)
 
     alc.log("info", string.format("decompose: %d sub-tasks", #subtasks))
 
-    -- Phase 2: Execute sub-tasks in parallel
-    local results = alc.map(subtasks, function(subtask, i)
-        return alc.llm(
-            string.format(
-                "You are working on part of a larger task.\n\n"
-                    .. "Overall goal: %s\n\n"
-                    .. "Your specific sub-task (%d of %d): %s\n\n"
-                    .. "Provide a thorough, self-contained answer for this sub-task.",
-                task, i, #subtasks, subtask
-            ),
-            {
-                system = "You are a focused specialist. Solve only the assigned sub-task "
-                    .. "thoroughly. Be specific and detailed.",
-                max_tokens = subtask_tokens,
-            }
+    -- Phase 2: Execute sub-tasks in parallel (1 round-trip via alc.llm_batch)
+    local results = alc.parallel(subtasks, function(subtask, i)
+        return string.format(
+            "You are working on part of a larger task.\n\n"
+                .. "Overall goal: %s\n\n"
+                .. "Your specific sub-task (%d of %d): %s\n\n"
+                .. "Provide a thorough, self-contained answer for this sub-task.",
+            task, i, #subtasks, subtask
         )
-    end)
+    end, {
+        system = "You are a focused specialist. Solve only the assigned sub-task "
+            .. "thoroughly. Be specific and detailed.",
+        max_tokens = subtask_tokens,
+    })
 
     -- Phase 3: Merge
     local parts = ""

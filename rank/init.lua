@@ -70,30 +70,20 @@ function M.run(ctx)
     local criteria = ctx.criteria or "quality, accuracy, completeness"
     local gen_tokens = ctx.gen_tokens or 400
 
-    -- Phase 1: Generate candidates in parallel
-    local candidates = alc.map(
-        (function()
-            local t = {}
-            for i = 1, n do t[i] = i end
-            return t
-        end)(),
-        function(i)
-            return alc.llm(
-                string.format(
-                    "Task: %s\n\nProvide your best response.",
-                    task
-                ),
-                {
-                    system = string.format(
-                        "You are expert #%d. Give a thorough, high-quality response. "
-                            .. "Take a distinctive approach.",
-                        i
-                    ),
-                    max_tokens = gen_tokens,
-                }
-            )
-        end
-    )
+    -- Phase 1: Generate candidates in parallel (1 round-trip via alc.llm_batch)
+    local indices = {}
+    for i = 1, n do indices[i] = i end
+    local candidates = alc.parallel(indices, function(i)
+        return {
+            prompt = string.format("Task: %s\n\nProvide your best response.", task),
+            system = string.format(
+                "You are expert #%d. Give a thorough, high-quality response. "
+                    .. "Take a distinctive approach.",
+                i
+            ),
+            max_tokens = gen_tokens,
+        }
+    end)
 
     alc.log("info", string.format("rank: %d candidates generated, starting tournament", n))
 

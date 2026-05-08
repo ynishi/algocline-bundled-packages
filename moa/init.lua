@@ -100,14 +100,13 @@ function M.run(ctx)
         agent_indices[i] = i
     end
 
-    local layer1 = alc.map(agent_indices, function(i)
-        return alc.llm(
-            string.format("Task: %s\n\nProvide a thorough, well-reasoned answer.", task),
-            {
-                system = PERSONAS[i],
-                max_tokens = gen_tokens,
-            }
-        )
+    -- Layer 1: all agents generate in parallel (1 round-trip via alc.llm_batch)
+    local layer1 = alc.parallel(agent_indices, function(i)
+        return {
+            prompt = string.format("Task: %s\n\nProvide a thorough, well-reasoned answer.", task),
+            system = PERSONAS[i],
+            max_tokens = gen_tokens,
+        }
     end)
 
     layer_outputs[1] = layer1
@@ -131,9 +130,10 @@ function M.run(ctx)
             )
         end
 
-        local layer_n = alc.map(agent_indices, function(i)
-            return alc.llm(
-                string.format(
+        -- Layer N: all agents improve in parallel (1 round-trip via alc.llm_batch)
+        local layer_n = alc.parallel(agent_indices, function(i)
+            return {
+                prompt = string.format(
                     "Task: %s\n\n"
                         .. "Other agents have provided these responses:\n\n%s"
                         .. "Considering all the above responses, provide an "
@@ -144,13 +144,11 @@ function M.run(ctx)
                         .. "- Resolves contradictions between responses",
                     task, ref_text
                 ),
-                {
-                    system = PERSONAS[i] .. " You have access to other agents' "
-                        .. "work. Build upon their insights while applying your "
-                        .. "unique perspective to improve the answer.",
-                    max_tokens = gen_tokens,
-                }
-            )
+                system = PERSONAS[i] .. " You have access to other agents' "
+                    .. "work. Build upon their insights while applying your "
+                    .. "unique perspective to improve the answer.",
+                max_tokens = gen_tokens,
+            }
         end)
 
         layer_outputs[layer] = layer_n

@@ -233,29 +233,27 @@ function M.run(ctx)
     end
     local sources_text = table.concat(source_block, "\n\n")
 
-    local attributions = alc.map(claims, function(claim)
-        return alc.llm(
-            string.format(
-                "Claim to trace:\n\"%s\"\n\n"
-                    .. "%s\n\n"
-                    .. "Find the specific span in the source(s) that supports this claim.\n\n"
-                    .. "Respond in this exact format:\n"
-                    .. "ATTRIBUTION: SUPPORTED | PARTIAL | UNSUPPORTED\n"
-                    .. "SPAN: \"exact quoted text from source\"\n"
-                    .. "SOURCE: [source number]\n"
-                    .. "REASONING: [why this span supports/doesn't support the claim]",
-                claim, sources_text
-            ),
-            {
-                system = "You are an evidence tracer. For each claim, find the specific "
-                    .. "text span in the source that supports it. SUPPORTED = claim is "
-                    .. "fully backed by a source span. PARTIAL = claim is partially backed "
-                    .. "or requires inference. UNSUPPORTED = no source evidence found. "
-                    .. "Quote the exact supporting text.",
-                max_tokens = trace_tokens,
-            }
+    -- Attribute each claim in parallel (1 round-trip via alc.llm_batch)
+    local attributions = alc.parallel(claims, function(claim)
+        return string.format(
+            "Claim to trace:\n\"%s\"\n\n"
+                .. "%s\n\n"
+                .. "Find the specific span in the source(s) that supports this claim.\n\n"
+                .. "Respond in this exact format:\n"
+                .. "ATTRIBUTION: SUPPORTED | PARTIAL | UNSUPPORTED\n"
+                .. "SPAN: \"exact quoted text from source\"\n"
+                .. "SOURCE: [source number]\n"
+                .. "REASONING: [why this span supports/doesn't support the claim]",
+            claim, sources_text
         )
-    end)
+    end, {
+        system = "You are an evidence tracer. For each claim, find the specific "
+            .. "text span in the source that supports it. SUPPORTED = claim is "
+            .. "fully backed by a source span. PARTIAL = claim is partially backed "
+            .. "or requires inference. UNSUPPORTED = no source evidence found. "
+            .. "Quote the exact supporting text.",
+        max_tokens = trace_tokens,
+    })
 
     -- ─── Step 3: Score attribution ───
     local results = {}

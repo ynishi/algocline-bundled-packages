@@ -164,9 +164,10 @@ function M.run(ctx)
             "critic: evaluating %d dimensions (round %d)", #dimensions, revision
         ))
 
-        local evaluations = alc.map(dimensions, function(dim)
-            return alc.llm(
-                string.format(
+        -- Evaluate all dimensions in parallel (1 round-trip via alc.llm_batch)
+        local evaluations = alc.parallel(dimensions, function(dim)
+            return {
+                prompt = string.format(
                     "Task: %s\n\n"
                         .. "Answer to evaluate:\n\"\"\"\n%s\n\"\"\"\n\n"
                         .. "Evaluate this answer on the dimension: **%s**\n"
@@ -176,16 +177,14 @@ function M.run(ctx)
                         .. "FEEDBACK: [specific strengths and weaknesses on this dimension]",
                     task, current_answer, dim.name, dim.description
                 ),
-                {
-                    system = string.format(
-                        "You are an expert evaluator assessing the '%s' dimension. "
-                            .. "Be rigorous and specific. Score honestly — reserve 9-10 "
-                            .. "for genuinely excellent work. Provide actionable feedback.",
-                        dim.name
-                    ),
-                    max_tokens = eval_tokens,
-                }
-            )
+                system = string.format(
+                    "You are an expert evaluator assessing the '%s' dimension. "
+                        .. "Be rigorous and specific. Score honestly — reserve 9-10 "
+                        .. "for genuinely excellent work. Provide actionable feedback.",
+                    dim.name
+                ),
+                max_tokens = eval_tokens,
+            }
         end)
 
         -- Parse evaluation results

@@ -82,25 +82,22 @@ function M.run(ctx)
         return ctx
     end
 
-    -- Map phase: process each chunk in parallel
-    local extractions = alc.map(chunks, function(chunk, i)
-        return alc.llm(
-            string.format(
-                "Goal: %s\n\n"
-                    .. "Text (section %d of %d):\n```\n%s\n```\n\n"
-                    .. "Extract relevant information for the goal above. "
-                    .. "Be specific — include names, numbers, and key details. "
-                    .. "If this section contains nothing relevant, output: NONE",
-                goal, i, #chunks, chunk
-            ),
-            {
-                system = "You are a precise information extractor. "
-                    .. "Focus only on content relevant to the stated goal. "
-                    .. "Preserve factual details, omit filler.",
-                max_tokens = map_tokens,
-            }
+    -- Map phase: process each chunk in parallel (1 round-trip via alc.llm_batch)
+    local extractions = alc.parallel(chunks, function(chunk, i)
+        return string.format(
+            "Goal: %s\n\n"
+                .. "Text (section %d of %d):\n```\n%s\n```\n\n"
+                .. "Extract relevant information for the goal above. "
+                .. "Be specific — include names, numbers, and key details. "
+                .. "If this section contains nothing relevant, output: NONE",
+            goal, i, #chunks, chunk
         )
-    end)
+    end, {
+        system = "You are a precise information extractor. "
+            .. "Focus only on content relevant to the stated goal. "
+            .. "Preserve factual details, omit filler.",
+        max_tokens = map_tokens,
+    })
 
     -- Filter out NONE responses
     local relevant = {}

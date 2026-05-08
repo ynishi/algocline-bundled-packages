@@ -33,6 +33,42 @@ local function mock_alc(llm_fn)
             return nil
         end,
     }
+    -- alc.llm_batch mock: process items sequentially, return results array
+    a.llm_batch = function(items)
+        local results = {}
+        for i, item in ipairs(items) do
+            results[i] = a.llm(item.prompt, {
+                system     = item.system,
+                max_tokens = item.max_tokens,
+            })
+        end
+        return results
+    end
+    -- alc.parallel mock: mirrors prelude.lua:473-515 behaviour
+    a.parallel = function(items, prompt_fn, opts)
+        opts = opts or {}
+        local batch = {}
+        for i, item in ipairs(items) do
+            local p = prompt_fn(item, i)
+            if type(p) == "string" then
+                local entry = { prompt = p }
+                if opts.system     then entry.system     = opts.system     end
+                if opts.max_tokens then entry.max_tokens = opts.max_tokens end
+                batch[i] = entry
+            else
+                batch[i] = p
+            end
+        end
+        local responses = a.llm_batch(batch)
+        if opts.post_fn then
+            local results = {}
+            for i, resp in ipairs(responses) do
+                results[i] = opts.post_fn(resp, items[i], i)
+            end
+            return results
+        end
+        return responses
+    end
     _G.alc = a
     return call_log
 end

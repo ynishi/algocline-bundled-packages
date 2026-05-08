@@ -120,27 +120,25 @@ function M.run(ctx)
         )
     end
 
-    local verdicts = alc.map(claims, function(claim, i)
-        return alc.llm(
-            string.format(
-                "Claim to verify:\n\"%s\"%s\n\n"
-                    .. "Evaluate this claim's factual accuracy.\n\n"
-                    .. "Answer with exactly one of:\n"
-                    .. "SUPPORTED — the claim is factually correct\n"
-                    .. "UNSUPPORTED — the claim is factually incorrect or misleading\n"
-                    .. "UNCERTAIN — cannot determine with confidence\n\n"
-                    .. "Then provide a one-sentence justification.",
-                claim, context_block
-            ),
-            {
-                system = "You are a rigorous fact-checker. Evaluate claims strictly. "
-                    .. "Only mark SUPPORTED if you are confident the claim is accurate. "
-                    .. "Mark UNCERTAIN if you lack sufficient knowledge to verify.",
-                max_tokens = verify_tokens,
-                grounded = true,
-            }
+    -- Verify each claim in parallel (1 round-trip via alc.llm_batch)
+    local verdicts = alc.parallel(claims, function(claim, i)
+        return string.format(
+            "Claim to verify:\n\"%s\"%s\n\n"
+                .. "Evaluate this claim's factual accuracy.\n\n"
+                .. "Answer with exactly one of:\n"
+                .. "SUPPORTED — the claim is factually correct\n"
+                .. "UNSUPPORTED — the claim is factually incorrect or misleading\n"
+                .. "UNCERTAIN — cannot determine with confidence\n\n"
+                .. "Then provide a one-sentence justification.",
+            claim, context_block
         )
-    end)
+    end, {
+        system = "You are a rigorous fact-checker. Evaluate claims strictly. "
+            .. "Only mark SUPPORTED if you are confident the claim is accurate. "
+            .. "Mark UNCERTAIN if you lack sufficient knowledge to verify.",
+        max_tokens = verify_tokens,
+        grounded = true,
+    })
 
     -- Phase 3: Score
     local results = {}

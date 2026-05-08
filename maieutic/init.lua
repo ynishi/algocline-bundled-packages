@@ -57,26 +57,25 @@ M.spec = {
     },
 }
 
---- Generate supporting and opposing explanations for a proposition.
+--- Generate supporting and opposing explanations for a proposition in parallel
+--- (1 round-trip via alc.llm_batch).
 local function generate_explanations(proposition, gen_tokens)
-    local results = alc.map({ "support", "oppose" }, function(stance)
-        return alc.llm(
-            string.format(
+    local results = alc.parallel({ "support", "oppose" }, function(stance)
+        return {
+            prompt = string.format(
                 "Proposition: \"%s\"\n\n"
                     .. "Provide a clear, specific explanation that %sS this proposition.\n"
                     .. "State it as a factual claim that can itself be evaluated as true or false.",
                 proposition, stance:upper()
             ),
-            {
-                system = string.format(
-                    "You are generating a %sing explanation. "
-                        .. "The explanation must be a concrete, verifiable claim — "
-                        .. "not an opinion or vague statement.",
-                    stance
-                ),
-                max_tokens = gen_tokens,
-            }
-        )
+            system = string.format(
+                "You are generating a %sing explanation. "
+                    .. "The explanation must be a concrete, verifiable claim — "
+                    .. "not an opinion or vague statement.",
+                stance
+            ),
+            max_tokens = gen_tokens,
+        }
     end)
     return results[1], results[2]
 end

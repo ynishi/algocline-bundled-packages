@@ -65,26 +65,24 @@ function M.run(ctx)
     local gen_tokens = ctx.gen_tokens or 400
     local judge_tokens = ctx.judge_tokens or 500
 
-    -- Phase 1: Opening statements (parallel)
-    local openings = alc.map({ "proponent", "opponent" }, function(role)
+    -- Phase 1: Opening statements in parallel (1 round-trip via alc.llm_batch)
+    local openings = alc.parallel({ "proponent", "opponent" }, function(role)
         local stance = role == "proponent" and "SUPPORT" or "OPPOSE"
-        return alc.llm(
-            string.format(
+        return {
+            prompt = string.format(
                 "Topic: %s\n\n"
                     .. "You are the %s. Present your opening argument to %s this position.\n"
                     .. "Be specific, cite reasoning, and anticipate counterarguments.",
                 task, role, stance
             ),
-            {
-                system = string.format(
-                    "You are a skilled debater assigned the %s role. "
-                        .. "Argue persuasively for your assigned position. "
-                        .. "Use evidence and logical reasoning.",
-                    role
-                ),
-                max_tokens = gen_tokens,
-            }
-        )
+            system = string.format(
+                "You are a skilled debater assigned the %s role. "
+                    .. "Argue persuasively for your assigned position. "
+                    .. "Use evidence and logical reasoning.",
+                role
+            ),
+            max_tokens = gen_tokens,
+        }
     end)
 
     local pro_arg = openings[1]

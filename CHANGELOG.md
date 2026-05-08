@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Simple 12 batch — `alc.map` → `alc.parallel`**: migrated 13
+  call-sites across 12 Simple-structured packages from the sequential
+  `alc.map` to the true batch-parallel `alc.parallel` primitive
+  (single `alc.llm_batch` round-trip per call-site). All 12 packages
+  carry "parallel" wording in docstring/comments that previously
+  contradicted the sequential `alc.map` implementation; this migration
+  brings claim and behavior into agreement and reduces N-section
+  latency from N round-trips to 1 round-trip. Migrated packages and
+  call-sites:
+    * `cascade` (`:194` perspectives)
+    * `claim_trace` (`:236` claim attribution)
+    * `critic` (`:167` per-dimension evaluation)
+    * `decompose` (`:101` Phase 2 sub-task execution)
+    * `distill` (`:86` MapReduce Map phase)
+    * `factscore` (`:123` per-claim verification)
+    * `moa` (`:103, :134` Layer 1 + Layer N agents, 2 call-sites)
+    * `negation` (`:190` per-condition verification)
+    * `p_tts` (`:221` per-constraint verification)
+    * `rank` (`:74` Phase 1 candidate generation)
+    * `maieutic` (`:62` support/oppose, N=2)
+    * `triad` (`:69` proponent/opponent opening, N=2)
+  Two callback patterns were used: Pattern A (single shared
+  `system` / `max_tokens` shared across all items, prompt_fn returns
+  prompt string; opts attached via `alc.parallel(items, fn, opts)`)
+  and Pattern B (item-specific `system` / `max_tokens`, prompt_fn
+  returns a `{prompt, system, max_tokens}` table per
+  `prelude.lua:491-499`). Behavior is mathematically equivalent —
+  callbacks were already independent (no inter-iteration state), and
+  `alc.parallel` preserves order via `for ipairs(items)` iteration
+  matching the previous `alc.map` semantics. `tests/test_new_packages.lua`
+  gains `alc.parallel` / `alc.llm_batch` mocks (delegating to the
+  existing `alc.llm` fixture mechanism, same pattern as
+  `tests/test_smc_sample.lua`). Closes child issues `1778160614-83833`
+  (cascade), `1778160623-83954` (claim_trace), `1778160661-84595`
+  (critic), `1778160672-84753` (decompose), `1778160680-84875`
+  (distill), `1778160689-85008` (factscore), `1778160554-82916` (moa),
+  `1778160731-85813` (negation), `1778160738-85947` (p_tts),
+  `1778160772-86479` (rank), `1778160724-85678` (maieutic),
+  `1778160875-88695` (triad) under parent migration tracker
+  `1778144244-78327`. Tests: `tests/test_new_packages.lua` 32/32 pass
+  (moa coverage included). New `tests/test_*.lua` for the 11
+  previously-untested packages and `scripts/e2e/*.lua` smokes are
+  out of scope for this batch and tracked separately.
+
 - **`scripts/e2e/sot.lua`**: new end-to-end smoke test for `sot`
   using agent-block + algocline MCP + real LLM (Anthropic API).
   Drives a 3-section Skeleton-of-Thought run on a short Lua-coroutine
