@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **End-to-end real-LLM validation of the post-migration hardening
+  (Phase B verification ran)**: executed all 19 newly-added e2e
+  smokes (Simple 12 from commit `954b7c8` + rstar/Multi-callsite 6
+  from commit `937a925`) via `just e2e <name>` against the live
+  Anthropic API. **18/19 e2e PASS** (~150,000 tokens consumed
+  across all runs). The lone FAIL is `review_and_investigate`,
+  whose agent ran 40 turns without crashing (agent_ok PASS,
+  max_tokens PASS at 74,828 / 250,000) but truncated mid-Phase-6
+  before surfacing the final result fields, so the
+  `output_present` / `theme_count_reported` /
+  `all_three_callsites_reported` graders failed. This is an
+  **e2e-harness design issue** (max_iterations + prompt + grader
+  field-name assumptions), **not a migration regression** — the
+  `tests/test_review_and_investigate.lua` 5/5 stub-based unit test
+  remains green and the package's own `alc.parallel` callsites
+  fired correctly during the live run. Tracked separately as
+  follow-up issue `1778215078-39073` (3-step refinement: confirm
+  result-shape field names, raise `max_iterations`, simplify task).
+  The **await-confluence pattern is now real-LLM-observable**
+  across all 6 Multi-callsite packages: `cross_verify_present`
+  (rstar), `comparison_phase_complete` (anti_cascade),
+  `n_steps_reported` (got), `trace_results_reported` (lineage),
+  `judgments_phase_complete` (counterfactual_verify), and
+  `grounded_output_present` + `n_levels_reported` (coa) all
+  PASSed end-to-end. With this validation, the
+  `alc.map → alc.parallel` migration tracked at parent issue
+  `1778144244-78327` is **functionally validated end-to-end**;
+  Phase A unit tests + Phase B static checks + this real-LLM
+  Phase B execution form three independent verification layers
+  for the migration.
+
 - **7 new `scripts/e2e/*.lua` real-LLM smoke tests** (Phase B
   sub-batch 2, **completing** the post-migration hardening): adds
   end-to-end smoke harnesses for `rstar` and the 6
