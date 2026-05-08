@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`scripts/e2e/sot.lua`**: new end-to-end smoke test for `sot`
+  using agent-block + algocline MCP + real LLM (Anthropic API).
+  Drives a 3-section Skeleton-of-Thought run on a short Lua-coroutine
+  topic and asserts: agent_ok / cumulative-token budget / output
+  non-empty / section_count surfaced / `##` heading marker present.
+  Validates the post-migration behavior end-to-end (Phase 2 fills
+  dispatched as a single `alc.llm_batch` round-trip via
+  `alc.parallel`). First green run: `2026-05-08_093746`, 6 turns /
+  6609 tokens / ~9 s wall-clock for 4 LLM calls (1 skeleton + 3
+  fills). Run via `just e2e sot`.
+
 - **`sot`** (Generation): migrated the section-fill call-site from
   the sequential `alc.map` to the true batch-parallel `alc.parallel`
   primitive (single `alc.llm_batch` round-trip). The previous
