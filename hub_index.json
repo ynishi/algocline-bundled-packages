@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:01:35Z",
+  "updated_at": "2026-05-08T23:15:19Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -1351,7 +1351,7 @@
       "version": "0.1.0",
       "description": "Tree-of-Thought — branching reasoning with evaluation and pruning",
       "category": "reasoning",
-      "docstring": "ToT — Tree-of-Thought reasoning\nExplores multiple reasoning paths via branching, evaluation, and pruning.\nUnlike linear CoT, ToT maintains a tree of thought branches and uses\nbeam search to focus on the most promising paths.\n\nBased on: Yao et al., \"Tree of Thoughts: Deliberate Problem Solving\nwith Large Language Models\" (2023, arXiv:2305.10601)\n\nUsage:\nlocal tot = require(\"tot\")\nreturn tot.run(ctx)\n\nctx.task (required): The problem to solve\nctx.breadth: Thoughts generated per node (default: 3)\nctx.depth: Maximum tree depth (default: 3)\nctx.beam_width: Branches kept after pruning (default: 2)",
+      "docstring": "tot(ToT) — beam-search tree-of-thought reasoning over branching thought paths\n\nExplores multiple reasoning paths by generating candidate thoughts at each\ndepth level, scoring them, and pruning to the top-scoring beams. Synthesizes\nthe best beam path into a final answer.\n\n## Usage\n\n```lua\nlocal tot = require(\"tot\")\nreturn tot.run(ctx)\n```\n\n## Algorithm\n\nGiven a task and beam parameters (breadth B, depth D, beam width K):\n\n1. At each depth d ∈ {1..D}, for every surviving beam, generate B candidate\nthoughts via `alc.llm` (thought generation prompt).\n2. Score each candidate thought with a separate `alc.llm` call that rates\nlogical soundness and progress on a 1-10 scale.\n3. Prune all candidates to the top-K by score (beam search step).\n4. After D rounds, synthesize the best-scored beam path into a conclusion\nvia a final `alc.llm` call.\n\nBeam search complexity: O(D × K × B) LLM calls for generation +\nO(D × K × B) calls for scoring = O(D × K × B) total.\n\n## Theoretical foundations\n\nYao et al. (2023) show that deliberate search over a tree of thoughts\noutperforms linear chain-of-thought (CoT) on tasks requiring exploration,\nstrategic look-ahead, or backtracking. The beam-search variant implemented\nhere approximates the BFS/DFS variants in the paper with a fixed-width\npruning step that trades completeness for bounded LLM call count.\n\n## References\n\n- Yao, S., Yu, D., Zhao, J., Shafran, I., Griffiths, T. L., Cao, Y.,\nand Narasimhan, K. (2023). \"Tree of Thoughts: Deliberate Problem Solving\nwith Large Language Models\". arXiv:2305.10601.\nhttps://arxiv.org/abs/2305.10601",
       "source": {
         "type": "unknown"
       },

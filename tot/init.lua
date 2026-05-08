@@ -1,19 +1,45 @@
---- ToT — Tree-of-Thought reasoning
---- Explores multiple reasoning paths via branching, evaluation, and pruning.
---- Unlike linear CoT, ToT maintains a tree of thought branches and uses
---- beam search to focus on the most promising paths.
+--- tot(ToT) — beam-search tree-of-thought reasoning over branching thought paths
 ---
---- Based on: Yao et al., "Tree of Thoughts: Deliberate Problem Solving
---- with Large Language Models" (2023, arXiv:2305.10601)
+--- Explores multiple reasoning paths by generating candidate thoughts at each
+--- depth level, scoring them, and pruning to the top-scoring beams. Synthesizes
+--- the best beam path into a final answer.
 ---
---- Usage:
----   local tot = require("tot")
----   return tot.run(ctx)
+--- ## Usage
 ---
---- ctx.task (required): The problem to solve
---- ctx.breadth: Thoughts generated per node (default: 3)
---- ctx.depth: Maximum tree depth (default: 3)
---- ctx.beam_width: Branches kept after pruning (default: 2)
+--- ```lua
+--- local tot = require("tot")
+--- return tot.run(ctx)
+--- ```
+---
+--- ## Algorithm
+---
+--- Given a task and beam parameters (breadth B, depth D, beam width K):
+---
+--- 1. At each depth d ∈ {1..D}, for every surviving beam, generate B candidate
+---    thoughts via `alc.llm` (thought generation prompt).
+--- 2. Score each candidate thought with a separate `alc.llm` call that rates
+---    logical soundness and progress on a 1-10 scale.
+--- 3. Prune all candidates to the top-K by score (beam search step).
+--- 4. After D rounds, synthesize the best-scored beam path into a conclusion
+---    via a final `alc.llm` call.
+---
+--- Beam search complexity: O(D × K × B) LLM calls for generation +
+--- O(D × K × B) calls for scoring = O(D × K × B) total.
+---
+--- ## Theoretical foundations
+---
+--- Yao et al. (2023) show that deliberate search over a tree of thoughts
+--- outperforms linear chain-of-thought (CoT) on tasks requiring exploration,
+--- strategic look-ahead, or backtracking. The beam-search variant implemented
+--- here approximates the BFS/DFS variants in the paper with a fixed-width
+--- pruning step that trades completeness for bounded LLM call count.
+---
+--- ## References
+---
+--- - Yao, S., Yu, D., Zhao, J., Shafran, I., Griffiths, T. L., Cao, Y.,
+---   and Narasimhan, K. (2023). "Tree of Thoughts: Deliberate Problem Solving
+---   with Large Language Models". arXiv:2305.10601.
+---   https://arxiv.org/abs/2305.10601
 
 local S = require("alc_shapes")
 local T = S.T
@@ -43,9 +69,9 @@ M.spec = {
                 best_path      = T.array_of(T.string):describe("Best beam path: ordered reasoning steps"),
                 best_score     = T.number:describe("Score of the best beam (1-10)"),
                 explored_paths = T.array_of(T.shape({
-                    rank  = T.number,
-                    path  = T.array_of(T.string),
-                    score = T.number,
+                    rank  = T.number:describe("1-based rank among surviving beams (1 = best score)"),
+                    path  = T.array_of(T.string):describe("Ordered reasoning steps for this beam"),
+                    score = T.number:describe("Aggregate score of this beam path (1-10)"),
                 })):describe("All surviving beams, rank-ordered by score"),
                 tree_stats     = T.shape({
                     depth      = T.number:describe("Search depth used"),
