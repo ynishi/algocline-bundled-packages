@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:42:58Z",
+  "updated_at": "2026-05-08T23:47:58Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -931,7 +931,7 @@
       "version": "0.1.0",
       "description": "Progressive-Hint Prompting — iterative re-solving with prior answers as hints",
       "category": "reasoning",
-      "docstring": "PHP — Progressive-Hint Prompting\nIteratively re-solves the problem using previous answers as hints.\nEach round feeds the prior answer back as a \"hint\", allowing the model\nto self-correct by building on (or departing from) its previous attempt.\nConverges when two consecutive answers agree.\n\nBased on: Zheng et al., \"Progressive-Hint Prompting Improves Reasoning\nin Large Language Models\" (2023, arXiv:2304.09797)\n\nUsage:\nlocal php = require(\"php\")\nreturn php.run(ctx)\n\nctx.task (required): The problem to solve\nctx.max_rounds: Maximum hint-retry cycles (default: 4)",
+      "docstring": "php(PHP) — iteratively re-solves problems using prior answers as hints\n\nIteratively re-solves the problem using previous answers as hints.\nEach round feeds prior answer conclusions back as hints, allowing the model\nto self-correct by building on (or departing from) its previous attempt.\nConverges when two consecutive rounds produce matching conclusions.\n\n## Algorithm\n\nGiven a task, PHP performs the following steps:\n\n1. Round 1 — initial solve: the model solves the task from scratch with no\nhints. A conclusion is extracted from the full answer.\n2. Rounds 2–N — hint-guided re-solve: all previous conclusions are\nconcatenated as hints. The model re-solves the task, either confirming\nor correcting its prior reasoning.\n3. Convergence check: after each round, the current conclusion is compared\nto the previous one via a separate LLM call. If they match (`SAME`),\nthe loop terminates early.\n4. Termination: stops at convergence or when `max_rounds` is exhausted.\n\n## Theoretical foundations\n\nZheng et al. (2023) show that feeding prior answers as hints narrows the\nhypothesis space and guides the model toward a stable fixpoint. Empirically,\nPHP improves arithmetic and multi-step reasoning accuracy over self-consistency\nbaselines because hints act as soft constraints that reduce exploration variance.\n\n## Usage\n\n```lua\nlocal php = require(\"php\")\nreturn php.run(ctx)\n```\n\n## References\n\n- Zheng, Cai, Chen, Liu (2023). \"Progressive-Hint Prompting Improves Reasoning\nin Large Language Models\". arXiv:2304.09797.\nhttps://arxiv.org/abs/2304.09797",
       "source": {
         "type": "unknown"
       },

@@ -1,18 +1,43 @@
---- PHP — Progressive-Hint Prompting
+--- php(PHP) — iteratively re-solves problems using prior answers as hints
+---
 --- Iteratively re-solves the problem using previous answers as hints.
---- Each round feeds the prior answer back as a "hint", allowing the model
+--- Each round feeds prior answer conclusions back as hints, allowing the model
 --- to self-correct by building on (or departing from) its previous attempt.
---- Converges when two consecutive answers agree.
+--- Converges when two consecutive rounds produce matching conclusions.
 ---
---- Based on: Zheng et al., "Progressive-Hint Prompting Improves Reasoning
---- in Large Language Models" (2023, arXiv:2304.09797)
+--- ## Algorithm
 ---
---- Usage:
----   local php = require("php")
----   return php.run(ctx)
+--- Given a task, PHP performs the following steps:
 ---
---- ctx.task (required): The problem to solve
---- ctx.max_rounds: Maximum hint-retry cycles (default: 4)
+--- 1. Round 1 — initial solve: the model solves the task from scratch with no
+---    hints. A conclusion is extracted from the full answer.
+--- 2. Rounds 2–N — hint-guided re-solve: all previous conclusions are
+---    concatenated as hints. The model re-solves the task, either confirming
+---    or correcting its prior reasoning.
+--- 3. Convergence check: after each round, the current conclusion is compared
+---    to the previous one via a separate LLM call. If they match (`SAME`),
+---    the loop terminates early.
+--- 4. Termination: stops at convergence or when `max_rounds` is exhausted.
+---
+--- ## Theoretical foundations
+---
+--- Zheng et al. (2023) show that feeding prior answers as hints narrows the
+--- hypothesis space and guides the model toward a stable fixpoint. Empirically,
+--- PHP improves arithmetic and multi-step reasoning accuracy over self-consistency
+--- baselines because hints act as soft constraints that reduce exploration variance.
+---
+--- ## Usage
+---
+--- ```lua
+--- local php = require("php")
+--- return php.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - Zheng, Cai, Chen, Liu (2023). "Progressive-Hint Prompting Improves Reasoning
+---   in Large Language Models". arXiv:2304.09797.
+---   https://arxiv.org/abs/2304.09797
 
 local S = require("alc_shapes")
 local T = S.T
