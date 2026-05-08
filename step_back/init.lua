@@ -1,17 +1,45 @@
---- Step-Back — abstraction-first reasoning
+--- step_back(StepBack) — abstraction-first reasoning
+---
 --- Instead of solving directly, first "step back" to identify the underlying
---- principle or concept, then apply that principle to solve the original problem.
+--- principle or concept, then apply that principle to solve the original
+--- problem. Implements the Step-Back Prompting method (Zheng et al. 2023),
+--- extended with a verification pass and optional revision round.
 ---
---- Based on: Zheng et al., "Take a Step Back: Evoking Reasoning via
---- Abstraction in Large Language Models" (2023, arXiv:2310.06117)
+--- ## Usage
 ---
---- Usage:
----   local step_back = require("step_back")
----   return step_back.run(ctx)
+--- ```lua
+--- local step_back = require("step_back")
+--- return step_back.run({ task = "Why does ice float on water?" })
+--- ```
 ---
---- ctx.task (required): The problem to solve
---- ctx.abstraction_levels: Number of abstraction rounds (default: 1)
---- ctx.domain_hint: Optional domain hint to guide abstraction
+--- ## Algorithm
+---
+--- Given a problem `task`, the pkg performs five phases:
+---
+--- 1. **Step-back question generation** — for each abstraction level, produce
+---    a higher-level question about the underlying principle (via `alc.llm`).
+--- 2. **Principle answering** — answer each step-back question to extract
+---    the domain principle.
+--- 3. **Principle-grounded solving** — solve `task` using the extracted
+---    principles as context.
+--- 4. **Verification** — check that the solution correctly applies the
+---    principles; output `VERIFIED` if consistent.
+--- 5. **Revision** (conditional) — if verification finds gaps, revise once.
+---
+--- ## Theoretical foundations
+---
+--- Step-Back Prompting (Zheng et al. 2023) shows that eliciting abstract
+--- principles before answering specific questions improves factual accuracy
+--- and reduces hallucination across multiple reasoning benchmarks. The
+--- abstraction step forces the model to retrieve broader, more reliable
+--- knowledge before grounding it to the specific query.
+---
+--- ## References
+---
+--- - Zheng, H., Cai, S., Huang, L., Liu, Y., Han, X., Liu, Z. (2023).
+---   "Take a Step Back: Evoking Reasoning via Abstraction in Large Language
+---   Models". arXiv:2310.06117.
+---   https://arxiv.org/abs/2310.06117
 
 local S = require("alc_shapes")
 local T = S.T
@@ -38,9 +66,9 @@ M.spec = {
             result = T.shape({
                 answer       = T.string:describe("Final answer (post-verification / post-revision)"),
                 abstractions = T.array_of(T.shape({
-                    level     = T.number,
-                    question  = T.string,
-                    principle = T.string,
+                    level     = T.number:describe("Abstraction level index (1-based)"),
+                    question  = T.string:describe("Step-back question generated for this level"),
+                    principle = T.string:describe("Principle or concept answer for the step-back question"),
                 })):describe("Ordered step-back Q/A per abstraction level"),
                 verification = T.string:describe("Verifier output"),
                 verified     = T.boolean:describe("Whether verification returned VERIFIED"),

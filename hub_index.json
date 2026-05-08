@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:31:58Z",
+  "updated_at": "2026-05-08T23:37:22Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -1303,7 +1303,7 @@
       "version": "0.1.0",
       "description": "Step-Back prompting — abstract the principle first, then solve from principles",
       "category": "reasoning",
-      "docstring": "Step-Back — abstraction-first reasoning\nInstead of solving directly, first \"step back\" to identify the underlying\nprinciple or concept, then apply that principle to solve the original problem.\n\nBased on: Zheng et al., \"Take a Step Back: Evoking Reasoning via\nAbstraction in Large Language Models\" (2023, arXiv:2310.06117)\n\nUsage:\nlocal step_back = require(\"step_back\")\nreturn step_back.run(ctx)\n\nctx.task (required): The problem to solve\nctx.abstraction_levels: Number of abstraction rounds (default: 1)\nctx.domain_hint: Optional domain hint to guide abstraction",
+      "docstring": "step_back(StepBack) — abstraction-first reasoning\n\nInstead of solving directly, first \"step back\" to identify the underlying\nprinciple or concept, then apply that principle to solve the original\nproblem. Implements the Step-Back Prompting method (Zheng et al. 2023),\nextended with a verification pass and optional revision round.\n\n## Usage\n\n```lua\nlocal step_back = require(\"step_back\")\nreturn step_back.run({ task = \"Why does ice float on water?\" })\n```\n\n## Algorithm\n\nGiven a problem `task`, the pkg performs five phases:\n\n1. **Step-back question generation** — for each abstraction level, produce\na higher-level question about the underlying principle (via `alc.llm`).\n2. **Principle answering** — answer each step-back question to extract\nthe domain principle.\n3. **Principle-grounded solving** — solve `task` using the extracted\nprinciples as context.\n4. **Verification** — check that the solution correctly applies the\nprinciples; output `VERIFIED` if consistent.\n5. **Revision** (conditional) — if verification finds gaps, revise once.\n\n## Theoretical foundations\n\nStep-Back Prompting (Zheng et al. 2023) shows that eliciting abstract\nprinciples before answering specific questions improves factual accuracy\nand reduces hallucination across multiple reasoning benchmarks. The\nabstraction step forces the model to retrieve broader, more reliable\nknowledge before grounding it to the specific query.\n\n## References\n\n- Zheng, H., Cai, S., Huang, L., Liu, Y., Han, X., Liu, Z. (2023).\n\"Take a Step Back: Evoking Reasoning via Abstraction in Large Language\nModels\". arXiv:2310.06117.\nhttps://arxiv.org/abs/2310.06117",
       "source": {
         "type": "unknown"
       },
