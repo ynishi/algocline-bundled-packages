@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:37:22Z",
+  "updated_at": "2026-05-08T23:42:58Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -727,7 +727,7 @@
       "version": "0.1.0",
       "description": "Meta-Prompting — orchestrator identifies and dispatches to specialist personas",
       "category": "reasoning",
-      "docstring": "Meta-Prompting — orchestrator dispatches to specialist personas\nA meta-orchestrator analyzes the task, identifies required expertise,\nthen sequentially delegates to specialist personas, collecting and\nintegrating their outputs.\n\nBased on: Suzgun & Kalai, \"Meta-Prompting: Enhancing Language Models\nwith Task-Agnostic Scaffolding\" (2024, arXiv:2401.12954)\n\nUsage:\nlocal mp = require(\"meta_prompt\")\nreturn mp.run(ctx)\n\nctx.task (required): The problem to solve\nctx.max_experts: Maximum number of expert consultations (default: 4)",
+      "docstring": "meta_prompt(Meta-Prompting) — orchestrator dispatches to specialist personas\n\nA meta-orchestrator analyzes the task, identifies required expertise,\nthen sequentially delegates to specialist personas, collecting and\nintegrating their outputs into a unified final answer.\n\n## Usage\n\n```lua\nlocal mp = require(\"meta_prompt\")\nreturn mp.run({ task = \"Explain the implications of quantum entanglement\" })\n```\n\n## Algorithm\n\nGiven a task, the pkg performs three phases:\n\n1. Orchestration — the meta-orchestrator identifies up to `max_experts`\nspecialist roles and formulates a focused question for each.\n2. Expert consultation — each specialist is queried sequentially,\nreceiving prior expert outputs as accumulated context.\n3. Synthesis — the meta-orchestrator integrates all expert analyses\ninto a single, conflict-resolved final answer.\n\n## Theoretical foundations\n\nBased on Suzgun & Kalai (2024), Meta-Prompting frames the LLM as a\nconductor that recruits specialist sub-agents from the same model.\nThe scaffolding is task-agnostic: no domain-specific prompts are\nhard-coded. Performance gains arise from structured decomposition and\nrole-conditioned generation rather than from additional fine-tuning.\n\n## References\n\n- Suzgun, M. & Kalai, A. T. (2024). \"Meta-Prompting: Enhancing Language\nModels with Task-Agnostic Scaffolding\". arXiv:2401.12954.\nhttps://arxiv.org/abs/2401.12954",
       "source": {
         "type": "unknown"
       },

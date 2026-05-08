@@ -1,17 +1,40 @@
---- Meta-Prompting — orchestrator dispatches to specialist personas
+--- meta_prompt(Meta-Prompting) — orchestrator dispatches to specialist personas
+---
 --- A meta-orchestrator analyzes the task, identifies required expertise,
 --- then sequentially delegates to specialist personas, collecting and
---- integrating their outputs.
+--- integrating their outputs into a unified final answer.
 ---
---- Based on: Suzgun & Kalai, "Meta-Prompting: Enhancing Language Models
---- with Task-Agnostic Scaffolding" (2024, arXiv:2401.12954)
+--- ## Usage
 ---
---- Usage:
----   local mp = require("meta_prompt")
----   return mp.run(ctx)
+--- ```lua
+--- local mp = require("meta_prompt")
+--- return mp.run({ task = "Explain the implications of quantum entanglement" })
+--- ```
 ---
---- ctx.task (required): The problem to solve
---- ctx.max_experts: Maximum number of expert consultations (default: 4)
+--- ## Algorithm
+---
+--- Given a task, the pkg performs three phases:
+---
+--- 1. Orchestration — the meta-orchestrator identifies up to `max_experts`
+---    specialist roles and formulates a focused question for each.
+--- 2. Expert consultation — each specialist is queried sequentially,
+---    receiving prior expert outputs as accumulated context.
+--- 3. Synthesis — the meta-orchestrator integrates all expert analyses
+---    into a single, conflict-resolved final answer.
+---
+--- ## Theoretical foundations
+---
+--- Based on Suzgun & Kalai (2024), Meta-Prompting frames the LLM as a
+--- conductor that recruits specialist sub-agents from the same model.
+--- The scaffolding is task-agnostic: no domain-specific prompts are
+--- hard-coded. Performance gains arise from structured decomposition and
+--- role-conditioned generation rather than from additional fine-tuning.
+---
+--- ## References
+---
+--- - Suzgun, M. & Kalai, A. T. (2024). "Meta-Prompting: Enhancing Language
+---   Models with Task-Agnostic Scaffolding". arXiv:2401.12954.
+---   https://arxiv.org/abs/2401.12954
 
 local S = require("alc_shapes")
 local T = S.T
@@ -37,10 +60,10 @@ M.spec = {
             result = T.shape({
                 answer            = T.string:describe("Orchestrator's integrated synthesis of all expert analyses"),
                 experts_consulted = T.array_of(T.shape({
-                    role     = T.string,
-                    focus    = T.string,
-                    question = T.string,
-                    response = T.string,
+                    role     = T.string:describe("Expert role title assigned by the orchestrator"),
+                    focus    = T.string:describe("Aspect of the task assigned to this expert"),
+                    question = T.string:describe("Specific question posed to the expert"),
+                    response = T.string:describe("Expert's analysis in response to the question"),
                 })):describe("Sequential expert consultations with the question asked and the response received"),
                 total_experts     = T.number:describe("Count of experts actually consulted (may be < max_experts due to parsing fallback)"),
             }),

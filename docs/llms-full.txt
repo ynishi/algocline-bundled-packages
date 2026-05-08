@@ -2469,14 +2469,50 @@ Returns:
 <!-- ── meta_prompt.md ── -->
 
 
-# Meta-Prompting — orchestrator dispatches to specialist personas
+# meta_prompt(Meta-Prompting) — orchestrator dispatches to specialist personas
 
-> A meta-orchestrator analyzes the task, identifies required expertise, then sequentially delegates to specialist personas, collecting and integrating their outputs.
+> A meta-orchestrator analyzes the task, identifies required expertise, then sequentially delegates to specialist personas, collecting and integrating their outputs into a unified final answer.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local mp = require("meta_prompt")
+return mp.run({ task = "Explain the implications of quantum entanglement" })
+```
+
+## Algorithm {#algorithm}
+
+Given a task, the pkg performs three phases:
+
+1. Orchestration — the meta-orchestrator identifies up to `max_experts`
+   specialist roles and formulates a focused question for each.
+2. Expert consultation — each specialist is queried sequentially,
+   receiving prior expert outputs as accumulated context.
+3. Synthesis — the meta-orchestrator integrates all expert analyses
+   into a single, conflict-resolved final answer.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Based on Suzgun & Kalai (2024), Meta-Prompting frames the LLM as a
+conductor that recruits specialist sub-agents from the same model.
+The scaffolding is task-agnostic: no domain-specific prompts are
+hard-coded. Performance gains arise from structured decomposition and
+role-conditioned generation rather than from additional fine-tuning.
+
+## References {#references}
+
+- Suzgun, M. & Kalai, A. T. (2024). "Meta-Prompting: Enhancing Language
+  Models with Task-Agnostic Scaffolding". arXiv:2401.12954.
+  https://arxiv.org/abs/2401.12954
 
 ## Parameters {#parameters}
 
