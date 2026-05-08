@@ -8,7 +8,7 @@ source: contrastive/init.lua
 generated: gen_docs (V0)
 ---
 
-# Contrastive — learn from correct AND incorrect reasoning
+# contrastive — learn from correct AND incorrect reasoning
 
 > Generates both a correct reasoning path and a plausible-but-wrong path, then contrasts them to strengthen the final answer. The only strategy that explicitly models failure modes.
 

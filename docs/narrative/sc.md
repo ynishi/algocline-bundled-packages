@@ -8,7 +8,7 @@ source: sc/init.lua
 generated: gen_docs (V0)
 ---
 
-# sc — Self-Consistency: independent sampling with majority vote
+# sc(SC) — independent multi-path sampling with majority vote
 
 > Samples multiple reasoning paths for the same problem, then selects the most consistent answer by majority voting.
 
@@ -19,12 +19,13 @@ generated: gen_docs (V0)
 - [Caveats](#caveats)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [References](#references)
+- [Parameters](#parameters)
 - [Result](#result)
 
 ## Algorithm {#algorithm}
 
 1. Sample `n` independent reasoning paths for the same task (varied via
-   `temperature_hint` for diversity)
+   a built-in diversity-hint rotation in the prompt)
 2. Extract a normalized answer per path
 3. Tally votes; the majority answer wins (with `consensus` LLM-synthesized
    summary across the winning paths)
@@ -59,6 +60,14 @@ among samples (LLM-as-judge). `sc` uses deterministic majority voting.
 
 Wang et al. (2022). "Self-Consistency Improves Chain of Thought Reasoning
 in Language Models". arXiv:2203.11171.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per reasoning path (default: 400). Truncating reasoning lowers per-agent accuracy p, which directly weakens Condorcet guarantees for downstream consumers |
+| `ctx.n` | number | optional | Number of independent reasoning paths to sample (default: 5) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
 
 ## Result {#result}
 

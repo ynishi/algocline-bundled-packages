@@ -8,7 +8,7 @@ source: distill/init.lua
 generated: gen_docs (V0)
 ---
 
-# Distill — MapReduce summarization and extraction
+# distill — MapReduce summarization and extraction
 
 > Splits large text into chunks, processes each in parallel, then reduces into a unified result.
 

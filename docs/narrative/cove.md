@@ -8,7 +8,7 @@ source: cove/init.lua
 generated: gen_docs (V0)
 ---
 
-# CoVe — Chain-of-Verification: draft-verify-revise cycle
+# cove(CoVe) — Chain-of-Verification draft-verify-revise cycle
 
 > Reduces hallucination by: draft → generate verification questions → answer them independently → produce verified final response.
 

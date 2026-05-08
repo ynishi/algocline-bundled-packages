@@ -8,7 +8,7 @@ source: sot/init.lua
 generated: gen_docs (V0)
 ---
 
-# SoT — Skeleton-of-Thought parallel generation
+# sot(SoT) — Skeleton-of-Thought parallel generation
 
 > Generates a structural outline first, then fills each section in parallel via alc.parallel (single alc.llm_batch round-trip). Produces structurally coherent long-form output.
 

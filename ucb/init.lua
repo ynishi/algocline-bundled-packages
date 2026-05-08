@@ -1,13 +1,27 @@
---- UCB — UCB1 hypothesis space exploration
---- Generates multiple hypotheses, scores them with UCB1, refines the best.
+--- ucb(UCB) — upper confidence bound hypothesis exploration
 ---
---- Usage:
----   local ucb = require("ucb")
----   return ucb.run(ctx)
+--- Generates N candidate hypotheses, scores each with an LLM evaluator, and
+--- selects the best-scoring candidate using the UCB1 bandit formula. The
+--- top-ranked hypothesis is then refined over multiple rounds.
 ---
---- ctx.task (required): The problem to solve
---- ctx.rounds: Number of rounds (default: 2)
---- ctx.n: Number of hypotheses (default: 3)
+--- ## Usage
+---
+--- ```lua
+--- local ucb = require("ucb")
+--- return ucb.run({ task = "Design a caching strategy for a REST API." })
+--- ```
+---
+--- ## Algorithm
+---
+--- 1. **Generate** — produce N distinct hypotheses via independent LLM calls.
+--- 2. **Score** — rate each hypothesis (1-10) for quality, feasibility, and
+---    originality. Scores accumulate across rounds.
+--- 3. **UCB1 select** — choose the hypothesis with the highest UCB1 value:
+---    `UCB1(i) = avg_score(i) + sqrt(2 * ln(total_pulls + 1) / n_pulls(i))`.
+---    A hypothesis with zero pulls returns `+inf`, ensuring each is sampled
+---    at least once.
+--- 4. **Refine** — rewrite the selected hypothesis, then repeat from step 2
+---    for the remaining rounds.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -34,9 +48,9 @@ M.spec = {
             result = T.shape({
                 best    = T.string:describe("Highest avg-scored hypothesis after rounds"),
                 ranking = T.array_of(T.shape({
-                    rank       = T.number,
-                    hypothesis = T.string,
-                    avg_score  = T.number,
+                    rank       = T.number:describe("Position in the final ranking (1 = best)"),
+                    hypothesis = T.string:describe("Hypothesis text"),
+                    avg_score  = T.number:describe("Average LLM score across all pulls (1-10 scale)"),
                     pulls      = T.number:describe("Number of UCB pulls allocated"),
                 })):describe("Full ranking sorted by average score descending"),
             }),

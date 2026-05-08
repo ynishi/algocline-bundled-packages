@@ -5,14 +5,54 @@
 <!-- ── ab_mcts.md ── -->
 
 
-# ab_mcts — Adaptive Branching Monte Carlo Tree Search
+# ab_mcts(AB-MCTS) — adaptive branching MCTS with Thompson Sampling
 
 > Extends standard MCTS by dynamically deciding at each node whether to explore wider (generate new candidates) or deeper (refine existing ones). Uses Thompson Sampling with Beta posteriors instead of UCB1, enabling principled exploration-exploitation balance that adapts to problem structure.
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+Pipeline (`2 * budget + 1` LLM calls). For each iteration:
+
+1. **Selection** — Thompson Sampling down the tree using Beta posteriors
+2. **Expansion** — generate new or refine existing (1 LLM call)
+3. **Evaluation** — score the result (1 LLM call)
+4. **Backprop** — update Beta posteriors along the path
+
+Final step: synthesize the best answer from the highest-scoring leaf.
+
+## Usage {#usage}
+
+```lua
+local ab_mcts = require("ab_mcts")
+return ab_mcts.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `mcts`: standard MCTS uses UCB1 with fixed branching. AB-MCTS
+introduces a virtual GEN node at each position — when Thompson
+Sampling selects GEN over existing children, a new candidate is
+generated (wider). When an existing child is selected, it is
+refined (deeper). This yields adaptive branching tuned to problem
+structure.
+
+vs `tot` / `got`: those use fixed-shape thought trees / graphs.
+AB-MCTS's branching shape is data-driven via posterior sampling.
+
+## References {#references}
+
+Inoue et al. (2025). "Wider or Deeper? Scaling LLM Inference-Time
+Compute with Adaptive Branching Tree Search". NeurIPS 2025 Spotlight.
+arXiv:2503.04412.
 
 ## Parameters {#parameters}
 
@@ -799,7 +839,7 @@ Returns `conformal_decided` shape:
 <!-- ── contrastive.md ── -->
 
 
-# Contrastive — learn from correct AND incorrect reasoning
+# contrastive — learn from correct AND incorrect reasoning
 
 > Generates both a correct reasoning path and a plausible-but-wrong path, then contrasts them to strengthen the final answer. The only strategy that explicitly models failure modes.
 
@@ -839,14 +879,14 @@ Returns:
 <!-- ── cot.md ── -->
 
 
-# CoT — iterative chain-of-thought reasoning
+# cot(CoT) — iterative chain-of-thought reasoning
 
 > Builds a reasoning chain step by step, then synthesizes the chain into a single coherent conclusion.
 
 ## Contents
 
 - [Usage](#usage)
-- [Behavior](#behavior)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
 
@@ -857,7 +897,7 @@ local cot = require("cot")
 return cot.run({ task = "Why is the sky blue?", depth = 3 })
 ```
 
-## Behavior {#behavior}
+## Algorithm {#algorithm}
 
 For each step `i` in `1..depth`, the LLM is asked for the next key
 insight conditional on all prior insights. After the last step, a
@@ -924,7 +964,7 @@ Returns:
 <!-- ── cove.md ── -->
 
 
-# CoVe — Chain-of-Verification: draft-verify-revise cycle
+# cove(CoVe) — Chain-of-Verification draft-verify-revise cycle
 
 > Reduces hallucination by: draft → generate verification questions → answer them independently → produce verified final response.
 
@@ -1200,7 +1240,7 @@ Returns:
 <!-- ── cumulative.md ── -->
 
 
-# Cumulative — propose-verify-accumulate reasoning
+# cumulative — propose-verify-accumulate reasoning
 
 > Three roles (proposer, verifier, reporter) collaborate in a loop. The proposer generates new propositions, the verifier checks them, and verified propositions accumulate as established facts for the next round.
 
@@ -1234,14 +1274,72 @@ Returns:
 <!-- ── dci.md ── -->
 
 
-# dci — Deliberative Collective Intelligence (DCI-CF).
+# dci(DCI-CF) — 8-stage structured deliberation with typed epistemic acts
 
-> Implements the 8-stage structured deliberation algorithm from:   Prakash, Sunil   "From Debate to Deliberation: Structured Collective Reasoning    with Typed Epistemic Acts" (arXiv:2603.11781, 2026-03-12)
+> 8-stage structured deliberation algorithm with 4 reasoning archetypes, 14 typed epistemic acts, shared workspace, and a guaranteed decision_packet emission with first-class minority_report preservation.
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [Entry contract](#entry-contract)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+4 roles (fixed): `framer` / `explorer` / `challenger` / `integrator`.
+
+14 acts organized into 6 classes (paper §4.1):
+
+| Class | Acts |
+|---|---|
+| Orienting | `frame`, `clarify`, `reframe` |
+| Generative | `propose`, `extend`, `spawn` (skeleton-only in v1) |
+| Critical | `ask`, `challenge` |
+| Integrative | `bridge`, `synthesize`, `recall` |
+| Epistemic | `ground`, `update` |
+| Decisional | `recommend` |
+
+DCI-CF 8 stages:
+
+1. **Stage 0** — init session
+2. **Stage 1** — independent proposals (per-role act(s))
+3. **Stage 2** — canonicalize & cluster options
+4. **Stages 3-6** (loop up to `Rmax=2`):
+   - Collect challenges / evidence
+   - Admit new hypotheses (cutoff)
+   - Revise & compress options
+   - Score against criteria + convergence test (dominance or no_blocking)
+5. **Stage 7** — fallback cascade
+6. **Stage 8** — finalize decision packet (5 components completeness)
+
+## Theoretical foundations {#theoretical-foundations}
+
+Forces the session to emit a `decision_packet` with first-class
+`minority_report` preservation even on fallback. Stage 7 fallback
+cascade (outranking → minimax → satisficing → Integrator arbitration)
+guarantees decision emission regardless of convergence quality, while
+the typed epistemic act constraint keeps the reasoning trace auditable.
+
+## Entry contract {#entry-contract}
+
+- `run` — Strategy, ctx-threading. `ctx.task` required;
+  returns `ctx.result :: deliberated shape` (see `alc_shapes`)
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Category: `synthesis` (panel-family alongside `panel`, `moa`, `recipe_*`).
+vs `panel`: `panel` runs heterogeneous agents in parallel and aggregates.
+DCI-CF runs fixed-role agents through a structured 8-stage protocol with
+typed acts, yielding richer trace + guaranteed decision_packet shape.
+
+## References {#references}
+
+Prakash & Sunil (2026). "From Debate to Deliberation: Structured Collective
+Reasoning with Typed Epistemic Acts". arXiv:2603.11781.
 
 ## Parameters {#parameters}
 
@@ -1276,7 +1374,7 @@ Returns `deliberated` shape:
 <!-- ── decompose.md ── -->
 
 
-# Decompose — task decomposition and parallel sub-task execution
+# decompose — task decomposition and parallel sub-task execution
 
 > Breaks a complex task into sub-tasks via LLM, executes each in parallel, then merges results into a unified answer.
 
@@ -1390,7 +1488,7 @@ Returns:
 <!-- ── distill.md ── -->
 
 
-# Distill — MapReduce summarization and extraction
+# distill — MapReduce summarization and extraction
 
 > Splits large text into chunks, processes each in parallel, then reduces into a unified result.
 
@@ -1426,7 +1524,7 @@ Returns:
 <!-- ── diverse.md ── -->
 
 
-# DiVERSe — diverse reasoning paths with step-level verification
+# diverse(DiVERSe) — diverse reasoning paths with step-level verification
 
 > Generates multiple diverse reasoning paths, then verifies each path at the step level (not just the final answer). Selects the path with the highest step-level verification score.
 
@@ -1842,7 +1940,7 @@ Returns:
 <!-- ── factscore.md ── -->
 
 
-# FActScore — atomic claim decomposition and per-claim verification
+# factscore(FActScore) — atomic claim decomposition and per-claim verification
 
 > Extracts atomic claims from text, then independently verifies each claim in parallel. Produces a factual precision score and annotated results.
 
@@ -3678,7 +3776,7 @@ Returns:
 <!-- ── sc.md ── -->
 
 
-# sc — Self-Consistency: independent sampling with majority vote
+# sc(SC) — independent multi-path sampling with majority vote
 
 > Samples multiple reasoning paths for the same problem, then selects the most consistent answer by majority voting.
 
@@ -3689,12 +3787,13 @@ Returns:
 - [Caveats](#caveats)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [References](#references)
+- [Parameters](#parameters)
 - [Result](#result)
 
 ## Algorithm {#algorithm}
 
 1. Sample `n` independent reasoning paths for the same task (varied via
-   `temperature_hint` for diversity)
+   a built-in diversity-hint rotation in the prompt)
 2. Extract a normalized answer per path
 3. Tally votes; the majority answer wins (with `consensus` LLM-synthesized
    summary across the winning paths)
@@ -3729,6 +3828,14 @@ among samples (LLM-as-judge). `sc` uses deterministic majority voting.
 
 Wang et al. (2022). "Self-Consistency Improves Chain of Thought Reasoning
 in Language Models". arXiv:2203.11171.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.gen_tokens` | number | optional | Max tokens per reasoning path (default: 400). Truncating reasoning lowers per-agent accuracy p, which directly weakens Condorcet guarantees for downstream consumers |
+| `ctx.n` | number | optional | Number of independent reasoning paths to sample (default: 5) |
+| `ctx.task` | string | **required** | Problem to solve (required) |
 
 ## Result {#result}
 
@@ -3943,7 +4050,7 @@ Returns `smc_sampled` shape:
 <!-- ── sot.md ── -->
 
 
-# SoT — Skeleton-of-Thought parallel generation
+# sot(SoT) — Skeleton-of-Thought parallel generation
 
 > Generates a structural outline first, then fills each section in parallel via alc.parallel (single alc.llm_batch round-trip). Produces structurally coherent long-form output.
 
@@ -4202,14 +4309,35 @@ Returns:
 <!-- ── ucb.md ── -->
 
 
-# UCB — UCB1 hypothesis space exploration
+# ucb(UCB) — upper confidence bound hypothesis exploration
 
-> Generates multiple hypotheses, scores them with UCB1, refines the best.
+> Generates N candidate hypotheses, scores each with an LLM evaluator, and selects the best-scoring candidate using the UCB1 bandit formula. The top-ranked hypothesis is then refined over multiple rounds.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ucb = require("ucb")
+return ucb.run({ task = "Design a caching strategy for a REST API." })
+```
+
+## Algorithm {#algorithm}
+
+1. **Generate** — produce N distinct hypotheses via independent LLM calls.
+2. **Score** — rate each hypothesis (1-10) for quality, feasibility, and
+   originality. Scores accumulate across rounds.
+3. **UCB1 select** — choose the hypothesis with the highest UCB1 value:
+   `UCB1(i) = avg_score(i) + sqrt(2 * ln(total_pulls + 1) / n_pulls(i))`.
+   A hypothesis with zero pulls returns `+inf`, ensuring each is sampled
+   at least once.
+4. **Refine** — rewrite the selected hypothesis, then repeat from step 2
+   for the remaining rounds.
 
 ## Parameters {#parameters}
 

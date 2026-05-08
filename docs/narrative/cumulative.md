@@ -8,7 +8,7 @@ source: cumulative/init.lua
 generated: gen_docs (V0)
 ---
 
-# Cumulative — propose-verify-accumulate reasoning
+# cumulative — propose-verify-accumulate reasoning
 
 > Three roles (proposer, verifier, reporter) collaborate in a loop. The proposer generates new propositions, the verifier checks them, and verified propositions accumulate as established facts for the next round.
 

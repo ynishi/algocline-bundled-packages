@@ -1194,6 +1194,11 @@
 ---@field denoised_context_length number @Length in chars of the denoised_context
 ---@field original_context_length number @Length in chars of the original context (or task when no context given)
 
+---@class AlcPkgInput_sc
+---@field gen_tokens? number @Max tokens per reasoning path (default: 400). Truncating reasoning lowers per-agent accuracy p, which directly weakens Condorcet guarantees for downstream consumers
+---@field n? number @Number of independent reasoning paths to sample (default: 5)
+---@field task string @Problem to solve (required)
+
 ---@alias AlcPkgResult_sc AlcResultVoted
 
 ---@class AlcPkgInput_schelling_abm

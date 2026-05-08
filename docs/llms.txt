@@ -108,7 +108,7 @@
 
 ## reasoning
 
-- [ab_mcts](narrative/ab_mcts.md): Adaptive Branching MCTS — Thompson Sampling with dynamic wider/deeper decisions. GEN node mechanism for principled branching. Consistently outperforms standard MCTS and repeated sampling.
+- [ab_mcts](narrative/ab_mcts.md): Adaptive branching MCTS with Thompson Sampling — wider/deeper per node
 - [analogical](narrative/analogical.md): Analogical prompting — self-generate analogies, extract patterns, apply to original
 - [bot](narrative/bot.md): Buffer of Thoughts — identify problem type, apply thought template, verify
 - [coa](narrative/coa.md): Chain-of-Abstraction — reason with abstract placeholders, then ground via parallel knowledge resolution. Decouples reasoning structure from concrete facts.
@@ -188,12 +188,12 @@
 
 ## synthesis
 
-- [dci](narrative/dci.md): Deliberative Collective Intelligence (DCI-CF). 4 roles (Framer/Explorer/Challenger/Integrator) × 14 typed epistemic acts (6 classes) × shared workspace (6 fields) × 8-stage convergence algorithm...
+- [dci](narrative/dci.md): Deliberative Collective Intelligence with typed epistemic acts
 - [panel](narrative/panel.md): Multi-perspective deliberation — distinct roles engage, moderator synthesizes
 
 ## validation
 
-- [conformal_vote](narrative/conformal_vote.md): Linear opinion pool + split conformal prediction gate for multi-agent deliberation. Emits a three-way decision (commit / escalate / anomaly) per Proposition 3, with a finite-sample coverage guarant...
+- [conformal_vote](narrative/conformal_vote.md): Split conformal prediction gate for multi-agent deliberation
 - [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual faithfulness verification — tests whether reasoning causally depends on inputs by simulating condition changes. Detects pattern-matching and unfaithful CoT.
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
 - [eval_guard](narrative/eval_guard.md): Evaluation safety gates for multi-agent systems — self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight che...

@@ -8,14 +8,35 @@ source: ucb/init.lua
 generated: gen_docs (V0)
 ---
 
-# UCB — UCB1 hypothesis space exploration
+# ucb(UCB) — upper confidence bound hypothesis exploration
 
-> Generates multiple hypotheses, scores them with UCB1, refines the best.
+> Generates N candidate hypotheses, scores each with an LLM evaluator, and selects the best-scoring candidate using the UCB1 bandit formula. The top-ranked hypothesis is then refined over multiple rounds.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ucb = require("ucb")
+return ucb.run({ task = "Design a caching strategy for a REST API." })
+```
+
+## Algorithm {#algorithm}
+
+1. **Generate** — produce N distinct hypotheses via independent LLM calls.
+2. **Score** — rate each hypothesis (1-10) for quality, feasibility, and
+   originality. Scores accumulate across rounds.
+3. **UCB1 select** — choose the hypothesis with the highest UCB1 value:
+   `UCB1(i) = avg_score(i) + sqrt(2 * ln(total_pulls + 1) / n_pulls(i))`.
+   A hypothesis with zero pulls returns `+inf`, ensuring each is sampled
+   at least once.
+4. **Refine** — rewrite the selected hypothesis, then repeat from step 2
+   for the remaining rounds.
 
 ## Parameters {#parameters}
 
