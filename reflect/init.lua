@@ -1,21 +1,40 @@
---- Reflect — self-critique and iterative refinement
+--- reflect(SelfRefine) — self-critique and iterative refinement
 ---
 --- Generate → Critique → Revise loop. The same LLM critiques
 --- its own output and refines until convergence or max rounds.
 ---
---- Based on: Madaan et al., "Self-Refine: Iterative Refinement with
---- Self-Feedback" (2023, arXiv:2303.17651)
+--- ## Usage
 ---
---- Usage:
----   local reflect = require("reflect")
----   return reflect.run(ctx)
+--- ```lua
+--- local reflect = require("reflect")
+--- return reflect.run({ task = "Explain the halting problem." })
+--- ```
 ---
---- ctx.task (required): The task to perform
---- ctx.initial_draft: Pre-generated draft to refine (skips initial LLM generation)
---- ctx.max_rounds: Maximum critique-revise cycles (default: 3)
---- ctx.stop_when: Stop condition — "no_major_issues" or "no_issues" (default: "no_major_issues")
---- ctx.gen_tokens: Max tokens for generation (default: 500)
---- ctx.critique_tokens: Max tokens for critique (default: 300)
+--- ## Algorithm
+---
+--- 1. **Generate** — produce an initial draft for the task (skipped if
+---    `initial_draft` is provided).
+--- 2. **Critique** — the LLM evaluates its own draft and emits structured
+---    feedback. Outputs `NO_MAJOR_ISSUES` / `NO_ISSUES` as a convergence
+---    signal.
+--- 3. **Revise** — the LLM rewrites the draft addressing every critique
+---    point. Steps 2–3 repeat up to `max_rounds` times or until the stop
+---    condition is met.
+---
+--- ## Theoretical foundations
+---
+--- Based on Madaan et al. (2023): an LLM can reliably critique and improve
+--- its own output without external feedback or reward models, provided the
+--- critique and revision are performed in separate inference calls so the
+--- model attends to the full prior draft without interference.
+---
+--- ## References
+---
+--- - Madaan, A., Tandon, N., Gupta, P., Hallinan, S., Gao, L., Wiegreffe, S.,
+---   Alon, U., Dziri, N., Prabhumoye, S., Yang, Y., Gupta, S., Majumder, B. P.,
+---   Hermann, K., Welleck, S., Yazdanbakhsh, A., Clark, P. (2023).
+---   "Self-Refine: Iterative Refinement with Self-Feedback."
+---   arXiv:2303.17651.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -45,9 +64,9 @@ M.spec = {
             result = T.shape({
                 output       = T.string:describe("Final refined draft"),
                 rounds       = T.array_of(T.shape({
-                    round     = T.number,
-                    critique  = T.string,
-                    converged = T.boolean,
+                    round     = T.number:describe("Round index (1-based)"),
+                    critique  = T.string:describe("Critique text emitted by the LLM for this round"),
+                    converged = T.boolean:describe("True if the critique signalled convergence (NO_MAJOR_ISSUES / NO_ISSUES)"),
                 })):describe("Ordered critique rounds with convergence flag"),
                 total_rounds = T.number:describe("Number of critique rounds executed"),
                 converged    = T.boolean:describe("Whether the last round converged"),
