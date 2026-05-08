@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **17 new `tests/test_*.lua` unit-test files** (Phase A of the
+  post-migration hardening): adds stub-based unit tests for the 17
+  packages migrated to `alc.parallel` that previously had no
+  individual test coverage. All test files reuse the canonical
+  `make_alc_stub` factory pattern from `tests/test_smc_sample.lua`
+  (with `alc.parallel` / `alc.llm_batch` mocks delegating to the
+  `alc.llm` fixture mechanism) and the `repo_root_from_package_path()`
+  REPO-resolution pattern (mlua-probe-mcp safety per CLAUDE.md
+  "失敗記録 2026-04-19"). Each file exercises 4-5 cases:
+  Simple-structured packages (cascade / claim_trace / critic /
+  decompose / distill / factscore / negation / p_tts / rank /
+  maieutic / triad — 11 packages × 4 cases) cover happy path /
+  input validation / package-specific behavior / edge case;
+  Multi-callsite-structured packages (anti_cascade / got / lineage /
+  counterfactual_verify / review_and_investigate / coa — 6 packages
+  × 5 cases) add a phase-boundary or DAG-correctness case asserting
+  that the awaited Phase-(N-1) result flows correctly into the
+  Phase-N callback (the await-confluence pattern validated by commit
+  `97d757a`). Total: 74 cases, ~3,725 LOC across 17 new files.
+  No package implementation (`init.lua`) was touched. All 74 cases
+  pass; existing test suites (`test_new_packages.lua` 32/32,
+  `test_smc_sample.lua` 77/77, `test_particle_infer.lua` 98/98,
+  `test_sot.lua` 5/5) remain green with no regression. New
+  `scripts/e2e/*.lua` files for the 19 packages without real-LLM
+  smokes are tracked separately as Phase B of the hardening work.
+
 - **Multi-callsite 6 batch — `alc.map` → `alc.parallel`**: migrated
   13 call-sites across 6 Multi-callsite / Multi-phase packages to
   the true batch-parallel `alc.parallel` primitive. Applies the
