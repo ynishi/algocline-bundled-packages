@@ -1,4 +1,4 @@
---- SoT — Skeleton-of-Thought parallel generation
+--- sot(SoT) — Skeleton-of-Thought parallel generation
 ---
 --- Generates a structural outline first, then fills each section
 --- in parallel via alc.parallel (single alc.llm_batch round-trip).
