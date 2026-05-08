@@ -45,12 +45,14 @@ Use algocline to run the review_and_investigate (deep code review) package.
 Call alc_advice with:
 - package: "review_and_investigate"
 - entry: "run"
-- code: %q
 - opts: {
+    code           = %q,
     context        = %q,
     deep_threshold = %g,
     max_fixes      = %d,
   }
+(NOTE: review_and_investigate requires ctx.code, NOT ctx.task. Pass
+code via opts so it lands in ctx.code. Do NOT use the task parameter.)
 
 Each alc.llm call inside `review_and_investigate.run` returns status
 "needs_response" — reply through alc_continue with a genuine response.
@@ -91,11 +93,18 @@ Phase 6 (Prescribe — fix options and ranking):
   For pairwise ranking: "F1 wins — returning nil with error is more correct
   than silently returning 0."
 
-When the run completes, report DIRECTLY from the alc_advice payload:
-1. summary.total_themes — count of surviving themes
-2. themes — the array of theme objects with accumulated phase fields
-3. summary.false_positives_removed — count removed in Phase 2 (if present)
-4. The best fix recommendation from Phase 6 ranking
+When the run completes, report DIRECTLY from the alc_advice payload IN
+ONE FINAL TURN. After alc_advice returns status="ok", you MUST output a
+single concise summary that includes ALL of the following keywords so
+the e2e graders can verify phase completion (this is the ONLY summary
+turn available — do not split across turns):
+
+1. "themes" — surviving theme count + each theme's id/name (Phase 1+2)
+2. "verified" or "confirmed" — Phase 2 verify outcome per theme
+3. "explore" or "locations" or "related" — Phase 3 explore outcome
+4. "root_cause" — Phase 4 diagnose outcome
+5. "summary.total_themes" — the count value from the result payload
+6. The best fix recommendation from Phase 6 ranking
 
 IMPORTANT:
 - Do NOT modify opts from the values above.
@@ -114,7 +123,7 @@ common.run({
     name           = "review_and_investigate",
     prompt         = prompt,
     params         = params,
-    max_iterations = 40,
+    max_iterations = 60,
     max_tokens_budget = 250000,
     graders = {
         common.grader_agent_ok(),

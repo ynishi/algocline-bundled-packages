@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`scripts/e2e/review_and_investigate.lua` harness fix (final
+  e2e to PASS — 19/19 complete)**: the initial run reported in the
+  earlier "End-to-end real-LLM validation" entry left this single
+  e2e FAIL. Root cause was identified by inspecting
+  `workspace/e2e-results/2026-05-08_130610/review_and_investigate.json`
+  turn-by-turn: (1) the prompt passed `code` via `task: %q` to
+  `alc_advice`, but the package requires `ctx.code` not `ctx.task`,
+  forcing the agent to self-correct to `alc_run` on Turn 1 (1
+  wasted turn); (2) `max_iterations = 40` was insufficient for
+  6 phases × 2 themes (T1 division_by_zero + T2 missing_type_validation,
+  with Phase 4 diagnose triggering an 8-call calibrate-to-triad
+  panel per theme), consuming all 40 iterations on phase work and
+  leaving no budget for the final summary turn — resulting in a
+  44-character truncated content `"**Phase 6 — Propose fix
+  candidates for T2:**"`. Fix: pass `code` through `opts`
+  (so it lands in `ctx.code`), raise `max_iterations` to `60`,
+  and explicitly instruct the agent to surface all required
+  keywords (themes / verified / explore / root_cause /
+  summary.total_themes / fix recommendation) in a single final
+  summary turn. Re-run result: 5/5 graders PASS, 41 turns, 164,842
+  tokens — `theme_count_reported` and `all_three_callsites_reported`
+  both green. With this fix, **all 19 newly-added e2e smokes PASS
+  (19/19 = 100%)**, completing the post-migration validation across
+  all 22 packages × 3 verification layers (static check / unit test
+  / real-LLM e2e). Closes follow-up issue `1778215078-39073`.
+
 - **End-to-end real-LLM validation of the post-migration hardening
   (Phase B verification ran)**: executed all 19 newly-added e2e
   smokes (Simple 12 from commit `954b7c8` + rstar/Multi-callsite 6
