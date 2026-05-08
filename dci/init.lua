@@ -1,45 +1,61 @@
---- dci — Deliberative Collective Intelligence (DCI-CF).
+--- dci(DCI-CF) — 8-stage structured deliberation with typed epistemic acts
 ---
---- Implements the 8-stage structured deliberation algorithm from:
----   Prakash, Sunil
----   "From Debate to Deliberation: Structured Collective Reasoning
----    with Typed Epistemic Acts" (arXiv:2603.11781, 2026-03-12)
+--- 8-stage structured deliberation algorithm with 4 reasoning archetypes,
+--- 14 typed epistemic acts, shared workspace, and a guaranteed
+--- decision_packet emission with first-class minority_report preservation.
 ---
---- 4 reasoning archetypes × 14 typed epistemic acts (6 classes) ×
---- shared workspace (6 fields) + decision packet (5 components) +
---- convergence test + fallback cascade (outranking → minimax →
---- satisficing → Integrator arbitration). Forces the session to emit a
---- decision_packet with first-class minority_report preservation, even
---- on fallback.
+--- ## Algorithm
 ---
---- 14 acts / 6 classes (issue §4.1):
----   Orienting   : frame, clarify, reframe
----   Generative  : propose, extend, spawn       (spawn skeleton-only in v1)
----   Critical    : ask, challenge
----   Integrative : bridge, synthesize, recall
----   Epistemic   : ground, update
----   Decisional  : recommend
+--- 4 roles (fixed): `framer` / `explorer` / `challenger` / `integrator`.
 ---
---- 4 roles (fixed): framer / explorer / challenger / integrator.
+--- 14 acts organized into 6 classes (paper §4.1):
+---
+--- | Class | Acts |
+--- |---|---|
+--- | Orienting | `frame`, `clarify`, `reframe` |
+--- | Generative | `propose`, `extend`, `spawn` (skeleton-only in v1) |
+--- | Critical | `ask`, `challenge` |
+--- | Integrative | `bridge`, `synthesize`, `recall` |
+--- | Epistemic | `ground`, `update` |
+--- | Decisional | `recommend` |
 ---
 --- DCI-CF 8 stages:
----   Stage 0 init session
----   Stage 1 independent proposals (per-role act(s))
----   Stage 2 canonicalize & cluster options
----   Stages 3-6 (loop up to Rmax=2):
----     3: collect challenges / evidence
----     4: admit new hypotheses (cutoff)
----     5: revise & compress options
----     6: score against criteria + convergence test
----        (dominance or no_blocking)
----   Stage 7 fallback cascade
----   Stage 8 finalize decision packet (5 components completeness)
 ---
---- Entry contract:
----   run — Strategy, ctx-threading. ctx.task required; returns
----         ctx.result :: deliberated shape (alc_shapes).
+--- 1. **Stage 0** — init session
+--- 2. **Stage 1** — independent proposals (per-role act(s))
+--- 3. **Stage 2** — canonicalize & cluster options
+--- 4. **Stages 3-6** (loop up to `Rmax=2`):
+---    - Collect challenges / evidence
+---    - Admit new hypotheses (cutoff)
+---    - Revise & compress options
+---    - Score against criteria + convergence test (dominance or no_blocking)
+--- 5. **Stage 7** — fallback cascade
+--- 6. **Stage 8** — finalize decision packet (5 components completeness)
 ---
---- Category: synthesis (panel-family).
+--- ## Theoretical foundations
+---
+--- Forces the session to emit a `decision_packet` with first-class
+--- `minority_report` preservation even on fallback. Stage 7 fallback
+--- cascade (outranking → minimax → satisficing → Integrator arbitration)
+--- guarantees decision emission regardless of convergence quality, while
+--- the typed epistemic act constraint keeps the reasoning trace auditable.
+---
+--- ## Entry contract
+---
+--- - `run` — Strategy, ctx-threading. `ctx.task` required;
+---   returns `ctx.result :: deliberated shape` (see `alc_shapes`)
+---
+--- ## Comparison with related packages
+---
+--- Category: `synthesis` (panel-family alongside `panel`, `moa`, `recipe_*`).
+--- vs `panel`: `panel` runs heterogeneous agents in parallel and aggregates.
+--- DCI-CF runs fixed-role agents through a structured 8-stage protocol with
+--- typed acts, yielding richer trace + guaranteed decision_packet shape.
+---
+--- ## References
+---
+--- Prakash & Sunil (2026). "From Debate to Deliberation: Structured Collective
+--- Reasoning with Typed Epistemic Acts". arXiv:2603.11781.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -50,15 +66,7 @@ local M = {}
 M.meta = {
     name = "dci",
     version = "0.1.0",
-    description = "Deliberative Collective Intelligence (DCI-CF). 4 "
-        .. "roles (Framer/Explorer/Challenger/Integrator) × 14 typed "
-        .. "epistemic acts (6 classes) × shared workspace (6 fields) × "
-        .. "8-stage convergence algorithm. Emits a decision_packet with "
-        .. "5 non-nil components (selected_option, residual_objections, "
-        .. "minority_report, next_actions, reopen_triggers). Stage 7 "
-        .. "fallback cascade (outranking → minimax → satisficing → "
-        .. "Integrator arbitration) preserves minority_report even on "
-        .. "forced convergence.",
+    description = "Deliberative Collective Intelligence with typed epistemic acts",
     category = "synthesis",
 }
 
