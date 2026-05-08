@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **7 new `scripts/e2e/*.lua` real-LLM smoke tests** (Phase B
+  sub-batch 2, **completing** the post-migration hardening): adds
+  end-to-end smoke harnesses for `rstar` and the 6
+  Multi-callsite-structured packages (`anti_cascade` / `got` /
+  `lineage` / `counterfactual_verify` / `review_and_investigate` /
+  `coa`). All files reuse the `scripts/e2e/sot.lua` baseline
+  (commit `439ae53`) and the Simple-12 e2e batch shape (commit
+  `954b7c8`). Transport: `alc_advice` (no closures). Each file
+  carries 5-6 graders combining `agent_ok` + `max_tokens(N)` (200k–
+  300k for multi-callsite packages, larger than the 150k Simple
+  baseline because more agent turns are spent across phases) +
+  `output_present` + 1-2 **phase-boundary graders** asserting that
+  Phase-N of the package consumed Phase-(N-1)'s awaited result —
+  the e2e-observable counterpart of the await-confluence pattern
+  validated by commit `97d757a`. Phase-boundary grader assertions:
+    rstar — `cross_verify_present` (a_checks_b / b_checks_a both
+      surface = Phase 3 ran after Phase 1+2 completed)
+    anti_cascade — `comparison_phase_complete` (flagged_steps /
+      max_drift / cascade_risk surface = Phase 2 ran after Phase 1)
+    got — `n_steps_reported` (graph_stats.operations surface = DAG
+      Generate→Score→KeepBest→Refine→Aggregate iteration ran)
+    lineage — `trace_results_reported` (traces / derives_from
+      surface = Phase 2 referenced Phase 1's step_claims)
+    counterfactual_verify — `judgments_phase_complete` (match_count
+      / faithful surface = judgments ran after predictions + actuals,
+      canonical closure-capture invariant)
+    review_and_investigate — `all_three_callsites_reported` (detect
+      / verify / explore-or-diagnose phases all surface)
+    coa — `grounded_output_present` (grounded_chain /
+      abstract_chain surface = topological loop fully resolved)
+  Total ~880 LOC across 7 new files. All files pass
+  `mcp__lua-debugger__check_launch` with 0 errors / 0 warnings.
+  Real-LLM execution is **not** performed in this commit. With this
+  commit, **all 22 migrated packages now have a real-LLM e2e smoke
+  harness** (sot via `439ae53`, particle_infer / smc_sample
+  pre-existing, Simple 12 via `954b7c8`, and rstar + Multi-callsite
+  6 here).
+
 - **12 new `scripts/e2e/*.lua` real-LLM smoke tests** (Phase B
   sub-batch 1 of the post-migration hardening): adds end-to-end
   smoke harnesses for the 12 Simple-structured packages migrated to
