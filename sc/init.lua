@@ -1,4 +1,4 @@
---- sc — Self-Consistency: independent sampling with majority vote
+--- sc(SC) — independent multi-path sampling with majority vote
 ---
 --- Samples multiple reasoning paths for the same problem, then selects
 --- the most consistent answer by majority voting.
@@ -6,7 +6,7 @@
 --- ## Algorithm
 ---
 --- 1. Sample `n` independent reasoning paths for the same task (varied via
----    `temperature_hint` for diversity)
+---    a built-in diversity-hint rotation in the prompt)
 --- 2. Extract a normalized answer per path
 --- 3. Tally votes; the majority answer wins (with `consensus` LLM-synthesized
 ---    summary across the winning paths)
@@ -42,6 +42,9 @@
 --- Wang et al. (2022). "Self-Consistency Improves Chain of Thought Reasoning
 --- in Language Models". arXiv:2203.11171.
 
+local S = require("alc_shapes")
+local T = S.T
+
 local M = {}
 
 ---@type AlcMeta
@@ -56,6 +59,15 @@ M.meta = {
 M.spec = {
     entries = {
         run = {
+            input = T.shape({
+                task       = T.string:describe("Problem to solve (required)"),
+                n          = T.number:is_optional()
+                    :describe("Number of independent reasoning paths to sample (default: 5)"),
+                gen_tokens = T.number:is_optional()
+                    :describe("Max tokens per reasoning path (default: 400). "
+                        .. "Truncating reasoning lowers per-agent accuracy p, which "
+                        .. "directly weakens Condorcet guarantees for downstream consumers"),
+            }),
             result = "voted",
         },
     },
