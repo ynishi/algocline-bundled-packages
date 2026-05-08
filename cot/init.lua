@@ -1,4 +1,4 @@
---- CoT — iterative chain-of-thought reasoning
+--- cot(CoT) — iterative chain-of-thought reasoning
 ---
 --- Builds a reasoning chain step by step, then synthesizes the chain
 --- into a single coherent conclusion.
@@ -10,7 +10,7 @@
 --- return cot.run({ task = "Why is the sky blue?", depth = 3 })
 --- ```
 ---
---- ## Behavior
+--- ## Algorithm
 ---
 --- For each step `i` in `1..depth`, the LLM is asked for the next key
 --- insight conditional on all prior insights. After the last step, a
