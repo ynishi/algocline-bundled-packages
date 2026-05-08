@@ -127,27 +127,24 @@ local function op_generate(graph, nodes, k, task, gen_tokens)
         local indices = {}
         for i = 1, k do indices[i] = i end
 
-        local results = alc.map(indices, function(i)
+        local results = alc.parallel(indices, function(i)
             local existing_hint = ""
             if i > 1 then
                 existing_hint = "\n\nProvide a DIFFERENT approach from previous ones."
             end
 
-            return alc.llm(
-                string.format(
-                    "Task: %s\n\n"
-                        .. "Current reasoning state:\n\"\"\"\n%s\n\"\"\"\n\n"
-                        .. "Generate reasoning approach #%d of %d.%s\n"
-                        .. "Be specific and concrete. Explore a distinct angle.",
-                    task, node.state, i, k, existing_hint
-                ),
-                {
-                    system = "You are a creative problem solver. Each thought must "
-                        .. "explore a genuinely different reasoning direction.",
-                    max_tokens = gen_tokens,
-                }
+            return string.format(
+                "Task: %s\n\n"
+                    .. "Current reasoning state:\n\"\"\"\n%s\n\"\"\"\n\n"
+                    .. "Generate reasoning approach #%d of %d.%s\n"
+                    .. "Be specific and concrete. Explore a distinct angle.",
+                task, node.state, i, k, existing_hint
             )
-        end)
+        end, {
+            system = "You are a creative problem solver. Each thought must "
+                .. "explore a genuinely different reasoning direction.",
+            max_tokens = gen_tokens,
+        })
 
         for _, result in ipairs(results) do
             local child = create_node(graph, result, "generate", { node.id })
@@ -219,20 +216,17 @@ end
 
 --- Score: evaluate thought quality via LLM (parallel).
 local function op_score(graph, nodes, task)
-    local scores = alc.map(nodes, function(node)
-        return alc.llm(
-            string.format(
-                "Task: %s\n\nReasoning:\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Rate this reasoning on a 1-10 scale:\n"
-                    .. "- Correctness: Is the logic sound?\n"
-                    .. "- Completeness: Does it address the full task?\n"
-                    .. "- Insight: Does it show genuine understanding?\n\n"
-                    .. "Reply with ONLY the number.",
-                task, node.state
-            ),
-            { system = "You are a critical evaluator. Just the number.", max_tokens = 10 }
+    local scores = alc.parallel(nodes, function(node)
+        return string.format(
+            "Task: %s\n\nReasoning:\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Rate this reasoning on a 1-10 scale:\n"
+                .. "- Correctness: Is the logic sound?\n"
+                .. "- Completeness: Does it address the full task?\n"
+                .. "- Insight: Does it show genuine understanding?\n\n"
+                .. "Reply with ONLY the number.",
+            task, node.state
         )
-    end)
+    end, { system = "You are a critical evaluator. Just the number.", max_tokens = 10 })
 
     for i, node in ipairs(nodes) do
         node.score = alc.parse_score(scores[i])

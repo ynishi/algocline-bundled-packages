@@ -355,37 +355,34 @@ local function phase_verify(themes, code, context)
     local verified = {}
     local false_positives = 0
 
-    local results = alc.map(themes, function(theme)
-        return alc.llm(
-            string.format(
-                "Verify whether the following review finding is factually correct by checking the code.\n\n"
-                    .. "Theme: %s\n"
-                    .. "Surface symptom: %s\n"
-                    .. "Reported locations: %s\n\n"
-                    .. "Code:\n```\n%s\n```\n%s\n"
-                    .. "Verification checklist:\n"
-                    .. "1. Does the reported location actually exist in the code?\n"
-                    .. "2. Does the surface symptom match the actual code behavior?\n"
-                    .. "3. Is this a false positive? (consider intentional design)\n\n"
-                    .. "Answer in one of these formats (first line only):\n"
-                    .. "CONFIRMED: [factual basis in one sentence]\n"
-                    .. "or\n"
-                    .. "FALSE_POSITIVE: [reason in one sentence]",
-                theme.name,
-                theme.surface_symptom or "",
-                alc.json_encode(theme.locations or {}),
-                code,
-                context_block
-            ),
-            {
-                system = "You are a fact-checker. Verify claims against actual code. "
-                    .. "Be strict — if you cannot verify the claim with concrete code evidence, "
-                    .. "mark FALSE_POSITIVE.",
-                max_tokens = 200,
-                grounded = true,
-            }
+    local results = alc.parallel(themes, function(theme)
+        return string.format(
+            "Verify whether the following review finding is factually correct by checking the code.\n\n"
+                .. "Theme: %s\n"
+                .. "Surface symptom: %s\n"
+                .. "Reported locations: %s\n\n"
+                .. "Code:\n```\n%s\n```\n%s\n"
+                .. "Verification checklist:\n"
+                .. "1. Does the reported location actually exist in the code?\n"
+                .. "2. Does the surface symptom match the actual code behavior?\n"
+                .. "3. Is this a false positive? (consider intentional design)\n\n"
+                .. "Answer in one of these formats (first line only):\n"
+                .. "CONFIRMED: [factual basis in one sentence]\n"
+                .. "or\n"
+                .. "FALSE_POSITIVE: [reason in one sentence]",
+            theme.name,
+            theme.surface_symptom or "",
+            alc.json_encode(theme.locations or {}),
+            code,
+            context_block
         )
-    end)
+    end, {
+        system = "You are a fact-checker. Verify claims against actual code. "
+            .. "Be strict — if you cannot verify the claim with concrete code evidence, "
+            .. "mark FALSE_POSITIVE.",
+        max_tokens = 200,
+        grounded = true,
+    })
 
     for i, result in ipairs(results) do
         if result:match("^%s*FALSE_POSITIVE") or result:match("FALSE_POSITIVE") then
@@ -412,46 +409,44 @@ end
 local function phase_explore(themes, code)
     alc.log("info", "review_and_investigate: Phase 3 — Explore")
 
-    local results = alc.map(themes, function(theme)
-        local exploration = alc.llm(
-            string.format(
-                "For the theme \"%s\", comprehensively investigate the entire codebase for related occurrences.\n\n"
-                    .. "Surface symptom: %s\n"
-                    .. "Known locations: %s\n\n"
-                    .. "Target code:\n```\n%s\n```\n\n"
-                    .. "Steps:\n"
-                    .. "1. Search for related patterns using Grep\n"
-                    .. "2. Confirm each found location by reading context with Read\n"
-                    .. "3. List all locations sharing the same structural issue\n\n"
-                    .. "Output format (JSON):\n"
-                    .. '{"related_locations": ["file:line — description"], "pattern": "search pattern used", "total_occurrences": N}',
-                theme.name,
-                theme.surface_symptom or "",
-                alc.json_encode(theme.locations or {}),
-                code
-            ),
-            {
-                system = "You are a codebase investigator. Use Grep and Read tools to "
-                    .. "find ALL related occurrences, not just the initially reported one. "
-                    .. "Be thorough. Output ONLY valid JSON.",
-                max_tokens = 500,
-            }
+    local results = alc.parallel(themes, function(theme)
+        return string.format(
+            "For the theme \"%s\", comprehensively investigate the entire codebase for related occurrences.\n\n"
+                .. "Surface symptom: %s\n"
+                .. "Known locations: %s\n\n"
+                .. "Target code:\n```\n%s\n```\n\n"
+                .. "Steps:\n"
+                .. "1. Search for related patterns using Grep\n"
+                .. "2. Confirm each found location by reading context with Read\n"
+                .. "3. List all locations sharing the same structural issue\n\n"
+                .. "Output format (JSON):\n"
+                .. '{"related_locations": ["file:line — description"], "pattern": "search pattern used", "total_occurrences": N}',
+            theme.name,
+            theme.surface_symptom or "",
+            alc.json_encode(theme.locations or {}),
+            code
         )
+    end, {
+        system = "You are a codebase investigator. Use Grep and Read tools to "
+            .. "find ALL related occurrences, not just the initially reported one. "
+            .. "Be thorough. Output ONLY valid JSON.",
+        max_tokens = 500,
+        post_fn = function(exploration, theme, _i)
+            -- Parse exploration result
+            local data = alc.json_decode(exploration)
+            if type(data) ~= "table" then
+                local json_str = exploration:match("%{.+%}")
+                if json_str then data = alc.json_decode(json_str) end
+            end
 
-        -- Parse exploration result
-        local data = alc.json_decode(exploration)
-        if type(data) ~= "table" then
-            local json_str = exploration:match("%{.+%}")
-            if json_str then data = alc.json_decode(json_str) end
-        end
-
-        return {
-            theme = theme,
-            related = data and data.related_locations or {},
-            pattern = data and data.pattern or "",
-            total = data and data.total_occurrences or 0,
-        }
-    end)
+            return {
+                theme = theme,
+                related = data and data.related_locations or {},
+                pattern = data and data.pattern or "",
+                total = data and data.total_occurrences or 0,
+            }
+        end,
+    })
 
     -- Merge exploration results back into themes
     for _, r in ipairs(results) do
@@ -621,34 +616,31 @@ end
 local function phase_research(themes, code)
     alc.log("info", "review_and_investigate: Phase 5 — Research")
 
-    local results = alc.map(themes, function(theme)
-        return alc.llm(
-            string.format(
-                "For the theme \"%s\", research best practices and analyze the gap with the current implementation.\n\n"
-                    .. "Root cause: %s\n"
-                    .. "Related locations: %d occurrences\n\n"
-                    .. "Code:\n```\n%s\n```\n\n"
-                    .. "Output format (JSON):\n"
-                    .. '{\n'
-                    .. '  "best_practice": "summary of BP (with sources)",\n'
-                    .. '  "current_state": "summary of current state",\n'
-                    .. '  "gap": "gap between BP and current state",\n'
-                    .. '  "references": ["source 1", "source 2"]\n'
-                    .. '}',
-                theme.name,
-                theme.root_cause or "",
-                theme.total_occurrences or 0,
-                slice_code(code, theme)
-            ),
-            {
-                system = "You are a best-practice researcher. Cite specific sources: "
-                    .. "Effective Rust, Rust API Guidelines, OWASP, relevant RFCs, "
-                    .. "seminal papers. Output ONLY valid JSON.",
-                max_tokens = 400,
-                grounded = true,
-            }
+    local results = alc.parallel(themes, function(theme)
+        return string.format(
+            "For the theme \"%s\", research best practices and analyze the gap with the current implementation.\n\n"
+                .. "Root cause: %s\n"
+                .. "Related locations: %d occurrences\n\n"
+                .. "Code:\n```\n%s\n```\n\n"
+                .. "Output format (JSON):\n"
+                .. '{\n'
+                .. '  "best_practice": "summary of BP (with sources)",\n'
+                .. '  "current_state": "summary of current state",\n'
+                .. '  "gap": "gap between BP and current state",\n'
+                .. '  "references": ["source 1", "source 2"]\n'
+                .. '}',
+            theme.name,
+            theme.root_cause or "",
+            theme.total_occurrences or 0,
+            slice_code(code, theme)
         )
-    end)
+    end, {
+        system = "You are a best-practice researcher. Cite specific sources: "
+            .. "Effective Rust, Rust API Guidelines, OWASP, relevant RFCs, "
+            .. "seminal papers. Output ONLY valid JSON.",
+        max_tokens = 400,
+        grounded = true,
+    })
 
     for i, raw in ipairs(results) do
         local data = alc.json_decode(raw)

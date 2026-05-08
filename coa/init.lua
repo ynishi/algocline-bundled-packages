@@ -234,26 +234,23 @@ function M.run(ctx)
         ))
 
         -- Resolve independent placeholders in parallel
-        local results = alc.map(independent, function(ph)
+        local results = alc.parallel(independent, function(ph)
             -- Substitute any already-resolved variables in the query
             local resolved_query = ph.query
             for var, val in pairs(resolved_vars) do
                 resolved_query = resolved_query:gsub(var, val)
             end
 
-            return alc.llm(
-                string.format(
-                    "Answer the following query concisely and factually:\n\n%s\n\n"
-                        .. "Provide only the answer — no explanation, no preamble.",
-                    resolved_query
-                ),
-                {
-                    system = "You are a precise knowledge source. Answer with just "
-                        .. "the fact requested. Be concise and accurate.",
-                    max_tokens = ground_tokens,
-                }
+            return string.format(
+                "Answer the following query concisely and factually:\n\n%s\n\n"
+                    .. "Provide only the answer — no explanation, no preamble.",
+                resolved_query
             )
-        end)
+        end, {
+            system = "You are a precise knowledge source. Answer with just "
+                .. "the fact requested. Be concise and accurate.",
+            max_tokens = ground_tokens,
+        })
 
         -- Apply results
         for i, ph in ipairs(independent) do

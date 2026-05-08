@@ -208,17 +208,13 @@ function M.run(ctx)
     alc.log("info", string.format("anti_cascade: analyzing %d steps", #steps))
 
     -- Phase 1: Independent re-derivation for each step (parallel)
-    local independent = alc.map(steps, function(step)
+    local independent = alc.parallel(steps, function(step)
         local instruction = step.instruction or step.name
-        local prompt = expand(REDERIVE_PROMPT, {
+        return expand(REDERIVE_PROMPT, {
             task = task,
             instruction = instruction,
         })
-        return alc.llm(prompt, {
-            system = REDERIVE_SYSTEM,
-            max_tokens = rederive_tokens,
-        })
-    end)
+    end, { system = REDERIVE_SYSTEM, max_tokens = rederive_tokens })
 
     -- Phase 2: Compare pipeline vs independent for each step (parallel)
     local comparisons_input = {}
@@ -229,18 +225,14 @@ function M.run(ctx)
         }
     end
 
-    local comparisons = alc.map(comparisons_input, function(item)
-        local prompt = expand(COMPARE_PROMPT, {
+    local comparisons = alc.parallel(comparisons_input, function(item)
+        return expand(COMPARE_PROMPT, {
             name = item.step.name,
             instruction = item.step.instruction or item.step.name,
             pipeline_output = item.step.output,
             independent_output = item.independent,
         })
-        return alc.llm(prompt, {
-            system = COMPARE_SYSTEM,
-            max_tokens = compare_tokens,
-        })
-    end)
+    end, { system = COMPARE_SYSTEM, max_tokens = compare_tokens })
 
     -- Phase 3: Parse results and build drift profile
     local step_results = {}

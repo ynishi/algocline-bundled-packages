@@ -271,21 +271,22 @@ function M.run(ctx)
     alc.log("info", string.format("lineage: tracking %d steps", #steps))
 
     -- Phase 1: Extract claims from each step (parallel)
-    local step_claims = alc.map(steps, function(step)
-        local prompt = expand(EXTRACT_PROMPT, {
+    local step_claims = alc.parallel(steps, function(step)
+        return expand(EXTRACT_PROMPT, {
             name = step.name,
             output = step.output,
         })
-        local raw = alc.llm(prompt, {
-            system = EXTRACT_SYSTEM,
-            max_tokens = extract_tokens,
-        })
-        return {
-            name = step.name,
-            claims = parse_claims(raw),
-            raw = raw,
-        }
-    end)
+    end, {
+        system = EXTRACT_SYSTEM,
+        max_tokens = extract_tokens,
+        post_fn = function(raw, step, _i)
+            return {
+                name = step.name,
+                claims = parse_claims(raw),
+                raw = raw,
+            }
+        end,
+    })
 
     alc.log("info", string.format(
         "lineage: extracted claims — %s",
@@ -304,28 +305,29 @@ function M.run(ctx)
         trace_pairs[#trace_pairs + 1] = { prev = step_claims[i - 1], curr = step_claims[i] }
     end
 
-    local trace_results = alc.map(trace_pairs, function(pair)
+    local trace_results = alc.parallel(trace_pairs, function(pair)
         local prev_formatted = format_claims(pair.prev.claims, pair.prev.name)
         local curr_formatted = format_claims(pair.curr.claims, pair.curr.name)
 
-        local prompt = expand(TRACE_PROMPT, {
+        return expand(TRACE_PROMPT, {
             task = task,
             prev_name = pair.prev.name,
             curr_name = pair.curr.name,
             prev_claims = prev_formatted,
             curr_claims = curr_formatted,
         })
-        local raw = alc.llm(prompt, {
-            system = TRACE_SYSTEM,
-            max_tokens = trace_tokens,
-        })
-        return {
-            from_step = pair.prev.name,
-            to_step = pair.curr.name,
-            traces = parse_traces(raw),
-            raw = raw,
-        }
-    end)
+    end, {
+        system = TRACE_SYSTEM,
+        max_tokens = trace_tokens,
+        post_fn = function(raw, pair, _i)
+            return {
+                from_step = pair.prev.name,
+                to_step = pair.curr.name,
+                traces = parse_traces(raw),
+                raw = raw,
+            }
+        end,
+    })
 
     -- Phase 3: Build lineage graph text for conflict analysis
     local graph_lines = {}

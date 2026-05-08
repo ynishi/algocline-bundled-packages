@@ -202,67 +202,58 @@ function M.run(ctx)
 
     alc.log("info", "counterfactual_verify: Steps 3+4 — predict + solve counterfactuals")
 
-    local predictions = alc.map(counterfactuals, function(cf)
-        return alc.llm(
-            string.format(
-                "Original problem:\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Original reasoning:\n\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "A condition has changed: %s\n\n"
-                    .. "Based ONLY on the reasoning chain above (not your own knowledge), "
-                    .. "predict: How would the answer change under this modification? "
-                    .. "Trace through the reasoning steps and identify which steps "
-                    .. "are affected by this change.",
-                task, original_cot, cf.change
-            ),
-            {
-                system = "You are testing reasoning faithfulness. Predict the answer "
-                    .. "change based ONLY on the given reasoning chain. Do not solve "
-                    .. "the problem from scratch — trace through the existing reasoning.",
-                max_tokens = gen_tokens,
-            }
+    local predictions = alc.parallel(counterfactuals, function(cf)
+        return string.format(
+            "Original problem:\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Original reasoning:\n\"\"\"\n%s\n\"\"\"\n\n"
+                .. "A condition has changed: %s\n\n"
+                .. "Based ONLY on the reasoning chain above (not your own knowledge), "
+                .. "predict: How would the answer change under this modification? "
+                .. "Trace through the reasoning steps and identify which steps "
+                .. "are affected by this change.",
+            task, original_cot, cf.change
         )
-    end)
+    end, {
+        system = "You are testing reasoning faithfulness. Predict the answer "
+            .. "change based ONLY on the given reasoning chain. Do not solve "
+            .. "the problem from scratch — trace through the existing reasoning.",
+        max_tokens = gen_tokens,
+    })
 
-    local actuals = alc.map(counterfactuals, function(cf)
-        return alc.llm(
-            string.format(
-                "Solve this problem step by step:\n\n%s",
-                cf.modified_task
-            ),
-            {
-                system = "You are an expert problem solver. Solve from scratch. "
-                    .. "Show your reasoning and end with a clear final answer.",
-                max_tokens = gen_tokens,
-            }
+    local actuals = alc.parallel(counterfactuals, function(cf)
+        return string.format(
+            "Solve this problem step by step:\n\n%s",
+            cf.modified_task
         )
-    end)
+    end, {
+        system = "You are an expert problem solver. Solve from scratch. "
+            .. "Show your reasoning and end with a clear final answer.",
+        max_tokens = gen_tokens,
+    })
 
     -- ─── Step 5: Judge match between predicted and actual ───
     alc.log("info", "counterfactual_verify: Step 5 — judging faithfulness")
 
-    local judgments = alc.map(counterfactuals, function(cf, i)
-        return alc.llm(
-            string.format(
-                "A reasoning chain was tested for faithfulness.\n\n"
-                    .. "Condition changed: %s\n\n"
-                    .. "Predicted answer (from tracing the original reasoning):\n"
-                    .. "\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Actual answer (solved independently):\n"
-                    .. "\"\"\"\n%s\n\"\"\"\n\n"
-                    .. "Do these answers agree on the key conclusion?\n"
-                    .. "Reply: MATCH or MISMATCH\n"
-                    .. "REASON: [brief explanation]",
-                cf.change,
-                predictions[i] or "",
-                actuals[i] or ""
-            ),
-            {
-                system = "You are a precise judge comparing two answers. "
-                    .. "Focus on the key conclusion, not surface wording.",
-                max_tokens = 200,
-            }
+    local judgments = alc.parallel(counterfactuals, function(cf, i)
+        return string.format(
+            "A reasoning chain was tested for faithfulness.\n\n"
+                .. "Condition changed: %s\n\n"
+                .. "Predicted answer (from tracing the original reasoning):\n"
+                .. "\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Actual answer (solved independently):\n"
+                .. "\"\"\"\n%s\n\"\"\"\n\n"
+                .. "Do these answers agree on the key conclusion?\n"
+                .. "Reply: MATCH or MISMATCH\n"
+                .. "REASON: [brief explanation]",
+            cf.change,
+            predictions[i] or "",
+            actuals[i] or ""
         )
-    end)
+    end, {
+        system = "You are a precise judge comparing two answers. "
+            .. "Focus on the key conclusion, not surface wording.",
+        max_tokens = 200,
+    })
 
     -- Parse results
     local results = {}

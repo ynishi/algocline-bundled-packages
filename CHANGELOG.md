@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Multi-callsite 6 batch — `alc.map` → `alc.parallel`**: migrated
+  13 call-sites across 6 Multi-callsite / Multi-phase packages to
+  the true batch-parallel `alc.parallel` primitive. Applies the
+  await-confluence pattern validated by commit `97d757a` (rstar):
+  Phase-N callbacks that closure-capture awaited Phase-(N-1) results
+  via Lua's synchronous upvalue semantics work identically under
+  `alc.parallel` and `alc.map`. Migrated packages and call-sites:
+    * `anti_cascade` (`:211, :232`, 2 call-sites — Phase 1
+      independent re-derivation + Phase 2 pipeline-vs-independent
+      compare; data-driven pack, no closure ref)
+    * `got` (`:130, :222`, 2 call-sites — Generate per node-batch
+      + Score per node; outer DAG step iteration loop preserved)
+    * `lineage` (`:274, :307`, 2 call-sites — Phase 1 extract claims
+      + Phase 2 trace deps per consecutive pair; data-driven via
+      trace_pairs pack, post_fn used for parse fallback)
+    * `counterfactual_verify` (`:205, :226, :243`, 3 call-sites —
+      predictions + actuals + judgments; judgments
+      closure-captures `predictions[i]` / `actuals[i]` from prior
+      phases — canonical await-confluence)
+    * `review_and_investigate` (`:358, :415, :624`, 3 call-sites —
+      themes-parallel review / investigate / counter-evidence; all
+      independent, no inter-callsite closure ref; one call-site
+      uses post_fn)
+    * `coa` (`:237`, 1 call-site — independent placeholders within
+      one topological-order batch; outer topological loop preserved,
+      callback closure-captures `resolved_vars` from outer loop
+      state)
+  Behavior is mathematically equivalent: callbacks were already
+  independent within each call-site (no inter-iteration state),
+  closure-captured awaited results are upvalue-stable under both
+  `alc.map` and `alc.parallel`, and `alc.parallel` preserves order
+  via `for ipairs(items)` iteration matching the previous semantics.
+  Closes child issues `1778160596-83566` (anti_cascade),
+  `1778160701-85165` (got), `1778160712-85322` (lineage),
+  `1778160653-84471` (counterfactual_verify), `1778160787-86686`
+  (review_and_investigate), `1778160638-84220` (coa) under parent
+  migration tracker `1778144244-78327`. Tests:
+  `tests/test_new_packages.lua` 32/32 pass (no regression). New
+  `tests/test_*.lua` for the 6 previously-untested packages and
+  `scripts/e2e/*.lua` smokes are out of scope for this batch and
+  tracked separately.
+
 - **`rstar`** (Reasoning): migrated both `alc.map` call-sites to
   `alc.parallel` — Phase 1+2 (`:98` two independent reasoning paths,
   N=2) and Phase 3 (`:129` cross-verification, N=2). Phase 3's
