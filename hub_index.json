@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:47:58Z",
+  "updated_at": "2026-05-08T23:52:59Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -1279,7 +1279,7 @@
       "version": "0.1.0",
       "description": "Skeleton-of-Thought — outline-first parallel section generation",
       "category": "generation",
-      "docstring": "sot(SoT) — Skeleton-of-Thought parallel generation\n\nGenerates a structural outline first, then fills each section\nin parallel via alc.parallel (single alc.llm_batch round-trip).\nProduces structurally coherent long-form output.\n\nBased on: Ning et al., \"Skeleton-of-Thought: Prompting LLMs for\nEfficient Parallel Generation\" (2023, arXiv:2307.15337; v3 retitled\nfrom v1 \"LLMs Can Do Parallel Decoding\"). Paper §3.1.1 reports up\nto 2.39x latency speedup on 8/12 models — parallel section fill is\nthe core claim, hence alc.parallel (not alc.map).\n\nUsage:\nlocal sot = require(\"sot\")\nreturn sot.run(ctx)\n\nctx.task (required): The task requiring long-form output\nctx.max_sections: Maximum outline sections (default: 6)\nctx.section_tokens: Max tokens per section fill (default: 400)\nctx.skeleton_tokens: Max tokens for skeleton generation (default: 300)",
+      "docstring": "sot(SoT) — Skeleton-of-Thought parallel generation\n\nGenerates a structural outline first, then fills each section\nin parallel via alc.parallel (single alc.llm_batch round-trip).\nProduces structurally coherent long-form output.\n\n## Usage\n\n```lua\nlocal sot = require(\"sot\")\nreturn sot.run(ctx)\n```\n\n## Algorithm\n\n1. **Skeleton generation** — prompt the LLM to produce a numbered\noutline of up to `max_sections` section titles.\n2. **Parallel fill** — send all sections concurrently via\n`alc.parallel` (single `alc.llm_batch` round-trip), each prompt\ncarrying the full outline for context so sections do not overlap.\n3. **Assembly** — concatenate fills under `## {title}` headings to\nproduce the final long-form output.\n\n## Theoretical foundations\n\nNing et al. (2023) demonstrate that skeleton-guided parallel decoding\nreduces end-to-end latency by up to 2.39x on 8 of 12 tested models\n(paper §3.1.1). The key invariant is that each section is\nself-contained enough to be written without the other fills, which\nthe skeleton prompt enforces by asking for independently writable\naspects. This pkg uses `alc.parallel` (not `alc.map`) to match the\npaper's single-batch parallel decoding claim.\n\n## References\n\n- Ning, X., Lin, Z., Zhou, Z., Wang, T., Yang, H., Zhang, M., Meng, F.,\nZhou, J. (2023). \"Skeleton-of-Thought: Prompting LLMs for Efficient\nParallel Generation\". arXiv:2307.15337.",
       "source": {
         "type": "unknown"
       },

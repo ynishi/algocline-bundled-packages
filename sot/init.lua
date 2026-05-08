@@ -4,20 +4,38 @@
 --- in parallel via alc.parallel (single alc.llm_batch round-trip).
 --- Produces structurally coherent long-form output.
 ---
---- Based on: Ning et al., "Skeleton-of-Thought: Prompting LLMs for
---- Efficient Parallel Generation" (2023, arXiv:2307.15337; v3 retitled
---- from v1 "LLMs Can Do Parallel Decoding"). Paper §3.1.1 reports up
---- to 2.39x latency speedup on 8/12 models — parallel section fill is
---- the core claim, hence alc.parallel (not alc.map).
+--- ## Usage
 ---
---- Usage:
----   local sot = require("sot")
----   return sot.run(ctx)
+--- ```lua
+--- local sot = require("sot")
+--- return sot.run(ctx)
+--- ```
 ---
---- ctx.task (required): The task requiring long-form output
---- ctx.max_sections: Maximum outline sections (default: 6)
---- ctx.section_tokens: Max tokens per section fill (default: 400)
---- ctx.skeleton_tokens: Max tokens for skeleton generation (default: 300)
+--- ## Algorithm
+---
+--- 1. **Skeleton generation** — prompt the LLM to produce a numbered
+---    outline of up to `max_sections` section titles.
+--- 2. **Parallel fill** — send all sections concurrently via
+---    `alc.parallel` (single `alc.llm_batch` round-trip), each prompt
+---    carrying the full outline for context so sections do not overlap.
+--- 3. **Assembly** — concatenate fills under `## {title}` headings to
+---    produce the final long-form output.
+---
+--- ## Theoretical foundations
+---
+--- Ning et al. (2023) demonstrate that skeleton-guided parallel decoding
+--- reduces end-to-end latency by up to 2.39x on 8 of 12 tested models
+--- (paper §3.1.1). The key invariant is that each section is
+--- self-contained enough to be written without the other fills, which
+--- the skeleton prompt enforces by asking for independently writable
+--- aspects. This pkg uses `alc.parallel` (not `alc.map`) to match the
+--- paper's single-batch parallel decoding claim.
+---
+--- ## References
+---
+--- - Ning, X., Lin, Z., Zhou, Z., Wang, T., Yang, H., Zhang, M., Meng, F.,
+---   Zhou, J. (2023). "Skeleton-of-Thought: Prompting LLMs for Efficient
+---   Parallel Generation". arXiv:2307.15337.
 
 local S = require("alc_shapes")
 local T = S.T
