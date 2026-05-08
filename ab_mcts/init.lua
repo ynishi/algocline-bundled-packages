@@ -1,37 +1,45 @@
---- ab_mcts — Adaptive Branching Monte Carlo Tree Search
+--- ab_mcts(AB-MCTS) — adaptive branching MCTS with Thompson Sampling
 ---
 --- Extends standard MCTS by dynamically deciding at each node whether to
 --- explore wider (generate new candidates) or deeper (refine existing ones).
 --- Uses Thompson Sampling with Beta posteriors instead of UCB1, enabling
 --- principled exploration-exploitation balance that adapts to problem structure.
 ---
---- Key difference from mcts: standard MCTS uses UCB1 with fixed branching.
---- AB-MCTS introduces a virtual GEN node at each position — when Thompson
---- Sampling selects GEN over existing children, a new candidate is generated
---- (wider). When an existing child is selected, it is refined (deeper).
+--- ## Algorithm
 ---
---- Based on: Inoue et al., "Wider or Deeper? Scaling LLM Inference-Time
---- Compute with Adaptive Branching Tree Search"
---- (NeurIPS 2025 Spotlight, arXiv:2503.04412)
+--- Pipeline (`2 * budget + 1` LLM calls). For each iteration:
 ---
---- Pipeline (2*budget + 1 LLM calls):
----   For each iteration:
----     Selection   — Thompson Sampling down the tree
----     Expansion   — generate new or refine existing (1 LLM call)
----     Evaluation  — score the result (1 LLM call)
----     Backprop    — update Beta posteriors along the path
----   Final: synthesize best answer
+--- 1. **Selection** — Thompson Sampling down the tree using Beta posteriors
+--- 2. **Expansion** — generate new or refine existing (1 LLM call)
+--- 3. **Evaluation** — score the result (1 LLM call)
+--- 4. **Backprop** — update Beta posteriors along the path
 ---
---- Usage:
----   local ab_mcts = require("ab_mcts")
----   return ab_mcts.run(ctx)
+--- Final step: synthesize the best answer from the highest-scoring leaf.
 ---
---- ctx.task (required): The problem to solve
---- ctx.budget: Total expansion iterations (default: 8)
---- ctx.max_depth: Maximum tree depth (default: 3)
---- ctx.alpha_prior: Beta prior alpha (default: 1.0)
---- ctx.beta_prior: Beta prior beta (default: 1.0)
---- ctx.gen_tokens: Max tokens for generation/refinement (default: 400)
+--- ## Usage
+---
+--- ```lua
+--- local ab_mcts = require("ab_mcts")
+--- return ab_mcts.run(ctx)
+--- ```
+---
+--- ## Comparison with related packages
+---
+--- vs `mcts`: standard MCTS uses UCB1 with fixed branching. AB-MCTS
+--- introduces a virtual GEN node at each position — when Thompson
+--- Sampling selects GEN over existing children, a new candidate is
+--- generated (wider). When an existing child is selected, it is
+--- refined (deeper). This yields adaptive branching tuned to problem
+--- structure.
+---
+--- vs `tot` / `got`: those use fixed-shape thought trees / graphs.
+--- AB-MCTS's branching shape is data-driven via posterior sampling.
+---
+--- ## References
+---
+--- Inoue et al. (2025). "Wider or Deeper? Scaling LLM Inference-Time
+--- Compute with Adaptive Branching Tree Search". NeurIPS 2025 Spotlight.
+--- arXiv:2503.04412.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -42,9 +50,7 @@ local M = {}
 M.meta = {
     name = "ab_mcts",
     version = "0.1.0",
-    description = "Adaptive Branching MCTS — Thompson Sampling with dynamic "
-        .. "wider/deeper decisions. GEN node mechanism for principled branching. "
-        .. "Consistently outperforms standard MCTS and repeated sampling.",
+    description = "Adaptive branching MCTS with Thompson Sampling — wider/deeper per node",
     category = "reasoning",
 }
 
