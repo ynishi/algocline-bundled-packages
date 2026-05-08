@@ -1246,8 +1246,41 @@ Returns:
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+1. Proposer generates `propositions_per_round` candidate propositions,
+   each conditioned on the current established-facts context.
+2. Verifier independently assesses each proposition for logical soundness
+   and consistency with established facts; accepted propositions are appended.
+3. Early-termination check: if `#established >= 3` and the LLM judges
+   facts sufficient, the loop exits before `max_rounds`.
+4. Reporter synthesises all established facts into a final answer.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Implements the Cumulative Reasoning framework of Zhang et al. (2024).
+The key invariant is monotone fact accumulation: only propositions
+confirmed by an independent verifier are added to the established set,
+preventing hallucinated facts from propagating across rounds.
+
+## Usage {#usage}
+
+```lua
+local cumulative = require("cumulative")
+return cumulative.run(ctx)
+```
+
+## References {#references}
+
+- Zhang, Y., Zhang, Y., Li, Y., Smola, A. (2024). "Cumulative Reasoning
+  with Large Language Models". arXiv:2308.04371.
 
 ## Parameters {#parameters}
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-08T23:52:59Z",
+  "updated_at": "2026-05-08T23:57:20Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -355,7 +355,7 @@
       "version": "0.1.0",
       "description": "Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation",
       "category": "reasoning",
-      "docstring": "cumulative — propose-verify-accumulate reasoning\nThree roles (proposer, verifier, reporter) collaborate in a loop.\nThe proposer generates new propositions, the verifier checks them,\nand verified propositions accumulate as established facts for the next round.\n\nBased on: Zhang et al., \"Cumulative Reasoning with Large Language Models\"\n(2024, arXiv:2308.04371)\n\nUsage:\nlocal cumulative = require(\"cumulative\")\nreturn cumulative.run(ctx)\n\nctx.task (required): The problem to solve\nctx.max_rounds: Maximum propose-verify cycles (default: 4)\nctx.propositions_per_round: Propositions to generate per round (default: 2)",
+      "docstring": "cumulative — propose-verify-accumulate reasoning\n\nThree roles (proposer, verifier, reporter) collaborate in a loop.\nThe proposer generates new propositions, the verifier checks them,\nand verified propositions accumulate as established facts for the next round.\n\n## Algorithm\n\n1. Proposer generates `propositions_per_round` candidate propositions,\neach conditioned on the current established-facts context.\n2. Verifier independently assesses each proposition for logical soundness\nand consistency with established facts; accepted propositions are appended.\n3. Early-termination check: if `#established >= 3` and the LLM judges\nfacts sufficient, the loop exits before `max_rounds`.\n4. Reporter synthesises all established facts into a final answer.\n\n## Theoretical foundations\n\nImplements the Cumulative Reasoning framework of Zhang et al. (2024).\nThe key invariant is monotone fact accumulation: only propositions\nconfirmed by an independent verifier are added to the established set,\npreventing hallucinated facts from propagating across rounds.\n\n## Usage\n\n```lua\nlocal cumulative = require(\"cumulative\")\nreturn cumulative.run(ctx)\n```\n\n## References\n\n- Zhang, Y., Zhang, Y., Li, Y., Smola, A. (2024). \"Cumulative Reasoning\nwith Large Language Models\". arXiv:2308.04371.",
       "source": {
         "type": "unknown"
       },
