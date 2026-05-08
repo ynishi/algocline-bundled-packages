@@ -1,4 +1,4 @@
---- Decompose — task decomposition and parallel sub-task execution
+--- decompose — task decomposition and parallel sub-task execution
 ---
 --- Breaks a complex task into sub-tasks via LLM, executes each
 --- in parallel, then merges results into a unified answer.
