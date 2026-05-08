@@ -1,10 +1,14 @@
 --- SoT — Skeleton-of-Thought parallel generation
 ---
 --- Generates a structural outline first, then fills each section
---- in parallel via alc.map. Produces structurally coherent long-form output.
+--- in parallel via alc.parallel (single alc.llm_batch round-trip).
+--- Produces structurally coherent long-form output.
 ---
---- Based on: Ning et al., "Skeleton-of-Thought: LLMs Can Do Parallel
---- Decoding" (2023, arXiv:2307.15337)
+--- Based on: Ning et al., "Skeleton-of-Thought: Prompting LLMs for
+--- Efficient Parallel Generation" (2023, arXiv:2307.15337; v3 retitled
+--- from v1 "LLMs Can Do Parallel Decoding"). Paper §3.1.1 reports up
+--- to 2.39x latency speedup on 8/12 models — parallel section fill is
+--- the core claim, hence alc.parallel (not alc.map).
 ---
 --- Usage:
 ---   local sot = require("sot")
@@ -97,35 +101,29 @@ function M.run(ctx)
 
     alc.log("info", string.format("sot: %d sections in skeleton", #sections))
 
-    -- Phase 2: Fill sections in parallel
-    local fills = alc.map(sections, function(section, i)
-        return alc.llm(
-            string.format(
-                "You are writing section %d of %d for the following task.\n\n"
-                    .. "Overall task: %s\n\n"
-                    .. "Full outline:\n%s\n\n"
-                    .. "Write ONLY section %d: \"%s\"\n\n"
-                    .. "Be thorough and detailed. Do not repeat content "
-                    .. "that belongs in other sections.",
-                i, #sections, task,
-                (function()
-                    local outline = ""
-                    for j, s in ipairs(sections) do
-                        local marker = j == i and ">>> " or "    "
-                        outline = outline .. string.format("%s%d. %s\n", marker, j, s)
-                    end
-                    return outline
-                end)(),
-                i, section
-            ),
-            {
-                system = "You are an expert writer. Write only the assigned section. "
-                    .. "Be aware of the full outline to avoid overlap with other sections. "
-                    .. "Maintain consistent tone and depth.",
-                max_tokens = section_tokens,
-            }
+    -- Phase 2: Fill sections in parallel via alc.parallel
+    -- (1 round-trip via alc.llm_batch; see prelude.lua:442-515)
+    local fills = alc.parallel(sections, function(section, i)
+        local outline = ""
+        for j, s in ipairs(sections) do
+            local marker = j == i and ">>> " or "    "
+            outline = outline .. string.format("%s%d. %s\n", marker, j, s)
+        end
+        return string.format(
+            "You are writing section %d of %d for the following task.\n\n"
+                .. "Overall task: %s\n\n"
+                .. "Full outline:\n%s\n\n"
+                .. "Write ONLY section %d: \"%s\"\n\n"
+                .. "Be thorough and detailed. Do not repeat content "
+                .. "that belongs in other sections.",
+            i, #sections, task, outline, i, section
         )
-    end)
+    end, {
+        system = "You are an expert writer. Write only the assigned section. "
+            .. "Be aware of the full outline to avoid overlap with other sections. "
+            .. "Maintain consistent tone and depth.",
+        max_tokens = section_tokens,
+    })
 
     -- Phase 3: Assemble
     local assembled = ""

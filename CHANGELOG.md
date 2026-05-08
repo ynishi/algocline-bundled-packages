@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`sot`** (Generation): migrated the section-fill call-site from
+  the sequential `alc.map` to the true batch-parallel `alc.parallel`
+  primitive (single `alc.llm_batch` round-trip). The previous
+  implementation contradicted the package's own paper-faithful claim:
+  Ning et al. "Skeleton-of-Thought: Prompting LLMs for Efficient
+  Parallel Generation" (2023, arXiv:2307.15337; v3 retitled from v1
+  "LLMs Can Do Parallel Decoding") reports up to **2.39× latency
+  speedup** on 8/12 models in §3.1.1 — parallel section fill is the
+  paper's core claim. The previous `alc.map` callback executed N
+  section fills as N sequential round-trips (hence ~1× latency, not
+  2.39×). Behavior is mathematically equivalent (section fills were
+  already independent, no inter-iteration state); only the dispatch
+  primitive changed. The inline IIFE that built the per-section
+  outline marker is expanded into the prompt_fn body for
+  readability. Docstring is updated to reflect the v3 paper title
+  and explicitly cite the 2.39× speedup as the reason for using
+  `alc.parallel` (not `alc.map`). Adds new `tests/test_sot.lua`
+  (5 cases: happy path / skeleton-parse fallback / max_sections
+  cap / LLM call counting / alc.parallel-not-alc.map invariant)
+  using the shared `make_alc_stub` pattern from
+  `tests/test_smc_sample.lua` (`alc.parallel` / `alc.llm_batch`
+  mocks delegating to the existing `alc.llm` fixture mechanism).
+  Closes child issue `1778160863-88511` under the parent migration
+  tracker `1778144244-78327`. Tests: 5/5 pass.
+
 - **`particle_infer` / `smc_sample`** (Sampling): migrated 3 LLM
   call-sites from the sequential `map_or_serial` helper to the true
   batch-parallel `alc.parallel(items, prompt_fn, opts)` primitive.
