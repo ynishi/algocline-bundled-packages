@@ -65,12 +65,7 @@ local M = {}
 M.meta = {
     name = "conformal_vote",
     version = "0.1.0",
-    description = "Linear opinion pool + split conformal prediction gate "
-        .. "for multi-agent deliberation. Emits a three-way decision "
-        .. "(commit / escalate / anomaly) per Proposition 3, with a "
-        .. "finite-sample coverage guarantee Pr[Y ∈ C(X)] ≥ 1-α "
-        .. "(Theorem 2). Calibration and online rounds share aggregation "
-        .. "weights so exchangeability is preserved.",
+    description = "Split conformal prediction gate for multi-agent deliberation",
     category = "validation",
 }
 
