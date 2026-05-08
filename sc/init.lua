@@ -1,33 +1,46 @@
---- SC — Self-Consistency: independent sampling with majority vote
---- Samples multiple reasoning paths for the same problem,
---- then selects the most consistent answer by majority voting.
+--- sc — Self-Consistency: independent sampling with majority vote
 ---
---- Based on: Wang et al., "Self-Consistency Improves Chain of Thought
---- Reasoning in Language Models" (2022, arXiv:2203.11171)
+--- Samples multiple reasoning paths for the same problem, then selects
+--- the most consistent answer by majority voting.
 ---
---- Usage:
----   local sc = require("sc")
----   return sc.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.n: Number of reasoning paths to sample (default: 5)
---- ctx.temperature_hint: Hint text for diversity (default: varies per sample)
---- ctx.gen_tokens: Max tokens per reasoning path (default: 400). Controls
----     how long each independent chain-of-thought can be. Setting this too
----     low truncates reasoning and lowers per-agent accuracy p, which
----     directly weakens Condorcet guarantees for downstream consumers.
+--- 1. Sample `n` independent reasoning paths for the same task (varied via
+---    `temperature_hint` for diversity)
+--- 2. Extract a normalized answer per path
+--- 3. Tally votes; the majority answer wins (with `consensus` LLM-synthesized
+---    summary across the winning paths)
 ---
---- NOTE on other token budgets (extract / consensus): intentionally NOT
---- exposed as ctx knobs.
+--- ## Usage
 ---
---- Evaluated by simulating plausible consumer workflows (long reasoning,
---- budget cap, UI display, downstream parser, custom extraction shape):
---- no workflow can tune these integers alone without ALSO changing the
---- coupled prompt or signal path. See call-site comments below for the
---- per-knob analysis. If a future workflow truly demands tuning, design
---- the coupled pieces together (prompt override + token budget, or
---- structured contract + parser + budget) — do NOT simply expose the
---- integers.
+--- ```lua
+--- local sc = require("sc")
+--- return sc.run(ctx)
+--- ```
+---
+--- ## Caveats
+---
+--- `gen_tokens` is exposed but other token budgets (extract / consensus)
+--- are intentionally NOT exposed as ctx knobs. Per-knob workflow simulation
+--- showed that no consumer workflow can tune those integers alone without
+--- ALSO changing the coupled prompt or signal path. If a future workflow
+--- truly demands tuning, design the coupled pieces together (prompt override
+--- + token budget, or structured contract + parser + budget) — do NOT simply
+--- expose the integers. See call-site comments below for the per-knob
+--- analysis.
+---
+--- ## Comparison with related packages
+---
+--- vs `panel` / `moa`: those use heterogeneous personas / models. `sc` uses
+--- a single agent with sampling-induced diversity. Cheaper but lower coverage.
+---
+--- vs `usc` (Universal Self-Consistency): `usc` lets the LLM pick the best
+--- among samples (LLM-as-judge). `sc` uses deterministic majority voting.
+---
+--- ## References
+---
+--- Wang et al. (2022). "Self-Consistency Improves Chain of Thought Reasoning
+--- in Language Models". arXiv:2203.11171.
 
 local M = {}
 

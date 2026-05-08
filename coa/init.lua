@@ -1,32 +1,40 @@
---- coa — Chain-of-Abstraction reasoning
+--- coa — Chain-of-Abstraction reasoning with parallel knowledge grounding
 ---
 --- Generates reasoning chains with abstract placeholders instead of concrete
 --- facts, then grounds them via parallel knowledge lookups. Decouples the
 --- reasoning structure from specific knowledge, enabling parallel tool calls
 --- and cleaner reasoning chains.
 ---
---- Key difference from faithful: faithful formalizes reasoning into code/logic
---- for verification (internal consistency). CoA abstracts away concrete knowledge
---- during reasoning and injects it afterward (external knowledge integration).
---- The two are complementary: CoA grounds knowledge, faithful verifies logic.
----
---- Based on: Gao et al., "Chain-of-Abstraction: Solving Elaborate Problems
---- via Abstraction Chains" (Meta/EPFL, COLING 2025, arXiv:2401.17464)
+--- ## Algorithm
 ---
 --- Pipeline (2 + N LLM calls):
----   Step 1: Abstract    — generate reasoning with [FUNC ...] placeholders
----   Step 2: Ground      — resolve placeholders via LLM knowledge (parallel)
----   Step 3: Answer      — produce final answer from grounded chain
 ---
---- Usage:
----   local coa = require("coa")
----   return coa.run(ctx)
+--- 1. **Abstract** — generate reasoning with `[FUNC tool("query") = yN]` placeholders
+--- 2. **Ground** — resolve placeholders via LLM knowledge in topological order
+---    (independent vars first, dependent vars after substitution)
+--- 3. **Answer** — produce final answer from the grounded chain
 ---
---- ctx.task (required): The problem to solve
---- ctx.tools: Tool name → description table (default: { knowledge = "..." })
---- ctx.max_depth: Max dependency resolution depth (default: 3)
---- ctx.gen_tokens: Max tokens for abstract chain (default: 600)
---- ctx.ground_tokens: Max tokens per grounding call (default: 300)
+--- ## Usage
+---
+--- ```lua
+--- local coa = require("coa")
+--- return coa.run(ctx)
+--- ```
+---
+--- ## Comparison with related packages
+---
+--- vs `faithful`: `faithful` formalizes reasoning into code/logic for
+--- verification (internal consistency). CoA abstracts away concrete knowledge
+--- during reasoning and injects it afterward (external knowledge integration).
+--- The two are complementary: CoA grounds knowledge, `faithful` verifies logic.
+---
+--- vs `least_to_most` / `decompose`: those decompose the *task*. CoA
+--- decomposes the *knowledge dependencies* within a single reasoning chain.
+---
+--- ## References
+---
+--- Gao et al. (2025). "Chain-of-Abstraction: Solving Elaborate Problems
+--- via Abstraction Chains". Meta/EPFL, COLING 2025. arXiv:2401.17464.
 
 local S = require("alc_shapes")
 local T = S.T

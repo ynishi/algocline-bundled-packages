@@ -10,7 +10,7 @@ generated: gen_docs (V0)
 
 # SoT — Skeleton-of-Thought parallel generation
 
-> Generates a structural outline first, then fills each section in parallel via alc.map. Produces structurally coherent long-form output.
+> Generates a structural outline first, then fills each section in parallel via alc.parallel (single alc.llm_batch round-trip). Produces structurally coherent long-form output.
 
 ## Contents
 

@@ -1,39 +1,60 @@
---- conformal_vote — Linear opinion pool + split conformal prediction
---- gate for safe multi-agent deliberation.
+--- conformal_vote — split conformal prediction gate for multi-agent deliberation
 ---
---- Implements the post-hoc decision layer from:
----   Wang, Xie, Wang, Gao, Yang, Li, Qiu, Han, Qiu, Huang, Zhu, Woo
----   "From Debate to Decision: Conformal Social Choice for Safe
----    Multi-Agent Deliberation" (arXiv:2604.07667, 2026-04-09)
+--- Linear opinion pool + split conformal prediction post-hoc decision layer.
+--- Emits a three-way decision (commit / escalate / anomaly) with a finite-sample
+--- coverage guarantee `Pr[Y ∈ C(X)] ≥ 1-α` (Theorem 2). Calibration and online
+--- rounds share aggregation weights so exchangeability is preserved.
+---
+--- ## Algorithm
 ---
 --- Given N agents that each emit a verbalized probability distribution
 --- π_i(y|x) over a fixed option set, the pkg performs:
 ---
----   Linear opinion pool:       P_social(y|x) = Σ_i w_i · π_i(y|x)
----   Nonconformity score:       s_nc(x, y)    = 1 - P_social(y|x)
----   Finite-sample quantile:    q̂ = sorted[⌈(n+1)(1-α)⌉]        (§4.3)
----   Prediction set:            C(x) = { y : P_social(y|x) ≥ 1 - q̂ }
----   Three-way decision (P. 3): |C|=1 ∧ p₁≥τ ∧ p₂<τ → commit
----                              |C|≥2 ∧ p₂≥τ        → escalate
----                              |C|=0 ∨ p₁<τ        → anomaly
+--- ```math
+--- P_social(y|x) = Σ_i w_i · π_i(y|x)        (linear opinion pool)
+--- s_nc(x, y)    = 1 - P_social(y|x)         (nonconformity score)
+--- q̂            = sorted[⌈(n+1)(1-α)⌉]       (finite-sample quantile, §4.3)
+--- C(x)          = { y : P_social(y|x) ≥ 1 - q̂ }   (prediction set)
+--- ```
 ---
---- Theorem 2 guarantees Pr[Y ∈ C(X)] ≥ 1-α in finite samples whenever
+--- Three-way decision (Proposition 3):
+---
+--- ```
+--- |C|=1 ∧ p₁≥τ ∧ p₂<τ → commit
+--- |C|≥2 ∧ p₂≥τ        → escalate
+--- |C|=0 ∨ p₁<τ        → anomaly
+--- ```
+---
+--- ## Theoretical foundations
+---
+--- Theorem 2 guarantees `Pr[Y ∈ C(X)] ≥ 1-α` in finite samples whenever
 --- calibration and online rounds share the same aggregation weights and
---- the data is exchangeable. The calibrate entry therefore *pins* the
---- weights it used (defaulting to uniform 1/N) into its return value so
---- M.run can replay them, never letting online aggregation drift from
+--- the data is exchangeable. The `calibrate` entry therefore *pins* the
+--- weights it used (defaulting to uniform `1/N`) into its return value so
+--- `M.run` can replay them, never letting online aggregation drift from
 --- the calibrated weights.
 ---
---- Entry contract (see M.spec below):
----   calibrate   — pure, direct-args. returns { q_hat, tau, alpha, n, weights }
----   aggregate   — pure, direct-args. returns { [label] = p_social }
----   predict_set — pure, direct-args. returns { labels, top1, top1_prob, top2, top2_prob }
----   decide      — pure, direct-args. returns { action, selected }
----   run         — Strategy, ctx-threading. queries N agents via alc.llm.
+--- ## Entry contract
 ---
---- Category: validation (alongside sprt, eval_guard, inverse_u).
+--- See `M.spec` below for the formal machine-readable contract:
+---
+--- - `calibrate`   — pure, direct-args. returns `{ q_hat, tau, alpha, n, weights }`
+--- - `aggregate`   — pure, direct-args. returns `{ [label] = p_social }`
+--- - `predict_set` — pure, direct-args. returns `{ labels, top1, top1_prob, top2, top2_prob }`
+--- - `decide`      — pure, direct-args. returns `{ action, selected }`
+--- - `run`         — Strategy, ctx-threading. queries N agents via `alc.llm`
+---
+--- ## Comparison with related packages
+---
+--- Category: `validation` (alongside `sprt`, `eval_guard`, `inverse_u`).
 --- The paper's informal "Governance" label describes the role; the
 --- machine-readable category string follows the existing sibling pkgs.
+---
+--- ## References
+---
+--- Wang, Xie, Wang, Gao, Yang, Li, Qiu, Han, Qiu, Huang, Zhu, Woo (2026).
+--- "From Debate to Decision: Conformal Social Choice for Safe Multi-Agent
+--- Deliberation". arXiv:2604.07667.
 
 local S = require("alc_shapes")
 local T = S.T

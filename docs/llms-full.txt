@@ -509,14 +509,49 @@ Returns:
 <!-- ── coa.md ── -->
 
 
-# coa — Chain-of-Abstraction reasoning
+# coa — Chain-of-Abstraction reasoning with parallel knowledge grounding
 
 > Generates reasoning chains with abstract placeholders instead of concrete facts, then grounds them via parallel knowledge lookups. Decouples the reasoning structure from specific knowledge, enabling parallel tool calls and cleaner reasoning chains.
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+Pipeline (2 + N LLM calls):
+
+1. **Abstract** — generate reasoning with `[FUNC tool("query") = yN]` placeholders
+2. **Ground** — resolve placeholders via LLM knowledge in topological order
+   (independent vars first, dependent vars after substitution)
+3. **Answer** — produce final answer from the grounded chain
+
+## Usage {#usage}
+
+```lua
+local coa = require("coa")
+return coa.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `faithful`: `faithful` formalizes reasoning into code/logic for
+verification (internal consistency). CoA abstracts away concrete knowledge
+during reasoning and injects it afterward (external knowledge integration).
+The two are complementary: CoA grounds knowledge, `faithful` verifies logic.
+
+vs `least_to_most` / `decompose`: those decompose the *task*. CoA
+decomposes the *knowledge dependencies* within a single reasoning chain.
+
+## References {#references}
+
+Gao et al. (2025). "Chain-of-Abstraction: Solving Elaborate Problems
+via Abstraction Chains". Meta/EPFL, COLING 2025. arXiv:2401.17464.
 
 ## Parameters {#parameters}
 
@@ -666,14 +701,70 @@ Returns:
 <!-- ── conformal_vote.md ── -->
 
 
-# conformal_vote — Linear opinion pool + split conformal prediction
+# conformal_vote — split conformal prediction gate for multi-agent deliberation
 
-> gate for safe multi-agent deliberation.
+> Linear opinion pool + split conformal prediction post-hoc decision layer. Emits a three-way decision (commit / escalate / anomaly) with a finite-sample coverage guarantee `Pr[Y ∈ C(X)] ≥ 1-α` (Theorem 2). Calibration and online rounds share aggregation weights so exchangeability is preserved.
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [Entry contract](#entry-contract)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+Given N agents that each emit a verbalized probability distribution
+π_i(y|x) over a fixed option set, the pkg performs:
+
+```math
+P_social(y|x) = Σ_i w_i · π_i(y|x)        (linear opinion pool)
+s_nc(x, y)    = 1 - P_social(y|x)         (nonconformity score)
+q̂            = sorted[⌈(n+1)(1-α)⌉]       (finite-sample quantile, §4.3)
+C(x)          = { y : P_social(y|x) ≥ 1 - q̂ }   (prediction set)
+```
+
+Three-way decision (Proposition 3):
+
+```
+|C|=1 ∧ p₁≥τ ∧ p₂<τ → commit
+|C|≥2 ∧ p₂≥τ        → escalate
+|C|=0 ∨ p₁<τ        → anomaly
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Theorem 2 guarantees `Pr[Y ∈ C(X)] ≥ 1-α` in finite samples whenever
+calibration and online rounds share the same aggregation weights and
+the data is exchangeable. The `calibrate` entry therefore *pins* the
+weights it used (defaulting to uniform `1/N`) into its return value so
+`M.run` can replay them, never letting online aggregation drift from
+the calibrated weights.
+
+## Entry contract {#entry-contract}
+
+See `M.spec` below for the formal machine-readable contract:
+
+- `calibrate`   — pure, direct-args. returns `{ q_hat, tau, alpha, n, weights }`
+- `aggregate`   — pure, direct-args. returns `{ [label] = p_social }`
+- `predict_set` — pure, direct-args. returns `{ labels, top1, top1_prob, top2, top2_prob }`
+- `decide`      — pure, direct-args. returns `{ action, selected }`
+- `run`         — Strategy, ctx-threading. queries N agents via `alc.llm`
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Category: `validation` (alongside `sprt`, `eval_guard`, `inverse_u`).
+The paper's informal "Governance" label describes the role; the
+machine-readable category string follows the existing sibling pkgs.
+
+## References {#references}
+
+Wang, Xie, Wang, Gao, Yang, Li, Qiu, Han, Qiu, Huang, Zhu, Woo (2026).
+"From Debate to Decision: Conformal Social Choice for Safe Multi-Agent
+Deliberation". arXiv:2604.07667.
 
 ## Parameters {#parameters}
 
@@ -3587,13 +3678,57 @@ Returns:
 <!-- ── sc.md ── -->
 
 
-# SC — Self-Consistency: independent sampling with majority vote
+# sc — Self-Consistency: independent sampling with majority vote
 
 > Samples multiple reasoning paths for the same problem, then selects the most consistent answer by majority voting.
 
 ## Contents
 
+- [Algorithm](#algorithm)
+- [Usage](#usage)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Result](#result)
+
+## Algorithm {#algorithm}
+
+1. Sample `n` independent reasoning paths for the same task (varied via
+   `temperature_hint` for diversity)
+2. Extract a normalized answer per path
+3. Tally votes; the majority answer wins (with `consensus` LLM-synthesized
+   summary across the winning paths)
+
+## Usage {#usage}
+
+```lua
+local sc = require("sc")
+return sc.run(ctx)
+```
+
+## Caveats {#caveats}
+
+`gen_tokens` is exposed but other token budgets (extract / consensus)
+are intentionally NOT exposed as ctx knobs. Per-knob workflow simulation
+showed that no consumer workflow can tune those integers alone without
+ALSO changing the coupled prompt or signal path. If a future workflow
+truly demands tuning, design the coupled pieces together (prompt override
++ token budget, or structured contract + parser + budget) — do NOT simply
+expose the integers. See call-site comments below for the per-knob
+analysis.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `panel` / `moa`: those use heterogeneous personas / models. `sc` uses
+a single agent with sampling-induced diversity. Cheaper but lower coverage.
+
+vs `usc` (Universal Self-Consistency): `usc` lets the LLM pick the best
+among samples (LLM-as-judge). `sc` uses deterministic majority voting.
+
+## References {#references}
+
+Wang et al. (2022). "Self-Consistency Improves Chain of Thought Reasoning
+in Language Models". arXiv:2203.11171.
 
 ## Result {#result}
 
@@ -3810,7 +3945,7 @@ Returns `smc_sampled` shape:
 
 # SoT — Skeleton-of-Thought parallel generation
 
-> Generates a structural outline first, then fills each section in parallel via alc.map. Produces structurally coherent long-form output.
+> Generates a structural outline first, then fills each section in parallel via alc.parallel (single alc.llm_batch round-trip). Produces structurally coherent long-form output.
 
 ## Contents
 
