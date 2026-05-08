@@ -1,4 +1,4 @@
---- CoVe — Chain-of-Verification: draft-verify-revise cycle
+--- cove(CoVe) — Chain-of-Verification draft-verify-revise cycle
 --- Reduces hallucination by: draft → generate verification questions →
 --- answer them independently → produce verified final response.
 ---
