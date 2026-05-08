@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **12 new `scripts/e2e/*.lua` real-LLM smoke tests** (Phase B
+  sub-batch 1 of the post-migration hardening): adds end-to-end
+  smoke harnesses for the 12 Simple-structured packages migrated to
+  `alc.parallel`. All files reuse the `scripts/e2e/sot.lua` baseline
+  (commit `439ae53`) — `package.path` shim + `common.lua` library +
+  `params` / `prompt` / `common.run({ name, prompt, params,
+  max_iterations, graders })` shape. Transport: `alc_advice` (no
+  closures in Simple-structured packages, opts are JSON-safe).
+  Grader budget per file: 4-5 graders, each combining
+  `common.grader_agent_ok()` + `common.grader_max_tokens(N)` +
+  `output_present` (≥50-char content) + 1-2 package-specific
+  structural assertions surfacing the `M.spec.entries.run.result`
+  primary fields (e.g. `level_used_reported` for cascade,
+  `attribution_score_reported` for claim_trace, `precision_score`
+  in [0,1] for factscore, sort-order verification for rank,
+  `verdict_reported` for maieutic / triad). Tasks are small,
+  deterministic, and shaped to trigger each package's
+  paper-faithful behavior (cascade escalation threshold, distill
+  3-chunk Map phase, moa 2-agent × 2-layer aggregation, etc.).
+  Files added:
+    cascade.lua / claim_trace.lua / critic.lua / decompose.lua /
+    distill.lua / factscore.lua / moa.lua / negation.lua /
+    p_tts.lua / rank.lua / maieutic.lua / triad.lua
+  Total ~1,150 LOC across 12 new files. All files pass
+  `mcp__lua-debugger__check_launch` with 0 errors / 0 warnings.
+  Real-LLM execution is **not** performed in this commit — running
+  these smokes via `just e2e <name>` is User-territory (Anthropic
+  API token consumption). New `scripts/e2e/*.lua` for the 7
+  Multi-callsite-structured packages (`rstar` + `anti_cascade` /
+  `got` / `lineage` / `counterfactual_verify` /
+  `review_and_investigate` / `coa`) is tracked separately as
+  Phase B sub-batch 2.
+
 - **17 new `tests/test_*.lua` unit-test files** (Phase A of the
   post-migration hardening): adds stub-based unit tests for the 17
   packages migrated to `alc.parallel` that previously had no
