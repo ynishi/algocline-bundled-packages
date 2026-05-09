@@ -1,41 +1,47 @@
---- sprt — Wald Sequential Probability Ratio Test (SPRT) for Bernoulli streams
+--- sprt(SPRT) — Wald Sequential Probability Ratio Test for Bernoulli streams
 ---
---- Given a Bernoulli stream X₁, X₂, … with unknown parameter p, SPRT
---- decides between H0: p = p0 and H1: p = p1 (with p0 < p1) while
---- observing trials one at a time. Maintains the running log-likelihood
---- ratio
+--- Given a Bernoulli stream `X₁, X₂, …` with unknown parameter `p`,
+--- SPRT decides between `H0: p = p0` and `H1: p = p1` (`p0 < p1`)
+--- while observing trials one at a time. Maintains the running
+--- log-likelihood ratio and stops as soon as it crosses an upper or
+--- lower boundary using Wald's classical approximations.
 ---
----     λ_n = Σᵢ log(f₁(Xᵢ) / f₀(Xᵢ))
+--- ## Usage
 ---
---- and stops as soon as λ_n crosses an upper boundary A (accept H1) or a
---- lower boundary B (accept H0), using Wald's classical approximations:
+--- ```lua
+--- local sprt = require("sprt")
+--- local st = sprt.new({ p0 = 0.5, p1 = 0.75, alpha = 0.05, beta = 0.10 })
+--- for _, x in ipairs(stream) do
+---     sprt.observe(st, x)
+---     if sprt.decide(st).verdict ~= "continue" then break end
+--- end
+--- ```
 ---
----     A = log((1 - β) / α)       B = log(β / (1 - α))
+--- ## Theoretical foundations
 ---
---- Wald & Wolfowitz (1948) proved SPRT minimizes E[N] among all tests
---- satisfying the (α, β) error constraints under the two boundary
---- hypotheses. This makes SPRT the right primitive for "stop as soon as
---- evidence is strong enough" decisions — complementing cs_pruner
---- (multi-arm anytime-valid elimination) and f_race (ranked Friedman
---- elimination). Key difference:
+--- ```math
+--- λ_n = Σᵢ log(f₁(Xᵢ) / f₀(Xᵢ))
+--- A   = log((1 - β) / α)        B = log(β / (1 - α))
+--- ```
 ---
----     cs_pruner : N candidates × D rubric dims, kill on CS overlap.
----     f_race    : N candidates × D dims, kill on Friedman rank gap.
----     sprt      : 1 stream of Bernoulli trials, 2-hypothesis stop.
+--- Wald & Wolfowitz (1948) proved SPRT minimizes `E[N]` among all
+--- tests satisfying `(α, β)` error constraints under the two boundary
+--- hypotheses. SPRT is the right primitive for "stop as soon as
+--- evidence is strong enough" decisions.
 ---
---- References:
----   Wald, A. (1945). "Sequential Tests of Statistical Hypotheses".
----       Ann. Math. Statist. 16(2), 117–186.
----   Wald & Wolfowitz (1948). "Optimum character of the sequential
----       probability ratio test". Ann. Math. Statist. 19(3), 326–339.
+--- ## Comparison with related packages
 ---
---- Usage:
----   local sprt = require("sprt")
----   local st = sprt.new({ p0 = 0.5, p1 = 0.75, alpha = 0.05, beta = 0.10 })
----   for _, x in ipairs(stream) do
----       sprt.observe(st, x)
----       if sprt.decide(st).verdict ~= "continue" then break end
----   end
+--- - `cs_pruner` — N candidates × D rubric dims, kill on CS overlap.
+--- - `f_race` — N candidates × D dims, kill on Friedman rank gap.
+--- - `sprt` — 1 stream of Bernoulli trials, 2-hypothesis stop.
+---
+--- ## References
+---
+--- - Wald, A. (1945). "Sequential Tests of Statistical Hypotheses".
+---   Ann. Math. Statist. 16(2), 117-186.
+--- - Wald, A., Wolfowitz, J. (1948). "Optimum character of the
+---   sequential probability ratio test". Ann. Math. Statist. 19(3),
+---   326-339.
 ---
 --- This is a substrate-style primitive: it does NOT call alc.llm. It only
 --- accumulates evidence and exposes the decision boundary. Users compose
