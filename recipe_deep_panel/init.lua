@@ -1,96 +1,61 @@
---- recipe_deep_panel — Deep-reasoning diverse panel with resume
+--- recipe_deep_panel(RecipeDeepPanel) — deep-reasoning diverse panel with resume
 ---
---- Recipe package: composes ab_mcts × N + ensemble_div + condorcet +
---- calibrate on top of flow. Fills the gap between recipe_safe_panel
---- (cheap sc-based majority vote) and single-agent ab_mcts: when each
---- individual opinion requires tree-search-quality reasoning AND the
---- panel is large enough to need checkpoint-resume, this recipe is
---- the right composition.
+--- Recipe package that composes `ab_mcts × N` + `ensemble_div` +
+--- `condorcet` + `calibrate` on top of `flow`. Fills the gap between
+--- `recipe_safe_panel` (cheap `sc`-based majority vote) and single-agent
+--- `ab_mcts`: when each opinion requires tree-search-quality reasoning
+--- and the panel is large enough to need checkpoint-resume, this recipe
+--- is the right composition.
 ---
---- Pipeline:
----   Stage 1: condorcet — Panel feasibility + Anti-Jury gate
----     Same gate as recipe_safe_panel: if p_estimate <= 0.5, majority
----     vote is provably harmful (anti-jury) or useless (coin-flip).
----     Aborts with zero LLM cost when the gate blocks.
+--- ## Usage
 ---
----   Stage 2: flow fan-out of ab_mcts — N independent tree searches
----     Uses flow.state_new + per-branch flow.state_get to checkpoint
----     each ab_mcts invocation. A crash mid-panel resumes at the first
----     incomplete branch. Each branch is a full ab_mcts run (2*budget+1
----     LLM calls in the NeurIPS 2025 Spotlight formula), differentiated
----     by a distinct approach-prompt. flow.token_wrap / token_verify
----     tag each call with a unique slot so a mis-routed response across
----     parallel branches is detected at the Frame boundary.
+--- ```lua
+--- local deep_panel = require("recipe_deep_panel")
+--- return deep_panel.run(ctx)
+--- ```
 ---
----   Stage 3: ensemble_div — Panel diversity diagnostic
----     3a (always): answer-level distinctness on normalized answers
----          (n_distinct / n). This is a structural diversity signal.
----     3b (conditional): when ctx.ground_truth is numeric AND every
----          branch's answer parses as a number, call
----          ensemble_div.decompose to verify E = E_bar - A_bar and
----          report A_bar (ambiguity) on the numeric predictions.
----          Skipped with an explicit reason for non-numeric tasks —
----          see M.caveats.
+--- ## Algorithm
 ---
----   Stage 4: condorcet.prob_majority — Expected panel accuracy
----     Plurality vote + Condorcet expected-accuracy under independence
----     at the declared p_estimate. Feeds into Stage 5.
+--- 1. `condorcet` — panel feasibility + Anti-Jury gate. If `p_estimate
+---    <= 0.5`, majority vote is provably harmful or useless; abort with
+---    zero LLM cost.
+--- 2. `flow` fan-out of `ab_mcts` — N independent tree searches with
+---    `flow.state_new` + per-branch `flow.state_get` checkpoints. A
+---    crash mid-panel resumes at the first incomplete branch. Each
+---    branch is a full `ab_mcts` run (`2*budget + 1` LLM calls)
+---    differentiated by a distinct approach-prompt; `flow.token_wrap` /
+---    `token_verify` tag each call so mis-routed responses across
+---    parallel branches are detected at the Frame boundary.
+--- 3. `ensemble_div` — panel diversity diagnostic. Stage 3a always runs
+---    answer-level distinctness on normalized answers (`n_distinct /
+---    n`). Stage 3b runs `ensemble_div.decompose` only when
+---    `ctx.ground_truth` is numeric and every branch answer parses as a
+---    number; otherwise skipped with an explicit reason (see
+---    `M.caveats`).
+--- 4. `condorcet.prob_majority` — plurality vote plus Condorcet
+---    expected accuracy under independence at the declared
+---    `p_estimate`.
+--- 5. `calibrate.assess` — single-call meta-confidence gate. Recipe
+---    raises `needs_investigation` when confidence falls below
+---    `ctx.confidence_threshold`.
 ---
----   Stage 5: calibrate.assess — Meta-confidence gate
----     Single-call assessment given panel summary (answer, plurality,
----     expected_acc, diversity). Recipe-level needs_investigation flag
----     fires when confidence < ctx.confidence_threshold.
+--- ## Caveats
 ---
---- Theory:
----   Inoue et al. "Wider or Deeper? Scaling LLM Inference-Time Compute
----     with Adaptive Branching Tree Search". NeurIPS 2025 Spotlight,
----     arXiv:2503.04412. AB-MCTS replaces UCB1 with Thompson Sampling
----     on Beta posteriors and adds a GEN node to decide between wider
----     (new candidate) and deeper (refine existing).
+--- See `M.caveats`. Key items: Anti-Jury abort, cost explosion with
+--- `N × budget`, resume replay semantics, and numeric-only Stage 3b.
 ---
----   Condorcet, M. "Essai sur l'application de l'analyse à la
----     probabilité des décisions rendues à la pluralité des voix",
----     1785. Anti-Jury corollary: p < 0.5 ⇒ P(Maj_n) → 0 as n → ∞.
+--- ## References
 ---
----   Krogh, Vedelsby. "Neural Network Ensembles, Cross Validation,
----     and Active Learning". NeurIPS 7, pp.231-238, 1995. Eq. 6:
----     E = E_bar - A_bar (ambiguity identity, independence-free).
----
----   Wang et al. "Self-Consistency Improves Chain of Thought Reasoning
----     in Language Models". 2022. arXiv:2203.11171. Justifies
----     majority-vote aggregation over diverse reasoning paths.
----
---- Caveats:
----   See M.caveats. Key: anti-jury abort, cost explosion with N×budget,
----   resume replay semantics, ensemble_div numeric-only Stage 3b.
----
---- Usage:
----   local deep_panel = require("recipe_deep_panel")
----   return deep_panel.run(ctx)
----
---- ctx.task (required): The problem to solve
---- ctx.task_id (required): Stable id for flow state persistence — the
----     checkpoint is keyed on this. Resuming an interrupted run requires
----     passing the same task_id with ctx.resume = true.
---- ctx.p_estimate (required): Per-agent accuracy in (0, 1]. REQUIRED
----     with no default: a silent default (e.g. 0.7) would bypass the
----     Anti-Jury gate on tasks where the real p < 0.5.
---- ctx.n_branches: Panel size (default: 3). Must be odd and >= 3 for
----     a meaningful majority vote.
---- ctx.budget: Per-branch ab_mcts budget (default: 8). Total LLM cost
----     is approximately N × (2*budget + 1) + 1 (calibrate).
---- ctx.max_depth: Per-branch ab_mcts max tree depth (default: 3).
---- ctx.approaches: Array of reasoning-style prompts, one per branch
----     (default: recipe-provided diverse set, up to 7). When
----     n_branches exceeds the default list length, ctx.approaches
----     MUST be provided explicitly.
---- ctx.resume: Set true to resume an interrupted run (default: false).
---- ctx.ground_truth: Optional number — enables ensemble_div.decompose
----     in Stage 3b. Only meaningful for numeric-answer tasks.
---- ctx.answer_normalizer: Optional callable string → string. Used for
----     vote bucketing (default: trim + lower).
---- ctx.confidence_threshold: calibrate gate threshold (default: 0.7).
---- ctx.gen_tokens: Max tokens per LLM call (default: 400).
+--- - Inoue, Y. et al. (2025). "Wider or Deeper? Scaling LLM
+---   Inference-Time Compute with Adaptive Branching Tree Search".
+---   NeurIPS 2025 Spotlight. https://arxiv.org/abs/2503.04412
+--- - Condorcet, M. (1785). "Essai sur l'application de l'analyse à la
+---   probabilité des décisions rendues à la pluralité des voix".
+--- - Krogh, A., Vedelsby, J. (1995). "Neural Network Ensembles, Cross
+---   Validation, and Active Learning". NeurIPS 7, pp.231-238.
+--- - Wang, X. et al. (2022). "Self-Consistency Improves Chain of
+---   Thought Reasoning in Language Models".
+---   https://arxiv.org/abs/2203.11171
 
 local M = {}
 
@@ -98,11 +63,7 @@ local M = {}
 M.meta = {
     name = "recipe_deep_panel",
     version = "0.1.0",
-    description = "Deep-reasoning diverse panel — N × ab_mcts (Thompson "
-        .. "Sampling tree search) fan-out via flow (resume-safe), followed "
-        .. "by ensemble_div diversity diagnostic, condorcet expected-accuracy, "
-        .. "and calibrate meta-confidence. The heavy-compute counterpart of "
-        .. "recipe_safe_panel (which uses sc instead of ab_mcts).",
+    description = "Deep-reasoning diverse panel: N x ab_mcts fan-out + diversity + calibrate.",
     category = "recipe",
 }
 
