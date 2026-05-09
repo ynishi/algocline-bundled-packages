@@ -3,19 +3,39 @@ name: robust_qa
 version: 0.1.0
 category: pipeline
 result_shape: "shape { adversarial_survived: boolean, answer: string, constraints_passed: boolean, critic_avg_score: number, critic_scores: table, phase1_answer: string, phase2_answer: string, phase3_answer: string, phases: array of any }"
-description: "Three-phase QA pipeline — constraint-first solving, adversarial stress-test, rubric evaluation"
+description: "Three-phase QA pipeline: constraint-first, adversarial test, rubric evaluation."
 source: robust_qa/init.lua
 generated: gen_docs (V0)
 ---
 
-# robust_qa — Three-phase quality assurance pipeline
+# robust_qa(RobustQA) — three-phase quality-assurance pipeline
 
-> Chains three independent verification strategies into a single pipeline:   Phase 1 (p_tts):    Constraint-first solving — generate constraints BEFORE                        solving, verify solution against specification   Phase 2 (negation): Adversarial stress-test — generate destruction conditions,                        verify if they hold, revise if flaws found   Phase 3 (critic):   Rubric-based evaluation — score per dimension, revise                        weak areas with targeted feedback
+> Chains three independent verification strategies into a single pipeline. Each phase operates on a different axis of quality and on the (potentially revised) output of the previous phase, so later phases evaluate a progressively hardened answer.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local robust_qa = require("robust_qa")
+return robust_qa.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `p_tts` — constraint-first solving. Generate constraints before
+   solving and verify the solution against the specification ("does
+   it satisfy the requirements?").
+2. `negation` — adversarial stress test. Generate destruction
+   conditions, check whether they hold, revise on flaws ("can it be
+   broken?").
+3. `critic` — rubric-based evaluation. Score per dimension and
+   revise weak areas with targeted feedback ("is it well-crafted?").
 
 ## Parameters {#parameters}
 

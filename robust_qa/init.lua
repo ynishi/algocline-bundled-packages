@@ -1,45 +1,27 @@
---- robust_qa — Three-phase quality assurance pipeline
+--- robust_qa(RobustQA) — three-phase quality-assurance pipeline
 ---
---- Chains three independent verification strategies into a single pipeline:
----   Phase 1 (p_tts):    Constraint-first solving — generate constraints BEFORE
----                        solving, verify solution against specification
----   Phase 2 (negation): Adversarial stress-test — generate destruction conditions,
----                        verify if they hold, revise if flaws found
----   Phase 3 (critic):   Rubric-based evaluation — score per dimension, revise
----                        weak areas with targeted feedback
+--- Chains three independent verification strategies into a single
+--- pipeline. Each phase operates on a different axis of quality and on
+--- the (potentially revised) output of the previous phase, so later
+--- phases evaluate a progressively hardened answer.
 ---
---- Each phase operates on a different axis of quality:
----   p_tts    = "Does it satisfy the requirements?"  (specification compliance)
----   negation = "Can it be broken?"                  (adversarial robustness)
----   critic   = "Is it well-crafted?"                (holistic quality)
+--- ## Usage
 ---
---- The phases are sequential: each operates on the (potentially revised)
---- output of the previous phase. This means later phases evaluate a
---- progressively hardened answer, not the naive initial generation.
+--- ```lua
+--- local robust_qa = require("robust_qa")
+--- return robust_qa.run(ctx)
+--- ```
 ---
---- Usage:
----   local robust_qa = require("robust_qa")
----   return robust_qa.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task/question to solve
----
---- Phase 1 (p_tts) options:
----   ctx.max_constraints: Max constraints to generate (default: 5)
----   ctx.max_repairs: Max p_tts repair attempts (default: 1)
----   ctx.plan_tokens: Max tokens for planning (default: 400)
----
---- Phase 2 (negation) options:
----   ctx.max_conditions: Max destruction conditions (default: 4)
----
---- Phase 3 (critic) options:
----   ctx.rubric: Table of {name, description} dimension definitions
----   ctx.threshold: Min acceptable score per dimension (default: 7)
----   ctx.max_revisions: Max critic revision rounds (default: 1)
----
---- General options:
----   ctx.gen_tokens: Max tokens for generation steps (default: 600)
----   ctx.skip_phases: NOT SUPPORTED — all phases run. Partial execution
----                    produces sub-standard output and is not meaningful.
+--- 1. `p_tts` — constraint-first solving. Generate constraints before
+---    solving and verify the solution against the specification ("does
+---    it satisfy the requirements?").
+--- 2. `negation` — adversarial stress test. Generate destruction
+---    conditions, check whether they hold, revise on flaws ("can it be
+---    broken?").
+--- 3. `critic` — rubric-based evaluation. Score per dimension and
+---    revise weak areas with targeted feedback ("is it well-crafted?").
 
 local S = require("alc_shapes")
 local T = S.T
@@ -50,7 +32,7 @@ local M = {}
 M.meta = {
     name = "robust_qa",
     version = "0.1.0",
-    description = "Three-phase QA pipeline — constraint-first solving, adversarial stress-test, rubric evaluation",
+    description = "Three-phase QA pipeline: constraint-first, adversarial test, rubric evaluation.",
     category = "pipeline",
 }
 
