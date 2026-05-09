@@ -1,16 +1,15 @@
---- orch_fixpipe — Deterministic Fixed Pipeline
---- Phases execute in strict order. Gate NG triggers retry up to max_retries.
---- Based on Lobster (OpenClaw) deterministic workflow pattern.
+--- orch_fixpipe(OrchFixpipe) — deterministic fixed-pipeline orchestration
 ---
---- Usage:
----   local orch = require("orch_fixpipe")
----   return orch.run(ctx)
+--- Phases execute in strict order. A gate NG triggers retry up to
+--- `max_retries`. Based on the Lobster (OpenClaw) deterministic workflow
+--- pattern.
 ---
---- ctx.task         (required): Task description
---- ctx.phases       (required): Phase definitions [{name, prompt, system, gate, ...}, ...]
---- ctx.max_retries  (optional): Gate NG retry limit (default: 3)
---- ctx.on_fail      (optional): "error" | "partial" (default: "error")
---- ctx.context_mode (optional): "summary" | "full" (default: "summary")
+--- ## Usage
+---
+--- ```lua
+--- local orch = require("orch_fixpipe")
+--- return orch.run(ctx)
+--- ```
 
 local S = require("alc_shapes")
 local T = S.T
