@@ -8,14 +8,37 @@ source: schelling_abm/init.lua
 generated: gen_docs (V0)
 ---
 
-# schelling_abm — Schelling Segregation Model
+# schelling_abm(SchellingABM) — Schelling segregation model
 
-> Agents of two types on a 2D grid. Each agent has a tolerance threshold: if the fraction of same-type neighbors is below threshold, the agent moves to a random empty cell.
+> Agents of two types on a 2D grid. Each agent has a tolerance threshold; if the fraction of same-type neighbors is below the threshold, the agent moves to a random empty cell. Even mild preferences (threshold ~0.3) produce strong macro-level segregation, demonstrating how micro-motives produce macro-behavior that no individual intended.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local schelling = require("schelling_abm")
+return schelling.run(ctx)
+```
+
+## References {#references}
+
+- Schelling, T. C. (1971). "Dynamic Models of Segregation". Journal
+  of Mathematical Sociology 1(2).
+- Schelling, T. C. (1978). "Micromotives and Macrobehavior". Norton.
+
+ctx.task (required): Description
+ctx.grid_size?: number Side length of square grid (default 20)
+ctx.threshold?: number Tolerance threshold (default 0.375)
+ctx.density?: number Fraction of cells occupied (default 0.8)
+ctx.type_ratio?: number Fraction of type A among agents (default 0.5)
+ctx.steps?: number Max steps (default 100)
+ctx.runs?: number MC runs (default 100)
 
 ## Parameters {#parameters}
 
