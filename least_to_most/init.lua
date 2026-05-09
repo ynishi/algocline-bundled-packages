@@ -1,17 +1,20 @@
---- Least-to-Most — progressive subproblem decomposition
---- Decomposes a complex problem into subproblems ordered from simplest to
---- most complex, then solves each in sequence, using previous solutions
---- as context for the next.
+--- least_to_most(LeastToMost) — progressive subproblem decomposition
 ---
---- Based on: Zhou et al., "Least-to-Most Prompting Enables Complex Reasoning
---- in Large Language Models" (2022, arXiv:2205.10625)
+--- Decomposes a complex problem into subproblems ordered from simplest
+--- to most complex, then solves each in sequence using previous
+--- solutions as context for the next.
 ---
---- Usage:
----   local ltm = require("least_to_most")
----   return ltm.run(ctx)
+--- ## Usage
 ---
---- ctx.task (required): The problem to solve
---- ctx.max_subproblems: Maximum number of subproblems (default: 5)
+--- ```lua
+--- local ltm = require("least_to_most")
+--- return ltm.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - Zhou, D. et al. (2022). "Least-to-Most Prompting Enables Complex
+---   Reasoning in Large Language Models". https://arxiv.org/abs/2205.10625
 
 local S = require("alc_shapes")
 local T = S.T
@@ -22,7 +25,7 @@ local M = {}
 M.meta = {
     name = "least_to_most",
     version = "0.1.0",
-    description = "Least-to-Most — decompose into ordered subproblems, solve simplest first, build up",
+    description = "Decompose into ordered subproblems and solve simplest first, building up.",
     category = "reasoning",
 }
 
