@@ -1,86 +1,66 @@
---- recipe_quick_vote — Adaptive-stop majority vote with SPRT gate
+--- recipe_quick_vote(RecipeQuickVote) — adaptive-stop majority vote with SPRT gate
 ---
---- Fills the Quick slot of the recipe family. Given a task that admits a
+--- Fills the Quick slot of the recipe family. For a task admitting a
 --- single short answer, samples independent reasoning paths one at a
 --- time and exits as soon as SPRT declares the leading answer confirmed
---- (H1 accepted) or rejected (H0 accepted) at the declared (α, β) error
---- rates. Truncates at max_n if neither boundary is hit — that case is
---- surfaced as `outcome = "truncated"` and `needs_investigation = true`
---- so the consumer can route to recipe_safe_panel / recipe_deep_panel.
+--- (H1 accepted) or rejected (H0 accepted) at the declared `(α, β)`
+--- error rates. Truncates at `max_n` if neither boundary is hit; that
+--- case surfaces as `outcome = "truncated"` and
+--- `needs_investigation = true` so the consumer can route to
+--- `recipe_safe_panel` / `recipe_deep_panel`.
 ---
---- Positioning in the recipe family:
+--- ## Usage
 ---
----   recipe_safe_panel : fixed n (≈ 5–7), cheap heuristic majority.
----                       ~8 LLM calls for math_basic, no early stop.
----   recipe_deep_panel : per-branch ab_mcts tree search.
----                       ~52 LLM calls @ N=3, budget=8.
----   recipe_quick_vote : adaptive stop via SPRT.
----                       E[N] is Wald–Wolfowitz minimal at declared
----                       (α, β). On easy tasks exits at 3–4 calls;
----                       on hard tasks truncates with an explicit
----                       statistical verdict the consumer can escalate.
+--- ```lua
+--- local recipe = require("recipe_quick_vote")
+--- return recipe.run({
+---     task = "What is 17 × 23?",
+---     p0 = 0.5, p1 = 0.80,
+---     alpha = 0.05, beta = 0.10,
+---     max_n = 8, min_n = 3,
+--- })
+--- ```
 ---
---- Pipeline:
+--- ## Algorithm
 ---
----   Stage 1: Sample 1 — sc-style reasoning + extraction.
----            The normalized extracted answer is committed as the
----            "leader". One LLM call for reasoning + one for
----            extraction (mirrors sc's pattern).
+--- 1. Sample 1 — `sc`-style reasoning + extraction; the normalized
+---    answer is committed as the "leader" (one LLM call for reasoning,
+---    one for extraction).
+--- 2. For samples `2..max_n`, generate reasoning with a diversity hint,
+---    extract, set `outcome = (normalized_answer == leader_norm)`, call
+---    `sprt.observe`. Once `i >= min_n`, inspect `sprt.decide`:
+---    `accept_h1 → "confirmed"`, `accept_h0 → "rejected"`, otherwise
+---    keep sampling.
+--- 3. If the loop reaches `max_n` without a verdict, `outcome =
+---    "truncated"` and `needs_investigation = true`.
 ---
----   Stage 2..max_n: For each subsequent sample:
----            - Generate reasoning with a diversity hint.
----            - Extract the final answer.
----            - outcome = (normalized_answer == leader_norm).
----            - sprt.observe(state, outcome).
----            - Once i >= min_n, check sprt.decide(state):
----                accept_h1 → outcome="confirmed", break.
----                accept_h0 → outcome="rejected",  break.
----                continue  → keep sampling.
+--- ## Theoretical foundations
 ---
----   Stage 3: If the loop reaches max_n without a verdict,
----            outcome="truncated" and needs_investigation=true.
+--- SPRT tests `H0: p_agree ≤ p0` against `H1: p_agree ≥ p1`, where
+--- `p_agree` is the probability that a newly drawn independent sample
+--- agrees with the first sample's answer. Under a well-posed task with
+--- a high-confidence answer, `p_agree ≈ per-sample accuracy`, so the
+--- recipe doubles as a per-task p-estimate gate that can feed
+--- `condorcet` / `recipe_safe_panel` downstream.
 ---
---- Hypothesis framing:
+--- ## Caveats
 ---
----   SPRT tests H0: p_agree ≤ p0 against H1: p_agree ≥ p1 where p_agree
----   is the probability that a newly drawn independent sample agrees
----   with the first sample's answer. Under a well-posed task with a
----   high-confidence answer, p_agree ≈ per-sample accuracy, so the
----   recipe doubles as a per-task p-estimate gate that can feed
----   condorcet / recipe_safe_panel downstream.
+--- POC simplification: a single committed leader from sample 1; a
+--- runner-up that overtakes the leader is not tracked separately and
+--- surfaces as `accept_h0` (leader rejected) so the consumer can
+--- re-enter with the new plurality. Full multi-arm dynamic-leader SPRT
+--- is deferred to v0.2.
 ---
---- POC simplification (see M.caveats):
+--- ## Comparison with related packages
 ---
----   * Single committed leader from sample 1. A runner-up that overtakes
----     the leader is NOT tracked separately — it surfaces as
----     accept_h0 (leader rejected) so the consumer can re-enter with
----     the new plurality. Full multi-arm dynamic-leader SPRT is
----     deferred to a v0.2 iteration.
----
---- Usage:
----   local recipe = require("recipe_quick_vote")
----   return recipe.run({
----       task = "What is 17 × 23?",
----       p0 = 0.5, p1 = 0.80,
----       alpha = 0.05, beta = 0.10,
----       max_n = 8, min_n = 3,
----   })
----
---- ctx.task (required): Task description.
---- ctx.p0 (default 0.5): Null agreement rate. Majority vote at p_agree
----                        ≤ p0 is no better than coin — reject leader.
---- ctx.p1 (default 0.80): Target agreement rate under H1 (confirmed).
---- ctx.alpha (default 0.05): Type-I error rate (false confirm).
---- ctx.beta  (default 0.10): Type-II error rate (false reject).
---- ctx.max_n (default 10): Safety cap on sample count.
---- ctx.min_n (default 3):  Minimum total samples (leader + agreement
----                          observations) before SPRT can fire. Must
----                          be >= 2; SPRT consumes min_n - 1
----                          observations before the first decide()
----                          call. Example: min_n=3 ⇒ leader + 2
----                          observations must accumulate before the
----                          recipe inspects SPRT verdict.
---- ctx.gen_tokens (default 400): Max tokens per reasoning path.
+--- - `recipe_safe_panel` — fixed `n ≈ 5-7`, cheap heuristic majority;
+---   ~8 LLM calls for `math_basic`, no early stop.
+--- - `recipe_deep_panel` — per-branch `ab_mcts` tree search; ~52 LLM
+---   calls at `N=3, budget=8`.
+--- - `recipe_quick_vote` — adaptive stop via SPRT. `E[N]` is
+---   Wald-Wolfowitz minimal at the declared `(α, β)`. On easy tasks
+---   exits at 3-4 calls; on hard tasks truncates with an explicit
+---   statistical verdict the consumer can escalate.
 
 local M = {}
 
