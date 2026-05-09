@@ -1,19 +1,21 @@
---- Triad — adversarial 3-role debate with judge arbitration
+--- triad(Triad) — adversarial 3-role debate with judge arbitration
 ---
---- Three distinct roles: Proponent (argues for), Opponent (argues against),
---- Judge (arbitrates). Multiple rounds of attack/defense, then final verdict.
+--- Three distinct roles: Proponent (argues for), Opponent (argues
+--- against), and Judge (arbitrates). Multiple rounds of attack and
+--- defense, then a final verdict.
 ---
---- Based on: Du et al., "Improving Factuality and Reasoning in Language
---- Models through Multiagent Debate" (2023, arXiv:2305.14325)
+--- ## Usage
 ---
---- Usage:
----   local triad = require("triad")
----   return triad.run(ctx)
+--- ```lua
+--- local triad = require("triad")
+--- return triad.run(ctx)
+--- ```
 ---
---- ctx.task (required): The question or claim to debate
---- ctx.rounds: Number of debate rounds (default: 3)
---- ctx.gen_tokens: Max tokens per argument (default: 400)
---- ctx.judge_tokens: Max tokens for final verdict (default: 500)
+--- ## References
+---
+--- - Du, Y. et al. (2023). "Improving Factuality and Reasoning in
+---   Language Models through Multiagent Debate".
+---   https://arxiv.org/abs/2305.14325
 
 local S = require("alc_shapes")
 local T = S.T

@@ -8,14 +8,29 @@ source: triad/init.lua
 generated: gen_docs (V0)
 ---
 
-# Triad — adversarial 3-role debate with judge arbitration
+# triad(Triad) — adversarial 3-role debate with judge arbitration
 
-> Three distinct roles: Proponent (argues for), Opponent (argues against), Judge (arbitrates). Multiple rounds of attack/defense, then final verdict.
+> Three distinct roles: Proponent (argues for), Opponent (argues against), and Judge (arbitrates). Multiple rounds of attack and defense, then a final verdict.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local triad = require("triad")
+return triad.run(ctx)
+```
+
+## References {#references}
+
+- Du, Y. et al. (2023). "Improving Factuality and Reasoning in
+  Language Models through Multiagent Debate".
+  https://arxiv.org/abs/2305.14325
 
 ## Parameters {#parameters}
 
