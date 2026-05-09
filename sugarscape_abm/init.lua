@@ -1,23 +1,25 @@
---- sugarscape_abm — Sugarscape Agent-Based Model
+--- sugarscape_abm(SugarscapeABM) — Sugarscape agent-based model
 ---
---- Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar
---- capacity and regrows at a fixed rate. Agents have metabolism (sugar
---- consumed per step) and vision (how far they can see). Each step,
---- an agent looks in four cardinal directions up to its vision range
---- and moves to the nearest unoccupied cell with the most sugar.
---- Agents die when sugar wealth reaches zero.
+--- Agents on a 2D toroidal grid forage for sugar. Each cell has a
+--- sugar capacity and regrows at a fixed rate. Agents have metabolism
+--- (sugar consumed per step) and vision (how far they can see). Each
+--- step an agent looks in four cardinal directions up to its vision
+--- range and moves to the nearest unoccupied cell with the most
+--- sugar. Agents die when sugar wealth reaches zero. Emergent
+--- phenomena include wealth inequality (Gini coefficient), Pareto-like
+--- skewed distributions, carrying capacity, and spatial clustering.
 ---
---- Emergent phenomena: wealth inequality (Gini coefficient),
---- skewed wealth distributions (Pareto-like), carrying capacity,
---- spatial clustering near sugar peaks.
+--- ## Usage
 ---
---- Based on:
----   Epstein & Axtell, "Growing Artificial Societies: Social Science
----   from the Bottom Up", MIT Press, 1996
+--- ```lua
+--- local sugarscape = require("sugarscape_abm")
+--- return sugarscape.run(ctx)
+--- ```
 ---
---- Usage:
----   local sugarscape = require("sugarscape_abm")
----   return sugarscape.run(ctx)
+--- ## References
+---
+--- - Epstein, J. M., Axtell, R. (1996). "Growing Artificial Societies:
+---   Social Science from the Bottom Up". MIT Press.
 ---
 --- ctx.task?: string Description
 --- ctx.grid_size?: number Side length of square grid (default 25)

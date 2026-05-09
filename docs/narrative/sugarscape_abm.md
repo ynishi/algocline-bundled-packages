@@ -8,14 +8,39 @@ source: sugarscape_abm/init.lua
 generated: gen_docs (V0)
 ---
 
-# sugarscape_abm — Sugarscape Agent-Based Model
+# sugarscape_abm(SugarscapeABM) — Sugarscape agent-based model
 
-> Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step, an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero.
+> Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero. Emergent phenomena include wealth inequality (Gini coefficient), Pareto-like skewed distributions, carrying capacity, and spatial clustering.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sugarscape = require("sugarscape_abm")
+return sugarscape.run(ctx)
+```
+
+## References {#references}
+
+- Epstein, J. M., Axtell, R. (1996). "Growing Artificial Societies:
+  Social Science from the Bottom Up". MIT Press.
+
+ctx.task?: string Description
+ctx.grid_size?: number Side length of square grid (default 25)
+ctx.n_agents?: number Initial population (default 100)
+ctx.max_sugar?: number Peak sugar capacity per cell (default 4)
+ctx.regrow_rate?: number Sugar regrowth per step (default 1)
+ctx.metabolism_range?: {number, number} Min/max metabolism (default {1, 4})
+ctx.vision_range?: {number, number} Min/max vision (default {1, 6})
+ctx.initial_wealth_range?: {number, number} (default {5, 25})
+ctx.steps?: number (default 100)
+ctx.runs?: number MC runs (default 100)
 
 ## Parameters {#parameters}
 
