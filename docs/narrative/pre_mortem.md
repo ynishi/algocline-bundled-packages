@@ -8,14 +8,39 @@ source: pre_mortem/init.lua
 generated: gen_docs (V0)
 ---
 
-# pre_mortem — feasibility-gated proposal filtering
+# pre_mortem(PreMortem) — feasibility-gated proposal filtering
 
-> Combinator package: orchestrates factscore, contrastive, calibrate to validate proposals BEFORE output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes/filters proposals with unverified prerequisites.
+> Combinator package that orchestrates `factscore`, `contrastive`, and `calibrate` to validate proposals before output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes or filters proposals with unverified prerequisites.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local pre_mortem = require("pre_mortem")
+return pre_mortem.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `factscore` — decompose each proposal into atomic prerequisites
+   and label each as SUPPORTED / UNSUPPORTED / UNCERTAIN.
+2. `contrastive` — for each proposal generate "why it would be
+   adopted" vs "why it would be rejected" reasoning pairs.
+3. `calibrate` — judge VERDICT (adopt / reject) with CONFIDENCE as a
+   meta-reliability gate. High confidence + adopt → accepted, high
+   confidence + reject → rejected, low confidence →
+   `needs_investigation` (escalate).
+4. `rank` — pairwise tournament of accepted proposals to produce a
+   final ordering by effectiveness.
+ctx.n_contrasts: Number of contrastive pairs per proposal (default: 1)
+ctx.extract_tokens: Max tokens for prerequisite extraction (default: 500)
+ctx.verify_tokens: Max tokens per prerequisite verification (default: 200)
 
 ## Parameters {#parameters}
 

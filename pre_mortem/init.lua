@@ -1,38 +1,36 @@
---- pre_mortem — feasibility-gated proposal filtering
+--- pre_mortem(PreMortem) — feasibility-gated proposal filtering
 ---
---- Combinator package: orchestrates factscore, contrastive, calibrate
---- to validate proposals BEFORE output. Decomposes each proposal into
---- prerequisite assumptions, checks verification status, generates
---- rejection reasons pre-emptively, and demotes/filters proposals
---- with unverified prerequisites.
+--- Combinator package that orchestrates `factscore`, `contrastive`, and
+--- `calibrate` to validate proposals before output. Decomposes each
+--- proposal into prerequisite assumptions, checks verification status,
+--- generates rejection reasons pre-emptively, and demotes or filters
+--- proposals with unverified prerequisites.
 ---
---- Problem solved: LLMs propose solutions with high confidence ratings
---- without checking feasibility (e.g., "MCP Sampling support" rated 9/10
---- when the host platform doesn't support it). This strategy forces
---- explicit prerequisite enumeration and verification-state labeling
---- before any rating is assigned.
+--- LLMs often propose solutions with high confidence ratings without
+--- checking feasibility (e.g. "MCP Sampling support" rated 9/10 when
+--- the host platform doesn't support it). This strategy forces explicit
+--- prerequisite enumeration and verification-state labeling before any
+--- rating is assigned.
 ---
---- Pipeline:
----   Step 1: factscore   — decompose each proposal into atomic prerequisites,
----                         label each as SUPPORTED/UNSUPPORTED/UNCERTAIN
----   Step 2: contrastive — for each proposal, generate "why it would be adopted"
----                         vs "why it would be rejected" reasoning pairs
----   Step 3: calibrate   — judge VERDICT (adopt/reject) with CONFIDENCE as
----                         meta-reliability gate. High confidence + adopt → accepted,
----                         high confidence + reject → rejected,
----                         low confidence → needs_investigation (escalate)
----   Step 4: rank        — pairwise tournament of accepted proposals to produce
----                         a final ordering by effectiveness
+--- ## Usage
 ---
---- Usage:
----   local pre_mortem = require("pre_mortem")
----   return pre_mortem.run(ctx)
+--- ```lua
+--- local pre_mortem = require("pre_mortem")
+--- return pre_mortem.run(ctx)
+--- ```
 ---
---- ctx.task (required): The original task/question that proposals address
---- ctx.proposals (required): A list of proposal strings, OR a single string
----     containing multiple proposals (will be decomposed by LLM)
---- ctx.context: Additional context for verification (e.g., known constraints)
---- ctx.threshold: Confidence threshold for acceptance (default: 0.6)
+--- ## Algorithm
+---
+--- 1. `factscore` — decompose each proposal into atomic prerequisites
+---    and label each as SUPPORTED / UNSUPPORTED / UNCERTAIN.
+--- 2. `contrastive` — for each proposal generate "why it would be
+---    adopted" vs "why it would be rejected" reasoning pairs.
+--- 3. `calibrate` — judge VERDICT (adopt / reject) with CONFIDENCE as a
+---    meta-reliability gate. High confidence + adopt → accepted, high
+---    confidence + reject → rejected, low confidence →
+---    `needs_investigation` (escalate).
+--- 4. `rank` — pairwise tournament of accepted proposals to produce a
+---    final ordering by effectiveness.
 --- ctx.n_contrasts: Number of contrastive pairs per proposal (default: 1)
 --- ctx.extract_tokens: Max tokens for prerequisite extraction (default: 500)
 --- ctx.verify_tokens: Max tokens per prerequisite verification (default: 200)
