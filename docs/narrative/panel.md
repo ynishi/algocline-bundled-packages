@@ -3,18 +3,26 @@ name: panel
 version: 0.1.0
 category: synthesis
 result_shape: paneled
-description: "Multi-perspective deliberation — distinct roles engage, moderator synthesizes"
+description: "Multi-perspective deliberation with distinct roles and moderator synthesis."
 source: panel/init.lua
 generated: gen_docs (V0)
 ---
 
-# Panel — multi-perspective deliberation
+# panel(Panel) — multi-perspective deliberation with moderator synthesis
 
-> Multiple roles present positions responding to prior arguments, then a moderator synthesizes.
+> Multiple roles present positions, each responding to prior arguments, and a moderator synthesizes the final answer from the deliberation.
 
 ## Contents
 
+- [Usage](#usage)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local panel = require("panel")
+return panel.run(ctx)
+```
 
 ## Result {#result}
 

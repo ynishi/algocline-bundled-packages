@@ -1,12 +1,14 @@
---- Panel — multi-perspective deliberation
---- Multiple roles present positions responding to prior arguments, then a moderator synthesizes.
+--- panel(Panel) — multi-perspective deliberation with moderator synthesis
 ---
---- Usage:
----   local panel = require("panel")
----   return panel.run(ctx)
+--- Multiple roles present positions, each responding to prior arguments,
+--- and a moderator synthesizes the final answer from the deliberation.
 ---
---- ctx.task (required): The topic/question
---- ctx.roles: List of role names (default: {"advocate", "critic", "pragmatist"})
+--- ## Usage
+---
+--- ```lua
+--- local panel = require("panel")
+--- return panel.run(ctx)
+--- ```
 
 local M = {}
 
@@ -14,7 +16,7 @@ local M = {}
 M.meta = {
     name = "panel",
     version = "0.1.0",
-    description = "Multi-perspective deliberation — distinct roles engage, moderator synthesizes",
+    description = "Multi-perspective deliberation with distinct roles and moderator synthesis.",
     category = "synthesis",
 }
 
