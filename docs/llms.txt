@@ -95,7 +95,7 @@
 
 ## pipeline
 
-- [robust_qa](narrative/robust_qa.md): Three-phase QA pipeline — constraint-first solving, adversarial stress-test, rubric evaluation
+- [robust_qa](narrative/robust_qa.md): Three-phase QA pipeline: constraint-first, adversarial test, rubric evaluation.
 
 ## planning
 

@@ -1,18 +1,19 @@
---- router_daao — Difficulty-Aware Agent Orchestration Router
---- Classifies task difficulty with a single LLM call, then maps to
---- optimal strategy/depth/parameters via deterministic lookup.
+--- router_daao(RouterDAAO) — difficulty-aware agent orchestration router
 ---
---- Based on DAAO (arxiv 2509.11079): lightweight difficulty estimation
---- followed by adaptive resource allocation.
+--- Classifies task difficulty with a single LLM call, then maps to the
+--- optimal strategy / depth / parameters via deterministic lookup
+--- (lightweight difficulty estimation + adaptive resource allocation).
 ---
---- Usage:
----   local router = require("router_daao")
----   return router.run(ctx)
+--- ## Usage
 ---
---- ctx.task       (required): Task description to route
---- ctx.candidates (optional): List of candidate strategy names or {name=...} tables
---- ctx.profiles   (optional): Custom difficulty→profile mapping table
----   Each profile may include confidence (0-1) and fallback_confidence (0-1)
+--- ```lua
+--- local router = require("router_daao")
+--- return router.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - DAAO. https://arxiv.org/abs/2509.11079
 
 local S = require("alc_shapes")
 local T = S.T

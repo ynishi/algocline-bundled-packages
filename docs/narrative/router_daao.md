@@ -8,14 +8,27 @@ source: router_daao/init.lua
 generated: gen_docs (V0)
 ---
 
-# router_daao — Difficulty-Aware Agent Orchestration Router
+# router_daao(RouterDAAO) — difficulty-aware agent orchestration router
 
-> Classifies task difficulty with a single LLM call, then maps to optimal strategy/depth/parameters via deterministic lookup.
+> Classifies task difficulty with a single LLM call, then maps to the optimal strategy / depth / parameters via deterministic lookup (lightweight difficulty estimation + adaptive resource allocation).
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local router = require("router_daao")
+return router.run(ctx)
+```
+
+## References {#references}
+
+- DAAO. https://arxiv.org/abs/2509.11079
 
 ## Parameters {#parameters}
 
