@@ -3,19 +3,47 @@ name: cascade
 version: 0.1.0
 category: routing
 result_shape: "shape { answer: string, confidence: number, escalated: boolean, history: array of shape { answer: string, confidence: number, detail: any, level: number, name: string }, level_used: number, max_level: number, threshold: number }"
-description: "Multi-level difficulty routing — escalate from fast to deep only when confidence is low"
+description: "Multi-level routing: escalate from fast to deep only when confidence is low."
 source: cascade/init.lua
 generated: gen_docs (V0)
 ---
 
-# cascade — Multi-level difficulty routing with confidence gating
+# cascade(Cascade) — multi-level difficulty routing with confidence gating
 
-> Routes problems through escalating complexity levels. Starts with the simplest (cheapest) approach; if confidence is below threshold, escalates to a more sophisticated strategy. Minimizes compute for easy problems while ensuring quality for hard ones.
+> Routes problems through escalating complexity levels. Starts with the cheapest approach; if confidence is below the threshold, escalates to a more sophisticated strategy. Minimizes compute for easy problems while preserving quality for hard ones.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local cascade = require("cascade")
+return cascade.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Level 1 (fast) — direct zero-shot answer plus self-assessed
+   confidence.
+2. Level 2 (medium) — chain-of-thought with verification.
+3. Level 3 (deep) — multi-perspective ensemble with ranking.
+
+The cascade exits as soon as the level's reported confidence reaches
+`threshold`, or after `max_level`.
+
+## References {#references}
+
+- Chen, L. et al. (2023). "FrugalGPT: How to Use Large Language Models
+  While Reducing Cost and Improving Performance".
+  https://arxiv.org/abs/2305.05176
+- Lu, K. et al. (2023). "Routing to the Expert: Efficient Reward-guided
+  Ensemble of Large Language Models". https://arxiv.org/abs/2311.08692
 
 ## Parameters {#parameters}
 

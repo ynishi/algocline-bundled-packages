@@ -1,29 +1,34 @@
---- cascade — Multi-level difficulty routing with confidence gating
+--- cascade(Cascade) — multi-level difficulty routing with confidence gating
 ---
---- Routes problems through escalating complexity levels. Starts with
---- the simplest (cheapest) approach; if confidence is below threshold,
---- escalates to a more sophisticated strategy. Minimizes compute for
---- easy problems while ensuring quality for hard ones.
+--- Routes problems through escalating complexity levels. Starts with the
+--- cheapest approach; if confidence is below the threshold, escalates to
+--- a more sophisticated strategy. Minimizes compute for easy problems
+--- while preserving quality for hard ones.
 ---
---- Based on: "FrugalGPT: How to Use Large Language Models While Reducing
----            Cost and Improving Performance" (Chen et al., arXiv 2305.05176, 2023)
----            + "Routing to the Expert: Efficient Reward-guided Ensemble of
----            Large Language Models" (Lu et al., arXiv 2311.08692, 2023)
+--- ## Usage
 ---
---- Pipeline:
----   Level 1 (fast):   Direct zero-shot answer + self-assessed confidence
----   Level 2 (medium): Chain-of-thought with verification
----   Level 3 (deep):   Multi-perspective ensemble with ranking
+--- ```lua
+--- local cascade = require("cascade")
+--- return cascade.run(ctx)
+--- ```
 ---
---- Usage:
----   local cascade = require("cascade")
----   return cascade.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task/question to solve
---- ctx.threshold: Confidence threshold to stop (default: 0.8)
---- ctx.max_level: Maximum cascade level (default: 3)
---- ctx.gen_tokens: Max tokens per generation (default: 400)
---- ctx.verify_tokens: Max tokens for verification (default: 300)
+--- 1. Level 1 (fast) — direct zero-shot answer plus self-assessed
+---    confidence.
+--- 2. Level 2 (medium) — chain-of-thought with verification.
+--- 3. Level 3 (deep) — multi-perspective ensemble with ranking.
+---
+--- The cascade exits as soon as the level's reported confidence reaches
+--- `threshold`, or after `max_level`.
+---
+--- ## References
+---
+--- - Chen, L. et al. (2023). "FrugalGPT: How to Use Large Language Models
+---   While Reducing Cost and Improving Performance".
+---   https://arxiv.org/abs/2305.05176
+--- - Lu, K. et al. (2023). "Routing to the Expert: Efficient Reward-guided
+---   Ensemble of Large Language Models". https://arxiv.org/abs/2311.08692
 
 local S = require("alc_shapes")
 local T = S.T
@@ -34,7 +39,7 @@ local M = {}
 M.meta = {
     name = "cascade",
     version = "0.1.0",
-    description = "Multi-level difficulty routing — escalate from fast to deep only when confidence is low",
+    description = "Multi-level routing: escalate from fast to deep only when confidence is low.",
     category = "routing",
 }
 

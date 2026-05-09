@@ -147,7 +147,7 @@
 
 ## routing
 
-- [cascade](narrative/cascade.md): Multi-level difficulty routing — escalate from fast to deep only when confidence is low
+- [cascade](narrative/cascade.md): Multi-level routing: escalate from fast to deep only when confidence is low.
 - [router_capability](narrative/router_capability.md): Capability-based routing using agent registry metadata matching. Extracts task requirements via LLM, then scores against agent capabilities using Jaccard similarity. Based on Dynamic Agent Registry...
 - [router_daao](narrative/router_daao.md): Difficulty-aware task routing based on DAAO (arxiv 2509.11079). Classifies task difficulty with a single LLM call, then maps to optimal strategy/depth/parameters via deterministic lookup.
 - [router_semantic](narrative/router_semantic.md): Keyword/pattern-based routing with LLM fallback. Zero LLM calls for clear matches, one call for ambiguous cases. Based on Semantic Router pattern (Microsoft Multi-Agent Reference Architecture).

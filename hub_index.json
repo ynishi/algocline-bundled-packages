@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:55:38Z",
+  "updated_at": "2026-05-09T02:56:26Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -161,9 +161,9 @@
     {
       "name": "cascade",
       "version": "0.1.0",
-      "description": "Multi-level difficulty routing — escalate from fast to deep only when confidence is low",
+      "description": "Multi-level routing: escalate from fast to deep only when confidence is low.",
       "category": "routing",
-      "docstring": "cascade — Multi-level difficulty routing with confidence gating\n\nRoutes problems through escalating complexity levels. Starts with\nthe simplest (cheapest) approach; if confidence is below threshold,\nescalates to a more sophisticated strategy. Minimizes compute for\neasy problems while ensuring quality for hard ones.\n\nBased on: \"FrugalGPT: How to Use Large Language Models While Reducing\nCost and Improving Performance\" (Chen et al., arXiv 2305.05176, 2023)\n+ \"Routing to the Expert: Efficient Reward-guided Ensemble of\nLarge Language Models\" (Lu et al., arXiv 2311.08692, 2023)\n\nPipeline:\nLevel 1 (fast):   Direct zero-shot answer + self-assessed confidence\nLevel 2 (medium): Chain-of-thought with verification\nLevel 3 (deep):   Multi-perspective ensemble with ranking\n\nUsage:\nlocal cascade = require(\"cascade\")\nreturn cascade.run(ctx)\n\nctx.task (required): The task/question to solve\nctx.threshold: Confidence threshold to stop (default: 0.8)\nctx.max_level: Maximum cascade level (default: 3)\nctx.gen_tokens: Max tokens per generation (default: 400)\nctx.verify_tokens: Max tokens for verification (default: 300)",
+      "docstring": "cascade(Cascade) — multi-level difficulty routing with confidence gating\n\nRoutes problems through escalating complexity levels. Starts with the\ncheapest approach; if confidence is below the threshold, escalates to\na more sophisticated strategy. Minimizes compute for easy problems\nwhile preserving quality for hard ones.\n\n## Usage\n\n```lua\nlocal cascade = require(\"cascade\")\nreturn cascade.run(ctx)\n```\n\n## Algorithm\n\n1. Level 1 (fast) — direct zero-shot answer plus self-assessed\nconfidence.\n2. Level 2 (medium) — chain-of-thought with verification.\n3. Level 3 (deep) — multi-perspective ensemble with ranking.\n\nThe cascade exits as soon as the level's reported confidence reaches\n`threshold`, or after `max_level`.\n\n## References\n\n- Chen, L. et al. (2023). \"FrugalGPT: How to Use Large Language Models\nWhile Reducing Cost and Improving Performance\".\nhttps://arxiv.org/abs/2305.05176\n- Lu, K. et al. (2023). \"Routing to the Expert: Efficient Reward-guided\nEnsemble of Large Language Models\". https://arxiv.org/abs/2311.08692",
       "source": {
         "type": "unknown"
       },
