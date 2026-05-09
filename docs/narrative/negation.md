@@ -8,14 +8,41 @@ source: negation/init.lua
 generated: gen_docs (V0)
 ---
 
-# negation — Adversarial self-test via destruction conditions
+# negation(Negation) — adversarial self-test via destruction conditions
 
-> Given an answer, generates "destruction conditions": specific scenarios or facts that, if true, would invalidate the answer. Then attempts to verify whether any destruction condition actually holds. Surviving answers are strengthened; refuted answers are revised.
+> Given an answer, generates destruction conditions (specific scenarios or facts that would invalidate the answer if true), then attempts to verify whether any condition actually holds. Surviving answers are strengthened; refuted answers are revised.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local negation = require("negation")
+return negation.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate — produce an initial answer (or use `ctx.answer`).
+2. Negate — generate destruction conditions for the answer.
+3. Verify — check whether any condition holds.
+4. Revise — if any condition holds, revise the answer.
+
+## References {#references}
+
+- Huang, J. et al. (2023). "Large Language Models Cannot Self-Correct
+  Reasoning Yet". https://arxiv.org/abs/2310.01798
+- Red-teaming / adversarial testing methodology.
+ctx.max_conditions: Max destruction conditions to generate (default: 5)
+ctx.gen_tokens: Max tokens for generation (default: 600)
+ctx.verify_tokens: Max tokens per condition verification (default: 200)
+ctx.revise_tokens: Max tokens for revision (default: 600)
 
 ## Parameters {#parameters}
 

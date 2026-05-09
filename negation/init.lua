@@ -1,28 +1,29 @@
---- negation — Adversarial self-test via destruction conditions
+--- negation(Negation) — adversarial self-test via destruction conditions
 ---
---- Given an answer, generates "destruction conditions": specific scenarios
---- or facts that, if true, would invalidate the answer. Then attempts to
---- verify whether any destruction condition actually holds. Surviving
---- answers are strengthened; refuted answers are revised.
+--- Given an answer, generates destruction conditions (specific scenarios
+--- or facts that would invalidate the answer if true), then attempts to
+--- verify whether any condition actually holds. Surviving answers are
+--- strengthened; refuted answers are revised.
 ---
---- Based on: "Large Language Models Cannot Self-Correct Reasoning Yet"
----            (Huang et al., arXiv 2310.01798, 2023) — external feedback
----            is required for effective self-correction. Negation provides
----            structured external-style feedback via adversarial probing.
----            + Red-teaming / adversarial testing methodology
+--- ## Usage
 ---
---- Pipeline:
----   Step 1: generate   — produce initial answer
----   Step 2: negate     — generate destruction conditions
----   Step 3: verify     — check if any condition holds
----   Step 4: revise     — if conditions hold, revise the answer
+--- ```lua
+--- local negation = require("negation")
+--- return negation.run(ctx)
+--- ```
 ---
---- Usage:
----   local negation = require("negation")
----   return negation.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task/question to solve
---- ctx.answer: Pre-supplied answer to test (default: nil → auto-generate)
+--- 1. Generate — produce an initial answer (or use `ctx.answer`).
+--- 2. Negate — generate destruction conditions for the answer.
+--- 3. Verify — check whether any condition holds.
+--- 4. Revise — if any condition holds, revise the answer.
+---
+--- ## References
+---
+--- - Huang, J. et al. (2023). "Large Language Models Cannot Self-Correct
+---   Reasoning Yet". https://arxiv.org/abs/2310.01798
+--- - Red-teaming / adversarial testing methodology.
 --- ctx.max_conditions: Max destruction conditions to generate (default: 5)
 --- ctx.gen_tokens: Max tokens for generation (default: 600)
 --- ctx.verify_tokens: Max tokens per condition verification (default: 200)
