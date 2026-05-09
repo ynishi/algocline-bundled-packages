@@ -1,53 +1,54 @@
---- listwise_rank — Zero-shot Listwise Reranking with Sliding Window
+--- listwise_rank(ListwiseRank) — zero-shot listwise reranking with sliding window
 ---
---- Ranks N pre-existing candidates by asking the LLM to output a permutation
---- of all candidates in a single call. For N exceeding the context window,
---- a sliding-window strategy progressively reranks overlapping windows from
---- the tail back to the head, merging the partial permutations into a final
---- order.
+--- Ranks N pre-existing candidates by asking the LLM to output a
+--- permutation of all candidates in a single call. For N exceeding the
+--- context window, a sliding-window strategy progressively reranks
+--- overlapping windows from the tail back to the head, merging the
+--- partial permutations into a final order.
 ---
---- Key difference from pointwise scoring (the dominant failure mode):
----   pointwise — asks the LLM to output an absolute score (e.g. 0-10) per
----               candidate. The LLM's number-generation prior anchors output
----               to the middle of the scale (typically 5-8), compressing
----               variance and making any fixed threshold either kill nothing
----               or kill everything. The "calibration problem" of LLM-as-Judge.
----   listwise — asks the LLM to output an ORDERING. Only the relative order
----               is asked, so calibration is moot. Empirically dominates
----               pointwise on TREC-DL and BEIR.
+--- ## Usage
 ---
---- Mathematical advantage:
----   Resolves the calibration problem by reformulating ranking as a permutation
----   generation task instead of an absolute scoring task. The LLM never has
----   to commit to a numeric value; it only commits to an order.
+--- ```lua
+--- local lr = require("listwise_rank")
+--- return lr.run(ctx)
+--- ```
 ---
---- Empirical results (from RankGPT, Sun et al.):
----   - GPT-4 with RankGPT achieves SOTA zero-shot reranking on TREC-DL19/20.
----   - Outperforms supervised baselines (monoT5-3B) and pointwise LLM
----     baselines on BEIR benchmarks.
----   - Knowledge distillable into smaller open-source models (RankZephyr,
----     RankVicuna) which retain most of the effectiveness.
+--- ## Theoretical foundations
 ---
---- Based on:
----   Sun et al., "Is ChatGPT Good at Search? Investigating Large Language
----     Models as Re-Ranking Agents" (EMNLP 2023, arXiv:2304.09542)
----   Ma et al., "Zero-Shot Listwise Document Reranking with a Large Language
----     Model" (arXiv:2305.02156)
----   Pradeep et al., "RankZephyr: Effective and Robust Zero-Shot Listwise
----     Reranking is a Breeze!" (arXiv:2312.02724)
+--- Resolves the calibration problem by reformulating ranking as
+--- permutation generation rather than absolute scoring; the LLM never
+--- commits to a numeric value, only to an order.
 ---
---- Usage:
----   local lr = require("listwise_rank")
----   return lr.run(ctx)
+--- ## Comparison with related packages
 ---
---- ctx.task (required): The criterion for ranking (e.g. "relevance to X",
----     "quality of business idea", "factual accuracy")
---- ctx.candidates (required): array of candidate texts to rank
---- ctx.top_k: how many to keep (default N — full ranked list)
---- ctx.window_size: sliding-window size (default 20). For N <= window_size
----     the entire ranking is done in 1 LLM call. For N > window_size, the
----     RankGPT sliding-window strategy is applied.
---- ctx.step: window stride (default ⌈window_size/2⌉)
+--- - Pointwise scoring asks the LLM for an absolute score per candidate.
+---   The LLM's number-generation prior anchors output to the middle of
+---   the scale (typically 5-8), compressing variance and making any
+---   fixed threshold either kill nothing or kill everything. This is the
+---   "calibration problem" of LLM-as-Judge.
+--- - Listwise asks the LLM for an ordering. Only the relative order is
+---   asked, so calibration is moot. Empirically dominates pointwise on
+---   TREC-DL and BEIR.
+---
+--- ## Empirical validation
+---
+--- - GPT-4 with RankGPT achieves SOTA zero-shot reranking on
+---   TREC-DL19/20.
+--- - Outperforms supervised baselines (monoT5-3B) and pointwise LLM
+---   baselines on BEIR.
+--- - Knowledge is distillable into smaller open-source models
+---   (RankZephyr, RankVicuna) that retain most of the effectiveness.
+---
+--- ## References
+---
+--- - Sun, W. et al. (2023). "Is ChatGPT Good at Search? Investigating
+---   Large Language Models as Re-Ranking Agents". EMNLP 2023.
+---   https://arxiv.org/abs/2304.09542
+--- - Ma, X. et al. (2023). "Zero-Shot Listwise Document Reranking with a
+---   Large Language Model". https://arxiv.org/abs/2305.02156
+--- - Pradeep, R. et al. (2023). "RankZephyr: Effective and Robust
+---   Zero-Shot Listwise Reranking is a Breeze!".
+---   https://arxiv.org/abs/2312.02724
 --- ctx.gen_tokens: max tokens for the ranking response (default 400)
 
 local M = {}
@@ -56,9 +57,7 @@ local M = {}
 M.meta = {
     name = "listwise_rank",
     version = "0.1.0",
-    description = "Zero-shot listwise reranking — RankGPT-style permutation "
-        .. "generation in 1 LLM call. Resolves the calibration problem of "
-        .. "pointwise scoring. Sliding window for large N.",
+    description = "Zero-shot listwise reranking via permutation generation with sliding window.",
     category = "selection",
 }
 
