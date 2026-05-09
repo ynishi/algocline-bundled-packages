@@ -8,14 +8,46 @@ source: pbft/init.lua
 generated: gen_docs (V0)
 ---
 
-# pbft — Practical Byzantine Fault Tolerant consensus via LLM
+# pbft(PBFT) — Practical Byzantine Fault Tolerant consensus via LLM agents
 
-> Multi-agent 3-phase consensus protocol inspired by PBFT (Castro-Liskov OSDI 1999). Uses the bft package for quorum validation and threshold computation.
+> Multi-agent 3-phase consensus protocol inspired by PBFT (Castro-Liskov OSDI 1999). Uses the `bft` package for quorum validation and threshold computation.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local pbft = require("pbft")
+return pbft.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Propose — `N` agents independently generate answers.
+2. Validate — each agent reviews all proposals and votes.
+3. Commit — if a quorum (`2f + 1`) agrees, commit that answer;
+   otherwise a synthesizer resolves.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Key safety properties carried over from PBFT:
+
+- Quorum intersection: any two quorums of size `2f + 1` share at
+  least one honest node when `n >= 3f + 1`.
+- Initial-answer preservation: the original proposal is always a
+  candidate (Red Line N2 compliance).
+
+## References {#references}
+
+- Castro, M., Liskov, B. (1999). "Practical Byzantine Fault
+  Tolerance". OSDI 1999.
 
 ## Parameters {#parameters}
 

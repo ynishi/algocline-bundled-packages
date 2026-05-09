@@ -164,7 +164,7 @@
 - [moa](narrative/moa.md): Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement
 - [mwu](narrative/mwu.md): Multiplicative Weights Update with O(sqrt(T ln N)) adversarial regret bound.
 - [pairwise_rank](narrative/pairwise_rank.md): Pairwise Ranking Prompting (PRP) — pairwise LLM-as-judge comparison with bidirectional position-bias cancellation. Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the calibration problem.
-- [particle_infer](narrative/particle_infer.md): Particle-Filter inference-time scaling (Puri et al. 2025, arXiv:2502.01618). State-Space formulation of LLM generation with PRM-guided every-step softmax resampling and ORM-based final selection. D...
+- [particle_infer](narrative/particle_infer.md): Particle-filter inference-time scaling with PRM-guided softmax resampling.
 - [rank](narrative/rank.md): Tournament selection — generate candidates, pairwise LLM-as-Judge ranking
 - [setwise_rank](narrative/setwise_rank.md): Setwise tournament reranking — LLM picks the best from small sets and winners advance. Mid-cost/mid-accuracy sweet spot between listwise and pairwise. Resolves calibration issue.
 - [slm_mux](narrative/slm_mux.md): Complementarity-driven K-subset selection over a pool of small language models. Implements Wang et al. (arXiv:2510.05077, ICLR 2026 Poster) §3.1 Algorithm 1 (confidence-based inference selection) ...
@@ -189,7 +189,7 @@
 ## synthesis
 
 - [dci](narrative/dci.md): Deliberative Collective Intelligence with typed epistemic acts
-- [panel](narrative/panel.md): Multi-perspective deliberation — distinct roles engage, moderator synthesizes
+- [panel](narrative/panel.md): Multi-perspective deliberation with distinct roles and moderator synthesis.
 
 ## validation
 

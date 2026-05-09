@@ -1,34 +1,36 @@
---- pbft — Practical Byzantine Fault Tolerant consensus via LLM
+--- pbft(PBFT) — Practical Byzantine Fault Tolerant consensus via LLM agents
 ---
 --- Multi-agent 3-phase consensus protocol inspired by PBFT
---- (Castro-Liskov OSDI 1999). Uses the bft package for quorum
+--- (Castro-Liskov OSDI 1999). Uses the `bft` package for quorum
 --- validation and threshold computation.
 ---
---- Protocol (adapted for LLM agents):
----   Phase 1 (Propose):  N agents independently generate answers
----   Phase 2 (Validate): Each agent reviews ALL proposals and votes
----   Phase 3 (Commit):   If quorum (2f+1) agrees, commit that answer;
----                        otherwise, a synthesizer resolves
+--- ## Usage
 ---
---- Key safety properties from PBFT:
----   - Quorum intersection: any two quorums of size 2f+1 share >= 1
----     honest node when n >= 3f+1
----   - Initial answer preservation: the original proposal is always
----     a candidate (Red Line N2 compliance)
+--- ```lua
+--- local pbft = require("pbft")
+--- return pbft.run(ctx)
+--- ```
 ---
---- Usage:
----   local pbft = require("pbft")
----   return pbft.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.n_agents: Number of agents (default: 3, must satisfy n >= 3f+1)
---- ctx.f: Assumed Byzantine faults (default: 0)
---- ctx.gen_tokens: Max tokens per proposal (default: 400)
---- ctx.vote_tokens: Max tokens per vote (default: 200)
---- ctx.synth_tokens: Max tokens for synthesis (default: 500)
---- ctx.gen_system: System prompt for proposal phase (default: built-in)
---- ctx.vote_system: System prompt for voting phase (default: built-in)
---- ctx.synth_system: System prompt for synthesis phase (default: built-in)
+--- 1. Propose — `N` agents independently generate answers.
+--- 2. Validate — each agent reviews all proposals and votes.
+--- 3. Commit — if a quorum (`2f + 1`) agrees, commit that answer;
+---    otherwise a synthesizer resolves.
+---
+--- ## Theoretical foundations
+---
+--- Key safety properties carried over from PBFT:
+---
+--- - Quorum intersection: any two quorums of size `2f + 1` share at
+---   least one honest node when `n >= 3f + 1`.
+--- - Initial-answer preservation: the original proposal is always a
+---   candidate (Red Line N2 compliance).
+---
+--- ## References
+---
+--- - Castro, M., Liskov, B. (1999). "Practical Byzantine Fault
+---   Tolerance". OSDI 1999.
 
 local bft = require("bft")
 
