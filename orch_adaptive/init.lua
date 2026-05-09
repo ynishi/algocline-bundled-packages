@@ -1,19 +1,19 @@
---- orch_adaptive — Adaptive Depth Orchestration
---- Dynamically adjusts phase count, retry budget, and context mode
---- based on task difficulty. Combines with router_daao for pre-classified
---- difficulty, or estimates internally.
+--- orch_adaptive(OrchAdaptive) — adaptive-depth orchestration by task difficulty
 ---
---- Based on DAAO (arxiv 2509.11079).
+--- Dynamically adjusts phase count, retry budget, and context mode based
+--- on task difficulty. Combines with `router_daao` for pre-classified
+--- difficulty or estimates internally.
 ---
---- Usage:
----   local orch = require("orch_adaptive")
----   return orch.run(ctx)
+--- ## Usage
 ---
---- ctx.task         (required): Task description
---- ctx.phases       (required): Phase definitions (superset; trimmed by difficulty)
---- ctx.difficulty   (optional): Pre-classified difficulty from router_daao
---- ctx.depth_config (optional): Custom difficulty→config mapping
---- ctx.on_fail      (optional): "error" | "partial" (default: "error")
+--- ```lua
+--- local orch = require("orch_adaptive")
+--- return orch.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - DAAO. https://arxiv.org/abs/2509.11079
 
 local S = require("alc_shapes")
 local T = S.T
@@ -24,10 +24,7 @@ local M = {}
 M.meta = {
     name = "orch_adaptive",
     version = "0.1.0",
-    description = "Adaptive depth orchestration based on task difficulty. "
-        .. "Dynamically adjusts phase count, retry budget, and context mode. "
-        .. "Combines with router_daao for pre-classified difficulty, "
-        .. "or estimates internally. Based on DAAO (arxiv 2509.11079).",
+    description = "Adaptive-depth orchestration: tune phase count and budget by task difficulty.",
     category = "orchestration",
 }
 
