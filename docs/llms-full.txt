@@ -1413,8 +1413,44 @@ Returns `deliberated` shape:
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local decompose = require("decompose")
+return decompose.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Decompose — prompt the LLM to split the task into N independent
+   sub-tasks (numbered list); falls back to single-task if parsing yields
+   nothing.
+2. Execute — run all sub-tasks in parallel via `alc.parallel`, each
+   with full context of the overall goal.
+3. Merge — synthesize all sub-task results into a unified, coherent
+   answer, resolving inconsistencies and preserving completeness.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Task decomposition draws on divide-and-conquer planning principles
+formalised in TDAG (Task Decomposition with Action Graphs, 2025) and
+HiPlan (Hierarchical Planning, 2025). Agent-Oriented Planning research
+establishes that decomposing into self-contained, collectively exhaustive,
+non-overlapping sub-tasks improves both accuracy and parallelism when
+sub-tasks are independently solvable.
+
+## References {#references}
+
+- TDAG: Task Decomposition with Action Graphs (2025).
+- HiPlan: Hierarchical Planning for LLM Agents (2025).
+- Agent-Oriented Planning in Multi-Agent Systems (2025).
 
 ## Parameters {#parameters}
 

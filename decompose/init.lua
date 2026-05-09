@@ -3,16 +3,37 @@
 --- Breaks a complex task into sub-tasks via LLM, executes each
 --- in parallel, then merges results into a unified answer.
 ---
---- Based on: TDAG (2025), HiPlan (2025), Agent-Oriented Planning
+--- ## Usage
 ---
---- Usage:
----   local decompose = require("decompose")
----   return decompose.run(ctx)
+--- ```lua
+--- local decompose = require("decompose")
+--- return decompose.run(ctx)
+--- ```
 ---
---- ctx.task (required): The complex task to decompose
---- ctx.max_subtasks: Maximum sub-tasks to generate (default: 5)
---- ctx.subtask_tokens: Max tokens per sub-task (default: 400)
---- ctx.merge_tokens: Max tokens for final merge (default: 600)
+--- ## Algorithm
+---
+--- 1. Decompose — prompt the LLM to split the task into N independent
+---    sub-tasks (numbered list); falls back to single-task if parsing yields
+---    nothing.
+--- 2. Execute — run all sub-tasks in parallel via `alc.parallel`, each
+---    with full context of the overall goal.
+--- 3. Merge — synthesize all sub-task results into a unified, coherent
+---    answer, resolving inconsistencies and preserving completeness.
+---
+--- ## Theoretical foundations
+---
+--- Task decomposition draws on divide-and-conquer planning principles
+--- formalised in TDAG (Task Decomposition with Action Graphs, 2025) and
+--- HiPlan (Hierarchical Planning, 2025). Agent-Oriented Planning research
+--- establishes that decomposing into self-contained, collectively exhaustive,
+--- non-overlapping sub-tasks improves both accuracy and parallelism when
+--- sub-tasks are independently solvable.
+---
+--- ## References
+---
+--- - TDAG: Task Decomposition with Action Graphs (2025).
+--- - HiPlan: Hierarchical Planning for LLM Agents (2025).
+--- - Agent-Oriented Planning in Multi-Agent Systems (2025).
 
 local S = require("alc_shapes")
 local T = S.T
