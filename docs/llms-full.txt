@@ -5429,13 +5429,27 @@ Returns:
 <!-- ── rank.md ── -->
 
 
-# Rank — generate candidates and select best via pairwise comparison
+# rank(Rank) — generate candidates and select best via pairwise comparison
 
-> Generates N candidate responses, then uses LLM-as-Judge to perform pairwise tournament selection. Produces a winner with reasoning.
+> Generates N candidate responses then uses LLM-as-Judge for a pairwise tournament that produces a winner with reasoning. Unlike majority vote (same answer wins), `rank` uses quality comparison.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local rank = require("rank")
+return rank.run(ctx)
+```
+
+## References {#references}
+
+- Best-of-N sampling.
+- Zheng, L. et al. (2023). LLM-as-Judge.
 
 ## Result {#result}
 
@@ -5454,13 +5468,67 @@ Returns `tournament` shape:
 <!-- ── recipe_deep_panel.md ── -->
 
 
-# recipe_deep_panel — Deep-reasoning diverse panel with resume
+# recipe_deep_panel(RecipeDeepPanel) — deep-reasoning diverse panel with resume
 
-> Recipe package: composes ab_mcts × N + ensemble_div + condorcet + calibrate on top of flow. Fills the gap between recipe_safe_panel (cheap sc-based majority vote) and single-agent ab_mcts: when each individual opinion requires tree-search-quality reasoning AND the panel is large enough to need checkpoint-resume, this recipe is the right composition.
+> Recipe package that composes `ab_mcts × N` + `ensemble_div` + `condorcet` + `calibrate` on top of `flow`. Fills the gap between `recipe_safe_panel` (cheap `sc`-based majority vote) and single-agent `ab_mcts`: when each opinion requires tree-search-quality reasoning and the panel is large enough to need checkpoint-resume, this recipe is the right composition.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local deep_panel = require("recipe_deep_panel")
+return deep_panel.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `condorcet` — panel feasibility + Anti-Jury gate. If `p_estimate
+   <= 0.5`, majority vote is provably harmful or useless; abort with
+   zero LLM cost.
+2. `flow` fan-out of `ab_mcts` — N independent tree searches with
+   `flow.state_new` + per-branch `flow.state_get` checkpoints. A
+   crash mid-panel resumes at the first incomplete branch. Each
+   branch is a full `ab_mcts` run (`2*budget + 1` LLM calls)
+   differentiated by a distinct approach-prompt; `flow.token_wrap` /
+   `token_verify` tag each call so mis-routed responses across
+   parallel branches are detected at the Frame boundary.
+3. `ensemble_div` — panel diversity diagnostic. Stage 3a always runs
+   answer-level distinctness on normalized answers (`n_distinct /
+   n`). Stage 3b runs `ensemble_div.decompose` only when
+   `ctx.ground_truth` is numeric and every branch answer parses as a
+   number; otherwise skipped with an explicit reason (see
+   `M.caveats`).
+4. `condorcet.prob_majority` — plurality vote plus Condorcet
+   expected accuracy under independence at the declared
+   `p_estimate`.
+5. `calibrate.assess` — single-call meta-confidence gate. Recipe
+   raises `needs_investigation` when confidence falls below
+   `ctx.confidence_threshold`.
+
+## Caveats {#caveats}
+
+See `M.caveats`. Key items: Anti-Jury abort, cost explosion with
+`N × budget`, resume replay semantics, and numeric-only Stage 3b.
+
+## References {#references}
+
+- Inoue, Y. et al. (2025). "Wider or Deeper? Scaling LLM
+  Inference-Time Compute with Adaptive Branching Tree Search".
+  NeurIPS 2025 Spotlight. https://arxiv.org/abs/2503.04412
+- Condorcet, M. (1785). "Essai sur l'application de l'analyse à la
+  probabilité des décisions rendues à la pluralité des voix".
+- Krogh, A., Vedelsby, J. (1995). "Neural Network Ensembles, Cross
+  Validation, and Active Learning". NeurIPS 7, pp.231-238.
+- Wang, X. et al. (2022). "Self-Consistency Improves Chain of
+  Thought Reasoning in Language Models".
+  https://arxiv.org/abs/2203.11171
 
 ## Result {#result}
 
@@ -5494,13 +5562,71 @@ Returns `deep_paneled` shape:
 <!-- ── recipe_quick_vote.md ── -->
 
 
-# recipe_quick_vote — Adaptive-stop majority vote with SPRT gate
+# recipe_quick_vote(RecipeQuickVote) — adaptive-stop majority vote with SPRT gate
 
-> Fills the Quick slot of the recipe family. Given a task that admits a single short answer, samples independent reasoning paths one at a time and exits as soon as SPRT declares the leading answer confirmed (H1 accepted) or rejected (H0 accepted) at the declared (α, β) error rates. Truncates at max_n if neither boundary is hit — that case is surfaced as `outcome = "truncated"` and `needs_investigation = true` so the consumer can route to recipe_safe_panel / recipe_deep_panel.
+> Fills the Quick slot of the recipe family. For a task admitting a single short answer, samples independent reasoning paths one at a time and exits as soon as SPRT declares the leading answer confirmed (H1 accepted) or rejected (H0 accepted) at the declared `(α, β)` error rates. Truncates at `max_n` if neither boundary is hit; that case surfaces as `outcome = "truncated"` and `needs_investigation = true` so the consumer can route to `recipe_safe_panel` / `recipe_deep_panel`.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local recipe = require("recipe_quick_vote")
+return recipe.run({
+    task = "What is 17 × 23?",
+    p0 = 0.5, p1 = 0.80,
+    alpha = 0.05, beta = 0.10,
+    max_n = 8, min_n = 3,
+})
+```
+
+## Algorithm {#algorithm}
+
+1. Sample 1 — `sc`-style reasoning + extraction; the normalized
+   answer is committed as the "leader" (one LLM call for reasoning,
+   one for extraction).
+2. For samples `2..max_n`, generate reasoning with a diversity hint,
+   extract, set `outcome = (normalized_answer == leader_norm)`, call
+   `sprt.observe`. Once `i >= min_n`, inspect `sprt.decide`:
+   `accept_h1 → "confirmed"`, `accept_h0 → "rejected"`, otherwise
+   keep sampling.
+3. If the loop reaches `max_n` without a verdict, `outcome =
+   "truncated"` and `needs_investigation = true`.
+
+## Theoretical foundations {#theoretical-foundations}
+
+SPRT tests `H0: p_agree ≤ p0` against `H1: p_agree ≥ p1`, where
+`p_agree` is the probability that a newly drawn independent sample
+agrees with the first sample's answer. Under a well-posed task with
+a high-confidence answer, `p_agree ≈ per-sample accuracy`, so the
+recipe doubles as a per-task p-estimate gate that can feed
+`condorcet` / `recipe_safe_panel` downstream.
+
+## Caveats {#caveats}
+
+POC simplification: a single committed leader from sample 1; a
+runner-up that overtakes the leader is not tracked separately and
+surfaces as `accept_h0` (leader rejected) so the consumer can
+re-enter with the new plurality. Full multi-arm dynamic-leader SPRT
+is deferred to v0.2.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `recipe_safe_panel` — fixed `n ≈ 5-7`, cheap heuristic majority;
+  ~8 LLM calls for `math_basic`, no early stop.
+- `recipe_deep_panel` — per-branch `ab_mcts` tree search; ~52 LLM
+  calls at `N=3, budget=8`.
+- `recipe_quick_vote` — adaptive stop via SPRT. `E[N]` is
+  Wald-Wolfowitz minimal at the declared `(α, β)`. On easy tasks
+  exits at 3-4 calls; on hard tasks truncates with an explicit
+  statistical verdict the consumer can escalate.
 
 ## Result {#result}
 
@@ -5525,13 +5651,73 @@ Returns `quick_voted` shape:
 <!-- ── recipe_ranking_funnel.md ── -->
 
 
-# recipe_ranking_funnel — Verified 3-stage ranking funnel
+# recipe_ranking_funnel(RecipeRankingFunnel) — verified 3-stage ranking funnel
 
-> Recipe package: composes listwise_rank and pairwise_rank into a cost-efficient funnel for ranking large candidate sets (N ≥ 20). Applies the information retrieval classic pattern:   Recall (cheap) → Precision (medium) → Final Rank (expensive)
+> Recipe package that composes `listwise_rank` and `pairwise_rank` into a cost-efficient funnel for ranking large candidate sets (`N ≥ 20`), applying the IR classic `Recall (cheap) → Precision (medium) → Final Rank (expensive)` pattern.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [Empirical validation](#empirical-validation)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local funnel = require("recipe_ranking_funnel")
+return funnel.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `listwise_rank` — coarse screening. Rank all N candidates via
+   sliding-window listwise permutation; keep `top_k1` (default
+   `ceil(N/3)`). Cost: `O(N / window_size)` LLM calls.
+2. Multi-axis LLM scoring — score survivors on quality axes
+   (correctness, completeness, relevance), rank by average, keep
+   `top_k2` (default `min(top_k1, 5)`). Cost: `top_k1` LLM calls.
+   With defaults, Stage 2 fires only when `top_k1 > 5` (i.e.
+   `N >= 16`); otherwise `#survivors_1 == top_k2` and Stage 2 is
+   skipped (flagged as `scoring_skipped`). Pass `ctx.top_k2`
+   explicitly lower than `top_k1` to force it on smaller N.
+3. `pairwise_rank` — precise pairwise comparison of the final
+   `top_k2` candidates in `allpair` mode with bidirectional
+   position-bias cancellation. Cost: `top_k2 · (top_k2 - 1)` LLM
+   calls.
+
+The composition reflects: `listwise_rank` screens cheapest (1 LLM
+call per window, no calibration problem); multi-axis scoring is a
+middle-ground evaluation; `pairwise_rank` is the most accurate
+LLM-as-judge method but `O(N²)` — applying it only to `top_k2 ≤ 5`
+keeps cost manageable.
+
+## Caveats {#caveats}
+
+See `M.caveats` for the full list. Key items: `listwise window_size
+< ceil(N/2)` loses top candidates; `N < 6` makes the funnel
+overhead counterproductive; `pairwise allpair` on `N > 12`
+explodes.
+
+## Empirical validation {#empirical-validation}
+
+Not yet populated. Run `alc_eval` with a ranking scenario and fill
+`M.verified` from the actual eval record.
+
+## References {#references}
+
+- Sun, W. et al. (2023). "Is ChatGPT Good at Search?". EMNLP 2023.
+- Qin, Z. et al. (2024). "Large Language Models are Effective Text
+  Rankers with Pairwise Ranking Prompting". NAACL 2024.
+- Inoue, Y. et al. (2025). "Wider or Deeper? Scaling LLM
+  Inference-Time Compute with Adaptive Branching Tree Search".
+  NeurIPS 2025.
+ctx.judge_gen_tokens: Max tokens per pairwise judgement call in
+    Stage 3 (and in the N<6 direct-pairwise bypass). Pairwise
+    judgements only need a short verdict (e.g. "A>B"), so this
+    defaults to 20 — lower than gen_tokens on purpose. (default: 20)
 
 ## Result {#result}
 
@@ -5557,13 +5743,81 @@ Returns `funnel_ranked` shape:
 <!-- ── recipe_safe_panel.md ── -->
 
 
-# recipe_safe_panel — Verified safe majority-vote panel
+# recipe_safe_panel(RecipeSafePanel) — verified safe majority-vote panel
 
-> Recipe package: composes condorcet, sc, inverse_u, and calibrate into a safety-gated panel vote. The recipe ensures that majority voting is only applied when the mathematical preconditions are met, and provides early warnings when adding more agents would degrade rather than improve accuracy.
+> Recipe package that composes `condorcet`, `sc`, `inverse_u`, and `calibrate` into a safety-gated panel vote. Ensures majority voting is only applied when mathematical preconditions are met and gives early warnings when adding more agents would degrade accuracy.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [Caveats](#caveats)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local safe_panel = require("recipe_safe_panel")
+return safe_panel.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `condorcet` — panel-size design. `is_anti_jury(p)` gates entry:
+   when `p < 0.5`, majority vote provably degrades with more agents.
+   `optimal_n(p, target)` computes the minimum panel size to reach
+   the target accuracy.
+2. `sc` — `sc.run({ task, n })` samples N independent reasoning
+   paths with diversity hints to maximize independence; the majority
+   answer is extracted via vote counting.
+3. `inverse_u` — vote-prefix stability check. Builds a
+   progressive-majority series from the first 3, 5, 7, ... votes of
+   the single `sc` run and feeds it to `inverse_u.detect` as a
+   lightweight stability proxy. This is not a true inverse-U test
+   (Chen 2024 concerns accuracy across independent panels of
+   increasing size); a prefix of one run tends to approach the
+   majority fraction monotonically and usually reports "safe". A
+   true inverse-U test requires repeating `sc.run` at multiple N.
+4. `calibrate` — meta-confidence gate. Synthesizes vote margin,
+   Condorcet expected accuracy, and `inverse_u` safety into a single
+   confidence assessment; low confidence raises
+   `needs_investigation`.
+
+## Theoretical foundations {#theoretical-foundations}
+
+- Condorcet Jury Theorem: `P(Maj_n) → 1` as `n → ∞` when `p > 0.5`;
+  Anti-Jury: `P(Maj_n) → 0` as `n → ∞` when `p < 0.5`.
+- Chen et al. NeurIPS 2024 Theorem 2: vote accuracy is inverse-U
+  shaped in N when `p1 + p2 > 1` and `α < 1 - 1/t`.
+
+## Caveats {#caveats}
+
+See `M.caveats`. Key: Anti-Jury abort, inverse-U detection,
+independence violation from same-model sampling.
+
+## References {#references}
+
+- Condorcet, M. (1785). "Essai sur l'application de l'analyse...".
+- Chen, L. et al. (2024). "Are More LM Calls All You Need? Scaling
+  Laws in Multi-Agent Systems". NeurIPS 2024.
+- Wang, X. et al. (2022). "Self-Consistency Improves Chain of
+  Thought Reasoning in Language Models".
+  https://arxiv.org/abs/2203.11171
+
+ctx.task (required): The problem to solve
+ctx.p_estimate (required): Estimated per-agent accuracy in (0, 1].
+    REQUIRED with no default — silent fallback to 0.7 would bypass
+    the Anti-Jury gate on tasks where the real p < 0.5. Estimate via
+    a pilot (sc.run at n=1 over a labeled sample, then
+    condorcet.estimate_p) or pass an explicit value based on task
+    difficulty.
+ctx.target_accuracy: Target majority-vote accuracy (default: 0.95)
+ctx.max_n: Maximum panel size (default: 15)
+ctx.confidence_threshold: Calibrate gate threshold (default: 0.7)
+ctx.scaling_check: Run inverse_u analysis (default: true)
+ctx.gen_tokens: Max tokens per LLM call (default: 400)
 
 ## Result {#result}
 
