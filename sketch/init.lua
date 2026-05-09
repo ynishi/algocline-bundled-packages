@@ -1,31 +1,39 @@
---- sketch — Sketch-of-Thought: cognitive-inspired efficient reasoning
+--- sketch(Sketch) — Sketch-of-Thought cognitive-inspired efficient reasoning
 ---
---- Selects one of three cognitive paradigms based on task characteristics,
---- then generates compressed reasoning using that paradigm's notation.
---- Reduces reasoning tokens by 60-84% while maintaining or improving accuracy.
+--- Selects one of three cognitive paradigms based on task
+--- characteristics, then generates compressed reasoning using that
+--- paradigm's notation. Reduces reasoning tokens by 60-84% while
+--- maintaining or improving accuracy.
 ---
---- Three paradigms (from cognitive science):
----   Conceptual Chaining  — key concepts linked with arrows (episodic memory)
----   Chunked Symbolism    — variables + equations (working memory chunking)
----   Expert Lexicons      — domain notation + abbreviations (expert schemas)
+--- ## Usage
 ---
---- Routing: keyword heuristic first (0 LLM calls), LLM fallback if ambiguous.
+--- ```lua
+--- local sketch = require("sketch")
+--- return sketch.run(ctx)
+--- ```
 ---
---- Based on: Aytes, Baek, Hwang, "Sketch-of-Thought: Efficient LLM Reasoning
---- with Adaptive Cognitive-Inspired Sketching" (EMNLP 2025, arXiv:2503.05179)
+--- ## Algorithm
 ---
---- Pipeline (1-2 LLM calls):
----   Step 1: Route    — select paradigm (keyword heuristic or LLM)
----   Step 2: Sketch   — generate compressed reasoning + answer
+--- The pipeline uses 1-2 LLM calls:
 ---
---- Usage:
----   local sketch = require("sketch")
----   return sketch.run(ctx)
+--- 1. Route — select paradigm via keyword heuristic (0 LLM calls);
+---    LLM fallback if ambiguous.
+--- 2. Sketch — generate compressed reasoning and final answer.
 ---
---- ctx.task (required): The problem to solve
---- ctx.paradigm: Force paradigm (default: nil → auto-route)
---- ctx.max_tokens: Max tokens for reasoning (default: 200)
---- ctx.routing_threshold: Keyword confidence threshold for LLM fallback (default: 0.4)
+--- Three cognitive paradigms:
+---
+--- - Conceptual Chaining — key concepts linked with arrows (episodic
+---   memory).
+--- - Chunked Symbolism — variables and equations (working memory
+---   chunking).
+--- - Expert Lexicons — domain notation and abbreviations (expert
+---   schemas).
+---
+--- ## References
+---
+--- - Aytes, S., Baek, J., Hwang, S. J. (2025). "Sketch-of-Thought:
+---   Efficient LLM Reasoning with Adaptive Cognitive-Inspired
+---   Sketching". EMNLP 2025. https://arxiv.org/abs/2503.05179
 
 local S = require("alc_shapes")
 local T = S.T
