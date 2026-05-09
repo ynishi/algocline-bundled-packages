@@ -1,28 +1,33 @@
---- USC — Universal Self-Consistency
+--- usc(USC) — Universal Self-Consistency for free-form generation
 ---
---- Extends standard Self-Consistency (SC) to free-form generation tasks.
---- Instead of majority voting on extracted answers (which requires structured
---- answer formats), USC concatenates all candidate responses and asks the LLM
---- to select the most consistent one.
+--- Extends standard Self-Consistency (SC) to free-form generation
+--- tasks. Instead of majority voting on extracted answers (which
+--- requires structured answer formats), USC concatenates all candidate
+--- responses and asks the LLM to select the most consistent one.
+--- Mathematically, majority vote is a special case of USC where the
+--- consistency function is exact string match.
 ---
---- Key difference from sc:
----   sc   — extracts short answers, clusters by string similarity, majority vote.
----          Only works when answers have a canonical form (numbers, options, etc.)
----   usc  — presents all full responses to LLM, asks it to judge consistency.
----          Works on ANY task: open-ended QA, summarization, code generation, etc.
----   Mathematically, majority vote is a special case of USC where the consistency
----   function is exact string match.
+--- ## Usage
 ---
---- Based on: Chen et al., "Universal Self-Consistency for Large Language Model
---- Generation" (ICML 2024, arXiv:2311.17311), Google DeepMind
+--- ```lua
+--- local usc = require("usc")
+--- return usc.run(ctx)
+--- ```
 ---
---- Usage:
----   local usc = require("usc")
----   return usc.run(ctx)
+--- ## Comparison with related packages
 ---
---- ctx.task (required): The problem/question to solve
---- ctx.n: Number of candidate responses to sample (default: 5)
---- ctx.gen_tokens: Max tokens per candidate (default: 400)
+--- - `sc` — extracts short answers, clusters by string similarity, and
+---   majority votes. Only works when answers have a canonical form
+---   (numbers, options, etc.).
+--- - `usc` — presents all full responses to the LLM and asks it to
+---   judge consistency. Works on any task: open-ended QA,
+---   summarization, code generation, etc.
+---
+--- ## References
+---
+--- - Chen, X. et al. (2024). "Universal Self-Consistency for Large
+---   Language Model Generation". ICML 2024 (Google DeepMind).
+---   https://arxiv.org/abs/2311.17311
 --- ctx.select_tokens: Max tokens for selection response (default: 500)
 
 local S = require("alc_shapes")

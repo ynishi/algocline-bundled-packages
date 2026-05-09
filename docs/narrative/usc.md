@@ -8,14 +8,40 @@ source: usc/init.lua
 generated: gen_docs (V0)
 ---
 
-# USC — Universal Self-Consistency
+# usc(USC) — Universal Self-Consistency for free-form generation
 
-> Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one.
+> Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one. Mathematically, majority vote is a special case of USC where the consistency function is exact string match.
 
 ## Contents
 
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local usc = require("usc")
+return usc.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `sc` — extracts short answers, clusters by string similarity, and
+  majority votes. Only works when answers have a canonical form
+  (numbers, options, etc.).
+- `usc` — presents all full responses to the LLM and asks it to
+  judge consistency. Works on any task: open-ended QA,
+  summarization, code generation, etc.
+
+## References {#references}
+
+- Chen, X. et al. (2024). "Universal Self-Consistency for Large
+  Language Model Generation". ICML 2024 (Google DeepMind).
+  https://arxiv.org/abs/2311.17311
+ctx.select_tokens: Max tokens for selection response (default: 500)
 
 ## Parameters {#parameters}
 
