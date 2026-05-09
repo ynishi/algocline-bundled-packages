@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:49:48Z",
+  "updated_at": "2026-05-09T02:50:34Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -77,9 +77,9 @@
     {
       "name": "anti_cascade",
       "version": "0.1.0",
-      "description": "Pipeline error cascade detection — independently re-derives from original inputs at each step and compares with pipeline output to detect error amplification. Generalizes Cascade Amplification countermeasure from 'From Spark to Fire' (Xie et al., AAMAS 2026). Addresses MAST failure modes F3/F9.",
+      "description": "Pipeline error cascade detection via per-step independent re-derivation.",
       "category": "governance",
-      "docstring": "anti_cascade — Pipeline error cascade amplification detection\n\nDetects when small errors compound through multi-step pipelines\nby independently re-deriving conclusions from original inputs at\neach checkpoint, then comparing with the pipeline's accumulated\noutput. Flags steps where drift exceeds threshold.\n\nGeneralizes the \"Cascade Amplification\" countermeasure from \"From\nSpark to Fire: Diagnosing and Overcoming the Fragility of Multi-\nAgent Systems\" (Xie et al., AAMAS 2026). The paper proved that a\nsingle atomic error injection can collapse an entire multi-agent\nsystem, and that independent re-derivation is one of the key\nstructural defenses.\n\nAlso addresses MAST (Cemri et al., 2025) failure modes F3\n(\"error propagation through pipeline\") and F9 (\"accumulated\ncontext drift\").\n\nPipeline (~1 + 2×N LLM calls, N = number of steps):\nFor each step:\n1. Independent re-derivation from original task (parallel)\n2. Comparison with pipeline output to compute drift score\nFinal: Summary with flagged steps and overall cascade risk\n\nUsage:\nlocal anti_cascade = require(\"anti_cascade\")\nreturn anti_cascade.run(ctx)\n\nctx.task (required): Original task/input\nctx.steps (required): Ordered table of pipeline step outputs\nEach entry: { name = \"step_name\", instruction = \"what this step does\", output = \"text\" }\nctx.drift_threshold (optional): Drift score above which a step is flagged (default: 0.4)\nctx.rederive_tokens: Max tokens for re-derivation (default: 500)\nctx.compare_tokens: Max tokens for comparison (default: 400)",
+      "docstring": "anti_cascade(AntiCascade) — pipeline error cascade amplification detection\n\nDetects when small errors compound through multi-step pipelines by\nindependently re-deriving conclusions from the original input at each\ncheckpoint and comparing with the pipeline's accumulated output. Steps\nwhose drift exceeds the threshold are flagged.\n\n## Usage\n\n```lua\nlocal anti_cascade = require(\"anti_cascade\")\nreturn anti_cascade.run(ctx)\n```\n\n## Algorithm\n\nFor a pipeline of N steps the entry uses ~1 + 2×N LLM calls:\n\n1. For each step, independently re-derive what the step should produce\nfrom the original task in parallel.\n2. Compare the re-derivation against the pipeline's actual output and\ncompute a drift score in [0, 1].\n3. Summarize flagged steps and overall cascade risk.\n\n## Theoretical foundations\n\nGeneralizes the \"Cascade Amplification\" countermeasure from Xie et al.\nThe paper proved that a single atomic error injection can collapse an\nentire multi-agent system, and that independent re-derivation is one\nof the key structural defenses. Also addresses MAST failure modes F3\n(\"error propagation through pipeline\") and F9 (\"accumulated context\ndrift\").\n\n## References\n\n- Xie, ... et al. (2026). \"From Spark to Fire: Diagnosing and\nOvercoming the Fragility of Multi-Agent Systems\". AAMAS 2026.\n- Cemri, ... et al. (2025). MAST failure mode taxonomy (F3, F9).",
       "source": {
         "type": "unknown"
       },
