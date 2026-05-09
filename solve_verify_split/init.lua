@@ -1,134 +1,113 @@
---- solve_verify_split — Compute-optimal split between solution
---- generation (Self-Consistency) and generative verification (GenRM)
---- under a fixed inference compute budget. Pure Computation pkg.
+--- solve_verify_split(SolveVerifySplit) — compute-optimal SC vs GenRM split
 ---
---- Based on:
----   Singhi, Bansal, Hosseini, Grover, Chang, Rohrbach, Rohrbach
----   "When To Solve, When To Verify: Compute-Optimal Problem Solving
----    and Generative Verification for LLM Reasoning"
----   (arXiv:2504.01005, COLM 2025)
----
---- Implements §3.1 cost model and §3.2 / §5.2 power-law inference
+--- Pure-computation package implementing the compute-optimal split
+--- between solution generation (Self-Consistency) and generative
+--- verification (GenRM) under a fixed inference compute budget.
+--- Implements paper §3.1 cost model and §3.2 / §5.2 power-law inference
 --- scaling laws as Pure Computation primitives (no LLM calls).
 ---
---- Core formulas:
+--- ## Usage
 ---
----   Cost (paper §3.1, per-solution verification model):
----     C(S, V) = S · (1 + λ · V)
----       where λ = T_V / T_S  (verify-token / solve-token ratio)
----       SC degenerate case: C(S, 0) = S
+--- ```lua
+--- local svs = require("solve_verify_split")
 ---
----   Power-law inference scaling (paper §5.2):
----     S_opt(C) = α_S · C^a
----     V_opt(C) = α_V · C^b
+--- -- §3.1 cost in isolation
+--- svs.cost(4, 3, 1.0)            -- = 16
+--- svs.cost(4, 1, 2.0)            -- = 12 (GenRM-FT λ=2)
 ---
----     paper-default exponents (§5.2 Llama-3.1-8B + GenRM-FT + MATH):
----       a = 0.57,  b = 0.39
----     Appendix J alternates (transferred only):
----       Qwen-2.5-7B + MATH:    a = 0.75, b = 0.32
----       Llama-3.3-70B + MATH:  a = 0.69, b = 0.43
+--- -- Optimal allocation (caller fits α_S, α_V from grid)
+--- local r = svs.optimal_split(100, {
+---     lambda = 2.0,
+---     exponent_solve = 0.57, exponent_verify = 0.39,
+---     prefactor_solve = 1.0, prefactor_verify = 1.0,
+--- })
+--- ```
 ---
----     α_S, α_V have NO numeric value in the paper — caller MUST fit
----     these from a (S, V) grid via §3.2 Step 5 (log-linear regression).
+--- ## Theoretical foundations
 ---
----   Allocator algorithm (this pkg's; paper §3.2 fits (a, b, α_S, α_V)
----   as a 6-step procedure ending at log-linear regression — Step 5 — but
----   has no allocator pseudocode for given (α, a, b). The 5 steps below
----   are this pkg's rounding/rescale allocator after the caller has
----   completed §3.2 Step 5):
----     Step 1: S_raw = α_S · B^a,    V_raw = α_V · B^b
----     Step 2: S_int = round(S_raw), V_int = round(V_raw)        (INJECT #A)
----     Step 3: C_actual = S_int · (1 + λ · V_int)
----     Step 4: if C_actual > B then rescale (S_int, V_int) within B (#B)
----     Step 5: if V_int == 0 then SC pure path: S = round(B), V = 0  (#C)
+--- ```math
+--- C(S, V) = S · (1 + λ · V)            -- paper §3.1
+--- S_opt(C) = α_S · C^a                  -- paper §5.2
+--- V_opt(C) = α_V · C^b
+--- ```
 ---
----   Domain: paper §3.1 implies S ≥ 1 (need at least one solution to
----   verify) and V ≥ 0 (V=0 is the SC degenerate case). The pure
----   `cost(S, V, λ)` entry accepts S ≥ 0 / V ≥ 0 for caller flexibility
----   but `optimal_split` always returns S_opt ≥ 1.
+--- where `λ = T_V / T_S`. Paper-default exponents (§5.2 Llama-3.1-8B +
+--- GenRM-FT + MATH): `a = 0.57, b = 0.39`. Appendix J alternates
+--- transferred only: Qwen-2.5-7B + MATH (`0.75, 0.32`),
+--- Llama-3.3-70B + MATH (`0.69, 0.43`). `α_S, α_V` have no numeric
+--- value in the paper; caller MUST fit them from a `(S, V)` grid via
+--- §3.2 Step 5 log-linear regression.
 ---
---- Cross-over observations (paper §5.1 — observations, NOT a constant):
----   * Llama-3.1-8B + GenRM-FT + MATH: GenRM matches SC at 8× compute,
----     +3.8% accuracy at 128× compute (Figure 1(b))
----   * Qwen-2.5-7B + MATH: 64× to match, +5.4% at 512× (§5.1)
----   * Llama-3.3-70B + GenRM-Base + MATH: 4× to match, +1.7% at 64×
----   * QwQ-32B (thinking) + MATH: 4× to match, +2.5% at 16×
+--- ## Algorithm
 ---
----   The 8× (or any specific) cross-over is verifier-quality and
----   model-dependent (Appendix E: GenRM-FT vs Base differs by 16×).
----   This pkg does NOT hardcode a cross-over multiplier.
+--- The pkg's allocator (paper §3.2 fits the parameters but has no
+--- pseudocode):
 ---
---- ═══ PAPER FIDELITY & INJECTION POINTS ═══════════════════════════════
---- Paper-faithful defaults:
----   * lambda = 1.0                           (§3.1 GenRM-Base equal-token)
----   * exponent_solve = 0.57                  (§5.2 Llama-8B/GenRM-FT/MATH)
----   * exponent_verify = 0.39                 (§5.2 Llama-8B/GenRM-FT/MATH)
----   * integer_method = "round"               (paper not fixed; neutral)
----   * rescale_method = "scale_proportional"  (paper not fixed)
----   * sc_fallback_when_v_zero = true         (§3.1 V=0 path)
+--- 1. `S_raw = α_S · B^a`, `V_raw = α_V · B^b`.
+--- 2. `S_int = round(S_raw)`, `V_int = round(V_raw)`.
+--- 3. `C_actual = S_int · (1 + λ · V_int)`.
+--- 4. If `C_actual > B`, rescale `(S_int, V_int)` within `B`.
+--- 5. If `V_int == 0`, take the pure SC path: `S = round(B), V = 0`.
 ---
---- REQUIRED injection points:
----   * B                          — Budget (§3.1 C unit, > 0).
----   * params.lambda              — λ = T_V / T_S (§3.1).
----   * params.exponent_solve      — a in S_opt ∝ C^a (§5.2).
----   * params.exponent_verify     — b in V_opt ∝ C^b (§5.2).
----   * params.prefactor_solve     — α_S; paper has NO numeric value
----                                  (§3.2 Step 5 = caller-fit).
----   * params.prefactor_verify    — α_V; paper has NO numeric value
----                                  (§3.2 Step 5 = caller-fit).
+--- Domain: paper §3.1 implies `S ≥ 1` and `V ≥ 0`. The pure `cost`
+--- entry accepts `S ≥ 0` / `V ≥ 0`; `optimal_split` always returns
+--- `S_opt ≥ 1`.
 ---
---- OPTIONAL paper-faithful injection points:
----   * opts.integer_method = "round" (default) | "floor" | "ceil"
----                                  — Power-law raw → integer rounding
----                                    (paper §3.2 not fixed).
----   * opts.rescale_method = "scale_proportional" (default)
----                          | "prefer_solve" | "prefer_verify"
----                                  — Strategy when integer-rounded
----                                    (S_int, V_int) overflows B
----                                    (paper §3.2 not fixed).
----   * opts.v_cap, opts.s_cap     — Hard caps on V / S (paper not fixed;
----                                    domain-specific).
----   * opts.sc_fallback_when_v_zero = true (default) | false
----                                  — When V_int = 0 after rounding, fall
----                                    back to pure SC path (§3.1 V=0).
+--- ## Injection points
 ---
---- OPTIONAL non-paper-faithful (caller must accept loss of paper guarantees):
----   * opts.cost_model = "per_solution" (default, paper §3.1) | "independent"
----                                  — "independent" uses C = S·c_s + V_total·c_v.
----                                    **NOT paper-faithful**: §3.1 has
----                                    per-solution V structure, not
----                                    independent V budget.
+--- Paper-faithful defaults: `lambda = 1.0` (§3.1 GenRM-Base equal-token),
+--- `exponent_solve = 0.57`, `exponent_verify = 0.39`,
+--- `integer_method = "round"`, `rescale_method = "scale_proportional"`,
+--- `sc_fallback_when_v_zero = true`.
 ---
---- NOT IN v1 (documented shortfalls):
----   * fit_exponents — Log-linear regression to fit (a, b, α_S, α_V)
----     from caller-supplied grid observations (paper §3.2 Step 5).
----     Caller fits in v1; potential v2 helper.
----   * Cross-over multiplier auto-estimation — Paper §5.1's 8× / 4× / 64×
----     are observations, not constants. Auto-inference would require an
----     accuracy curve model the paper does not formalise.
----   * Multi-question budget partition — Total budget across Q questions.
----     Caller's responsibility (per-question B = total / Q is trivial).
----   * "independent" cost_model — declared as NOT paper-faithful opt-in
----     but not implemented in v1; reserved for the API surface only.
---- ═══════════════════════════════════════════════════════════════════════
+--- REQUIRED:
 ---
---- Usage:
+--- - `B` — budget (§3.1 C unit, > 0).
+--- - `params.lambda` — `λ = T_V / T_S` (§3.1).
+--- - `params.exponent_solve` — `a` in `S_opt ∝ C^a` (§5.2).
+--- - `params.exponent_verify` — `b` in `V_opt ∝ C^b` (§5.2).
+--- - `params.prefactor_solve` — `α_S` (caller-fit, §3.2 Step 5).
+--- - `params.prefactor_verify` — `α_V` (caller-fit, §3.2 Step 5).
 ---
----   local svs = require("solve_verify_split")
+--- OPTIONAL paper-faithful: `opts.integer_method` (`round` / `floor` /
+--- `ceil`), `opts.rescale_method` (`scale_proportional` /
+--- `prefer_solve` / `prefer_verify`), `opts.v_cap` / `opts.s_cap`,
+--- `opts.sc_fallback_when_v_zero`. Paper §3.2 does not fix these.
 ---
----   -- §3.1 cost in isolation
----   svs.cost(4, 3, 1.0)            -- = 16
----   svs.cost(4, 1, 2.0)            -- = 12 (GenRM-FT λ=2)
+--- OPTIONAL non-paper-faithful: `opts.cost_model = "independent"`
+--- (uses `C = S·c_s + V_total·c_v`; paper §3.1 has per-solution V
+--- structure).
 ---
----   -- Optimal allocation (caller fits α_S, α_V from grid)
----   local r = svs.optimal_split(100, {
----       lambda = 2.0,
----       exponent_solve = 0.57, exponent_verify = 0.39,
----       prefactor_solve = 1.0, prefactor_verify = 1.0,
----   })
----   -- r.s_opt / r.v_opt / r.cost_used / r.rescaled / r.raw / ...
+--- ## Caveats
 ---
---- Category: orchestration (allocator alongside compute_alloc).
+--- Cross-over observations (paper §5.1, observations not constants):
+---
+--- - Llama-3.1-8B + GenRM-FT + MATH: GenRM matches SC at 8× compute,
+---   +3.8% accuracy at 128×.
+--- - Qwen-2.5-7B + MATH: 64× to match, +5.4% at 512×.
+--- - Llama-3.3-70B + GenRM-Base + MATH: 4× to match, +1.7% at 64×.
+--- - QwQ-32B (thinking) + MATH: 4× to match, +2.5% at 16×.
+---
+--- The cross-over is verifier-quality and model-dependent (Appendix E:
+--- GenRM-FT vs Base differs by 16×); the pkg does not hardcode a
+--- multiplier.
+---
+--- Out of scope for v1: `fit_exponents` log-linear regression (caller
+--- fits in v1), cross-over multiplier auto-estimation, multi-question
+--- budget partition, and the `independent` cost model (declared but
+--- not implemented).
+---
+--- ## Comparison with related packages
+---
+--- Category: orchestration (allocator alongside `compute_alloc`).
+---
+--- ## References
+---
+--- - Singhi, ..., Bansal, ..., Hosseini, ..., Grover, ..., Chang, ...,
+---   Rohrbach, ..., Rohrbach, ... (2025). "When To Solve, When To
+---   Verify: Compute-Optimal Problem Solving and Generative
+---   Verification for LLM Reasoning". COLM 2025.
+---   https://arxiv.org/abs/2504.01005
 
 local S = require("alc_shapes")
 local T = S.T
