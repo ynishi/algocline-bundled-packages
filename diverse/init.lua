@@ -1,17 +1,41 @@
 --- diverse(DiVERSe) — diverse reasoning paths with step-level verification
+---
 --- Generates multiple diverse reasoning paths, then verifies each path
 --- at the step level (not just the final answer). Selects the path with
 --- the highest step-level verification score.
 ---
---- Based on: Li et al., "Making Language Models Better Reasoners with
---- Step-Aware Verifier" (DiVERSe, 2023, arXiv:2206.02336)
+--- ## Usage
 ---
---- Usage:
----   local diverse = require("diverse")
----   return diverse.run(ctx)
+--- ```lua
+--- local diverse = require("diverse")
+--- return diverse.run(ctx)
+--- ```
 ---
---- ctx.task (required): The problem to solve
---- ctx.n_paths: Number of diverse reasoning paths (default: 3)
+--- ## Algorithm
+---
+--- 1. **Generate**: produce `n_paths` diverse reasoning paths by prompting
+---    with increasingly divergent instructions (straightforward → alternative
+---    → explicitly different from prior paths).
+--- 2. **Verify**: for each path, parse individual steps (numbered or
+---    sentence-split) and send each step to a step-level verifier LLM that
+---    rates correctness 1-10 given the task and prior steps.
+--- 3. **Select**: rank paths by average step score; pick the highest-scoring
+---    path as the winner.
+--- 4. **Synthesize**: ask the LLM to produce a final answer grounded in the
+---    winning path's reasoning chain.
+---
+--- ## Theoretical foundations
+---
+--- DiVERSe (Li et al., 2022) shows that step-level process reward models
+--- outperform outcome reward models on mathematical reasoning benchmarks.
+--- Verifying individual steps rather than only the final answer catches
+--- faulty intermediate conclusions that happen to reach a correct endpoint.
+---
+--- ## References
+---
+--- - Li, Y., Lin, Z., Liu, Z., Fu, Q., Lou, J.-G., Chen, W., Deng, Z. (2022).
+---   "Making Large Language Models Better Reasoners with Step-Aware Verifier".
+---   arXiv:2206.02336.
 
 local S = require("alc_shapes")
 local T = S.T

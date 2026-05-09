@@ -14,8 +14,45 @@ generated: gen_docs (V0)
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local diverse = require("diverse")
+return diverse.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. **Generate**: produce `n_paths` diverse reasoning paths by prompting
+   with increasingly divergent instructions (straightforward → alternative
+   → explicitly different from prior paths).
+2. **Verify**: for each path, parse individual steps (numbered or
+   sentence-split) and send each step to a step-level verifier LLM that
+   rates correctness 1-10 given the task and prior steps.
+3. **Select**: rank paths by average step score; pick the highest-scoring
+   path as the winner.
+4. **Synthesize**: ask the LLM to produce a final answer grounded in the
+   winning path's reasoning chain.
+
+## Theoretical foundations {#theoretical-foundations}
+
+DiVERSe (Li et al., 2022) shows that step-level process reward models
+outperform outcome reward models on mathematical reasoning benchmarks.
+Verifying individual steps rather than only the final answer catches
+faulty intermediate conclusions that happen to reach a correct endpoint.
+
+## References {#references}
+
+- Li, Y., Lin, Z., Liu, Z., Fu, Q., Lou, J.-G., Chen, W., Deng, Z. (2022).
+  "Making Large Language Models Better Reasoners with Step-Aware Verifier".
+  arXiv:2206.02336.
 
 ## Parameters {#parameters}
 

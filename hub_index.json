@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T00:07:50Z",
+  "updated_at": "2026-05-09T00:11:32Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -427,7 +427,7 @@
       "version": "0.1.0",
       "description": "DiVERSe — diverse reasoning paths with step-level verification and selection",
       "category": "reasoning",
-      "docstring": "diverse(DiVERSe) — diverse reasoning paths with step-level verification\nGenerates multiple diverse reasoning paths, then verifies each path\nat the step level (not just the final answer). Selects the path with\nthe highest step-level verification score.\n\nBased on: Li et al., \"Making Language Models Better Reasoners with\nStep-Aware Verifier\" (DiVERSe, 2023, arXiv:2206.02336)\n\nUsage:\nlocal diverse = require(\"diverse\")\nreturn diverse.run(ctx)\n\nctx.task (required): The problem to solve\nctx.n_paths: Number of diverse reasoning paths (default: 3)",
+      "docstring": "diverse(DiVERSe) — diverse reasoning paths with step-level verification\n\nGenerates multiple diverse reasoning paths, then verifies each path\nat the step level (not just the final answer). Selects the path with\nthe highest step-level verification score.\n\n## Usage\n\n```lua\nlocal diverse = require(\"diverse\")\nreturn diverse.run(ctx)\n```\n\n## Algorithm\n\n1. **Generate**: produce `n_paths` diverse reasoning paths by prompting\nwith increasingly divergent instructions (straightforward → alternative\n→ explicitly different from prior paths).\n2. **Verify**: for each path, parse individual steps (numbered or\nsentence-split) and send each step to a step-level verifier LLM that\nrates correctness 1-10 given the task and prior steps.\n3. **Select**: rank paths by average step score; pick the highest-scoring\npath as the winner.\n4. **Synthesize**: ask the LLM to produce a final answer grounded in the\nwinning path's reasoning chain.\n\n## Theoretical foundations\n\nDiVERSe (Li et al., 2022) shows that step-level process reward models\noutperform outcome reward models on mathematical reasoning benchmarks.\nVerifying individual steps rather than only the final answer catches\nfaulty intermediate conclusions that happen to reach a correct endpoint.\n\n## References\n\n- Li, Y., Lin, Z., Liu, Z., Fu, Q., Lou, J.-G., Chen, W., Deng, Z. (2022).\n\"Making Large Language Models Better Reasoners with Step-Aware Verifier\".\narXiv:2206.02336.",
       "source": {
         "type": "unknown"
       },
