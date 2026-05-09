@@ -8,14 +8,50 @@ source: reflexion/init.lua
 generated: gen_docs (V0)
 ---
 
-# reflexion — Episodic Memory Self-Improvement
+# reflexion(Reflexion) — episodic-memory self-improvement
 
-> Iteratively attempts a task, evaluates the result, generates a natural language "reflection" from failures, and stores it in episodic memory. Subsequent attempts reference accumulated reflections to avoid repeating the same mistakes.
+> Iteratively attempts a task, evaluates the result, generates a natural-language "reflection" from failures, and stores it in episodic memory. Subsequent attempts reference accumulated reflections to avoid repeating the same mistakes.
 
 ## Contents
 
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Empirical validation](#empirical-validation)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local rfx = require("reflexion")
+return rfx.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `reflect` — Generate → Critique → Revise within a single attempt;
+  each round improves the current draft, no cross-attempt memory.
+  Metaphor: proofreading and editing a paper.
+- `reflexion` — multiple independent attempts, each informed by
+  reflections on previous failures stored in episodic memory.
+  Metaphor: retaking an exam after studying your mistakes.
+
+`reflect` polishes a single output (local optimization);
+`reflexion` explores fundamentally different approaches informed by
+past failures (global search with memory).
+
+## Empirical validation {#empirical-validation}
+
+- HumanEval: 67% → 91%.
+- AlfWorld: 134/134 tasks.
+
+## References {#references}
+
+- Shinn, N. et al. (2023). "Reflexion: Language Agents with Verbal
+  Reinforcement Learning". NeurIPS 2023.
+  https://arxiv.org/abs/2303.11366
+ctx.reflect_tokens: Max tokens per reflection (default: 300)
 
 ## Parameters {#parameters}
 

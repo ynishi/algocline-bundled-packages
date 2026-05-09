@@ -1,38 +1,40 @@
---- reflexion — Episodic Memory Self-Improvement
+--- reflexion(Reflexion) — episodic-memory self-improvement
 ---
---- Iteratively attempts a task, evaluates the result, generates a natural
---- language "reflection" from failures, and stores it in episodic memory.
---- Subsequent attempts reference accumulated reflections to avoid repeating
---- the same mistakes.
+--- Iteratively attempts a task, evaluates the result, generates a
+--- natural-language "reflection" from failures, and stores it in
+--- episodic memory. Subsequent attempts reference accumulated
+--- reflections to avoid repeating the same mistakes.
 ---
---- Key difference from reflect:
----   reflect   — Generate → Critique → Revise loop within a SINGLE attempt.
----               Each round improves the CURRENT draft. No memory across attempts.
----               Metaphor: proofreading and editing a paper.
----   reflexion — Multiple INDEPENDENT attempts, each informed by reflections on
----               previous FAILURES. Stores what went wrong and why in episodic
----               memory. Each attempt starts fresh but with accumulated wisdom.
----               Metaphor: retaking an exam after studying your mistakes.
+--- ## Usage
 ---
---- Why this matters:
----   reflect polishes a single output (local optimization).
----   reflexion explores fundamentally different approaches informed by past
----   failures (global search with memory). On HumanEval: 67% → 91%.
----   On AlfWorld: achieved 134/134 tasks. The episodic memory prevents
----   the agent from repeating the same class of errors.
+--- ```lua
+--- local rfx = require("reflexion")
+--- return rfx.run(ctx)
+--- ```
 ---
---- Based on: Shinn et al., "Reflexion: Language Agents with Verbal
---- Reinforcement Learning" (NeurIPS 2023, arXiv:2303.11366)
+--- ## Comparison with related packages
 ---
---- Usage:
----   local rfx = require("reflexion")
----   return rfx.run(ctx)
+--- - `reflect` — Generate → Critique → Revise within a single attempt;
+---   each round improves the current draft, no cross-attempt memory.
+---   Metaphor: proofreading and editing a paper.
+--- - `reflexion` — multiple independent attempts, each informed by
+---   reflections on previous failures stored in episodic memory.
+---   Metaphor: retaking an exam after studying your mistakes.
 ---
---- ctx.task (required): The task to solve
---- ctx.max_trials: Maximum number of attempts (default: 3)
---- ctx.evaluator: Custom evaluation prompt (optional)
---- ctx.success_threshold: Score threshold to accept (default: 8, scale 1-10)
---- ctx.gen_tokens: Max tokens per attempt (default: 500)
+--- `reflect` polishes a single output (local optimization);
+--- `reflexion` explores fundamentally different approaches informed by
+--- past failures (global search with memory).
+---
+--- ## Empirical validation
+---
+--- - HumanEval: 67% → 91%.
+--- - AlfWorld: 134/134 tasks.
+---
+--- ## References
+---
+--- - Shinn, N. et al. (2023). "Reflexion: Language Agents with Verbal
+---   Reinforcement Learning". NeurIPS 2023.
+---   https://arxiv.org/abs/2303.11366
 --- ctx.reflect_tokens: Max tokens per reflection (default: 300)
 
 local S = require("alc_shapes")
