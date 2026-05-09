@@ -8,7 +8,7 @@ source: ab_select/init.lua
 generated: gen_docs (V0)
 ---
 
-# ab_select(AB-Select) — selects the best candidate via multi-fidelity Thompson sampling
+# ab_select(AB-Select) — multi-fidelity Thompson sampling for candidate selection
 
 > Selects the best candidate from a fixed pool using staged evaluators of increasing cost. Thompson Sampling decides which candidate receives the next, more expensive evaluation, allocating expensive evaluators only to candidates whose Beta posterior suggests they are promising.
 

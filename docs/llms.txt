@@ -173,7 +173,7 @@
 
 ## simulation
 
-- [abm](narrative/abm.md): Agent-Based Model framework — Agent/Model/Scheduler + Monte Carlo runner + sensitivity sweep. LLM-amplified simulation for structural reasoning.
+- [abm](narrative/abm.md): Agent-based modeling framework with Monte Carlo and sensitivity sweep.
 - [boids_abm](narrative/boids_abm.md): Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization. Based on Reynolds (1987).
 - [epidemic_abm](narrative/epidemic_abm.md): SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0. Emergent epidemic curves, herd immunity thresholds, and stochastic extinction.
 - [evogame_abm](narrative/evogame_abm.md): Evolutionary Game Theory ABM — iterated games with selection and mutation. Prisoner's Dilemma, Hawk-Dove, or custom payoff matrices. Based on Axelrod (1984).
