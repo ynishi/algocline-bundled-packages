@@ -1,26 +1,28 @@
---- bisect — Binary search for reasoning errors
+--- bisect(Bisect) — binary search for reasoning errors
 ---
---- Instead of verifying every step of a reasoning chain (O(n)),
---- bisects the chain to locate the first error in O(log n) steps.
---- Once found, regenerates only the erroneous step and continues.
+--- Instead of verifying every step of a reasoning chain (O(n)), bisects
+--- the chain to locate the first error in O(log n) steps. Once found,
+--- regenerates only the erroneous step and continues.
 ---
---- Inspired by: Process Reward Models and step-level verification
----              (arXiv 2410.08146, "Rewarding Progress", 2024)
----              + git bisect methodology applied to reasoning chains
+--- ## Usage
 ---
---- Pipeline:
----   Step 1: generate   — produce a full reasoning chain (numbered steps)
----   Step 2: bisect     — binary search for first incorrect step
----   Step 3: regenerate — re-derive from the last correct step
+--- ```lua
+--- local bisect = require("bisect")
+--- return bisect.run(ctx)
+--- ```
 ---
---- Usage:
----   local bisect = require("bisect")
----   return bisect.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task/question to solve
---- ctx.max_repairs: Maximum number of bisect→repair cycles (default: 2)
---- ctx.gen_tokens: Max tokens for chain generation (default: 800)
---- ctx.verify_tokens: Max tokens per verification (default: 200)
+--- 1. Generate a full numbered reasoning chain for the task.
+--- 2. Binary-search the chain to locate the first incorrect step.
+--- 3. Regenerate from the last correct step. Repeat up to `max_repairs`
+---    times.
+---
+--- ## References
+---
+--- - "Rewarding Progress" (Process Reward Models, step-level
+---   verification). https://arxiv.org/abs/2410.08146
+--- - `git bisect` methodology applied to reasoning chains.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -31,7 +33,7 @@ local M = {}
 M.meta = {
     name = "bisect",
     version = "0.1.0",
-    description = "Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point",
+    description = "Binary search to locate the first incorrect step in a reasoning chain.",
     category = "debugging",
 }
 

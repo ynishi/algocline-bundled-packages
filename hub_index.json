@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:51:21Z",
+  "updated_at": "2026-05-09T02:51:53Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -101,9 +101,9 @@
     {
       "name": "bisect",
       "version": "0.1.0",
-      "description": "Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point",
+      "description": "Binary search to locate the first incorrect step in a reasoning chain.",
       "category": "debugging",
-      "docstring": "bisect — Binary search for reasoning errors\n\nInstead of verifying every step of a reasoning chain (O(n)),\nbisects the chain to locate the first error in O(log n) steps.\nOnce found, regenerates only the erroneous step and continues.\n\nInspired by: Process Reward Models and step-level verification\n(arXiv 2410.08146, \"Rewarding Progress\", 2024)\n+ git bisect methodology applied to reasoning chains\n\nPipeline:\nStep 1: generate   — produce a full reasoning chain (numbered steps)\nStep 2: bisect     — binary search for first incorrect step\nStep 3: regenerate — re-derive from the last correct step\n\nUsage:\nlocal bisect = require(\"bisect\")\nreturn bisect.run(ctx)\n\nctx.task (required): The task/question to solve\nctx.max_repairs: Maximum number of bisect→repair cycles (default: 2)\nctx.gen_tokens: Max tokens for chain generation (default: 800)\nctx.verify_tokens: Max tokens per verification (default: 200)",
+      "docstring": "bisect(Bisect) — binary search for reasoning errors\n\nInstead of verifying every step of a reasoning chain (O(n)), bisects\nthe chain to locate the first error in O(log n) steps. Once found,\nregenerates only the erroneous step and continues.\n\n## Usage\n\n```lua\nlocal bisect = require(\"bisect\")\nreturn bisect.run(ctx)\n```\n\n## Algorithm\n\n1. Generate a full numbered reasoning chain for the task.\n2. Binary-search the chain to locate the first incorrect step.\n3. Regenerate from the last correct step. Repeat up to `max_repairs`\ntimes.\n\n## References\n\n- \"Rewarding Progress\" (Process Reward Models, step-level\nverification). https://arxiv.org/abs/2410.08146\n- `git bisect` methodology applied to reasoning chains.",
       "source": {
         "type": "unknown"
       },

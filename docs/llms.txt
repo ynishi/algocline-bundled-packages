@@ -37,7 +37,7 @@
 
 ## debugging
 
-- [bisect](narrative/bisect.md): Binary search for reasoning errors — locate first incorrect step in O(log n), then regenerate from that point
+- [bisect](narrative/bisect.md): Binary search to locate the first incorrect step in a reasoning chain.
 
 ## evaluation
 
