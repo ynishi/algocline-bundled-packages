@@ -1,26 +1,28 @@
---- Prism — cognitive-load-aware intent decomposition and logical clarification
+--- prism(Prism) — cognitive-load-aware intent decomposition and clarification
 ---
---- Decomposes complex user intents into structured sub-intents, identifies
---- logical dependencies among them, and generates clarification questions
---- in dependency order to minimize user cognitive load.
+--- Decomposes complex user intents into structured sub-intents,
+--- identifies logical dependencies among them, and generates
+--- clarification questions in dependency order to minimize user
+--- cognitive load.
 ---
---- Based on: "Prism: Towards Lowering User Cognitive Load in LLMs via
---- Complex Intent Understanding" (2026, arXiv:2601.08653)
+--- ## Usage
 ---
---- The algorithm has three phases:
----   Phase 1 (Decompose): Break task into atomic sub-intents
----   Phase 2 (Dependency): Identify logical dependencies between sub-intents
----   Phase 3 (Clarify): Generate clarification questions in topological order,
----           then integrate responses into a fully-specified task
+--- ```lua
+--- local prism = require("prism")
+--- return prism.run(ctx)
+--- ```
 ---
---- Usage:
----   local prism = require("prism")
----   return prism.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task or request to analyze
---- ctx.max_sub_intents: Maximum sub-intents to extract (default: 8)
---- ctx.decompose_tokens: Max tokens for decomposition (default: 600)
---- ctx.clarify_tokens: Max tokens per clarification phase (default: 400)
+--- 1. Decompose — break the task into atomic sub-intents.
+--- 2. Dependency — identify logical dependencies between sub-intents.
+--- 3. Clarify — generate clarification questions in topological order,
+---    then integrate responses into a fully-specified task.
+---
+--- ## References
+---
+--- - "Prism: Towards Lowering User Cognitive Load in LLMs via Complex
+---   Intent Understanding" (2026). https://arxiv.org/abs/2601.08653
 
 local S = require("alc_shapes")
 local T = S.T

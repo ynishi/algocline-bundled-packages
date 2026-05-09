@@ -8,14 +8,36 @@ source: prism/init.lua
 generated: gen_docs (V0)
 ---
 
-# Prism — cognitive-load-aware intent decomposition and logical clarification
+# prism(Prism) — cognitive-load-aware intent decomposition and clarification
 
 > Decomposes complex user intents into structured sub-intents, identifies logical dependencies among them, and generates clarification questions in dependency order to minimize user cognitive load.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local prism = require("prism")
+return prism.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Decompose — break the task into atomic sub-intents.
+2. Dependency — identify logical dependencies between sub-intents.
+3. Clarify — generate clarification questions in topological order,
+   then integrate responses into a fully-specified task.
+
+## References {#references}
+
+- "Prism: Towards Lowering User Cognitive Load in LLMs via Complex
+  Intent Understanding" (2026). https://arxiv.org/abs/2601.08653
 
 ## Parameters {#parameters}
 
