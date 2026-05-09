@@ -1,55 +1,49 @@
---- pairwise_rank — Pairwise Ranking Prompting (PRP)
+--- pairwise_rank(PairwiseRank) — Pairwise Ranking Prompting (PRP)
 ---
---- Ranks N candidates by asking the LLM "is A or B better?" for pairs and
---- aggregating the wins (Copeland-style score). PRP is the most accurate
+--- Ranks N candidates by asking the LLM "is A or B better?" for pairs
+--- and aggregating wins (Copeland-style score). PRP is the most accurate
 --- known LLM-as-judge method when the LLM is small or the task is hard,
 --- because it asks the LLM the simplest possible question (a single
---- pairwise preference) at the cost of more LLM calls.
+--- pairwise preference) at the cost of more LLM calls. By comparing two
+--- items at a time, PRP sidesteps both numeric calibration and
+--- list-positional reasoning.
 ---
---- Key difference from listwise_rank / setwise_rank:
----   listwise_rank — 1 LLM call to rank everything. Cheapest. Limited by
----                   context window. Can suffer from list-position bias.
----   setwise_rank  — Tournament with set comparisons of size k. O(N log N)
----                   calls. Mid-cost, mid-accuracy.
----   pairwise_rank — Pure pairwise. O(N²) "all-pairs" or O(N log N)
----                   "tournament" call modes. Highest accuracy when N is
----                   modest. Position bias mitigated by querying both
----                   orderings (A,B) and (B,A) and counting wins.
+--- ## Usage
 ---
---- Mathematical advantage:
----   By only ever asking the LLM to compare two items at a time, PRP
----   reduces the LLM's task complexity to its minimum, sidestepping
----   numeric calibration AND list-positional reasoning. The paper
----   explicitly identifies "resolving the calibration issue" as PRP's
----   motivation.
+--- ```lua
+--- local pr = require("pairwise_rank")
+--- return pr.run(ctx)
+--- ```
 ---
---- Empirical results (from PRP, Qin et al.):
----   - Flan-UL2 (20B params) with PRP-Allpair matches GPT-4 (~50× larger)
----     on TREC-DL 2019 and 2020.
----   - Outperforms pointwise LLM rankers by >10% NDCG@10 on average across
----     7 BEIR tasks.
----   - Outperforms blackbox ChatGPT listwise reranking by 4.2% NDCG@10.
+--- ## Algorithm
 ---
---- Based on:
----   Qin et al., "Large Language Models are Effective Text Rankers with
----     Pairwise Ranking Prompting" (NAACL 2024 Findings, arXiv:2306.17563)
+--- - `allpair` — every unordered pair compared in both directions to
+---   cancel position bias. `2 · C(N,2) = N·(N-1)` LLM calls. Most
+---   accurate; use for `N ≤ 12`.
+--- - `sorting` — heap-style insertion sort using pairwise comparisons.
+---   `O(N log N)` calls in expectation; use for larger N.
 ---
---- Modes:
----   "allpair" — every unordered pair compared in BOTH directions to
----               cancel position bias. 2 * C(N,2) = N*(N-1) LLM calls.
----               Most accurate. Use for N ≤ 12.
----   "sorting" — heap-style insertion sort using pairwise comparisons.
----               O(N log N) calls in expectation. Use for larger N.
+--- ## Comparison with related packages
 ---
---- Usage:
----   local pr = require("pairwise_rank")
----   return pr.run(ctx)
+--- - `listwise_rank` — 1 LLM call ranks everything; cheapest but limited
+---   by context window and can suffer list-position bias.
+--- - `setwise_rank` — tournament with set comparisons of size `k`,
+---   `O(N log N)` calls; mid-cost / mid-accuracy.
+--- - `pairwise_rank` — pure pairwise; highest accuracy when N is modest.
 ---
---- ctx.task (required): The criterion for comparison
---- ctx.candidates (required): array of candidate texts
---- ctx.top_k: how many to keep (default N — full ranked list)
---- ctx.method: "allpair" | "sorting" (default "allpair")
---- ctx.gen_tokens: max tokens per pairwise judgment (default 20)
+--- ## Empirical validation
+---
+--- - Flan-UL2 (20B params) with PRP-Allpair matches GPT-4 (~50× larger)
+---   on TREC-DL 2019/2020.
+--- - Outperforms pointwise LLM rankers by >10% NDCG@10 on average across
+---   7 BEIR tasks.
+--- - Outperforms blackbox ChatGPT listwise reranking by 4.2% NDCG@10.
+---
+--- ## References
+---
+--- - Qin, Z. et al. (2024). "Large Language Models are Effective Text
+---   Rankers with Pairwise Ranking Prompting". NAACL 2024 Findings.
+---   https://arxiv.org/abs/2306.17563
 
 local M = {}
 
