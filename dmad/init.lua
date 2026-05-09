@@ -1,32 +1,33 @@
---- dmad — Dialectical reasoning (thesis → antithesis → synthesis)
+--- dmad(DMAD) — dialectical reasoning (thesis → antithesis → synthesis)
 ---
---- Applies the Hegelian dialectic to LLM reasoning: first generates a
---- thesis (initial position), then constructs the strongest possible
---- antithesis (opposing position), and finally produces a synthesis that
---- integrates valid points from both sides.
+--- Applies the Hegelian dialectic to LLM reasoning: generates a thesis
+--- (initial position), constructs the strongest possible antithesis,
+--- and produces a synthesis that integrates valid points from both
+--- sides. Unlike `panel` (sequential multi-role discussion) or
+--- `negation` (destruction conditions), `dmad` explicitly builds a
+--- well-argued counter-position and forces genuine integration rather
+--- than simple error correction.
 ---
---- Unlike panel (sequential multi-role discussion) or negation (destruction
---- conditions), dmad explicitly constructs a well-argued counter-position
---- and forces genuine integration rather than simple error-correction.
+--- ## Usage
 ---
---- Based on: "Improving Factuality and Reasoning in Language Models through
----            Multiagent Debate" (Du et al., arXiv 2305.14325, 2023)
----            + Hegelian dialectic methodology
+--- ```lua
+--- local dmad = require("dmad")
+--- return dmad.run(ctx)
+--- ```
 ---
---- Pipeline:
----   Step 1: thesis     — generate initial reasoned position
----   Step 2: antithesis — construct strongest opposing argument
----   Step 3: rebuttal   — thesis side responds to antithesis
----   Step 4: synthesis  — integrate valid points from both sides
+--- ## Algorithm
 ---
---- Usage:
----   local dmad = require("dmad")
----   return dmad.run(ctx)
+--- 1. Thesis — generate the initial reasoned position.
+--- 2. Antithesis — construct the strongest opposing argument.
+--- 3. Rebuttal — the thesis side responds to the antithesis.
+--- 4. Synthesis — integrate valid points from both sides.
 ---
---- ctx.task (required): The task/question to analyze
---- ctx.rounds: Number of thesis-antithesis exchange rounds (default: 1)
---- ctx.gen_tokens: Max tokens per position (default: 500)
---- ctx.synth_tokens: Max tokens for synthesis (default: 600)
+--- ## References
+---
+--- - Du, Y. et al. (2023). "Improving Factuality and Reasoning in
+---   Language Models through Multiagent Debate".
+---   https://arxiv.org/abs/2305.14325
+--- - Hegelian dialectic methodology.
 
 local S = require("alc_shapes")
 local T = S.T

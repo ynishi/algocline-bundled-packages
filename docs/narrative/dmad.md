@@ -8,14 +8,38 @@ source: dmad/init.lua
 generated: gen_docs (V0)
 ---
 
-# dmad — Dialectical reasoning (thesis → antithesis → synthesis)
+# dmad(DMAD) — dialectical reasoning (thesis → antithesis → synthesis)
 
-> Applies the Hegelian dialectic to LLM reasoning: first generates a thesis (initial position), then constructs the strongest possible antithesis (opposing position), and finally produces a synthesis that integrates valid points from both sides.
+> Applies the Hegelian dialectic to LLM reasoning: generates a thesis (initial position), constructs the strongest possible antithesis, and produces a synthesis that integrates valid points from both sides. Unlike `panel` (sequential multi-role discussion) or `negation` (destruction conditions), `dmad` explicitly builds a well-argued counter-position and forces genuine integration rather than simple error correction.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local dmad = require("dmad")
+return dmad.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Thesis — generate the initial reasoned position.
+2. Antithesis — construct the strongest opposing argument.
+3. Rebuttal — the thesis side responds to the antithesis.
+4. Synthesis — integrate valid points from both sides.
+
+## References {#references}
+
+- Du, Y. et al. (2023). "Improving Factuality and Reasoning in
+  Language Models through Multiagent Debate".
+  https://arxiv.org/abs/2305.14325
+- Hegelian dialectic methodology.
 
 ## Parameters {#parameters}
 
