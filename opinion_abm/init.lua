@@ -1,31 +1,27 @@
---- opinion_abm — Hegselmann-Krause Bounded Confidence Opinion Dynamics
+--- opinion_abm(OpinionABM) — Hegselmann-Krause bounded-confidence opinion dynamics
 ---
---- N agents hold continuous opinion values in [0,1].
---- Each step, an agent updates its opinion to the average of all agents
---- whose opinions are within ε (bounded confidence threshold).
+--- N agents hold continuous opinion values in `[0, 1]`. Each step an
+--- agent updates its opinion to the average of all agents whose opinions
+--- are within `ε` (bounded-confidence threshold). The threshold value
+--- determines the emergent regime:
 ---
---- Emergent phenomena: consensus, polarization (2-3 clusters),
---- fragmentation (many clusters). Determined by ε value.
----   ε > 0.5  → consensus (single cluster)
----   ε ≈ 0.2  → polarization (2-3 clusters)
----   ε < 0.1  → fragmentation (many clusters)
+--- - `ε > 0.5` — consensus (single cluster).
+--- - `ε ≈ 0.2` — polarization (2-3 clusters).
+--- - `ε < 0.1` — fragmentation (many clusters).
 ---
---- Based on:
----   Hegselmann & Krause, "Opinion Dynamics and Bounded Confidence:
----   Models, Analysis and Simulation", JASSS 5(3), 2002
+--- ## Usage
 ---
----   Rodrigo, "Extending the Hegselmann-Krause Model to include
----   AI Oracles", arXiv:2502.19701, 2025
+--- ```lua
+--- local opinion = require("opinion_abm")
+--- return opinion.run(ctx)
+--- ```
 ---
---- Usage:
----   local opinion = require("opinion_abm")
----   return opinion.run(ctx)
+--- ## References
 ---
---- ctx.task (required): Description of the opinion scenario
---- ctx.n_agents?: number (default 50)
---- ctx.epsilon?: number Bounded confidence threshold (default 0.25)
---- ctx.steps?: number (default 50)
---- ctx.runs?: number MC runs (default 100)
+--- - Hegselmann, R., Krause, U. (2002). "Opinion Dynamics and Bounded
+---   Confidence: Models, Analysis and Simulation". JASSS 5(3).
+--- - Rodrigo, ... (2025). "Extending the Hegselmann-Krause Model to
+---   include AI Oracles". https://arxiv.org/abs/2502.19701
 --- ctx.initial_distribution?: "uniform"|"bimodal"|"clustered" (default "uniform")
 
 local abm = require("abm")

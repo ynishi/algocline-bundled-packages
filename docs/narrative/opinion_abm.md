@@ -8,14 +8,31 @@ source: opinion_abm/init.lua
 generated: gen_docs (V0)
 ---
 
-# opinion_abm — Hegselmann-Krause Bounded Confidence Opinion Dynamics
+# opinion_abm(OpinionABM) — Hegselmann-Krause bounded-confidence opinion dynamics
 
-> N agents hold continuous opinion values in [0,1]. Each step, an agent updates its opinion to the average of all agents whose opinions are within ε (bounded confidence threshold).
+> N agents hold continuous opinion values in `[0, 1]`. Each step an agent updates its opinion to the average of all agents whose opinions are within `ε` (bounded-confidence threshold). The threshold value determines the emergent regime:
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local opinion = require("opinion_abm")
+return opinion.run(ctx)
+```
+
+## References {#references}
+
+- Hegselmann, R., Krause, U. (2002). "Opinion Dynamics and Bounded
+  Confidence: Models, Analysis and Simulation". JASSS 5(3).
+- Rodrigo, ... (2025). "Extending the Hegselmann-Krause Model to
+  include AI Oracles". https://arxiv.org/abs/2502.19701
+ctx.initial_distribution?: "uniform"|"bimodal"|"clustered" (default "uniform")
 
 ## Parameters {#parameters}
 
