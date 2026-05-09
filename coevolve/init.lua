@@ -1,39 +1,38 @@
---- coevolve — Challenger-Solver Co-evolution
+--- coevolve(Coevolve) — challenger-solver co-evolution self-play
 ---
---- Two LLM roles evolve together: Challenger generates problems at the edge
---- of Solver's ability, Solver attempts to solve them. As Solver improves,
---- Challenger generates harder problems. This adversarial co-evolution
---- automatically expands the exploration space — unlike cooperative methods
---- (panel, rstar) that work within a fixed problem scope.
+--- Two LLM roles evolve together: the Challenger generates problems at the
+--- edge of the Solver's ability and the Solver attempts to solve them. As
+--- the Solver improves, the Challenger generates harder problems. The
+--- adversarial co-evolution automatically expands the exploration space,
+--- unlike cooperative methods (`panel`, `rstar`) that work within a fixed
+--- scope.
 ---
---- Based on:
----   [1] Singh et al. "Self-Play for LLM Reasoning: Challenger-Solver
----       Co-evolution" (2025, arXiv:2510.27072)
----       GSM-PLUS: +8.92% via co-evolutionary self-play
----   [2] Faldor et al. "OMNI-EPIC: Open-endedness via Models of human
----       Notions of Interestingness" (ICLR 2025, arXiv:2405.15568)
----   [3] Sukhbaatar et al. "Intrinsic Motivation and Automatic Curricula
----       via Asymmetric Self-Play" (ICLR 2018)
+--- ## Usage
 ---
---- Pipeline (rounds × (problems × 2 + 2) LLM calls):
----   Seed     — initial problem set (provided or generated)
----   Loop (per round):
----     Solve      — Solver attempts each problem
----     Analyze    — review success/failure patterns
----     Challenge  — Challenger generates new problems targeting weaknesses
----     Calibrate  — adjust difficulty based on success rate
----   Final: Solver answers the original task using accumulated skill
+--- ```lua
+--- local coevolve = require("coevolve")
+--- return coevolve.run(ctx)
+--- ```
 ---
---- Usage:
----   local coevolve = require("coevolve")
----   return coevolve.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The domain/problem to explore
---- ctx.seed_problems: Initial problem set (optional, will generate if nil)
---- ctx.rounds: Co-evolution rounds (default: 4)
---- ctx.problems_per_round: Problems Challenger generates per round (default: 3)
---- ctx.difficulty_target: Target success rate for calibration (default: 0.5)
---- ctx.solver_tokens: Max tokens for Solver responses (default: 400)
+--- 1. Seed an initial problem set (provided or auto-generated).
+--- 2. For each of `rounds`:
+---    - Solve each problem with the Solver.
+---    - Analyze success and failure patterns.
+---    - Challenger generates new problems targeting weaknesses.
+---    - Calibrate difficulty based on the success rate.
+--- 3. Solver answers the original task using accumulated skill.
+---
+--- ## References
+---
+--- - Singh, ... et al. (2025). "Self-Play for LLM Reasoning:
+---   Challenger-Solver Co-evolution". https://arxiv.org/abs/2510.27072
+--- - Faldor, M. et al. (2025). "OMNI-EPIC: Open-endedness via Models of
+---   human Notions of Interestingness". ICLR 2025.
+---   https://arxiv.org/abs/2405.15568
+--- - Sukhbaatar, S. et al. (2018). "Intrinsic Motivation and Automatic
+---   Curricula via Asymmetric Self-Play". ICLR 2018.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -44,9 +43,7 @@ local M = {}
 M.meta = {
     name = "coevolve",
     version = "0.1.0",
-    description = "Challenger-Solver Co-evolution — adversarial self-play where "
-        .. "Challenger generates problems at Solver's ability boundary and "
-        .. "Solver evolves to solve them. Automatic search space expansion.",
+    description = "Challenger-Solver co-evolution self-play that auto-expands the search space.",
     category = "exploration",
 }
 

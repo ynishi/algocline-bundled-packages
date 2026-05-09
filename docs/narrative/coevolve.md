@@ -3,19 +3,49 @@ name: coevolve
 version: 0.1.0
 category: exploration
 result_shape: "shape { all_results: array of shape { answer: string, problem: shape { difficulty: string, round: number, text: string }, reason?: string, round: number, verdict: string }, answer: string, round_stats: array of shape { correct: number, difficulty_hint: string, problems: number, round: number, success_rate: number }, total_correct: number, total_partial: number, total_problems: number, total_wrong: number }"
-description: "Challenger-Solver Co-evolution — adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion."
+description: "Challenger-Solver co-evolution self-play that auto-expands the search space."
 source: coevolve/init.lua
 generated: gen_docs (V0)
 ---
 
-# coevolve — Challenger-Solver Co-evolution
+# coevolve(Coevolve) — challenger-solver co-evolution self-play
 
-> Two LLM roles evolve together: Challenger generates problems at the edge of Solver's ability, Solver attempts to solve them. As Solver improves, Challenger generates harder problems. This adversarial co-evolution automatically expands the exploration space — unlike cooperative methods (panel, rstar) that work within a fixed problem scope.
+> Two LLM roles evolve together: the Challenger generates problems at the edge of the Solver's ability and the Solver attempts to solve them. As the Solver improves, the Challenger generates harder problems. The adversarial co-evolution automatically expands the exploration space, unlike cooperative methods (`panel`, `rstar`) that work within a fixed scope.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local coevolve = require("coevolve")
+return coevolve.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Seed an initial problem set (provided or auto-generated).
+2. For each of `rounds`:
+   - Solve each problem with the Solver.
+   - Analyze success and failure patterns.
+   - Challenger generates new problems targeting weaknesses.
+   - Calibrate difficulty based on the success rate.
+3. Solver answers the original task using accumulated skill.
+
+## References {#references}
+
+- Singh, ... et al. (2025). "Self-Play for LLM Reasoning:
+  Challenger-Solver Co-evolution". https://arxiv.org/abs/2510.27072
+- Faldor, M. et al. (2025). "OMNI-EPIC: Open-endedness via Models of
+  human Notions of Interestingness". ICLR 2025.
+  https://arxiv.org/abs/2405.15568
+- Sukhbaatar, S. et al. (2018). "Intrinsic Motivation and Automatic
+  Curricula via Asymmetric Self-Play". ICLR 2018.
 
 ## Parameters {#parameters}
 
