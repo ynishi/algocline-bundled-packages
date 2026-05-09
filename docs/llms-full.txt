@@ -3630,13 +3630,63 @@ Returns:
 <!-- ── listwise_rank.md ── -->
 
 
-# listwise_rank — Zero-shot Listwise Reranking with Sliding Window
+# listwise_rank(ListwiseRank) — zero-shot listwise reranking with sliding window
 
 > Ranks N pre-existing candidates by asking the LLM to output a permutation of all candidates in a single call. For N exceeding the context window, a sliding-window strategy progressively reranks overlapping windows from the tail back to the head, merging the partial permutations into a final order.
 
 ## Contents
 
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Empirical validation](#empirical-validation)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local lr = require("listwise_rank")
+return lr.run(ctx)
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Resolves the calibration problem by reformulating ranking as
+permutation generation rather than absolute scoring; the LLM never
+commits to a numeric value, only to an order.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- Pointwise scoring asks the LLM for an absolute score per candidate.
+  The LLM's number-generation prior anchors output to the middle of
+  the scale (typically 5-8), compressing variance and making any
+  fixed threshold either kill nothing or kill everything. This is the
+  "calibration problem" of LLM-as-Judge.
+- Listwise asks the LLM for an ordering. Only the relative order is
+  asked, so calibration is moot. Empirically dominates pointwise on
+  TREC-DL and BEIR.
+
+## Empirical validation {#empirical-validation}
+
+- GPT-4 with RankGPT achieves SOTA zero-shot reranking on
+  TREC-DL19/20.
+- Outperforms supervised baselines (monoT5-3B) and pointwise LLM
+  baselines on BEIR.
+- Knowledge is distillable into smaller open-source models
+  (RankZephyr, RankVicuna) that retain most of the effectiveness.
+
+## References {#references}
+
+- Sun, W. et al. (2023). "Is ChatGPT Good at Search? Investigating
+  Large Language Models as Re-Ranking Agents". EMNLP 2023.
+  https://arxiv.org/abs/2304.09542
+- Ma, X. et al. (2023). "Zero-Shot Listwise Document Reranking with a
+  Large Language Model". https://arxiv.org/abs/2305.02156
+- Pradeep, R. et al. (2023). "RankZephyr: Effective and Robust
+  Zero-Shot Listwise Reranking is a Breeze!".
+  https://arxiv.org/abs/2312.02724
+ctx.gen_tokens: max tokens for the ranking response (default 400)
 
 ## Result {#result}
 
@@ -3657,14 +3707,28 @@ Returns `listwise_ranked` shape:
 <!-- ── maieutic.md ── -->
 
 
-# Maieutic — recursive explanation tree with logical consistency filtering
+# maieutic(Maieutic) — recursive explanation tree with logical consistency filtering
 
 > Given a proposition, generates supporting and opposing explanations recursively (depth-limited tree), then checks logical consistency between parent-child pairs to filter contradictions.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local maieutic = require("maieutic")
+return maieutic.run(ctx)
+```
+
+## References {#references}
+
+- Jung, J. et al. (2022). "Maieutic Prompting: Logically Consistent
+  Reasoning with Recursive Explanations". https://arxiv.org/abs/2205.11822
 
 ## Parameters {#parameters}
 
@@ -3692,14 +3756,51 @@ Returns:
 <!-- ── mbr_select.md ── -->
 
 
-# mbr_select — Minimum Bayes Risk Selection
+# mbr_select(MBRSelect) — Minimum Bayes Risk candidate selection
 
-> Selects the candidate that minimizes expected loss across all other candidates. Instead of picking "the best" directly (which requires an absolute quality oracle), MBR picks the candidate most agreed-upon by all others — the one with minimum expected risk.
+> Selects the candidate that minimizes expected loss across all other candidates. Instead of picking "the best" directly (which requires an absolute quality oracle), MBR picks the candidate most agreed-upon by the others — the one with minimum expected risk.
 
 ## Contents
 
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local mbr = require("mbr_select")
+return mbr.run(ctx)
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+argmin_y E_{y'~P}[L(y, y')]   ≡   argmax_y E_{y'~P}[similarity(y, y')]
+```
+
+where `L = 1 - similarity`. This is the Bayes-optimal decision under
+the candidate distribution.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `rank` — single-elimination tournament with pairwise LLM-as-Judge.
+  `O(N log N)` comparisons. Subject to bracket luck: a strong
+  candidate can be eliminated by a flawed matchup; A/B position bias
+  affects results.
+- `mbr_select` — computes pairwise similarity for all pairs and
+  selects the candidate with highest total agreement. `O(N²/2)`
+  symmetric comparisons. No bracket luck and mathematically optimal
+  under Bayes decision theory.
+
+## References {#references}
+
+- "Regularized Best-of-N Sampling with Minimum Bayes Risk" (NAACL
+  2025).
+- Eikema, B., Aziz, W. (2020). MBR decoding literature.
 
 ## Parameters {#parameters}
 
@@ -3730,14 +3831,47 @@ Returns:
 <!-- ── mcts.md ── -->
 
 
-# MCTS — Monte Carlo Tree Search reasoning
+# mcts(MCTS) — Monte Carlo Tree Search reasoning
 
-> Applies MCTS to LLM reasoning: selection (UCB1), expansion (generate), simulation (rollout to conclusion), backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
+> Applies MCTS to LLM reasoning with selection (UCB1), expansion (generate), simulation (rollout to conclusion), and backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local mcts = require("mcts")
+return mcts.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Selection — descend with UCB1 to a promising leaf.
+2. Expansion — generate new children with the LLM.
+3. Simulation — roll out to a conclusion and score it.
+4. Backpropagation — propagate the score back up to the root.
+
+Optional reflection mechanism (`ctx.reflection = true`): when a
+simulation scores below the reflection threshold, the LLM generates a
+one-sentence diagnosis of why the path failed. The reflections are
+accumulated and injected into subsequent expansion prompts to help
+the search avoid repeating the same mistakes.
+
+## References {#references}
+
+- Hao, S. et al. (2023). "Reasoning with Language Model is Planning
+  with World Model" (RAP). https://arxiv.org/abs/2305.14992
+- Zhou, A. et al. (2024). "Language Agent Tree Search Unifies
+  Reasoning, Acting, and Planning in Language Models" (LATS).
+  ICML 2024. https://arxiv.org/abs/2310.04406
+- Xu, ... et al. (2025). "CogMCTS: Cognitive-Guided Monte Carlo Tree
+  Search". https://arxiv.org/abs/2512.08609
 
 ## Parameters {#parameters}
 
@@ -3834,14 +3968,46 @@ Returns:
 <!-- ── moa.md ── -->
 
 
-# moa — Mixture of Agents: layered multi-agent aggregation
+# moa(MoA) — Mixture-of-Agents layered multi-agent aggregation
 
-> Multiple agents generate responses independently, then a second layer of agents improves upon those responses by referencing all of them. Unlike simple panel (single-round), MoA uses iterative layers where each layer's agents see ALL previous layer outputs, enabling cross- pollination of ideas and progressive refinement.
+> Multiple agents generate responses independently, then a second layer of agents improves on those responses by referencing all of them. Unlike a single-round `panel`, MoA uses iterative layers where each layer's agents see all previous-layer outputs, enabling cross-pollination of ideas and progressive refinement.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Empirical validation](#empirical-validation)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local moa = require("moa")
+return moa.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+For `n_layers` layers (4-8 LLM calls typical):
+
+1. Layer 1 — `n_agents` agents generate independent responses in
+   parallel.
+2. Layer 2..N — each agent sees all previous-layer responses and
+   produces an improved response in parallel.
+3. Final — the aggregator synthesizes the best answer from the last
+   layer.
+
+## Empirical validation {#empirical-validation}
+
+The source paper reports an AlpacaEval 2.0 LC win rate of 65.8% (SOTA
+at publication).
+
+## References {#references}
+
+- Wang, J. et al. (2024). "Mixture-of-Agents Enhances Large Language
+  Model Capabilities". https://arxiv.org/abs/2406.04692
 
 ## Parameters {#parameters}
 

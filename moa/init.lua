@@ -1,30 +1,38 @@
---- moa — Mixture of Agents: layered multi-agent aggregation
+--- moa(MoA) — Mixture-of-Agents layered multi-agent aggregation
 ---
 --- Multiple agents generate responses independently, then a second layer
---- of agents improves upon those responses by referencing all of them.
---- Unlike simple panel (single-round), MoA uses iterative layers where
---- each layer's agents see ALL previous layer outputs, enabling cross-
---- pollination of ideas and progressive refinement.
+--- of agents improves on those responses by referencing all of them.
+--- Unlike a single-round `panel`, MoA uses iterative layers where each
+--- layer's agents see all previous-layer outputs, enabling
+--- cross-pollination of ideas and progressive refinement.
 ---
---- Based on: Wang et al., "Mixture-of-Agents Enhances Large Language
---- Model Capabilities" (2024, arXiv:2406.04692)
---- Achieved AlpacaEval 2.0 LC win rate of 65.8% (SOTA at publication)
+--- ## Usage
 ---
---- Pipeline (4-8 LLM calls depending on layers):
----   Layer 1: N agents generate independent responses (parallel)
----   Layer 2: N agents each see ALL Layer 1 responses + improve (parallel)
----   ...repeat for configured layers...
----   Final:   Aggregator synthesizes best answer from last layer
+--- ```lua
+--- local moa = require("moa")
+--- return moa.run(ctx)
+--- ```
 ---
---- Usage:
----   local moa = require("moa")
----   return moa.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task to solve
---- ctx.n_agents: Agents per layer (default: 3)
---- ctx.n_layers: Number of improvement layers (default: 2)
---- ctx.gen_tokens: Max tokens per agent response (default: 400)
---- ctx.agg_tokens: Max tokens for final aggregation (default: 500)
+--- For `n_layers` layers (4-8 LLM calls typical):
+---
+--- 1. Layer 1 — `n_agents` agents generate independent responses in
+---    parallel.
+--- 2. Layer 2..N — each agent sees all previous-layer responses and
+---    produces an improved response in parallel.
+--- 3. Final — the aggregator synthesizes the best answer from the last
+---    layer.
+---
+--- ## Empirical validation
+---
+--- The source paper reports an AlpacaEval 2.0 LC win rate of 65.8% (SOTA
+--- at publication).
+---
+--- ## References
+---
+--- - Wang, J. et al. (2024). "Mixture-of-Agents Enhances Large Language
+---   Model Capabilities". https://arxiv.org/abs/2406.04692
 
 local S = require("alc_shapes")
 local T = S.T

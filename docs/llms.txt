@@ -159,8 +159,8 @@
 - [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance, frontier extraction, and layered ranking.
 - [cs_pruner](narrative/cs_pruner.md): Anytime-valid candidate pruning via empirical-Bernstein confidence sequences.
 - [f_race](narrative/f_race.md): Friedman race partial-data pruner with Nemenyi post-hoc elimination.
-- [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking — RankGPT-style permutation generation in 1 LLM call. Resolves the calibration problem of pointwise scoring. Sliding window for large N.
-- [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection — picks the candidate with highest expected agreement across all others. Bayes-optimal selection without bracket luck or position bias.
+- [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking via permutation generation with sliding window.
+- [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection: pick candidate with highest pairwise agreement.
 - [moa](narrative/moa.md): Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement
 - [mwu](narrative/mwu.md): Multiplicative Weights Update — adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions (Littlesto...
 - [pairwise_rank](narrative/pairwise_rank.md): Pairwise Ranking Prompting (PRP) — pairwise LLM-as-judge comparison with bidirectional position-bias cancellation. Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the calibration problem.
