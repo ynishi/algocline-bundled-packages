@@ -1,32 +1,30 @@
---- Intent Belief — Bayesian intent estimation via hypothesis generation and update
+--- intent_belief(IntentBelief) — Bayesian intent estimation via hypothesis update
 ---
 --- Maintains a belief distribution over candidate intents. Generates
---- multiple intent hypotheses as prior, then iteratively updates beliefs
---- through diagnostic questions and likelihood estimation.
+--- multiple intent hypotheses as the prior, then iteratively updates
+--- beliefs through diagnostic questions and likelihood estimation.
 ---
---- Based on: "Probabilistic Modeling of Intentions in Socially Intelligent
---- LLM Agents" (2025, arXiv:2510.18476)
+--- ## Usage
 ---
---- The algorithm:
----   Phase 1 (Prior): Generate N candidate intent hypotheses from context
----   Phase 2 (Diagnose): Generate a discriminating question that maximally
----           separates the hypotheses (information gain)
----   Phase 3 (Update): Given user response, re-estimate likelihood of each
----           hypothesis and update belief distribution
----   Phase 4 (Converge): If top hypothesis has sufficient confidence,
----           or max rounds reached, output the MAP estimate
+--- ```lua
+--- local intent_belief = require("intent_belief")
+--- return intent_belief.run(ctx)
+--- ```
 ---
---- Usage:
----   local intent_belief = require("intent_belief")
----   return intent_belief.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The initial user request
---- ctx.n_hypotheses: Number of intent hypotheses (default: 5)
---- ctx.max_rounds: Maximum belief update rounds (default: 3)
---- ctx.confidence_threshold: Stop when top hypothesis exceeds this (default: 0.7)
---- ctx.prior_tokens: Max tokens for prior generation (default: 600)
---- ctx.diagnose_tokens: Max tokens for diagnostic question (default: 400)
---- ctx.update_tokens: Max tokens for belief update (default: 500)
+--- 1. Prior — generate N candidate intent hypotheses from context.
+--- 2. Diagnose — generate a discriminating question that maximally
+---    separates the hypotheses (information gain).
+--- 3. Update — given the user response, re-estimate the likelihood of
+---    each hypothesis and update the belief distribution.
+--- 4. Converge — if the top hypothesis exceeds `confidence_threshold` or
+---    `max_rounds` is reached, output the MAP estimate.
+---
+--- ## References
+---
+--- - "Probabilistic Modeling of Intentions in Socially Intelligent LLM
+---   Agents" (2025). https://arxiv.org/abs/2510.18476
 
 local S = require("alc_shapes")
 local T = S.T

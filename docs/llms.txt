@@ -48,7 +48,7 @@
 
 - [aco](narrative/aco.md): Ant Colony Optimization — discrete path search with pheromone-based learning (Dorigo 1996, Gutjahr 2000 convergence)
 - [coevolve](narrative/coevolve.md): Challenger-Solver co-evolution self-play that auto-expands the search space.
-- [falsify](narrative/falsify.md): Sequential Falsification — Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight.
+- [falsify](narrative/falsify.md): Popper-style sequential falsification of hypotheses with successor derivation.
 - [prompt_breed](narrative/prompt_breed.md): Self-Referential Prompt Evolution — evolves task prompts via genetic operators with meta-mutation (the mutation operators themselves evolve). Double evolutionary loop.
 - [qdaif](narrative/qdaif.md): Quality-Diversity through AI Feedback — MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification. Produces diverse, high-quality solution populations.
 
@@ -118,8 +118,8 @@
 - [diverse](narrative/diverse.md): DiVERSe — diverse reasoning paths with step-level verification and selection
 - [dmad](narrative/dmad.md): Dialectical reasoning — thesis, antithesis, and synthesis for deeper analysis
 - [faithful](narrative/faithful.md): Faithful CoT — formalize reasoning into code/logic for verification, then answer
-- [got](narrative/got.md): Graph of Thoughts — DAG-structured reasoning with aggregation, refinement, and multi-path synthesis. Enables thought merging impossible in tree-based approaches (ToT).
-- [gumbel_search](narrative/gumbel_search.md): Budget-optimal tree search — Sequential Halving for optimal budget allocation + Gumbel Top-k for unbiased sampling. Provably minimizes simple regret under fixed evaluation budget.
+- [got](narrative/got.md): Graph of Thoughts: DAG reasoning with aggregation, refinement, and synthesis.
+- [gumbel_search](narrative/gumbel_search.md): Budget-optimal search via Sequential Halving and Gumbel Top-k sampling.
 - [least_to_most](narrative/least_to_most.md): Least-to-Most — decompose into ordered subproblems, solve simplest first, build up
 - [maieutic](narrative/maieutic.md): Maieutic prompting — recursive explanation tree with logical consistency verification
 - [mcts](narrative/mcts.md): Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning

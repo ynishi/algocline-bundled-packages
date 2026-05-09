@@ -2976,14 +2976,42 @@ Returns:
 <!-- ── falsify.md ── -->
 
 
-# falsify — Sequential Falsification for Hypothesis Exploration
+# falsify(Falsify) — sequential falsification for hypothesis exploration
 
-> Explores hypothesis space via Popper's falsificationism: generate hypotheses, attempt to refute each one, prune the refuted, derive new hypotheses from the refutation insights. Unlike verify_first (checks consistency) or cove (verification chain), falsify actively ATTACKS hypotheses and uses refutation failures as evidence of robustness, while refutation successes drive the generation of improved successor hypotheses.
+> Explores hypothesis space via Popper's falsificationism: generate hypotheses, attempt to refute each one, prune the refuted, and derive new hypotheses from the refutation insights. Unlike `verify_first` (checks consistency) or `cove` (verification chain), `falsify` actively attacks hypotheses and uses refutation failures as evidence of robustness while refutation successes drive successor generation.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local falsify = require("falsify")
+return falsify.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Seed — generate initial hypotheses.
+2. For each of `max_rounds` rounds:
+   - Falsify — attempt to refute each active hypothesis (1 LLM call).
+   - Judge — was the refutation successful? (1 LLM call).
+   - Prune — remove refuted hypotheses.
+   - Derive — generate successor hypotheses from refutation insights.
+3. Synthesize the surviving hypotheses into a final answer.
+
+## References {#references}
+
+- Sourati, J. et al. (2025). "Automated Hypothesis Validation with
+  Agentic Sequential Falsifications". https://arxiv.org/abs/2502.09858
+- Yamada, Y. et al. (2025). "AI Scientist v2: Agentic Tree Search for
+  Scientific Discovery". https://arxiv.org/abs/2504.08066
+- Popper, K. (1959). "The Logic of Scientific Discovery".
 
 ## Parameters {#parameters}
 
@@ -3020,14 +3048,46 @@ Returns:
 <!-- ── got.md ── -->
 
 
-# GoT — Graph of Thoughts reasoning
+# got(GoT) — Graph of Thoughts reasoning over a DAG
 
-> Models reasoning as a DAG (Directed Acyclic Graph) enabling operations impossible in tree structures: aggregation of multiple thought paths, self-refinement loops, and hierarchical decomposition with merge.
+> Models reasoning as a directed acyclic graph, enabling operations impossible in tree structures: aggregation of multiple thought paths, self-refinement loops, and hierarchical decomposition with merge. Unlike `tot`, `got` supports Aggregate (many-to-one merge) where independent branches combine into a superior synthesis.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local got = require("got")
+return got.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+Operations:
+
+- Generate — branch one thought into `k` new thoughts (1-to-many).
+- Aggregate — merge `k` thoughts into one synthesis (GoT-unique).
+- Refine — improve a thought in place (self-loop).
+- Score — evaluate thought quality (LLM or custom function).
+- KeepBest — prune to top-`n` thoughts by score.
+
+Default Graph-of-Operations pipeline:
+
+```text
+Generate(k) → Score → KeepBest(n) → Refine → Aggregate → Refine → Answer
+```
+
+## References {#references}
+
+- Besta, M. et al. (2024). "Graph of Thoughts: Solving Elaborate
+  Problems with Large Language Models". AAAI 2024.
+  https://arxiv.org/abs/2308.09687
 
 ## Parameters {#parameters}
 
@@ -3056,14 +3116,55 @@ Returns:
 <!-- ── gumbel_search.md ── -->
 
 
-# gumbel_search — Gumbel Top-k + Sequential Halving Tree Search
+# gumbel_search(GumbelSearch) — Gumbel Top-k + Sequential Halving budget-optimal search
 
-> Budget-optimal tree search that combines two theoretically grounded techniques: Gumbel Top-k for unbiased candidate sampling without replacement, and Sequential Halving for optimal budget allocation when comparing candidates.
+> Budget-optimal tree search that combines Gumbel Top-k for unbiased candidate sampling without replacement and Sequential Halving for optimal budget allocation when comparing candidates.
 
 ## Contents
 
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local gs = require("gumbel_search")
+return gs.run(ctx)
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+- Sequential Halving achieves an `O(N/log N)` simple-regret bound
+  (Karnin et al., 2013) and is optimal among algorithms that do not
+  use arm means.
+- Gumbel Top-k provides unbiased non-replacement sampling from
+  categorical distributions (Kool et al., 2019); equivalent to
+  sorting by value plus Gumbel noise.
+- The combination is fixed-budget optimal pure exploration; best when
+  the question is "I have exactly B evaluation budget, find the best
+  answer." Outperforms standard decoding with 5-15 simulations
+  (~500 tokens).
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `ab_mcts` — Thompson Sampling with adaptive branching; Beta
+  posteriors need multiple visits and benefit from unlimited budget.
+- `tot` — fixed DFS/BFS; structured but budget allocation is not
+  optimized.
+- `gumbel_search` — fixed-budget optimal pure exploration via
+  Sequential Halving + Gumbel Top-k.
+
+## References {#references}
+
+- "Revisiting Tree Search for LLMs: Gumbel and Sequential Halving for
+  Budget-Scalable Reasoning" (2026). https://arxiv.org/abs/2603.21162
+- Karnin, Z. et al. (2013). "Almost Optimal Exploration in
+  Multi-Armed Bandits". ICML 2013.
+- Kool, W. et al. (2019). "Stochastic Beams and Where to Find Them".
 
 ## Parameters {#parameters}
 
@@ -3093,23 +3194,88 @@ Returns:
 <!-- ── hybrid_abm.md ── -->
 
 
-# hybrid_abm — LLM-as-Parameterizer Agent-Based Model strategy
+# hybrid_abm(HybridABM) — LLM-as-parameterizer agent-based model strategy
 
-> Hybrid architecture: LLM extracts simulation parameters (Phase A), Pure Lua ABM runs Monte Carlo (Phase B+C), sensitivity sweep (Phase D).
+> Hybrid architecture: an LLM extracts simulation parameters (Phase A), a pure-Lua ABM runs Monte Carlo (Phases B and C), and a sensitivity sweep (Phase D) tests robustness. The LLM is excellent at extracting domain parameters from natural-language descriptions but terrible at running simulations; ABM is the inverse. Combining them gives better results than either alone.
+
+## Contents
+
+- [Usage](#usage)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local hybrid = require("hybrid_abm")
+return hybrid.run(ctx)
+```
+
+## References {#references}
+
+- FCLAgent (2025). "judgment = LLM, execution = rules" decoupling.
+  https://arxiv.org/abs/2510.12189
+- JASSS position paper (2025). Modular hybrid recommendation.
+  https://arxiv.org/abs/2507.19364
+ctx.sweep_runs?: number (default 50, for quick eval per perturbation)
+
+Shape policy (why hybrid_abm is NOT S.instrument-decorated):
+  Phase 6-a-fix-3: sibling ABM pkgs (boids_abm, epidemic_abm, evogame_abm,
+  opinion_abm, schelling_abm, sugarscape_abm) all declare their result
+  shape via `abm.mc.shape({numbers = ..., booleans = ...})` because their
+  `extract` key set is known at load time.
+
+  hybrid_abm is different: `extract`, `sim_fn`, `classify_fn`,
+  `param_schema`, `sweep_params` are ALL supplied by the caller via ctx
+  at run time. The set of suffix-expanded keys in ctx.result.simulation
+  (K_median / K_rate / K_ci / ...) therefore depends on the caller's
+  extract list and cannot be pinned at module load. Declaring a closed
+  T.shape({...}) here would either reject valid callers or degrade to
+  T.table opaque, and T.table opaque ≡ T.any (no discoverability value).
+
+  Resolution: hybrid_abm stays un-instrumented. Callers that wrap
+  hybrid_abm (e.g. a domain-specific pkg that fixes its own extract set)
+  should call `abm.mc.shape(...)` with their known keys in their own
+  M.spec, then `S.instrument` at their layer. See boids_abm/init.lua for
+  the canonical pattern.
 
 ---
 
 <!-- ── intent_belief.md ── -->
 
 
-# Intent Belief — Bayesian intent estimation via hypothesis generation and update
+# intent_belief(IntentBelief) — Bayesian intent estimation via hypothesis update
 
-> Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
+> Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as the prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local intent_belief = require("intent_belief")
+return intent_belief.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Prior — generate N candidate intent hypotheses from context.
+2. Diagnose — generate a discriminating question that maximally
+   separates the hypotheses (information gain).
+3. Update — given the user response, re-estimate the likelihood of
+   each hypothesis and update the belief distribution.
+4. Converge — if the top hypothesis exceeds `confidence_threshold` or
+   `max_rounds` is reached, output the MAP estimate.
+
+## References {#references}
+
+- "Probabilistic Modeling of Intentions in Socially Intelligent LLM
+  Agents" (2025). https://arxiv.org/abs/2510.18476
 
 ## Parameters {#parameters}
 

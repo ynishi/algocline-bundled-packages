@@ -8,14 +8,39 @@ source: intent_belief/init.lua
 generated: gen_docs (V0)
 ---
 
-# Intent Belief — Bayesian intent estimation via hypothesis generation and update
+# intent_belief(IntentBelief) — Bayesian intent estimation via hypothesis update
 
-> Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
+> Maintains a belief distribution over candidate intents. Generates multiple intent hypotheses as the prior, then iteratively updates beliefs through diagnostic questions and likelihood estimation.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local intent_belief = require("intent_belief")
+return intent_belief.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Prior — generate N candidate intent hypotheses from context.
+2. Diagnose — generate a discriminating question that maximally
+   separates the hypotheses (information gain).
+3. Update — given the user response, re-estimate the likelihood of
+   each hypothesis and update the belief distribution.
+4. Converge — if the top hypothesis exceeds `confidence_threshold` or
+   `max_rounds` is reached, output the MAP estimate.
+
+## References {#references}
+
+- "Probabilistic Modeling of Intentions in Socially Intelligent LLM
+  Agents" (2025). https://arxiv.org/abs/2510.18476
 
 ## Parameters {#parameters}
 
