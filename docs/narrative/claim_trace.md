@@ -3,19 +3,43 @@ name: claim_trace
 version: 0.1.0
 category: attribution
 result_shape: "shape { answer: string, attribution_score: number, claims: array of shape { claim: string, raw: string, reasoning: string, source_index?: number, span: string, status: string }, coverage: number, partial: number, sources_count?: number, supported: number, total: number, unsupported: number }"
-description: "Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance"
+description: "Span-level evidence attribution: trace each claim to supporting source spans."
 source: claim_trace/init.lua
 generated: gen_docs (V0)
 ---
 
-# claim_trace — Span-level evidence attribution for LLM outputs
+# claim_trace(ClaimTrace) — span-level evidence attribution for LLM outputs
 
-> For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike factscore (which only verifies correctness), claim_trace provides provenance: which part of the source supports each claim, enabling transparent attribution.
+> For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike `factscore` (which only verifies correctness), `claim_trace` provides provenance — which part of the source supports each claim — enabling transparent attribution.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local claim_trace = require("claim_trace")
+return claim_trace.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Decompose — extract atomic claims from the answer.
+2. Attribute — for each claim, find supporting span(s) in the source.
+3. Score — compute attribution coverage and precision.
+
+## References {#references}
+
+- Bohnet, B. et al. (2022). "Attributed QA: Evaluation and Modeling
+  for Attributed Large Language Models".
+  https://arxiv.org/abs/2212.08037
+- Gao, T. et al. (2023). "ALCE: Attributed Language Model Evaluation".
+  https://arxiv.org/abs/2305.14627
 
 ## Parameters {#parameters}
 

@@ -1,32 +1,30 @@
---- claim_trace — Span-level evidence attribution for LLM outputs
+--- claim_trace(ClaimTrace) — span-level evidence attribution for LLM outputs
 ---
 --- For each claim in an LLM-generated answer, traces it back to specific
---- spans in the source context. Unlike factscore (which only verifies
---- correctness), claim_trace provides provenance: which part of the source
---- supports each claim, enabling transparent attribution.
+--- spans in the source context. Unlike `factscore` (which only verifies
+--- correctness), `claim_trace` provides provenance — which part of the
+--- source supports each claim — enabling transparent attribution.
 ---
---- Based on: "Attributed QA: Evaluation and Modeling for Attributed
----            Large Language Models" (Bohnet et al., arXiv 2212.08037, 2022)
----            + "ALCE: Attributed Language Model Evaluation"
----            (Gao et al., arXiv 2305.14627, 2023)
+--- ## Usage
 ---
---- Pipeline:
----   Step 1: decompose  — extract atomic claims from the answer
----   Step 2: attribute  — for each claim, find supporting span(s) in source
----   Step 3: score      — compute attribution coverage and precision
+--- ```lua
+--- local claim_trace = require("claim_trace")
+--- return claim_trace.run(ctx)
+--- ```
 ---
---- Usage:
----   local claim_trace = require("claim_trace")
----   return claim_trace.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The original question/task
---- ctx.answer: Pre-supplied answer to attribute (default: nil → auto-generate)
---- ctx.sources (required): Source text(s) to trace claims against
----     - string: single source document
----     - table of strings: multiple source documents
---- ctx.extract_tokens: Max tokens for claim extraction (default: 500)
---- ctx.trace_tokens: Max tokens per claim attribution (default: 300)
---- ctx.gen_tokens: Max tokens for answer generation (default: 600)
+--- 1. Decompose — extract atomic claims from the answer.
+--- 2. Attribute — for each claim, find supporting span(s) in the source.
+--- 3. Score — compute attribution coverage and precision.
+---
+--- ## References
+---
+--- - Bohnet, B. et al. (2022). "Attributed QA: Evaluation and Modeling
+---   for Attributed Large Language Models".
+---   https://arxiv.org/abs/2212.08037
+--- - Gao, T. et al. (2023). "ALCE: Attributed Language Model Evaluation".
+---   https://arxiv.org/abs/2305.14627
 
 local S = require("alc_shapes")
 local T = S.T
@@ -37,7 +35,7 @@ local M = {}
 M.meta = {
     name = "claim_trace",
     version = "0.1.0",
-    description = "Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance",
+    description = "Span-level evidence attribution: trace each claim to supporting source spans.",
     category = "attribution",
 }
 
