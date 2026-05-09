@@ -3,19 +3,40 @@ name: boids_abm
 version: 0.1.0
 category: simulation
 result_shape: "shape { params: shape { alignment_weight: number, cohesion_weight: number, max_force: number, max_speed: number, n_boids: number, perception_radius: number, separation_weight: number, steps: number, world_size: number }, sensitivity: array of shape { base_value: number, delta: number, factor: number, high_value: number, low_value: number, param: string, score_at_high: number, score_at_low: number }, simulation: shape { alignment_score_mean: number, alignment_score_median: number, alignment_score_p25: number, alignment_score_p75: number, alignment_score_std: number, avg_nearest_distance_mean: number, avg_nearest_distance_median: number, avg_nearest_distance_p25: number, avg_nearest_distance_p75: number, avg_nearest_distance_std: number, clusters_mean: number, clusters_median: number, clusters_p25: number, clusters_p75: number, clusters_std: number, cohesive_flock_ci: shape { lower: number, upper: number }, cohesive_flock_count: number, cohesive_flock_rate: number, runs: number, scattered_ci: shape { lower: number, upper: number }, scattered_count: number, scattered_rate: number } }"
-description: "Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization. Based on Reynolds (1987)."
+description: "Reynolds boids flocking simulation (separation, alignment, cohesion)."
 source: boids_abm/init.lua
 generated: gen_docs (V0)
 ---
 
-# boids_abm — Boids Flocking Model
+# boids_abm(BoidsABM) — Reynolds boids flocking simulation
 
-> N agents (boids) in 2D continuous space follow three simple rules:   1. Separation: steer away from nearby boids to avoid crowding   2. Alignment: steer towards the average heading of nearby boids   3. Cohesion: steer towards the average position of nearby boids
+> N agents (boids) in 2D continuous space follow Reynolds' three rules to produce emergent flocking, lane formation, obstacle avoidance, and predator evasion. The balance of the three weights determines flock structure (tight swarm, loose stream, or scattered individuals).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local boids = require("boids_abm")
+return boids.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Separation — steer away from nearby boids to avoid crowding.
+2. Alignment — steer towards the average heading of nearby boids.
+3. Cohesion — steer towards the average position of nearby boids.
+
+## References {#references}
+
+- Reynolds, C. W. (1987). "Flocks, Herds, and Schools: A Distributed
+  Behavioral Model". SIGGRAPH 1987.
 
 ## Parameters {#parameters}
 

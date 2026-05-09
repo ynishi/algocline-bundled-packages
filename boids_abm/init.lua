@@ -1,33 +1,27 @@
---- boids_abm — Boids Flocking Model
+--- boids_abm(BoidsABM) — Reynolds boids flocking simulation
 ---
---- N agents (boids) in 2D continuous space follow three simple rules:
----   1. Separation: steer away from nearby boids to avoid crowding
----   2. Alignment: steer towards the average heading of nearby boids
----   3. Cohesion: steer towards the average position of nearby boids
+--- N agents (boids) in 2D continuous space follow Reynolds' three rules to
+--- produce emergent flocking, lane formation, obstacle avoidance, and
+--- predator evasion. The balance of the three weights determines flock
+--- structure (tight swarm, loose stream, or scattered individuals).
 ---
---- Emergent phenomena: flocking, lane formation, obstacle avoidance,
---- predator evasion. The balance of three weights determines flock
---- structure (tight swarm, loose stream, scattered individuals).
+--- ## Usage
 ---
---- Based on:
----   Reynolds, "Flocks, Herds, and Schools: A Distributed Behavioral
----   Model", SIGGRAPH 1987
+--- ```lua
+--- local boids = require("boids_abm")
+--- return boids.run(ctx)
+--- ```
 ---
---- Usage:
----   local boids = require("boids_abm")
----   return boids.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task?: string Description
---- ctx.n_boids?: number (default 50)
---- ctx.steps?: number (default 100)
---- ctx.separation_weight?: number (default 1.5)
---- ctx.alignment_weight?: number (default 1.0)
---- ctx.cohesion_weight?: number (default 1.0)
---- ctx.perception_radius?: number (default 50)
---- ctx.max_speed?: number (default 4)
---- ctx.max_force?: number Steering force limit (default 0.3)
---- ctx.world_size?: number Side length of square world (default 300)
---- ctx.runs?: number MC runs (default 100)
+--- 1. Separation — steer away from nearby boids to avoid crowding.
+--- 2. Alignment — steer towards the average heading of nearby boids.
+--- 3. Cohesion — steer towards the average position of nearby boids.
+---
+--- ## References
+---
+--- - Reynolds, C. W. (1987). "Flocks, Herds, and Schools: A Distributed
+---   Behavioral Model". SIGGRAPH 1987.
 
 local abm = require("abm")
 local S = require("alc_shapes")
@@ -39,9 +33,7 @@ local M = {}
 M.meta = {
     name = "boids_abm",
     version = "0.1.0",
-    description = "Boids flocking model — separation, alignment, cohesion "
-        .. "produce emergent flocking behavior. Tunable weights for "
-        .. "Hybrid LLM parameter optimization. Based on Reynolds (1987).",
+    description = "Reynolds boids flocking simulation (separation, alignment, cohesion).",
     category = "simulation",
 }
 
