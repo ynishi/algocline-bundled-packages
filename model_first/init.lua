@@ -1,34 +1,36 @@
---- model_first — Model-First Reasoning
+--- model_first(ModelFirst) — model-first reasoning via explicit problem modeling
 ---
---- Separates problem representation from problem solving. First constructs
---- an explicit problem model (entities, state variables, actions with
---- preconditions/effects, and constraints), then reasons within that model.
+--- Separates problem representation from problem solving. First
+--- constructs an explicit problem model (entities, state variables,
+--- actions with preconditions/effects, and constraints), then reasons
+--- within that model. Unlike `plan_solve` (which generates "what to
+--- do"), `model_first` generates "what exists" before any solving,
+--- catching constraint violations that an implicit-constraint plan
+--- misses.
 ---
---- Key difference from plan_solve: plan_solve generates "what to do" (action
---- sequence). model_first generates "what exists" (world model) before any
---- solving. This catches constraint violations that plan_solve misses
---- because constraints are implicit in plan_solve but explicit here.
+--- ## Usage
 ---
---- Based on: Rana & Kumar, "Model-First Reasoning LLM Agents: Reducing
---- Hallucinations through Explicit Problem Modeling"
---- (arXiv:2512.14474, 2025)
+--- ```lua
+--- local mf = require("model_first")
+--- return mf.run(ctx)
+--- ```
 ---
---- Pipeline (2-4 LLM calls):
----   Step 1: Model    — construct explicit problem model (entities, states,
----                       actions, constraints). Do NOT solve yet.
----   Step 2: Solve    — reason within the model, tracking state transitions
----   Step 3: Verify   — check solution against all model constraints (optional)
----   Step 4: Extract  — concise final answer (optional)
+--- ## Algorithm
 ---
---- Usage:
----   local mf = require("model_first")
----   return mf.run(ctx)
+--- The pipeline uses 2-4 LLM calls:
 ---
---- ctx.task (required): The problem to solve
---- ctx.verify: Run constraint verification step (default: true)
---- ctx.extract: Extract concise answer (default: true)
---- ctx.model_tokens: Max tokens for model construction (default: 500)
---- ctx.solve_tokens: Max tokens for solving (default: 600)
+--- 1. Model — construct an explicit problem model (entities, states,
+---    actions, constraints). Do not solve yet.
+--- 2. Solve — reason within the model, tracking state transitions.
+--- 3. Verify (optional) — check the solution against all model
+---    constraints.
+--- 4. Extract (optional) — produce a concise final answer.
+---
+--- ## References
+---
+--- - Rana, ..., Kumar, ... (2025). "Model-First Reasoning LLM Agents:
+---   Reducing Hallucinations through Explicit Problem Modeling".
+---   https://arxiv.org/abs/2512.14474
 
 local S = require("alc_shapes")
 local T = S.T
@@ -39,9 +41,7 @@ local M = {}
 M.meta = {
     name = "model_first",
     version = "0.1.0",
-    description = "Model-First Reasoning — construct explicit problem model "
-        .. "(entities, states, actions, constraints) before solving. "
-        .. "Reduces constraint violations in planning and scheduling tasks.",
+    description = "Construct explicit problem model (entities/states/constraints) before solving.",
     category = "reasoning",
 }
 
