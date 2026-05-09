@@ -8,14 +8,38 @@ source: plan_solve/init.lua
 generated: gen_docs (V0)
 ---
 
-# plan_solve — Plan-and-Solve prompting
+# plan_solve(PlanSolve) — Plan-and-Solve prompting
 
-> Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full decompose (no parallel subtask dispatch).
+> Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full `decompose` (no parallel subtask dispatch).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local plan_solve = require("plan_solve")
+return plan_solve.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 2-3 LLM calls:
+
+1. Plan — devise a numbered plan of reasoning steps.
+2. Execute — carry out the plan step by step.
+3. Extract (optional) — produce a concise final answer.
+
+## References {#references}
+
+- Wang, L. et al. (2023). "Plan-and-Solve Prompting: Improving
+  Zero-Shot Chain-of-Thought Reasoning by Large Language Models".
+  https://arxiv.org/abs/2305.04091
 
 ## Parameters {#parameters}
 

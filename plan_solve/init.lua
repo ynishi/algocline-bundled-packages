@@ -1,25 +1,29 @@
---- plan_solve — Plan-and-Solve prompting
+--- plan_solve(PlanSolve) — Plan-and-Solve prompting
 ---
 --- Devises an explicit step-by-step plan before execution, then carries
 --- out each step sequentially. More structured than Chain-of-Thought,
---- lighter than full decompose (no parallel subtask dispatch).
+--- lighter than full `decompose` (no parallel subtask dispatch).
 ---
---- Based on: Wang et al., "Plan-and-Solve Prompting: Improving Zero-Shot
---- Chain-of-Thought Reasoning by Large Language Models" (2023, arXiv:2305.04091)
+--- ## Usage
 ---
---- Pipeline (2-3 LLM calls):
----   Step 1: Plan     — devise a numbered plan of reasoning steps
----   Step 2: Execute  — carry out the plan step by step
----   Step 3: Extract  — (optional) extract concise final answer
+--- ```lua
+--- local plan_solve = require("plan_solve")
+--- return plan_solve.run(ctx)
+--- ```
 ---
---- Usage:
----   local plan_solve = require("plan_solve")
----   return plan_solve.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.extract: Whether to extract a concise answer (default: true)
---- ctx.plan_tokens: Max tokens for plan generation (default: 300)
---- ctx.solve_tokens: Max tokens for execution (default: 500)
+--- The pipeline uses 2-3 LLM calls:
+---
+--- 1. Plan — devise a numbered plan of reasoning steps.
+--- 2. Execute — carry out the plan step by step.
+--- 3. Extract (optional) — produce a concise final answer.
+---
+--- ## References
+---
+--- - Wang, L. et al. (2023). "Plan-and-Solve Prompting: Improving
+---   Zero-Shot Chain-of-Thought Reasoning by Large Language Models".
+---   https://arxiv.org/abs/2305.04091
 
 local S = require("alc_shapes")
 local T = S.T
