@@ -1,20 +1,26 @@
---- CoD — Chain-of-Density iterative compression
+--- cod(CoD) — Chain-of-Density iterative compression
 ---
 --- Iteratively rewrites text to increase information density while
---- maintaining length. Each round adds missing entities/details and
+--- preserving length. Each round adds missing entities and details and
 --- removes filler, producing progressively denser output.
 ---
---- Based on: Adams et al., "From Sparse to Dense: GPT-4 Summarization
---- with Chain of Density Prompting" (2023, arXiv:2309.04269)
+--- ## Usage
 ---
---- Usage:
----   local cod = require("cod")
----   return cod.run(ctx)
+--- ```lua
+--- local cod = require("cod")
+--- return cod.run(ctx)
+--- ```
 ---
---- ctx.text (required): Source text to compress
---- ctx.rounds: Number of densification rounds (default: 3)
---- ctx.target_length: Approximate target length in words (default: auto ~1/3 of input)
---- ctx.gen_tokens: Max tokens per round (default: 400)
+--- ## Algorithm
+---
+--- 1. Generate an initial summary at the target length.
+--- 2. For `rounds` iterations, identify missing salient entities and
+---    rewrite to incorporate them while removing filler.
+---
+--- ## References
+---
+--- - Adams, G. et al. (2023). "From Sparse to Dense: GPT-4 Summarization
+---   with Chain of Density Prompting". https://arxiv.org/abs/2309.04269
 
 local S = require("alc_shapes")
 local T = S.T
@@ -25,7 +31,7 @@ local M = {}
 M.meta = {
     name = "cod",
     version = "0.1.0",
-    description = "Chain-of-Density — iterative information densification with fidelity preservation",
+    description = "Chain-of-Density iterative information densification with fidelity preservation.",
     category = "optimization",
 }
 
