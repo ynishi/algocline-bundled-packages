@@ -8,14 +8,49 @@ source: step_verify/init.lua
 generated: gen_docs (V0)
 ---
 
-# step_verify — Step-Level Verification (PRM-style, LLM-as-Verifier)
+# step_verify(StepVerify) — step-level verification (PRM-style LLM-as-Verifier)
 
-> Verifies each intermediate reasoning step independently, identifying exactly where errors occur. Retains only verified-correct steps and re-derives from the last correct point.
+> Verifies each intermediate reasoning step independently, identifies exactly where errors occur, retains only verified-correct steps, and re-derives from the last correct point.
 
 ## Contents
 
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sv = require("step_verify")
+return sv.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `cove` — generates verification questions about factual claims,
+  answers them independently, then revises. Targets factual
+  accuracy of the whole draft.
+- `factscore` — decomposes text into atomic factual claims and
+  scores each. Targets factual precision.
+- `step_verify` — scores each reasoning step for logical
+  correctness; identifies the first point of failure and re-derives
+  from there.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Grounded in Process Reward Model (PRM) research: PRMs consistently
+outperform Outcome Reward Models (ORMs) for mathematical and
+multi-step reasoning (Lightman et al. 2023); step-level
+supervision localizes errors that outcome-level misses.
+
+## References {#references}
+
+- PRM Survey (2025). https://arxiv.org/abs/2510.08049
+- ThinkPRM (2025). https://arxiv.org/abs/2504.16828
+- DiVeRSe (Li, ... et al., 2025). https://arxiv.org/abs/2502.09955
 
 ## Parameters {#parameters}
 

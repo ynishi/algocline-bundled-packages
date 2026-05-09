@@ -1,37 +1,39 @@
---- step_verify — Step-Level Verification (PRM-style, LLM-as-Verifier)
+--- step_verify(StepVerify) — step-level verification (PRM-style LLM-as-Verifier)
 ---
---- Verifies each intermediate reasoning step independently, identifying
---- exactly where errors occur. Retains only verified-correct steps and
---- re-derives from the last correct point.
+--- Verifies each intermediate reasoning step independently, identifies
+--- exactly where errors occur, retains only verified-correct steps,
+--- and re-derives from the last correct point.
 ---
---- Key difference from cove / factscore:
----   cove       — generates verification QUESTIONS about factual claims,
----                answers them independently, then revises. Targets factual
----                accuracy of the whole draft.
----   factscore  — decomposes text into atomic factual claims and scores each.
----                Targets factual precision (is each fact true?).
----   step_verify — scores each REASONING STEP for logical correctness.
----                Targets logical validity (does step N follow from step N-1?).
----                Identifies the first point of failure and re-derives from there.
+--- ## Usage
 ---
---- Grounded in Process Reward Model (PRM) research:
----   - PRMs consistently outperform Outcome Reward Models (ORMs) for
----     mathematical and multi-step reasoning (Lightman et al., 2023)
----   - Step-level supervision localizes errors that outcome-level misses
----   - ThinkPRM: generative verification via chain-of-thought (2025)
----   - DiVeRSe: diverse prompts + step-level verification (Li et al.)
+--- ```lua
+--- local sv = require("step_verify")
+--- return sv.run(ctx)
+--- ```
 ---
---- Based on: PRM Survey (arXiv:2510.08049, 2025), ThinkPRM (arXiv:2504.16828),
---- DiVeRSe (arXiv:2502.09955)
+--- ## Comparison with related packages
 ---
---- Usage:
----   local sv = require("step_verify")
----   return sv.run(ctx)
+--- - `cove` — generates verification questions about factual claims,
+---   answers them independently, then revises. Targets factual
+---   accuracy of the whole draft.
+--- - `factscore` — decomposes text into atomic factual claims and
+---   scores each. Targets factual precision.
+--- - `step_verify` — scores each reasoning step for logical
+---   correctness; identifies the first point of failure and re-derives
+---   from there.
 ---
---- ctx.task (required): The problem to solve
---- ctx.max_repair_rounds: Max re-derivation attempts (default: 2)
---- ctx.gen_tokens: Max tokens for generation (default: 500)
---- ctx.verify_tokens: Max tokens per verification (default: 200)
+--- ## Theoretical foundations
+---
+--- Grounded in Process Reward Model (PRM) research: PRMs consistently
+--- outperform Outcome Reward Models (ORMs) for mathematical and
+--- multi-step reasoning (Lightman et al. 2023); step-level
+--- supervision localizes errors that outcome-level misses.
+---
+--- ## References
+---
+--- - PRM Survey (2025). https://arxiv.org/abs/2510.08049
+--- - ThinkPRM (2025). https://arxiv.org/abs/2504.16828
+--- - DiVeRSe (Li, ... et al., 2025). https://arxiv.org/abs/2502.09955
 
 local S = require("alc_shapes")
 local T = S.T
