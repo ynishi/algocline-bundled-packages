@@ -1,62 +1,55 @@
---- shapley — Shapley Value computation for agent contribution attribution
+--- shapley(Shapley) — Shapley value computation for agent contribution attribution
 ---
---- Pure-computation utility for attributing individual agent contributions
---- within a coalition (ensemble/swarm). Implements both exact computation
---- and Monte Carlo permutation sampling approximation.
+--- Pure-computation utility for attributing individual agent
+--- contributions within a coalition (ensemble or swarm). Implements
+--- both exact computation and Monte Carlo permutation sampling.
 ---
---- Theory:
----   Shapley, L. S. "A Value for n-Person Games". Contributions to the
----   Theory of Games II, Annals of Mathematics Studies 28, pp.307-317, 1953.
+--- ## Usage
 ---
----   The Shapley value is the UNIQUE allocation satisfying four axioms:
----     1. Efficiency:  Σ φ_i = v(N) - v(∅)
----     2. Symmetry:    i,j interchangeable ⟹ φ_i = φ_j
----     3. Dummy:       i contributes nothing ⟹ φ_i = 0
----     4. Additivity:  φ_i(v+w) = φ_i(v) + φ_i(w)
+--- ```lua
+--- local shapley = require("shapley")
 ---
----   Central formula:
----     φ_i(v) = Σ_{S ⊆ N\{i}} [|S|! (n-|S|-1)! / n!] · [v(S∪{i}) - v(S)]
+--- -- Exact computation (n <= 12)
+--- local r = shapley.exact({"a","b","c"}, v_fn)
 ---
----   Monte Carlo approximation (Ghorbani & Zou, AISTATS 2019 "Data Shapley"):
----     Sample random permutations π, compute marginal contribution of i
----     as v(predecessors_of_i ∪ {i}) - v(predecessors_of_i).
----     Convergence: O(1/√M) by CLT.
+--- -- Monte Carlo approximation
+--- local r = shapley.montecarlo({"a","b","c"}, v_fn, {samples=1000})
 ---
---- Multi-Agent / Swarm context:
----   In a multi-agent swarm, not all agents contribute equally. Some
----   are essential, some are redundant, and some actively harm the
----   ensemble. Shapley values provide the theoretically unique fair
----   attribution of each agent's contribution.
+--- -- Helper: build v_fn from agent outputs + ground truth
+--- local v_fn = shapley.accuracy_coalition(outputs, truth)
+--- ```
 ---
----   - Agent valuation: compute the marginal value of each agent to
----     the ensemble's overall accuracy/quality. Identifies which
----     agents to keep, which are redundant, and which should be
----     removed (negative Shapley value = harmful agent).
----   - Budget allocation: Shapley values can guide token/cost
----     allocation — agents with higher contribution deserve more
----     compute budget. Connects to mwu (weight learning) and
----     cost_pareto (cost-effectiveness analysis).
----   - Exact computation (n ≤ 12): O(2^n) enumeration with bitmask
----     optimization. Feasible for typical agent panels.
----   - Monte Carlo (large n): O(M·n) permutation sampling with
----     95% confidence intervals. Use for large swarms.
----   - accuracy_coalition() helper: builds a coalition value function
----     from agent binary predictions + ground truth using majority
----     vote, ready for immediate Shapley computation.
----   - Composable with panel, moa, sc for post-hoc analysis:
----     "which agents actually contributed to the final answer?"
+--- ## Theoretical foundations
 ---
---- Usage:
----   local shapley = require("shapley")
+--- The Shapley value is the unique allocation satisfying four axioms:
 ---
----   -- Exact computation (n <= 12)
----   local r = shapley.exact({"a","b","c"}, v_fn)
+--- 1. Efficiency: `Σ φ_i = v(N) - v(∅)`.
+--- 2. Symmetry: `i, j` interchangeable ⟹ `φ_i = φ_j`.
+--- 3. Dummy: `i` contributes nothing ⟹ `φ_i = 0`.
+--- 4. Additivity: `φ_i(v+w) = φ_i(v) + φ_i(w)`.
 ---
----   -- Monte Carlo approximation
----   local r = shapley.montecarlo({"a","b","c"}, v_fn, {samples=1000})
+--- ```math
+--- φ_i(v) = Σ_{S ⊆ N\{i}} [|S|! · (n-|S|-1)! / n!] · [v(S∪{i}) - v(S)]
+--- ```
 ---
----   -- Helper: build v_fn from agent outputs + ground truth
----   local v_fn = shapley.accuracy_coalition(outputs, truth)
+--- Monte Carlo approximation (Ghorbani & Zou 2019): sample random
+--- permutations `π`, compute the marginal contribution of `i` as
+--- `v(predecessors_of_i ∪ {i}) - v(predecessors_of_i)`. Convergence
+--- `O(1/√M)` by CLT.
+---
+--- In a multi-agent swarm not all agents contribute equally; Shapley
+--- values give a fair attribution. `exact` (n ≤ 12) uses `O(2^n)`
+--- bitmask enumeration; `montecarlo` is `O(M·n)` with 95% CIs.
+--- `accuracy_coalition` helper builds a coalition value function from
+--- binary predictions plus ground truth via majority vote. Composable
+--- with `panel`, `moa`, `sc` for post-hoc analysis.
+---
+--- ## References
+---
+--- - Shapley, L. S. (1953). "A Value for n-Person Games". Contributions
+---   to the Theory of Games II, Annals of Mathematics Studies 28,
+---   pp.307-317.
+--- - Ghorbani, A., Zou, J. (2019). "Data Shapley". AISTATS 2019.
 
 local S = require("alc_shapes")
 local T = S.T
