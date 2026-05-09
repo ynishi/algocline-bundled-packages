@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-05-09
+
 ### Changed
+
+- **pkg-author-conventions full compliance sweep (all 117 packages,
+  lint 96 → 0)**: applied `refs/pkg-author-conventions.md` rubric to
+  every bundled package in a one-package-per-commit sweep. Per-pkg
+  changes: D1 docstring header normalized to
+  `<pkg>(<PascalName>) — <one-line summary>` form; E16 fake-label
+  blocks (`Lua Modeling style`, etc.) removed in favor of plain
+  prose; E4/E5 inline math escaped into fenced math blocks where
+  appropriate; F README-style sections (`## Usage`,
+  `## Algorithm`, `## Theoretical foundations`,
+  `## Injection points`, `## Caveats`, `## Comparison`,
+  `## References`) added per pkg-conventions §F. Final
+  `alc_hub_dist lint_strict=true` reports 117 generated / 0 failed /
+  0 errors / 0 warnings (down from 96 W_FAKE_LABEL warnings at sweep
+  start). No package implementation (`init.lua` runtime) was touched
+  in this sweep — docs / docstring / spec metadata only. Tests
+  remain green (existing per-pkg suites pass with no regression).
+  Captured in `workspace/journal.md` 2026-05-08 ~ 2026-05-09 chapter
+  (pkg-author-conventions full compliance, lint 0/0 完全制覇).
 
 - **`scripts/e2e/review_and_investigate.lua` harness fix (final
   e2e to PASS — 19/19 complete)**: the initial run reported in the
