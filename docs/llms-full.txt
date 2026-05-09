@@ -6208,14 +6208,28 @@ Returns:
 <!-- ── router_semantic.md ── -->
 
 
-# router_semantic — Semantic Router with LLM Fallback
+# router_semantic(RouterSemantic) — semantic router with LLM fallback
 
-> Keyword/pattern-based routing with LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
+> Keyword/pattern-based routing with an LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local router = require("router_semantic")
+return router.run(ctx)
+```
+
+## References {#references}
+
+- Semantic Router pattern (Microsoft Multi-Agent Reference
+  Architecture).
 
 ## Parameters {#parameters}
 
@@ -6242,14 +6256,39 @@ Returns:
 <!-- ── rstar.md ── -->
 
 
-# rstar — Mutual reasoning verification via self-play
+# rstar(RStar) — mutual reasoning verification via self-play
 
 > Generates two independent reasoning paths, then each path verifies the other. Disagreements trigger a resolution round. Achieves MCTS-level accuracy at a fraction of the cost by replacing tree search with targeted mutual critique.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local rstar = require("rstar")
+return rstar.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 4-6 LLM calls:
+
+1. Generate Path A — independent reasoning attempt.
+2. Generate Path B — independent reasoning attempt (parallel).
+3. Cross-verify — A verifies B and B verifies A (parallel).
+4. Resolve — on disagreement, synthesize the final answer.
+
+## References {#references}
+
+- Qi, Z. et al. (2024). "Mutual Reasoning Makes Smaller LLMs
+  Stronger Problem-Solvers" (rStar).
+  https://arxiv.org/abs/2408.06195
 
 ## Parameters {#parameters}
 
@@ -6277,14 +6316,37 @@ Returns:
 <!-- ── s2a.md ── -->
 
 
-# s2a — System 2 Attention: context denoising before reasoning
+# s2a(S2A) — System 2 Attention context denoising before reasoning
 
 > Strips irrelevant, distracting, or misleading information from the input context, then re-answers using only the cleaned context. Dramatically reduces sycophancy and distraction effects.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local s2a = require("s2a")
+return s2a.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 2 LLM calls:
+
+1. Regenerate context — rewrite the input, removing opinions,
+   irrelevant details, and biasing language.
+2. Answer — solve the task using only the denoised context.
+
+## References {#references}
+
+- Weston, J., Sukhbaatar, S. (2023). "System 2 Attention (is
+  something you might need too)". Meta. https://arxiv.org/abs/2311.11829
 
 ## Parameters {#parameters}
 
@@ -6391,14 +6453,37 @@ Returns `voted` shape:
 <!-- ── schelling_abm.md ── -->
 
 
-# schelling_abm — Schelling Segregation Model
+# schelling_abm(SchellingABM) — Schelling segregation model
 
-> Agents of two types on a 2D grid. Each agent has a tolerance threshold: if the fraction of same-type neighbors is below threshold, the agent moves to a random empty cell.
+> Agents of two types on a 2D grid. Each agent has a tolerance threshold; if the fraction of same-type neighbors is below the threshold, the agent moves to a random empty cell. Even mild preferences (threshold ~0.3) produce strong macro-level segregation, demonstrating how micro-motives produce macro-behavior that no individual intended.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local schelling = require("schelling_abm")
+return schelling.run(ctx)
+```
+
+## References {#references}
+
+- Schelling, T. C. (1971). "Dynamic Models of Segregation". Journal
+  of Mathematical Sociology 1(2).
+- Schelling, T. C. (1978). "Micromotives and Macrobehavior". Norton.
+
+ctx.task (required): Description
+ctx.grid_size?: number Side length of square grid (default 20)
+ctx.threshold?: number Tolerance threshold (default 0.375)
+ctx.density?: number Fraction of cells occupied (default 0.8)
+ctx.type_ratio?: number Fraction of type A among agents (default 0.5)
+ctx.steps?: number Max steps (default 100)
+ctx.runs?: number MC runs (default 100)
 
 ## Parameters {#parameters}
 
@@ -6427,9 +6512,71 @@ Returns:
 <!-- ── scoring_rule.md ── -->
 
 
-# scoring_rule — Proper Scoring Rules for calibration measurement
+# scoring_rule(ScoringRule) — proper scoring rules for calibration measurement
 
-> Pure-computation utility for evaluating the calibration of probabilistic predictions. A scoring rule S(p, y) is "proper" if reporting one's true belief maximizes expected score, and "strictly proper" if this maximum is unique.
+> Pure-computation utility for evaluating the calibration of probabilistic predictions. A scoring rule `S(p, y)` is *proper* if reporting one's true belief maximizes expected score, and *strictly proper* if the maximum is unique.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local sr = require("scoring_rule")
+sr.brier(0.8, 1)           -- => -0.04
+sr.log_score(0.8, 1)       -- => -0.2231...
+local cal = sr.calibration(predictions, outcomes, { bins = 10 })
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Properness (Savage 1971):
+
+```math
+S is proper  ⟺  ∀q: E_{Y~q}[S(q, Y)] ≥ E_{Y~q}[S(p, Y)] ∀p
+Strictly proper: equality only when p = q
+```
+
+Provided rules (all strictly proper):
+
+```math
+Brier:        S(p, y) = -(p - y)²
+Logarithmic:  S(p, y) = y·ln(p) + (1-y)·ln(1-p)
+Spherical:    S(p, y) = [p·y + (1-p)·(1-y)] / √(p² + (1-p)²)
+```
+
+Proper scoring rules are the mathematically correct way to evaluate
+whether an agent's confidence matches its actual accuracy. An agent
+that says "80% sure" should be right ~80% of the time.
+
+- `evaluate` scores a series of agent predictions against outcomes;
+  poorly calibrated agents are identified quantitatively.
+- `calibration` computes Expected Calibration Error with binned
+  analysis and flags systematic over/under confidence.
+- `compare` ranks multiple agents by calibration quality.
+- Rule selection: Brier is robust; log score is more sensitive to
+  extreme miscalibration; spherical has less extreme penalties than
+  log.
+
+Composes with `mwu` (calibration scores as loss input for weight
+learning), `condorcet` (well-calibrated `p > 0.5` validates the Jury
+Theorem), and `eval_guard` (calibration as evaluation quality
+metric).
+
+## References {#references}
+
+- Brier, G. W. (1950). "Verification of forecasts expressed in
+  terms of probability". Monthly Weather Review 78(1), pp.1-3.
+- Savage, L. J. (1971). "Elicitation of personal probabilities and
+  expectations". JASA 66(336), pp.783-801.
+- Gneiting, T., Raftery, A. E. (2007). "Strictly Proper Scoring
+  Rules, Prediction, and Estimation". JASA 102(477), pp.359-378.
+- Naeini, M. P., Cooper, G. F., Hauskrecht, M. (2015). "Obtaining
+  Well Calibrated Probabilities Using Bayesian Binning into
+  Quantiles". AAAI 2015.
 
 ---
 
