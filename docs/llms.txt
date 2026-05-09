@@ -11,7 +11,7 @@
 - [condorcet](narrative/condorcet.md): Condorcet Jury Theorem probability and Anti-Jury detection.
 - [ensemble_div](narrative/ensemble_div.md): Krogh-Vedelsby ambiguity decomposition for ensemble diversity measurement.
 - [isp_aggregate](narrative/isp_aggregate.md): LLM aggregation via higher-order information (Zhang et al. 2025, arXiv:2510.01499). Paper-faithful ISP (inverse surprising popularity) and OW (optimal weight) aggregators with a calibration/run spl...
-- [kemeny](narrative/kemeny.md): Kemeny-Young rank aggregation — axiomatically unique consensus ranking that minimizes total Kendall tau distance. Merges multiple agent rankings into optimal consensus with Condorcet consistency ...
+- [kemeny](narrative/kemeny.md): Kemeny-Young optimal rank aggregation minimizing total Kendall tau distance.
 - [pbft](narrative/pbft.md): PBFT-inspired 3-phase LLM consensus — propose, validate, commit with BFT quorum guarantees (Castro-Liskov 1999)
 - [sc](narrative/sc.md): Independent multi-path sampling with majority vote aggregation
 - [usc](narrative/usc.md): Universal Self-Consistency — LLM-based consistency selection across free-form responses. Extends SC to open-ended tasks where majority vote is inapplicable.
@@ -65,7 +65,7 @@
 - [anti_cascade](narrative/anti_cascade.md): Pipeline error cascade detection via per-step independent re-derivation.
 - [bft](narrative/bft.md): Byzantine Fault Tolerance quorum thresholds and impossibility bounds.
 - [dissent](narrative/dissent.md): Forced adversarial challenge to prevent multi-agent consensus inertia.
-- [lineage](narrative/lineage.md): Pipeline-spanning claim lineage tracking — extracts claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Generalizes the lineage graph governance layer from '...
+- [lineage](narrative/lineage.md): Pipeline-spanning claim lineage tracking with conflict and ungrounded detection.
 
 ## intent
 
@@ -120,7 +120,7 @@
 - [faithful](narrative/faithful.md): Faithful CoT — formalize reasoning into code/logic for verification, then answer
 - [got](narrative/got.md): Graph of Thoughts: DAG reasoning with aggregation, refinement, and synthesis.
 - [gumbel_search](narrative/gumbel_search.md): Budget-optimal search via Sequential Halving and Gumbel Top-k sampling.
-- [least_to_most](narrative/least_to_most.md): Least-to-Most — decompose into ordered subproblems, solve simplest first, build up
+- [least_to_most](narrative/least_to_most.md): Decompose into ordered subproblems and solve simplest first, building up.
 - [maieutic](narrative/maieutic.md): Maieutic prompting — recursive explanation tree with logical consistency verification
 - [mcts](narrative/mcts.md): Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning
 - [meta_prompt](narrative/meta_prompt.md): Meta-Prompting — orchestrator identifies and dispatches to specialist personas
@@ -198,7 +198,7 @@
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
 - [eval_guard](narrative/eval_guard.md): Multi-agent evaluation safety gates (self-critique / baseline / contamination).
 - [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring
-- [inverse_u](narrative/inverse_u.md): Inverse-U scaling detection — detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling (Chen et al. NeurIPS 2024, Theorem 2).
+- [inverse_u](narrative/inverse_u.md): Detect inverse-U accuracy scaling when adding more agents (safety gate).
 - [negation](narrative/negation.md): Adversarial self-test — generate destruction conditions and verify answer survival
 - [sprt](narrative/sprt.md): Wald Sequential Probability Ratio Test — anytime 2-hypothesis stopping rule for Bernoulli streams with (α, β) error guarantees and Wald–Wolfowitz optimal E[N]. Complements cs_pruner (multi-ar...
 - [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.

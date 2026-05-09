@@ -1,38 +1,41 @@
---- lineage — Pipeline-spanning claim lineage tracking
+--- lineage(Lineage) — pipeline-spanning claim lineage tracking
 ---
---- Tracks the provenance of claims across multi-step pipelines.
---- Extracts atomic claims from each step's output, traces inter-step
---- dependencies (which claim in step N derived from which claim in step N-1),
---- and detects conflicts and ungrounded claims in the final output.
+--- Tracks the provenance of claims across multi-step pipelines: extracts
+--- atomic claims from each step's output, traces inter-step dependencies
+--- (which claim in step `N` derived from which claim in step `N-1`), and
+--- detects conflicts and ungrounded claims in the final output.
 ---
---- Generalizes the "lineage graph governance layer" concept from
---- "From Spark to Fire: Diagnosing and Overcoming the Fragility of
---- Multi-Agent Systems" (Xie et al., AAMAS 2026), which demonstrated
---- that a provenance-tracking middleware improves pipeline defense rate
---- from 0.32 to 0.89 against cascade errors — without changing the
---- underlying model.
+--- ## Usage
 ---
---- Also informed by MAST (Cemri et al., 2025), which found that 41.8%
---- of multi-agent system failures originate from system design rather
---- than model performance. Lineage tracking addresses the "information
---- loss at handoff" failure mode (MAST category F7).
+--- ```lua
+--- local lineage = require("lineage")
+--- return lineage.run(ctx)
+--- ```
 ---
---- Pipeline (~2×N LLM calls, N = number of steps):
----   Step 1: Extract atomic claims from each step output (N calls, parallel)
----   Step 2: Trace inter-step dependencies (N-1 calls, parallel per step pair)
----   Step 3: Detect conflicts and ungrounded claims (1 call)
----   Total: N + (N-1) + 1 = 2N
+--- ## Algorithm
 ---
---- Usage:
----   local lineage = require("lineage")
----   return lineage.run(ctx)
+--- For `N` pipeline steps the entry uses ~2N LLM calls:
 ---
---- ctx.task (required): Original task description
---- ctx.steps (required): Ordered table of step outputs
----     Each entry: { name = "step_name", output = "text" }
----     Example: { {name="plan", output="..."}, {name="implement", output="..."} }
---- ctx.extract_tokens: Max tokens for claim extraction (default: 600)
---- ctx.trace_tokens: Max tokens for dependency tracing (default: 500)
+--- 1. Extract atomic claims from each step output (`N` calls, parallel).
+--- 2. Trace inter-step dependencies (`N-1` calls, parallel per pair).
+--- 3. Detect conflicts and ungrounded claims (1 call).
+---
+--- ## Theoretical foundations
+---
+--- Generalizes the "lineage graph governance layer" concept from Xie et
+--- al., which demonstrated that provenance-tracking middleware improves
+--- pipeline defense rate from 0.32 to 0.89 against cascade errors
+--- without changing the underlying model. Also informed by MAST (Cemri
+--- et al., 2025), which found 41.8% of multi-agent system failures
+--- originate from system design rather than model performance; lineage
+--- tracking addresses the "information loss at handoff" failure mode
+--- (MAST category F7).
+---
+--- ## References
+---
+--- - Xie, ... et al. (2026). "From Spark to Fire: Diagnosing and
+---   Overcoming the Fragility of Multi-Agent Systems". AAMAS 2026.
+--- - Cemri, ... et al. (2025). MAST failure-mode taxonomy (F7).
 --- ctx.summary_tokens: Max tokens for final summary (default: 600)
 
 local S = require("alc_shapes")
@@ -44,11 +47,7 @@ local M = {}
 M.meta = {
     name = "lineage",
     version = "0.1.0",
-    description = "Pipeline-spanning claim lineage tracking — extracts claims "
-        .. "per step, traces inter-step dependencies, detects conflicts and "
-        .. "ungrounded claims. Generalizes the lineage graph governance layer "
-        .. "from 'From Spark to Fire' (Xie et al., AAMAS 2026). "
-        .. "Defense rate improvement: 0.32 → 0.89.",
+    description = "Pipeline-spanning claim lineage tracking with conflict and ungrounded detection.",
     category = "governance",
 }
 

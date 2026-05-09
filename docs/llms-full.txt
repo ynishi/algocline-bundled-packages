@@ -3312,14 +3312,38 @@ Returns:
 <!-- ── intent_discovery.md ── -->
 
 
-# Intent Discovery — exploratory intent formation through action
+# intent_discovery(IntentDiscovery) — exploratory intent formation through action
 
-> Users often approach tasks without fully-formed goals. This strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration.
+> Users often approach tasks without fully-formed goals. The strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration. Cognitive-science insight: in open-ended problems, people discover what they need by exploring possible outcomes; understanding of a problem and its solutions co-evolve.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local intent_discovery = require("intent_discovery")
+return intent_discovery.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Surface — present structured options that span the solution space.
+2. Observe — capture user preference and reaction.
+3. Concretize — narrow the intent hierarchy based on feedback.
+
+Repeat until the intent is sufficiently concrete or `max_rounds` is
+reached.
+
+## References {#references}
+
+- "DiscoverLLM: From Executing Intents to Discovering Them" (2026).
+  https://arxiv.org/abs/2602.03429
 
 ## Parameters {#parameters}
 
@@ -3349,9 +3373,56 @@ Returns:
 <!-- ── inverse_u.md ── -->
 
 
-# inverse_u — Inverse-U scaling detection (Chen et al. NeurIPS 2024)
+# inverse_u(InverseU) — inverse-U scaling detection for multi-agent systems
 
-> Pure-computation utility for detecting non-monotonic accuracy scaling when increasing the number of LLM agents/calls.
+> Pure-computation utility for detecting non-monotonic accuracy scaling when increasing the number of LLM agents or calls.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local iu = require("inverse_u")
+local r = iu.detect({0.70, 0.75, 0.73, 0.71})
+-- r.peak_idx=2, r.is_declining=true, r.consecutive_drops=2
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Chen et al.'s Theorem 2: for a synthetic dataset `D_{α,p1,p2}`, if
+`p1 + p2 > 1` and `α < 1 - 1/t`, then Vote / Filter-Vote accuracy is
+inverse-U shaped in `N` (the number of agents). This contradicts the
+naive assumption that more agents always improves accuracy. The
+mechanism: on hard queries (accuracy `< 0.5`) majority vote amplifies
+the wrong answer as `N` grows.
+
+The package is a critical safety gate for any multi-agent system that
+scales by adding agents (`sc`, `panel`, `moa`, `pbft`):
+
+- `detect` analyzes an accuracy-by-`N` series to identify whether
+  performance has peaked and is declining; run after each round of
+  agent addition.
+- `should_stop` returns a binary go/no-go: if 2+ consecutive accuracy
+  drops are observed, stop adding agents immediately.
+- `chen_condition` checks whether Theorem 2's formal conditions hold
+  for a given task distribution (easy/hard split, per-subset
+  accuracy).
+
+Composes with `condorcet` (Anti-Jury is the `p < 0.5` case),
+`ensemble_div` (low diversity + inverse-U co-occur), and
+`cost_pareto` (more agents at declining accuracy = Pareto-dominated).
+Used as gate G1 in agent-swarm orchestration: before spawning more
+agents, check whether the inverse-U has already been reached.
+
+## References {#references}
+
+- Chen, L. et al. (2024). "Are More LM Calls All You Need? Scaling
+  Laws in Multi-Agent Systems". NeurIPS 2024.
+  https://arxiv.org/abs/2403.02419
 
 ---
 
@@ -3387,23 +3458,82 @@ Returns:
 <!-- ── kemeny.md ── -->
 
 
-# kemeny — Kemeny-Young optimal rank aggregation
+# kemeny(Kemeny) — Kemeny-Young optimal rank aggregation
 
-> Aggregates multiple rankings (total orders) into a single consensus ranking that minimizes the total Kendall tau distance to all input rankings. The Kemeny rule is the UNIQUE aggregation method satisfying Condorcet consistency + neutrality + consistency (Young-Levenglick 1978).
+> Aggregates multiple rankings (total orders) into a single consensus ranking that minimizes total Kendall tau distance to the inputs. The Kemeny rule is the unique aggregation method satisfying Condorcet consistency + neutrality + consistency (Young-Levenglick 1978). Also exposes Borda count, Condorcet winner detection, and Kendall tau distance as standalone helpers.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local kemeny = require("kemeny")
+local r = kemeny.aggregate(rankings)
+-- r.ranking, r.total_distance, r.method
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+σ* = argmin_{σ} Σ_{k=1}^{N} d_KT(σ, σ_k)
+```
+
+where `d_KT` is the Kendall tau distance (pairwise disagreements).
+Computational complexity is NP-hard (Bartholdi, Tovey, Trick 1989):
+
+- `m ≤ 8` candidates: exact via full enumeration (`m! ≤ 40320`).
+- `m > 8`: Borda count approximation (`O(N·m)`, 2-approximation).
+
+When multiple agents produce rankings (ordering solution candidates,
+prioritizing hypotheses, sorting search results), Kemeny-Young is the
+axiomatically optimal way to merge them. Composable with
+`listwise_rank`, `pairwise_rank`, `setwise_rank` for LLM-generated
+rankings and with `scoring_rule` for evaluating ranking quality.
+
+## References {#references}
+
+- Kemeny, J. G. (1959). "Mathematics without Numbers". Daedalus
+  88(4), pp.577-591.
+- Young, H. P., Levenglick, A. (1978). "A Consistent Extension of
+  Condorcet's Election Principle". SIAM J. Applied Math 35(2),
+  pp.285-300.
+- Bartholdi, J., Tovey, C., Trick, M. (1989). "Voting schemes for
+  which it can be difficult to tell who won the election". Social
+  Choice and Welfare 6, pp.157-165.
+- de Borda, J.-C. (1781). Borda count.
+- Young, H. P. (1974). Axiomatic characterization of Borda count.
 
 ---
 
 <!-- ── least_to_most.md ── -->
 
 
-# Least-to-Most — progressive subproblem decomposition
+# least_to_most(LeastToMost) — progressive subproblem decomposition
 
-> Decomposes a complex problem into subproblems ordered from simplest to most complex, then solves each in sequence, using previous solutions as context for the next.
+> Decomposes a complex problem into subproblems ordered from simplest to most complex, then solves each in sequence using previous solutions as context for the next.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ltm = require("least_to_most")
+return ltm.run(ctx)
+```
+
+## References {#references}
+
+- Zhou, D. et al. (2022). "Least-to-Most Prompting Enables Complex
+  Reasoning in Large Language Models". https://arxiv.org/abs/2205.10625
 
 ## Parameters {#parameters}
 
@@ -3427,14 +3557,51 @@ Returns:
 <!-- ── lineage.md ── -->
 
 
-# lineage — Pipeline-spanning claim lineage tracking
+# lineage(Lineage) — pipeline-spanning claim lineage tracking
 
-> Tracks the provenance of claims across multi-step pipelines. Extracts atomic claims from each step's output, traces inter-step dependencies (which claim in step N derived from which claim in step N-1), and detects conflicts and ungrounded claims in the final output.
+> Tracks the provenance of claims across multi-step pipelines: extracts atomic claims from each step's output, traces inter-step dependencies (which claim in step `N` derived from which claim in step `N-1`), and detects conflicts and ungrounded claims in the final output.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local lineage = require("lineage")
+return lineage.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+For `N` pipeline steps the entry uses ~2N LLM calls:
+
+1. Extract atomic claims from each step output (`N` calls, parallel).
+2. Trace inter-step dependencies (`N-1` calls, parallel per pair).
+3. Detect conflicts and ungrounded claims (1 call).
+
+## Theoretical foundations {#theoretical-foundations}
+
+Generalizes the "lineage graph governance layer" concept from Xie et
+al., which demonstrated that provenance-tracking middleware improves
+pipeline defense rate from 0.32 to 0.89 against cascade errors
+without changing the underlying model. Also informed by MAST (Cemri
+et al., 2025), which found 41.8% of multi-agent system failures
+originate from system design rather than model performance; lineage
+tracking addresses the "information loss at handoff" failure mode
+(MAST category F7).
+
+## References {#references}
+
+- Xie, ... et al. (2026). "From Spark to Fire: Diagnosing and
+  Overcoming the Fragility of Multi-Agent Systems". AAMAS 2026.
+- Cemri, ... et al. (2025). MAST failure-mode taxonomy (F7).
+ctx.summary_tokens: Max tokens for final summary (default: 600)
 
 ## Parameters {#parameters}
 
