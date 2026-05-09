@@ -3,17 +3,45 @@
 --- Extracts atomic claims from text, then independently verifies each
 --- claim in parallel. Produces a factual precision score and annotated results.
 ---
---- Based on: Min et al., "FActScore: Fine-grained Atomic Evaluation of
---- Factual Precision in Long Form Text Generation" (2023, arXiv:2305.14251)
+--- ## Usage
 ---
---- Usage:
----   local factscore = require("factscore")
----   return factscore.run(ctx)
+--- ```lua
+--- local factscore = require("factscore")
+--- return factscore.run(ctx)
+--- ```
 ---
---- ctx.text (required): The text to fact-check
---- ctx.context: Optional reference context for verification
---- ctx.verify_tokens: Max tokens per claim verification (default: 200)
---- ctx.extract_tokens: Max tokens for claim extraction (default: 500)
+--- ## Algorithm
+---
+--- Given a text, the pkg performs three phases:
+---
+--- 1. **Decompose** — an LLM extracts the text into atomic, self-contained
+---    factual claims (each independently verifiable).
+--- 2. **Verify** — each claim is verified in parallel via `alc.parallel`.
+---    Each verifier emits SUPPORTED / UNSUPPORTED / UNCERTAIN with a
+---    one-sentence justification.
+--- 3. **Score** — factual precision is computed as:
+---
+--- ```math
+--- FActScore = supported / (supported + unsupported)
+--- ```
+---
+--- Uncertain claims are excluded from the denominator; score is 1.0 when
+--- no decisive (supported or unsupported) claims exist.
+---
+--- ## Theoretical foundations
+---
+--- Min et al. (2023) define factual precision as the fraction of atomic
+--- claims that are supported by a knowledge source. Each claim is the
+--- smallest independently verifiable unit of information in the text.
+--- The metric is designed to isolate factual errors from stylistic or
+--- logical errors.
+---
+--- ## References
+---
+--- - Min, S., Krishna, K., Lyu, X., Lewis, M., Yih, W., Koh, P. W.,
+---   Iyyer, M., Zettlemoyer, L., Hajishirzi, H. (2023).
+---   "FActScore: Fine-grained Atomic Evaluation of Factual Precision
+---   in Long Form Text Generation". arXiv:2305.14251.
 
 local S = require("alc_shapes")
 local T = S.T

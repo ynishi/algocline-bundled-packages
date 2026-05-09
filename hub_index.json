@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T00:11:32Z",
+  "updated_at": "2026-05-09T00:15:25Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -511,7 +511,7 @@
       "version": "0.1.0",
       "description": "Atomic claim decomposition — per-claim factual verification with scoring",
       "category": "validation",
-      "docstring": "factscore(FActScore) — atomic claim decomposition and per-claim verification\n\nExtracts atomic claims from text, then independently verifies each\nclaim in parallel. Produces a factual precision score and annotated results.\n\nBased on: Min et al., \"FActScore: Fine-grained Atomic Evaluation of\nFactual Precision in Long Form Text Generation\" (2023, arXiv:2305.14251)\n\nUsage:\nlocal factscore = require(\"factscore\")\nreturn factscore.run(ctx)\n\nctx.text (required): The text to fact-check\nctx.context: Optional reference context for verification\nctx.verify_tokens: Max tokens per claim verification (default: 200)\nctx.extract_tokens: Max tokens for claim extraction (default: 500)",
+      "docstring": "factscore(FActScore) — atomic claim decomposition and per-claim verification\n\nExtracts atomic claims from text, then independently verifies each\nclaim in parallel. Produces a factual precision score and annotated results.\n\n## Usage\n\n```lua\nlocal factscore = require(\"factscore\")\nreturn factscore.run(ctx)\n```\n\n## Algorithm\n\nGiven a text, the pkg performs three phases:\n\n1. **Decompose** — an LLM extracts the text into atomic, self-contained\nfactual claims (each independently verifiable).\n2. **Verify** — each claim is verified in parallel via `alc.parallel`.\nEach verifier emits SUPPORTED / UNSUPPORTED / UNCERTAIN with a\none-sentence justification.\n3. **Score** — factual precision is computed as:\n\n```math\nFActScore = supported / (supported + unsupported)\n```\n\nUncertain claims are excluded from the denominator; score is 1.0 when\nno decisive (supported or unsupported) claims exist.\n\n## Theoretical foundations\n\nMin et al. (2023) define factual precision as the fraction of atomic\nclaims that are supported by a knowledge source. Each claim is the\nsmallest independently verifiable unit of information in the text.\nThe metric is designed to isolate factual errors from stylistic or\nlogical errors.\n\n## References\n\n- Min, S., Krishna, K., Lyu, X., Lewis, M., Yih, W., Koh, P. W.,\nIyyer, M., Zettlemoyer, L., Hajishirzi, H. (2023).\n\"FActScore: Fine-grained Atomic Evaluation of Factual Precision\nin Long Form Text Generation\". arXiv:2305.14251.",
       "source": {
         "type": "unknown"
       },

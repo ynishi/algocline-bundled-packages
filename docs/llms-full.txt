@@ -2089,8 +2089,52 @@ Returns:
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local factscore = require("factscore")
+return factscore.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+Given a text, the pkg performs three phases:
+
+1. **Decompose** — an LLM extracts the text into atomic, self-contained
+   factual claims (each independently verifiable).
+2. **Verify** — each claim is verified in parallel via `alc.parallel`.
+   Each verifier emits SUPPORTED / UNSUPPORTED / UNCERTAIN with a
+   one-sentence justification.
+3. **Score** — factual precision is computed as:
+
+```math
+FActScore = supported / (supported + unsupported)
+```
+
+Uncertain claims are excluded from the denominator; score is 1.0 when
+no decisive (supported or unsupported) claims exist.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Min et al. (2023) define factual precision as the fraction of atomic
+claims that are supported by a knowledge source. Each claim is the
+smallest independently verifiable unit of information in the text.
+The metric is designed to isolate factual errors from stylistic or
+logical errors.
+
+## References {#references}
+
+- Min, S., Krishna, K., Lyu, X., Lewis, M., Yih, W., Koh, P. W.,
+  Iyyer, M., Zettlemoyer, L., Hajishirzi, H. (2023).
+  "FActScore: Fine-grained Atomic Evaluation of Factual Precision
+  in Long Form Text Generation". arXiv:2305.14251.
 
 ## Parameters {#parameters}
 
