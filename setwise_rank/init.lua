@@ -1,58 +1,58 @@
---- setwise_rank — Setwise Tournament Reranking
+--- setwise_rank(SetwiseRank) — setwise tournament reranking
 ---
 --- Ranks N candidates by repeatedly asking the LLM "which is the best
---- among these k items?" and advancing winners through tournament rounds.
---- Each comparison spans a SET (size k) rather than a pair, dramatically
---- reducing LLM calls vs pairwise while keeping the LLM task simpler than
---- listwise (it only picks ONE best, not a full permutation).
+--- among these k items?" and advancing winners through tournament
+--- rounds. Each comparison spans a set (size k) rather than a pair,
+--- dramatically reducing LLM calls vs pairwise while keeping the LLM
+--- task simpler than listwise (pick one best, not a full permutation).
+--- The setwise reformulation is free of the absolute-score calibration
+--- problem of pointwise judging.
 ---
---- Position on the cost/accuracy spectrum:
----   listwise_rank — 1 LLM call to rank ALL. Cheapest. Limited by context.
----                   List-position bias risk.
----   setwise_rank  — Tournament with set comparisons of size k.
----                   O(top_k * N / k) LLM calls. Mid-cost / mid-accuracy.
----                   Sweet spot when N is moderate (10–50) and you need
----                   stronger guarantees than a single listwise pass.
----   pairwise_rank — Pure pairwise. O(N²) or O(N log N). Highest accuracy.
+--- ## Usage
 ---
---- Mathematical motivation:
----   Setwise reduces the LLM's burden to selecting the single best from a
----   small set — a task substantially easier than producing a full ordering
----   and free of the absolute-score calibration problem of pointwise
----   judging. Empirically Zhuang et al. show setwise matches or beats
----   listwise on TREC-DL and BEIR while using comparable or fewer tokens.
+--- ```lua
+--- local sr = require("setwise_rank")
+--- return sr.run(ctx)
+--- ```
 ---
---- Empirical results (Zhuang et al., SIGIR 2024):
----   - Setwise with Flan-T5 matches RankGPT (listwise) on TREC-DL19/20.
----   - More efficient than pairwise; comparable accuracy to listwise with
----     better robustness to position bias.
+--- ## Algorithm
 ---
---- Based on:
----   Zhuang et al., "A Setwise Approach for Effective and Highly Efficient
----     Zero-shot Ranking with Large Language Models" (SIGIR 2024,
----     arXiv:2310.09497)
+--- Iterative top-k extraction:
 ---
---- Algorithm (iterative top-k extraction):
----   active ← {1..N}
----   for rank = 1 .. top_k do
----     while #active > 1 do
----       partition active into groups of size set_size (last group may be smaller)
----       for each group of size >= 2: LLM picks the best index
----       active ← winners ∪ singleton-groups
----     end
----     ranked[rank] ← active[1]
----     remove ranked[rank] from the original pool, restart with remaining
+--- ```text
+--- active ← {1..N}
+--- for rank = 1 .. top_k do
+---   while #active > 1 do
+---     partition active into groups of size set_size
+---     for each group of size >= 2: LLM picks the best index
+---     active ← winners ∪ singleton-groups
 ---   end
+---   ranked[rank] ← active[1]
+---   remove ranked[rank] from pool; restart with remaining
+--- end
+--- ```
 ---
---- Usage:
----   local sr = require("setwise_rank")
----   return sr.run(ctx)
+--- ## Comparison with related packages
 ---
---- ctx.task (required): The criterion for ranking
---- ctx.candidates (required): array of candidate texts
---- ctx.top_k: how many to keep (default N — full ranked list)
---- ctx.set_size: tournament group size (default 4)
---- ctx.gen_tokens: max tokens per pick response (default 20)
+--- - `listwise_rank` — 1 LLM call to rank all; cheapest but limited by
+---   context, list-position bias risk.
+--- - `setwise_rank` — tournament with set comparisons of size `k`;
+---   `O(top_k · N / k)` LLM calls. Mid-cost / mid-accuracy. Sweet spot
+---   for moderate N (10-50).
+--- - `pairwise_rank` — pure pairwise (`O(N²)` or `O(N log N)`); highest
+---   accuracy.
+---
+--- ## Empirical validation
+---
+--- - Setwise with Flan-T5 matches RankGPT (listwise) on TREC-DL19/20.
+--- - More efficient than pairwise; comparable accuracy to listwise with
+---   better robustness to position bias.
+---
+--- ## References
+---
+--- - Zhuang, S. et al. (2024). "A Setwise Approach for Effective and
+---   Highly Efficient Zero-shot Ranking with Large Language Models".
+---   SIGIR 2024. https://arxiv.org/abs/2310.09497
 
 local S = require("alc_shapes")
 local T = S.T
