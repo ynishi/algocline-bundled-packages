@@ -1,17 +1,19 @@
---- orch_escalate — Cascade Escalation Orchestration
---- Start with lightest strategy, escalate to heavier ones if quality
---- is insufficient. Minimizes cost for easy tasks, guarantees quality
---- for hard ones.
+--- orch_escalate(OrchEscalate) — cascade-escalation orchestration
 ---
---- Based on Cascade Escalation (Microsoft + DAAO cost optimization).
+--- Starts with the lightest strategy and escalates to heavier ones when
+--- quality is insufficient. Minimizes cost for easy tasks while
+--- preserving quality for hard ones.
 ---
---- Usage:
----   local orch = require("orch_escalate")
----   return orch.run(ctx)
+--- ## Usage
 ---
---- ctx.task    (required): Task description
---- ctx.levels  (optional): Custom escalation chain [{name, prompt_template|multi_phase, threshold, ...}]
---- ctx.on_fail (optional): "error" | "partial" (default: "partial")
+--- ```lua
+--- local orch = require("orch_escalate")
+--- return orch.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - Cascade Escalation (Microsoft + DAAO cost optimization).
 
 local S = require("alc_shapes")
 local T = S.T

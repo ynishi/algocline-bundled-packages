@@ -8,14 +8,27 @@ source: orch_escalate/init.lua
 generated: gen_docs (V0)
 ---
 
-# orch_escalate — Cascade Escalation Orchestration
+# orch_escalate(OrchEscalate) — cascade-escalation orchestration
 
-> Start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones.
+> Starts with the lightest strategy and escalates to heavier ones when quality is insufficient. Minimizes cost for easy tasks while preserving quality for hard ones.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local orch = require("orch_escalate")
+return orch.run(ctx)
+```
+
+## References {#references}
+
+- Cascade Escalation (Microsoft + DAAO cost optimization).
 
 ## Parameters {#parameters}
 
