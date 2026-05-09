@@ -1,68 +1,65 @@
---- mwu — Multiplicative Weights Update for adversarial online learning
+--- mwu(MWU) — Multiplicative Weights Update for adversarial online learning
 ---
 --- Maintains a weight distribution over N agents (experts/arms) and
 --- updates weights multiplicatively based on observed losses. Provides
---- optimal O(√(T ln N)) regret bound against ANY adversarial loss
+--- an optimal `O(√(T ln N))` regret bound against any adversarial loss
 --- sequence — no stochastic assumption required.
 ---
---- Theory:
----   Littlestone, N., Warmuth, M. K. "The Weighted Majority Algorithm".
----   Information and Computation 108(2), pp.212-261, 1994.
+--- ## Usage
 ---
----   Freund, Y., Schapire, R. E. "A Decision-Theoretic Generalization of
----   On-Line Learning and an Application to Boosting". JCSS 55(1),
----   pp.119-139, 1997.
+--- ```lua
+--- local mwu = require("mwu")
 ---
----   Cesa-Bianchi, N., Lugosi, G. "Prediction, Learning, and Games".
----   Cambridge University Press, 2006. §2.1-2.3.
+--- -- Stateful updater
+--- local u = mwu.new({ n = 5, T = 100 })
+--- u:update({ 0.3, 0.8, 0.1, 0.5, 0.2 })
+--- local w = u:weights()
 ---
----   Update rule:
----     w_i(t+1) = w_i(t) · (1 - η · ℓ_i(t))
+--- -- One-shot from loss matrix
+--- local r = mwu.solve(loss_matrix)
+--- ```
 ---
----   Normalized distribution:
----     p_i(t) = w_i(t) / Σ_j w_j(t)
+--- ## Theoretical foundations
 ---
----   Regret bound:
----     Regret_T = Σ_t p(t)·ℓ(t) - min_i Σ_t ℓ_i(t)
----              ≤ (ln N)/η + η·T
----     Optimal η = √(ln N / T) yields: Regret_T ≤ 2√(T ln N)
+--- ```math
+--- w_i(t+1) = w_i(t) · (1 - η · ℓ_i(t))
+--- p_i(t)   = w_i(t) / Σ_j w_j(t)
+--- Regret_T = Σ_t p(t)·ℓ(t) - min_i Σ_t ℓ_i(t)
+---          ≤ (ln N)/η + η·T
+--- ```
 ---
---- Multi-Agent / Swarm context:
----   MWU is the principled way to learn agent weights over time in
----   an adversarial environment (where tasks/prompts can change
----   arbitrarily between rounds). Unlike UCB1 which selects ONE arm,
----   MWU outputs a full WEIGHT DISTRIBUTION over all agents.
+--- The optimal `η = √(ln N / T)` yields `Regret_T ≤ 2√(T ln N)`. MWU is
+--- the principled way to learn agent weights over time in an adversarial
+--- environment where tasks can change arbitrarily between rounds.
+--- Unlike UCB1 (`ucb`), which selects one arm, MWU outputs a full weight
+--- distribution. Implementation notes:
 ---
----   - Dynamic weight learning: as agents are evaluated on successive
----     tasks, MWU concentrates weight on consistently good performers
----     while maintaining exploration. No i.i.d. assumption required —
----     works even if an adversary chooses the worst possible tasks.
----   - Regret guarantee: total loss of the weighted mixture is at most
----     2√(T ln N) worse than the BEST single agent in hindsight.
----     This bound holds against any sequence of tasks.
----   - Doubling trick: when T (number of rounds) is unknown in advance,
----     the doubling trick maintains O(√(T ln N)) regret by restarting
----     with doubled epoch lengths and recalculated η.
----   - Log-space computation: weights are maintained in log-space to
----     prevent numerical underflow when agents have extreme loss
----     contrast over many rounds.
----   - Difference from UCB1 (ucb package):
----     UCB1: stochastic bandits (i.i.d. losses), selects ONE arm
----     MWU:  adversarial setting (arbitrary losses), outputs DISTRIBUTION
----   - Composable with panel/moa (weight the agent mixture), shapley
----     (post-hoc attribution), and scoring_rule (loss from calibration
----     scores as input to MWU).
+--- - Doubling trick: when `T` is unknown in advance, restart with
+---   doubled epoch lengths and recalculated `η` to maintain
+---   `O(√(T ln N))` regret.
+--- - Log-space computation: weights are maintained in log space to
+---   prevent numerical underflow when agents have extreme loss contrast
+---   over many rounds.
 ---
---- Usage:
----   local mwu = require("mwu")
+--- Composable with `panel` / `moa` (weight the agent mixture),
+--- `shapley` (post-hoc attribution), and `scoring_rule` (loss from
+--- calibration scores).
 ---
----   -- Stateful updater
----   local u = mwu.new({ n = 5, T = 100 })
----   u:update({ 0.3, 0.8, 0.1, 0.5, 0.2 })
----   local w = u:weights()
+--- ## Comparison with related packages
 ---
----   -- One-shot from loss matrix
----   local r = mwu.solve(loss_matrix)
+--- - `ucb` — stochastic bandits (i.i.d. losses), selects one arm.
+--- - `mwu` — adversarial setting (arbitrary losses), outputs a weight
+---   distribution.
+---
+--- ## References
+---
+--- - Littlestone, N., Warmuth, M. K. (1994). "The Weighted Majority
+---   Algorithm". Information and Computation 108(2), pp.212-261.
+--- - Freund, Y., Schapire, R. E. (1997). "A Decision-Theoretic
+---   Generalization of On-Line Learning and an Application to Boosting".
+---   JCSS 55(1), pp.119-139.
+--- - Cesa-Bianchi, N., Lugosi, G. (2006). "Prediction, Learning, and
+---   Games". Cambridge University Press, §2.1-2.3.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -73,10 +70,7 @@ local M = {}
 M.meta = {
     name = "mwu",
     version = "0.1.0",
-    description = "Multiplicative Weights Update — adversarial online agent "
-        .. "weight learning with O(√(T ln N)) regret bound. Learns optimal "
-        .. "agent mixture weights over time without stochastic assumptions "
-        .. "(Littlestone-Warmuth 1994, Freund-Schapire 1997).",
+    description = "Multiplicative Weights Update with O(sqrt(T ln N)) adversarial regret bound.",
     category = "selection",
 }
 
