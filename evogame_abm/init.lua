@@ -1,27 +1,24 @@
---- evogame_abm — Evolutionary Game Theory ABM
+--- evogame_abm(EvoGameABM) — evolutionary game theory agent-based simulation
 ---
---- N agents with strategies play iterated games (Prisoner's Dilemma by default).
---- Each generation: random pairing → payoff calculation → selection → mutation.
---- Emergent phenomena: cooperation/defection equilibria, cyclic dominance,
---- strategy invasion dynamics.
+--- N strategy-bearing agents play iterated games (Prisoner's Dilemma by
+--- default). Each generation runs random pairing, payoff calculation,
+--- selection, and mutation, producing emergent cooperation/defection
+--- equilibria, cyclic dominance, and strategy-invasion dynamics.
 ---
---- Based on:
----   Axelrod, "The Evolution of Cooperation", Basic Books, 1984
----   Nowak & May, "Evolutionary Games and Spatial Chaos", Nature 359, 1992
----   Mao et al., "ALYMPICS: LLM Agents Meet Game Theory", COLING 2025
+--- ## Usage
 ---
---- Usage:
----   local evogame = require("evogame_abm")
----   return evogame.run(ctx)
+--- ```lua
+--- local evogame = require("evogame_abm")
+--- return evogame.run(ctx)
+--- ```
 ---
---- ctx.task (required): Description
---- ctx.n_agents?: number (default 50)
---- ctx.generations?: number (default 30)
---- ctx.rounds_per_gen?: number Games per generation (default 10)
---- ctx.mutation_rate?: number (default 0.05)
---- ctx.payoff_matrix?: table Custom payoff { CC, CD, DC, DD }
---- ctx.strategies?: string[] Initial strategy distribution
---- ctx.runs?: number MC runs (default 100)
+--- ## References
+---
+--- - Axelrod, R. (1984). "The Evolution of Cooperation". Basic Books.
+--- - Nowak, M. A., May, R. M. (1992). "Evolutionary Games and Spatial
+---   Chaos". Nature 359.
+--- - Mao, S. et al. (2025). "ALYMPICS: LLM Agents Meet Game Theory".
+---   COLING 2025.
 
 local abm = require("abm")
 local S = require("alc_shapes")
