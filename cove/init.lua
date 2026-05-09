@@ -1,16 +1,28 @@
 --- cove(CoVe) — Chain-of-Verification draft-verify-revise cycle
---- Reduces hallucination by: draft → generate verification questions →
---- answer them independently → produce verified final response.
 ---
---- Based on: Dhuliawala et al., "Chain-of-Verification Reduces
---- Hallucination in Large Language Models" (2023, arXiv:2309.11495)
+--- Reduces hallucination by drafting an answer, generating verification
+--- questions about its claims, answering them independently, and
+--- producing a verified final response.
 ---
---- Usage:
----   local cove = require("cove")
----   return cove.run(ctx)
+--- ## Usage
 ---
---- ctx.task (required): The question/task to answer
---- ctx.n_questions: Number of verification questions (default: 3)
+--- ```lua
+--- local cove = require("cove")
+--- return cove.run(ctx)
+--- ```
+---
+--- ## Algorithm
+---
+--- 1. Draft an initial answer.
+--- 2. Generate `n_questions` verification questions about the draft.
+--- 3. Answer each verification question independently.
+--- 4. Revise the draft using the verification answers.
+---
+--- ## References
+---
+--- - Dhuliawala, S. et al. (2023). "Chain-of-Verification Reduces
+---   Hallucination in Large Language Models".
+---   https://arxiv.org/abs/2309.11495
 
 local S = require("alc_shapes")
 local T = S.T
