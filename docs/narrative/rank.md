@@ -8,13 +8,27 @@ source: rank/init.lua
 generated: gen_docs (V0)
 ---
 
-# Rank — generate candidates and select best via pairwise comparison
+# rank(Rank) — generate candidates and select best via pairwise comparison
 
-> Generates N candidate responses, then uses LLM-as-Judge to perform pairwise tournament selection. Produces a winner with reasoning.
+> Generates N candidate responses then uses LLM-as-Judge for a pairwise tournament that produces a winner with reasoning. Unlike majority vote (same answer wins), `rank` uses quality comparison.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local rank = require("rank")
+return rank.run(ctx)
+```
+
+## References {#references}
+
+- Best-of-N sampling.
+- Zheng, L. et al. (2023). LLM-as-Judge.
 
 ## Result {#result}
 

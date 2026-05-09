@@ -1,21 +1,20 @@
---- Rank — generate candidates and select best via pairwise comparison
+--- rank(Rank) — generate candidates and select best via pairwise comparison
 ---
---- Generates N candidate responses, then uses LLM-as-Judge to perform
---- pairwise tournament selection. Produces a winner with reasoning.
+--- Generates N candidate responses then uses LLM-as-Judge for a pairwise
+--- tournament that produces a winner with reasoning. Unlike majority
+--- vote (same answer wins), `rank` uses quality comparison.
 ---
---- Key difference from ensemble: ensemble uses majority vote (same answer
---- wins), rank uses quality comparison (best answer wins).
+--- ## Usage
 ---
---- Based on: Best-of-N sampling, LLM-as-Judge (Zheng et al., 2023)
+--- ```lua
+--- local rank = require("rank")
+--- return rank.run(ctx)
+--- ```
 ---
---- Usage:
----   local rank = require("rank")
----   return rank.run(ctx)
+--- ## References
 ---
---- ctx.task (required): The task to generate candidates for
---- ctx.candidates: Number of candidates to generate (default: 4)
---- ctx.criteria: Judging criteria (default: "quality, accuracy, completeness")
---- ctx.gen_tokens: Max tokens per candidate (default: 400)
+--- - Best-of-N sampling.
+--- - Zheng, L. et al. (2023). LLM-as-Judge.
 
 local M = {}
 
