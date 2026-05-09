@@ -1,18 +1,15 @@
---- orch_gatephase — Gate-Phase Orchestration with Pre/Post Hooks
---- Each phase has pre-event (context setup) and post-event (gate + checks).
---- Task type determines which phases to skip.
---- Based on Thin Agent / Fat Platform (Praetorian).
+--- orch_gatephase(OrchGatephase) — gate-phase orchestration with pre/post hooks
 ---
---- Usage:
----   local orch = require("orch_gatephase")
----   return orch.run(ctx)
+--- Each phase has a pre-event (context setup) and a post-event (gate +
+--- checks). The task type determines which phases to skip. Based on the
+--- Thin Agent / Fat Platform pattern (Praetorian).
 ---
---- ctx.task       (required): Task description
---- ctx.phases     (required): Phase definitions [{name, prompt, gate, checks, ...}, ...]
---- ctx.max_retries (optional): Gate NG retry limit (default: 3)
---- ctx.task_type  (optional): Pre-classified type (bugfix/typo/refactor/feature/test)
---- ctx.skip_rules (optional): Custom skip rules table
---- ctx.on_fail    (optional): "error" | "partial" (default: "error")
+--- ## Usage
+---
+--- ```lua
+--- local orch = require("orch_gatephase")
+--- return orch.run(ctx)
+--- ```
 
 local S = require("alc_shapes")
 local T = S.T

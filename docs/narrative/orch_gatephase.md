@@ -8,14 +8,22 @@ source: orch_gatephase/init.lua
 generated: gen_docs (V0)
 ---
 
-# orch_gatephase — Gate-Phase Orchestration with Pre/Post Hooks
+# orch_gatephase(OrchGatephase) — gate-phase orchestration with pre/post hooks
 
-> Each phase has pre-event (context setup) and post-event (gate + checks). Task type determines which phases to skip. Based on Thin Agent / Fat Platform (Praetorian).
+> Each phase has a pre-event (context setup) and a post-event (gate + checks). The task type determines which phases to skip. Based on the Thin Agent / Fat Platform pattern (Praetorian).
 
 ## Contents
 
+- [Usage](#usage)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local orch = require("orch_gatephase")
+return orch.run(ctx)
+```
 
 ## Parameters {#parameters}
 
