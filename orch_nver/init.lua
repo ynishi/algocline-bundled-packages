@@ -1,17 +1,20 @@
---- orch_nver — N-version Programming Orchestration
---- Execute N parallel variants, evaluate each, select best.
---- Trades cost for quality. Mitigates 29.6% regression rate (SWE-Bench).
+--- orch_nver(OrchNver) — N-version programming orchestration
 ---
---- Based on N-version approach from Agentic SE Roadmap (arxiv 2509.06216).
+--- Execute N parallel variants, evaluate each, and select the best.
+--- Trades cost for quality and mitigates the SWE-Bench 29.6% regression
+--- rate.
 ---
---- Usage:
----   local orch = require("orch_nver")
----   return orch.run(ctx)
+--- ## Usage
 ---
---- ctx.task      (required): Task description
---- ctx.n         (optional): Number of parallel variants (default: 3)
---- ctx.phases    (optional): Phase definitions for each variant's pipeline
---- ctx.selection (optional): "score" | "vote" (default: "score")
+--- ```lua
+--- local orch = require("orch_nver")
+--- return orch.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - Agentic SE Roadmap (N-version approach).
+---   https://arxiv.org/abs/2509.06216
 
 local S = require("alc_shapes")
 local T = S.T

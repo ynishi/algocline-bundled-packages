@@ -8,14 +8,28 @@ source: orch_nver/init.lua
 generated: gen_docs (V0)
 ---
 
-# orch_nver — N-version Programming Orchestration
+# orch_nver(OrchNver) — N-version programming orchestration
 
-> Execute N parallel variants, evaluate each, select best. Trades cost for quality. Mitigates 29.6% regression rate (SWE-Bench).
+> Execute N parallel variants, evaluate each, and select the best. Trades cost for quality and mitigates the SWE-Bench 29.6% regression rate.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local orch = require("orch_nver")
+return orch.run(ctx)
+```
+
+## References {#references}
+
+- Agentic SE Roadmap (N-version approach).
+  https://arxiv.org/abs/2509.06216
 
 ## Parameters {#parameters}
 

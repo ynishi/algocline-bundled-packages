@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T04:03:45Z",
+  "updated_at": "2026-05-09T04:06:44Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -809,9 +809,9 @@
     {
       "name": "orch_adaptive",
       "version": "0.1.0",
-      "description": "Adaptive depth orchestration based on task difficulty. Dynamically adjusts phase count, retry budget, and context mode. Combines with router_daao for pre-classified difficulty, or estimates internally. Based on DAAO (arxiv 2509.11079).",
+      "description": "Adaptive-depth orchestration: tune phase count and budget by task difficulty.",
       "category": "orchestration",
-      "docstring": "orch_adaptive — Adaptive Depth Orchestration\nDynamically adjusts phase count, retry budget, and context mode\nbased on task difficulty. Combines with router_daao for pre-classified\ndifficulty, or estimates internally.\n\nBased on DAAO (arxiv 2509.11079).\n\nUsage:\nlocal orch = require(\"orch_adaptive\")\nreturn orch.run(ctx)\n\nctx.task         (required): Task description\nctx.phases       (required): Phase definitions (superset; trimmed by difficulty)\nctx.difficulty   (optional): Pre-classified difficulty from router_daao\nctx.depth_config (optional): Custom difficulty→config mapping\nctx.on_fail      (optional): \"error\" | \"partial\" (default: \"error\")",
+      "docstring": "orch_adaptive(OrchAdaptive) — adaptive-depth orchestration by task difficulty\n\nDynamically adjusts phase count, retry budget, and context mode based\non task difficulty. Combines with `router_daao` for pre-classified\ndifficulty or estimates internally.\n\n## Usage\n\n```lua\nlocal orch = require(\"orch_adaptive\")\nreturn orch.run(ctx)\n```\n\n## References\n\n- DAAO. https://arxiv.org/abs/2509.11079",
       "source": {
         "type": "unknown"
       },
@@ -823,7 +823,7 @@
       "version": "0.1.0",
       "description": "Cascade escalation: start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones. Based on Cascade Escalation (Microsoft + DAAO cost optimization).",
       "category": "orchestration",
-      "docstring": "orch_escalate — Cascade Escalation Orchestration\nStart with lightest strategy, escalate to heavier ones if quality\nis insufficient. Minimizes cost for easy tasks, guarantees quality\nfor hard ones.\n\nBased on Cascade Escalation (Microsoft + DAAO cost optimization).\n\nUsage:\nlocal orch = require(\"orch_escalate\")\nreturn orch.run(ctx)\n\nctx.task    (required): Task description\nctx.levels  (optional): Custom escalation chain [{name, prompt_template|multi_phase, threshold, ...}]\nctx.on_fail (optional): \"error\" | \"partial\" (default: \"partial\")",
+      "docstring": "orch_escalate(OrchEscalate) — cascade-escalation orchestration\n\nStarts with the lightest strategy and escalates to heavier ones when\nquality is insufficient. Minimizes cost for easy tasks while\npreserving quality for hard ones.\n\n## Usage\n\n```lua\nlocal orch = require(\"orch_escalate\")\nreturn orch.run(ctx)\n```\n\n## References\n\n- Cascade Escalation (Microsoft + DAAO cost optimization).",
       "source": {
         "type": "unknown"
       },
@@ -835,7 +835,7 @@
       "version": "0.1.0",
       "description": "Deterministic fixed pipeline with gate/retry. Phases execute in strict order. Gate NG triggers retry up to max_retries. Based on Lobster (OpenClaw) deterministic workflow pattern.",
       "category": "orchestration",
-      "docstring": "orch_fixpipe — Deterministic Fixed Pipeline\nPhases execute in strict order. Gate NG triggers retry up to max_retries.\nBased on Lobster (OpenClaw) deterministic workflow pattern.\n\nUsage:\nlocal orch = require(\"orch_fixpipe\")\nreturn orch.run(ctx)\n\nctx.task         (required): Task description\nctx.phases       (required): Phase definitions [{name, prompt, system, gate, ...}, ...]\nctx.max_retries  (optional): Gate NG retry limit (default: 3)\nctx.on_fail      (optional): \"error\" | \"partial\" (default: \"error\")\nctx.context_mode (optional): \"summary\" | \"full\" (default: \"summary\")",
+      "docstring": "orch_fixpipe(OrchFixpipe) — deterministic fixed-pipeline orchestration\n\nPhases execute in strict order. A gate NG triggers retry up to\n`max_retries`. Based on the Lobster (OpenClaw) deterministic workflow\npattern.\n\n## Usage\n\n```lua\nlocal orch = require(\"orch_fixpipe\")\nreturn orch.run(ctx)\n```",
       "source": {
         "type": "unknown"
       },
@@ -847,7 +847,7 @@
       "version": "0.1.0",
       "description": "Phase orchestration with pre/post hooks and skip rules. Each phase has pre-event (context setup) and post-event (gate + checks). Task type determines which phases to skip. Based on Thin Agent / Fat Platform (Praetorian).",
       "category": "orchestration",
-      "docstring": "orch_gatephase — Gate-Phase Orchestration with Pre/Post Hooks\nEach phase has pre-event (context setup) and post-event (gate + checks).\nTask type determines which phases to skip.\nBased on Thin Agent / Fat Platform (Praetorian).\n\nUsage:\nlocal orch = require(\"orch_gatephase\")\nreturn orch.run(ctx)\n\nctx.task       (required): Task description\nctx.phases     (required): Phase definitions [{name, prompt, gate, checks, ...}, ...]\nctx.max_retries (optional): Gate NG retry limit (default: 3)\nctx.task_type  (optional): Pre-classified type (bugfix/typo/refactor/feature/test)\nctx.skip_rules (optional): Custom skip rules table\nctx.on_fail    (optional): \"error\" | \"partial\" (default: \"error\")",
+      "docstring": "orch_gatephase(OrchGatephase) — gate-phase orchestration with pre/post hooks\n\nEach phase has a pre-event (context setup) and a post-event (gate +\nchecks). The task type determines which phases to skip. Based on the\nThin Agent / Fat Platform pattern (Praetorian).\n\n## Usage\n\n```lua\nlocal orch = require(\"orch_gatephase\")\nreturn orch.run(ctx)\n```",
       "source": {
         "type": "unknown"
       },
@@ -859,7 +859,7 @@
       "version": "0.1.0",
       "description": "N-version programming: execute N parallel variants, evaluate each, select best. Trades cost for quality. Based on N-version approach from Agentic SE Roadmap (arxiv 2509.06216). Mitigates 29.6% regression rate found in SWE-Bench audits.",
       "category": "orchestration",
-      "docstring": "orch_nver — N-version Programming Orchestration\nExecute N parallel variants, evaluate each, select best.\nTrades cost for quality. Mitigates 29.6% regression rate (SWE-Bench).\n\nBased on N-version approach from Agentic SE Roadmap (arxiv 2509.06216).\n\nUsage:\nlocal orch = require(\"orch_nver\")\nreturn orch.run(ctx)\n\nctx.task      (required): Task description\nctx.n         (optional): Number of parallel variants (default: 3)\nctx.phases    (optional): Phase definitions for each variant's pipeline\nctx.selection (optional): \"score\" | \"vote\" (default: \"score\")",
+      "docstring": "orch_nver(OrchNver) — N-version programming orchestration\n\nExecute N parallel variants, evaluate each, and select the best.\nTrades cost for quality and mitigates the SWE-Bench 29.6% regression\nrate.\n\n## Usage\n\n```lua\nlocal orch = require(\"orch_nver\")\nreturn orch.run(ctx)\n```\n\n## References\n\n- Agentic SE Roadmap (N-version approach).\nhttps://arxiv.org/abs/2509.06216",
       "source": {
         "type": "unknown"
       },
