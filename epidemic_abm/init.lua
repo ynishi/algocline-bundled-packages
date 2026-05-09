@@ -1,31 +1,24 @@
---- epidemic_abm — SIR Agent-Based Epidemic Model
+--- epidemic_abm(EpidemicABM) — SIR agent-based epidemic simulation
 ---
 --- N agents transition between Susceptible → Infected → Recovered states.
---- Each step, infected agents probabilistically transmit to susceptible
---- contacts, and recover with probability γ.
+--- At each step, infected agents probabilistically transmit to
+--- susceptible contacts and recover with probability γ. Emergent
+--- phenomena include the epidemic threshold (`R0 = β/γ > 1`), herd
+--- immunity, wave dynamics, and stochastic extinction.
 ---
---- Emergent phenomena: epidemic threshold (R0 = β/γ > 1),
---- herd immunity, wave dynamics, stochastic extinction.
+--- ## Usage
 ---
---- Based on:
----   Kermack & McKendrick, "A Contribution to the Mathematical Theory
----   of Epidemics", Proc. Royal Society A, 1927 (SIR ODE)
+--- ```lua
+--- local epidemic = require("epidemic_abm")
+--- return epidemic.run(ctx)
+--- ```
 ---
----   Epstein, "Generative Social Science: Studies in Agent-Based
----   Computational Modeling", Princeton, 2006 (ABM formulation)
+--- ## References
 ---
---- Usage:
----   local epidemic = require("epidemic_abm")
----   return epidemic.run(ctx)
----
---- ctx.task (required): Description
---- ctx.n_agents?: number (default 200)
---- ctx.initial_infected?: number (default 5)
---- ctx.beta?: number Transmission probability per contact (default 0.3)
---- ctx.gamma?: number Recovery probability per step (default 0.1)
---- ctx.contacts_per_step?: number Mean contacts per agent (default 5)
---- ctx.steps?: number (default 100)
---- ctx.runs?: number MC runs (default 100)
+--- - Kermack, W. O., McKendrick, A. G. (1927). "A Contribution to the
+---   Mathematical Theory of Epidemics". Proc. Royal Society A.
+--- - Epstein, J. M. (2006). "Generative Social Science: Studies in
+---   Agent-Based Computational Modeling". Princeton.
 
 local abm = require("abm")
 local S = require("alc_shapes")
@@ -37,9 +30,7 @@ local M = {}
 M.meta = {
     name = "epidemic_abm",
     version = "0.1.0",
-    description = "SIR Agent-Based epidemic model — stochastic individual-level "
-        .. "disease transmission with tunable R0. Emergent epidemic curves, "
-        .. "herd immunity thresholds, and stochastic extinction.",
+    description = "SIR agent-based epidemic simulation with tunable R0.",
     category = "simulation",
 }
 
