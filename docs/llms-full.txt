@@ -1563,8 +1563,45 @@ Returns:
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local distill = require("distill")
+return distill.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+Three-phase MapReduce pipeline (LLM×MapReduce §3):
+
+1. **Chunk** — split `ctx.text` into overlapping windows of `chunk_size` lines
+   with `chunk_overlap` lines of context carry-over
+2. **Map** — process each chunk in parallel via `alc.parallel`; each LLM call
+   extracts information relevant to `ctx.goal`; chunks with no relevant content
+   respond with the sentinel `NONE`
+3. **Reduce** — filter out `NONE` responses, concatenate surviving extractions,
+   and synthesize a unified result via a single LLM call
+
+## Theoretical foundations {#theoretical-foundations}
+
+Based on LLM×MapReduce (Chen et al. 2024, arXiv:2410.09342). The paper
+demonstrates that the MapReduce paradigm enables LLMs to process arbitrarily
+long documents by decomposing them into independent map tasks and merging the
+partial results in a single reduce pass. The `NONE` sentinel filter ensures
+the reduce context contains only relevant extractions, mitigating noise from
+irrelevant chunks.
+
+## References {#references}
+
+- Chen, Zhu, Wang, Li, Liu, Han (2024). "LLM×MapReduce: Simplified Long-Sequence
+  Processing using Large Language Models". arXiv:2410.09342.
 
 ## Parameters {#parameters}
 

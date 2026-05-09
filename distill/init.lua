@@ -3,18 +3,38 @@
 --- Splits large text into chunks, processes each in parallel,
 --- then reduces into a unified result.
 ---
---- Based on: LLM×MapReduce (2024, arXiv:2410.09342)
+--- ## Usage
 ---
---- Usage:
----   local distill = require("distill")
----   return distill.run(ctx)
+--- ```lua
+--- local distill = require("distill")
+--- return distill.run(ctx)
+--- ```
 ---
---- ctx.text (required): Source text to process
---- ctx.goal: What to extract/summarize (default: "Summarize the key points")
---- ctx.chunk_size: Lines per chunk (default: 100)
---- ctx.chunk_overlap: Overlap lines between chunks (default: 5)
---- ctx.map_tokens: Max tokens per map call (default: 300)
---- ctx.reduce_tokens: Max tokens for final reduce (default: 600)
+--- ## Algorithm
+---
+--- Three-phase MapReduce pipeline (LLM×MapReduce §3):
+---
+--- 1. **Chunk** — split `ctx.text` into overlapping windows of `chunk_size` lines
+---    with `chunk_overlap` lines of context carry-over
+--- 2. **Map** — process each chunk in parallel via `alc.parallel`; each LLM call
+---    extracts information relevant to `ctx.goal`; chunks with no relevant content
+---    respond with the sentinel `NONE`
+--- 3. **Reduce** — filter out `NONE` responses, concatenate surviving extractions,
+---    and synthesize a unified result via a single LLM call
+---
+--- ## Theoretical foundations
+---
+--- Based on LLM×MapReduce (Chen et al. 2024, arXiv:2410.09342). The paper
+--- demonstrates that the MapReduce paradigm enables LLMs to process arbitrarily
+--- long documents by decomposing them into independent map tasks and merging the
+--- partial results in a single reduce pass. The `NONE` sentinel filter ensures
+--- the reduce context contains only relevant extractions, mitigating noise from
+--- irrelevant chunks.
+---
+--- ## References
+---
+--- - Chen, Zhu, Wang, Li, Liu, Han (2024). "LLM×MapReduce: Simplified Long-Sequence
+---   Processing using Large Language Models". arXiv:2410.09342.
 
 local S = require("alc_shapes")
 local T = S.T
