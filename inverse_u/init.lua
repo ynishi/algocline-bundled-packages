@@ -1,46 +1,48 @@
---- inverse_u — Inverse-U scaling detection (Chen et al. NeurIPS 2024)
+--- inverse_u(InverseU) — inverse-U scaling detection for multi-agent systems
 ---
---- Pure-computation utility for detecting non-monotonic accuracy
---- scaling when increasing the number of LLM agents/calls.
+--- Pure-computation utility for detecting non-monotonic accuracy scaling
+--- when increasing the number of LLM agents or calls.
 ---
---- Theory:
----   Chen, Davis, Hanin, Bailis, Stoica, Zaharia, Zou.
----   "Are More LM Calls All You Need? Scaling Laws in Multi-Agent Systems."
----   NeurIPS 2024. arXiv:2403.02419
+--- ## Usage
 ---
----   Theorem 2: For a synthetic dataset D_{α,p1,p2},
----   if p1 + p2 > 1 AND α < 1 - 1/t, then Vote / Filter-Vote
----   accuracy is inverse-U shaped in N (number of agents).
+--- ```lua
+--- local iu = require("inverse_u")
+--- local r = iu.detect({0.70, 0.75, 0.73, 0.71})
+--- -- r.peak_idx=2, r.is_declining=true, r.consecutive_drops=2
+--- ```
 ---
----   This directly contradicts the naive assumption that "more agents
----   = better accuracy". The mechanism: on hard queries (accuracy < 0.5),
----   majority vote amplifies the wrong answer as N grows.
+--- ## Theoretical foundations
 ---
---- Multi-Agent / Swarm context:
----   This is a critical safety gate for any multi-agent system that
----   scales by adding more agents (sc, panel, moa, pbft).
+--- Chen et al.'s Theorem 2: for a synthetic dataset `D_{α,p1,p2}`, if
+--- `p1 + p2 > 1` and `α < 1 - 1/t`, then Vote / Filter-Vote accuracy is
+--- inverse-U shaped in `N` (the number of agents). This contradicts the
+--- naive assumption that more agents always improves accuracy. The
+--- mechanism: on hard queries (accuracy `< 0.5`) majority vote amplifies
+--- the wrong answer as `N` grows.
 ---
----   - Scaling validation: detect() analyzes an accuracy-by-N series
----     to identify whether performance has peaked and is declining.
----     Run this after each round of agent addition.
----   - Early stopping: should_stop() provides a binary go/no-go
----     decision — if 2+ consecutive accuracy drops are observed,
----     stop adding agents immediately.
----   - Theoretical verification: chen_condition() checks whether
----     the formal conditions of Theorem 2 hold for a given task
----     distribution (easy/hard split, per-subset accuracy).
----   - Connects to condorcet (Anti-Jury is the p < 0.5 case),
----     ensemble_div (low diversity + inverse-U co-occur), and
----     cost_pareto (more agents at declining accuracy = Pareto-
----     dominated by smaller panel).
----   - Used as gate G1 in agent swarm orchestration: before
----     spawning additional agents, check if the inverse-U has
----     already been reached.
+--- The package is a critical safety gate for any multi-agent system that
+--- scales by adding agents (`sc`, `panel`, `moa`, `pbft`):
 ---
---- Usage:
----   local iu = require("inverse_u")
----   local r = iu.detect({0.70, 0.75, 0.73, 0.71})
----   -- r.peak_idx=2, r.is_declining=true, r.consecutive_drops=2
+--- - `detect` analyzes an accuracy-by-`N` series to identify whether
+---   performance has peaked and is declining; run after each round of
+---   agent addition.
+--- - `should_stop` returns a binary go/no-go: if 2+ consecutive accuracy
+---   drops are observed, stop adding agents immediately.
+--- - `chen_condition` checks whether Theorem 2's formal conditions hold
+---   for a given task distribution (easy/hard split, per-subset
+---   accuracy).
+---
+--- Composes with `condorcet` (Anti-Jury is the `p < 0.5` case),
+--- `ensemble_div` (low diversity + inverse-U co-occur), and
+--- `cost_pareto` (more agents at declining accuracy = Pareto-dominated).
+--- Used as gate G1 in agent-swarm orchestration: before spawning more
+--- agents, check whether the inverse-U has already been reached.
+---
+--- ## References
+---
+--- - Chen, L. et al. (2024). "Are More LM Calls All You Need? Scaling
+---   Laws in Multi-Agent Systems". NeurIPS 2024.
+---   https://arxiv.org/abs/2403.02419
 
 local S = require("alc_shapes")
 local T = S.T
@@ -51,10 +53,7 @@ local M = {}
 M.meta = {
     name = "inverse_u",
     version = "0.1.0",
-    description = "Inverse-U scaling detection — detects non-monotonic "
-        .. "accuracy-vs-N curves where adding more agents degrades "
-        .. "performance. Safety gate for multi-agent scaling "
-        .. "(Chen et al. NeurIPS 2024, Theorem 2).",
+    description = "Detect inverse-U accuracy scaling when adding more agents (safety gate).",
     category = "validation",
 }
 
