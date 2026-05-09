@@ -1,26 +1,30 @@
---- bot — Buffer of Thoughts: template-based meta-reasoning
+--- bot(BoT) — Buffer of Thoughts template-based meta-reasoning
 ---
 --- Identifies the problem type, retrieves an appropriate thought template
---- (structured reasoning pattern), instantiates it for the specific problem,
---- then verifies the result. Efficient because it leverages pre-defined
---- reasoning patterns rather than discovering them from scratch each time.
+--- (a structured reasoning pattern), instantiates it for the specific
+--- problem, and verifies the result. Efficient because it leverages
+--- pre-defined patterns rather than discovering them from scratch.
 ---
---- Based on: Yang et al., "Buffer of Thoughts: Thought-Augmented Reasoning
---- with Large Language Models" (2024, arXiv:2406.04271)
+--- ## Usage
 ---
---- Pipeline (3-4 LLM calls):
----   Step 1: Distill  — identify problem type and retrieve thought template
----   Step 2: Instantiate — apply template to the specific problem
----   Step 3: Verify   — check the instantiated reasoning
----   Step 4: Answer   — produce final answer (merged with Step 3 if clean)
+--- ```lua
+--- local bot = require("bot")
+--- return bot.run(ctx)
+--- ```
 ---
---- Usage:
----   local bot = require("bot")
----   return bot.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.templates: Custom template library (optional; uses built-in if absent)
---- ctx.gen_tokens: Max tokens per step (default: 500)
+--- The pipeline uses 3-4 LLM calls:
+---
+--- 1. Distill — identify the problem type and retrieve a thought template.
+--- 2. Instantiate — apply the template to the specific problem.
+--- 3. Verify — check the instantiated reasoning.
+--- 4. Answer — produce the final answer (merged with step 3 when clean).
+---
+--- ## References
+---
+--- - Yang, L. et al. (2024). "Buffer of Thoughts: Thought-Augmented
+---   Reasoning with Large Language Models". https://arxiv.org/abs/2406.04271
 
 local S = require("alc_shapes")
 local T = S.T
@@ -31,7 +35,7 @@ local M = {}
 M.meta = {
     name = "bot",
     version = "0.1.0",
-    description = "Buffer of Thoughts — identify problem type, apply thought template, verify",
+    description = "Identify problem type, apply thought template, verify (Buffer of Thoughts).",
     category = "reasoning",
 }
 
