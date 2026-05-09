@@ -8,14 +8,28 @@ source: router_semantic/init.lua
 generated: gen_docs (V0)
 ---
 
-# router_semantic — Semantic Router with LLM Fallback
+# router_semantic(RouterSemantic) — semantic router with LLM fallback
 
-> Keyword/pattern-based routing with LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
+> Keyword/pattern-based routing with an LLM fallback for ambiguous cases. Zero LLM calls for clear matches, one call for ambiguous cases.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local router = require("router_semantic")
+return router.run(ctx)
+```
+
+## References {#references}
+
+- Semantic Router pattern (Microsoft Multi-Agent Reference
+  Architecture).
 
 ## Parameters {#parameters}
 

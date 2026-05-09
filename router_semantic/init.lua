@@ -1,16 +1,20 @@
---- router_semantic — Semantic Router with LLM Fallback
---- Keyword/pattern-based routing with LLM fallback for ambiguous cases.
---- Zero LLM calls for clear matches, one call for ambiguous cases.
+--- router_semantic(RouterSemantic) — semantic router with LLM fallback
 ---
---- Based on Semantic Router pattern (Microsoft Multi-Agent Reference Architecture).
+--- Keyword/pattern-based routing with an LLM fallback for ambiguous
+--- cases. Zero LLM calls for clear matches, one call for ambiguous
+--- cases.
 ---
---- Usage:
----   local router = require("router_semantic")
----   return router.run(ctx)
+--- ## Usage
 ---
---- ctx.task      (required): Task description to route
---- ctx.rules     (optional): Routing rules [{name, keywords, description}, ...]
---- ctx.threshold (optional): Minimum keyword score to skip LLM (default: 0.3)
+--- ```lua
+--- local router = require("router_semantic")
+--- return router.run(ctx)
+--- ```
+---
+--- ## References
+---
+--- - Semantic Router pattern (Microsoft Multi-Agent Reference
+---   Architecture).
 
 local S = require("alc_shapes")
 local T = S.T
