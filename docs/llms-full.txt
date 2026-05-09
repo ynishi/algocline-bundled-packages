@@ -7056,9 +7056,122 @@ Returns `smc_sampled` shape:
 <!-- ── solve_verify_split.md ── -->
 
 
-# solve_verify_split — Compute-optimal split between solution
+# solve_verify_split(SolveVerifySplit) — compute-optimal SC vs GenRM split
 
-> generation (Self-Consistency) and generative verification (GenRM) under a fixed inference compute budget. Pure Computation pkg.
+> Pure-computation package implementing the compute-optimal split between solution generation (Self-Consistency) and generative verification (GenRM) under a fixed inference compute budget. Implements paper §3.1 cost model and §3.2 / §5.2 power-law inference scaling laws as Pure Computation primitives (no LLM calls).
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Algorithm](#algorithm)
+- [Injection points](#injection-points)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local svs = require("solve_verify_split")
+
+-- §3.1 cost in isolation
+svs.cost(4, 3, 1.0)            -- = 16
+svs.cost(4, 1, 2.0)            -- = 12 (GenRM-FT λ=2)
+
+-- Optimal allocation (caller fits α_S, α_V from grid)
+local r = svs.optimal_split(100, {
+    lambda = 2.0,
+    exponent_solve = 0.57, exponent_verify = 0.39,
+    prefactor_solve = 1.0, prefactor_verify = 1.0,
+})
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+C(S, V) = S · (1 + λ · V)            -- paper §3.1
+S_opt(C) = α_S · C^a                  -- paper §5.2
+V_opt(C) = α_V · C^b
+```
+
+where `λ = T_V / T_S`. Paper-default exponents (§5.2 Llama-3.1-8B +
+GenRM-FT + MATH): `a = 0.57, b = 0.39`. Appendix J alternates
+transferred only: Qwen-2.5-7B + MATH (`0.75, 0.32`),
+Llama-3.3-70B + MATH (`0.69, 0.43`). `α_S, α_V` have no numeric
+value in the paper; caller MUST fit them from a `(S, V)` grid via
+§3.2 Step 5 log-linear regression.
+
+## Algorithm {#algorithm}
+
+The pkg's allocator (paper §3.2 fits the parameters but has no
+pseudocode):
+
+1. `S_raw = α_S · B^a`, `V_raw = α_V · B^b`.
+2. `S_int = round(S_raw)`, `V_int = round(V_raw)`.
+3. `C_actual = S_int · (1 + λ · V_int)`.
+4. If `C_actual > B`, rescale `(S_int, V_int)` within `B`.
+5. If `V_int == 0`, take the pure SC path: `S = round(B), V = 0`.
+
+Domain: paper §3.1 implies `S ≥ 1` and `V ≥ 0`. The pure `cost`
+entry accepts `S ≥ 0` / `V ≥ 0`; `optimal_split` always returns
+`S_opt ≥ 1`.
+
+## Injection points {#injection-points}
+
+Paper-faithful defaults: `lambda = 1.0` (§3.1 GenRM-Base equal-token),
+`exponent_solve = 0.57`, `exponent_verify = 0.39`,
+`integer_method = "round"`, `rescale_method = "scale_proportional"`,
+`sc_fallback_when_v_zero = true`.
+
+REQUIRED:
+
+- `B` — budget (§3.1 C unit, > 0).
+- `params.lambda` — `λ = T_V / T_S` (§3.1).
+- `params.exponent_solve` — `a` in `S_opt ∝ C^a` (§5.2).
+- `params.exponent_verify` — `b` in `V_opt ∝ C^b` (§5.2).
+- `params.prefactor_solve` — `α_S` (caller-fit, §3.2 Step 5).
+- `params.prefactor_verify` — `α_V` (caller-fit, §3.2 Step 5).
+
+OPTIONAL paper-faithful: `opts.integer_method` (`round` / `floor` /
+`ceil`), `opts.rescale_method` (`scale_proportional` /
+`prefer_solve` / `prefer_verify`), `opts.v_cap` / `opts.s_cap`,
+`opts.sc_fallback_when_v_zero`. Paper §3.2 does not fix these.
+
+OPTIONAL non-paper-faithful: `opts.cost_model = "independent"`
+(uses `C = S·c_s + V_total·c_v`; paper §3.1 has per-solution V
+structure).
+
+## Caveats {#caveats}
+
+Cross-over observations (paper §5.1, observations not constants):
+
+- Llama-3.1-8B + GenRM-FT + MATH: GenRM matches SC at 8× compute,
+  +3.8% accuracy at 128×.
+- Qwen-2.5-7B + MATH: 64× to match, +5.4% at 512×.
+- Llama-3.3-70B + GenRM-Base + MATH: 4× to match, +1.7% at 64×.
+- QwQ-32B (thinking) + MATH: 4× to match, +2.5% at 16×.
+
+The cross-over is verifier-quality and model-dependent (Appendix E:
+GenRM-FT vs Base differs by 16×); the pkg does not hardcode a
+multiplier.
+
+Out of scope for v1: `fit_exponents` log-linear regression (caller
+fits in v1), cross-over multiplier auto-estimation, multi-question
+budget partition, and the `independent` cost model (declared but
+not implemented).
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Category: orchestration (allocator alongside `compute_alloc`).
+
+## References {#references}
+
+- Singhi, ..., Bansal, ..., Hosseini, ..., Grover, ..., Chang, ...,
+  Rohrbach, ..., Rohrbach, ... (2025). "When To Solve, When To
+  Verify: Compute-Optimal Problem Solving and Generative
+  Verification for LLM Reasoning". COLM 2025.
+  https://arxiv.org/abs/2504.01005
 
 ---
 
@@ -7136,9 +7249,57 @@ Returns:
 <!-- ── sprt.md ── -->
 
 
-# sprt — Wald Sequential Probability Ratio Test (SPRT) for Bernoulli streams
+# sprt(SPRT) — Wald Sequential Probability Ratio Test for Bernoulli streams
 
-> Given a Bernoulli stream X₁, X₂, … with unknown parameter p, SPRT decides between H0: p = p0 and H1: p = p1 (with p0 < p1) while observing trials one at a time. Maintains the running log-likelihood ratio
+> Given a Bernoulli stream `X₁, X₂, …` with unknown parameter `p`, SPRT decides between `H0: p = p0` and `H1: p = p1` (`p0 < p1`) while observing trials one at a time. Maintains the running log-likelihood ratio and stops as soon as it crosses an upper or lower boundary using Wald's classical approximations.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local sprt = require("sprt")
+local st = sprt.new({ p0 = 0.5, p1 = 0.75, alpha = 0.05, beta = 0.10 })
+for _, x in ipairs(stream) do
+    sprt.observe(st, x)
+    if sprt.decide(st).verdict ~= "continue" then break end
+end
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+λ_n = Σᵢ log(f₁(Xᵢ) / f₀(Xᵢ))
+A   = log((1 - β) / α)        B = log(β / (1 - α))
+```
+
+Wald & Wolfowitz (1948) proved SPRT minimizes `E[N]` among all
+tests satisfying `(α, β)` error constraints under the two boundary
+hypotheses. SPRT is the right primitive for "stop as soon as
+evidence is strong enough" decisions.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `cs_pruner` — N candidates × D rubric dims, kill on CS overlap.
+- `f_race` — N candidates × D dims, kill on Friedman rank gap.
+- `sprt` — 1 stream of Bernoulli trials, 2-hypothesis stop.
+
+## References {#references}
+
+- Wald, A. (1945). "Sequential Tests of Statistical Hypotheses".
+  Ann. Math. Statist. 16(2), 117-186.
+- Wald, A., Wolfowitz, J. (1948). "Optimum character of the
+  sequential probability ratio test". Ann. Math. Statist. 19(3),
+  326-339.
+
+This is a substrate-style primitive: it does NOT call alc.llm. It only
+accumulates evidence and exposes the decision boundary. Users compose
+it inside a recipe (see recipe_quick_vote) or orch driver loop.
 
 ---
 
@@ -7219,14 +7380,49 @@ Returns:
 <!-- ── step_verify.md ── -->
 
 
-# step_verify — Step-Level Verification (PRM-style, LLM-as-Verifier)
+# step_verify(StepVerify) — step-level verification (PRM-style LLM-as-Verifier)
 
-> Verifies each intermediate reasoning step independently, identifying exactly where errors occur. Retains only verified-correct steps and re-derives from the last correct point.
+> Verifies each intermediate reasoning step independently, identifies exactly where errors occur, retains only verified-correct steps, and re-derives from the last correct point.
 
 ## Contents
 
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sv = require("step_verify")
+return sv.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `cove` — generates verification questions about factual claims,
+  answers them independently, then revises. Targets factual
+  accuracy of the whole draft.
+- `factscore` — decomposes text into atomic factual claims and
+  scores each. Targets factual precision.
+- `step_verify` — scores each reasoning step for logical
+  correctness; identifies the first point of failure and re-derives
+  from there.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Grounded in Process Reward Model (PRM) research: PRMs consistently
+outperform Outcome Reward Models (ORMs) for mathematical and
+multi-step reasoning (Lightman et al. 2023); step-level
+supervision localizes errors that outcome-level misses.
+
+## References {#references}
+
+- PRM Survey (2025). https://arxiv.org/abs/2510.08049
+- ThinkPRM (2025). https://arxiv.org/abs/2504.16828
+- DiVeRSe (Li, ... et al., 2025). https://arxiv.org/abs/2502.09955
 
 ## Parameters {#parameters}
 
@@ -7255,14 +7451,39 @@ Returns:
 <!-- ── sugarscape_abm.md ── -->
 
 
-# sugarscape_abm — Sugarscape Agent-Based Model
+# sugarscape_abm(SugarscapeABM) — Sugarscape agent-based model
 
-> Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step, an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero.
+> Agents on a 2D toroidal grid forage for sugar. Each cell has a sugar capacity and regrows at a fixed rate. Agents have metabolism (sugar consumed per step) and vision (how far they can see). Each step an agent looks in four cardinal directions up to its vision range and moves to the nearest unoccupied cell with the most sugar. Agents die when sugar wealth reaches zero. Emergent phenomena include wealth inequality (Gini coefficient), Pareto-like skewed distributions, carrying capacity, and spatial clustering.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sugarscape = require("sugarscape_abm")
+return sugarscape.run(ctx)
+```
+
+## References {#references}
+
+- Epstein, J. M., Axtell, R. (1996). "Growing Artificial Societies:
+  Social Science from the Bottom Up". MIT Press.
+
+ctx.task?: string Description
+ctx.grid_size?: number Side length of square grid (default 25)
+ctx.n_agents?: number Initial population (default 100)
+ctx.max_sugar?: number Peak sugar capacity per cell (default 4)
+ctx.regrow_rate?: number Sugar regrowth per step (default 1)
+ctx.metabolism_range?: {number, number} Min/max metabolism (default {1, 4})
+ctx.vision_range?: {number, number} Min/max vision (default {1, 6})
+ctx.initial_wealth_range?: {number, number} (default {5, 25})
+ctx.steps?: number (default 100)
+ctx.runs?: number MC runs (default 100)
 
 ## Parameters {#parameters}
 
@@ -7294,14 +7515,49 @@ Returns:
 <!-- ── topo_route.md ── -->
 
 
-# topo_route — Topology-aware meta-router for multi-agent pipelines
+# topo_route(TopoRoute) — topology-aware meta-router for multi-agent pipelines
 
 > Analyzes task characteristics and recommends the optimal agent topology (linear, star, DAG, mesh, debate) along with concrete package combinations from the algocline bundled collection.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local topo_route = require("topo_route")
+return topo_route.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 1-2 LLM calls:
+
+1. Task analysis — classify complexity, decomposability,
+   verification needs, and adversarial requirements.
+2. Topology recommendation with package mapping.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Generalizes the "Topological Sensitivity" finding from Xie et al.,
+which demonstrated that the same agents connected in different
+topologies show up to 40% reliability variation. Topology
+selection is therefore a first-class architectural decision, not
+an implementation detail. Also informed by MAST (Cemri et al.
+2025), which identified 14 failure modes, many topology-dependent
+(F1 wrong decomposition granularity, F5 missing verification
+stage, F11 groupthink in mesh topologies).
+
+## References {#references}
+
+- Xie, ... et al. (2026). "From Spark to Fire". AAMAS 2026.
+- Cemri, ... et al. (2025). MAST failure-mode taxonomy.
 
 ## Parameters {#parameters}
 

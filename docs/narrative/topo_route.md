@@ -8,14 +8,49 @@ source: topo_route/init.lua
 generated: gen_docs (V0)
 ---
 
-# topo_route — Topology-aware meta-router for multi-agent pipelines
+# topo_route(TopoRoute) — topology-aware meta-router for multi-agent pipelines
 
 > Analyzes task characteristics and recommends the optimal agent topology (linear, star, DAG, mesh, debate) along with concrete package combinations from the algocline bundled collection.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local topo_route = require("topo_route")
+return topo_route.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 1-2 LLM calls:
+
+1. Task analysis — classify complexity, decomposability,
+   verification needs, and adversarial requirements.
+2. Topology recommendation with package mapping.
+
+## Theoretical foundations {#theoretical-foundations}
+
+Generalizes the "Topological Sensitivity" finding from Xie et al.,
+which demonstrated that the same agents connected in different
+topologies show up to 40% reliability variation. Topology
+selection is therefore a first-class architectural decision, not
+an implementation detail. Also informed by MAST (Cemri et al.
+2025), which identified 14 failure modes, many topology-dependent
+(F1 wrong decomposition granularity, F5 missing verification
+stage, F11 groupthink in mesh topologies).
+
+## References {#references}
+
+- Xie, ... et al. (2026). "From Spark to Fire". AAMAS 2026.
+- Cemri, ... et al. (2025). MAST failure-mode taxonomy.
 
 ## Parameters {#parameters}
 

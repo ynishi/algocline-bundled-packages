@@ -1,32 +1,39 @@
---- topo_route — Topology-aware meta-router for multi-agent pipelines
+--- topo_route(TopoRoute) — topology-aware meta-router for multi-agent pipelines
 ---
 --- Analyzes task characteristics and recommends the optimal agent
 --- topology (linear, star, DAG, mesh, debate) along with concrete
 --- package combinations from the algocline bundled collection.
 ---
---- Generalizes the "Topological Sensitivity" finding from "From Spark
---- to Fire" (Xie et al., AAMAS 2026), which demonstrated that the
---- SAME agents connected in different topologies show up to 40%
---- reliability variation. Topology selection is therefore a first-class
---- architectural decision, not an implementation detail.
+--- ## Usage
 ---
---- Also informed by MAST (Cemri et al., 2025) which identified 14
---- failure modes, many of which are topology-dependent (F1: wrong
---- decomposition granularity, F5: missing verification stage, F11:
---- groupthink in mesh topologies).
+--- ```lua
+--- local topo_route = require("topo_route")
+--- return topo_route.run(ctx)
+--- ```
 ---
---- Pipeline (1-2 LLM calls):
----   Step 1: Task analysis — classify complexity, decomposability,
----           verification needs, and adversarial requirements
----   Step 2: Topology recommendation with package mapping
+--- ## Algorithm
 ---
---- Usage:
----   local topo_route = require("topo_route")
----   return topo_route.run(ctx)
+--- The pipeline uses 1-2 LLM calls:
 ---
---- ctx.task (required): Task description to route
---- ctx.available_packages (optional): Override default package registry
---- ctx.analysis_tokens: Max tokens for analysis (default: 600)
+--- 1. Task analysis — classify complexity, decomposability,
+---    verification needs, and adversarial requirements.
+--- 2. Topology recommendation with package mapping.
+---
+--- ## Theoretical foundations
+---
+--- Generalizes the "Topological Sensitivity" finding from Xie et al.,
+--- which demonstrated that the same agents connected in different
+--- topologies show up to 40% reliability variation. Topology
+--- selection is therefore a first-class architectural decision, not
+--- an implementation detail. Also informed by MAST (Cemri et al.
+--- 2025), which identified 14 failure modes, many topology-dependent
+--- (F1 wrong decomposition granularity, F5 missing verification
+--- stage, F11 groupthink in mesh topologies).
+---
+--- ## References
+---
+--- - Xie, ... et al. (2026). "From Spark to Fire". AAMAS 2026.
+--- - Cemri, ... et al. (2025). MAST failure-mode taxonomy.
 
 local S = require("alc_shapes")
 local T = S.T
