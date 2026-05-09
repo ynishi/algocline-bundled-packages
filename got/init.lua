@@ -1,36 +1,39 @@
---- GoT — Graph of Thoughts reasoning
---- Models reasoning as a DAG (Directed Acyclic Graph) enabling operations
+--- got(GoT) — Graph of Thoughts reasoning over a DAG
+---
+--- Models reasoning as a directed acyclic graph, enabling operations
 --- impossible in tree structures: aggregation of multiple thought paths,
 --- self-refinement loops, and hierarchical decomposition with merge.
+--- Unlike `tot`, `got` supports Aggregate (many-to-one merge) where
+--- independent branches combine into a superior synthesis.
 ---
---- Key difference from ToT: GoT supports Aggregate (many-to-one merge)
---- where independent reasoning branches combine into a superior synthesis.
---- ToT is limited to tree structures where branches never reconverge.
+--- ## Usage
 ---
---- Based on: Besta et al., "Graph of Thoughts: Solving Elaborate Problems
---- with Large Language Models" (AAAI 2024, arXiv:2308.09687)
+--- ```lua
+--- local got = require("got")
+--- return got.run(ctx)
+--- ```
+---
+--- ## Algorithm
 ---
 --- Operations:
----   Generate   — branch one thought into k new thoughts (1-to-many)
----   Aggregate  — merge k thoughts into one synthesis (many-to-1, GoT-unique)
----   Refine     — improve a thought in-place (self-loop)
----   Score      — evaluate thought quality (LLM or custom function)
----   KeepBest   — prune to top-n thoughts by score
 ---
---- Pipeline (default GoO):
----   Generate(k) → Score → KeepBest(n) → Refine → Aggregate → Refine → Answer
+--- - Generate — branch one thought into `k` new thoughts (1-to-many).
+--- - Aggregate — merge `k` thoughts into one synthesis (GoT-unique).
+--- - Refine — improve a thought in place (self-loop).
+--- - Score — evaluate thought quality (LLM or custom function).
+--- - KeepBest — prune to top-`n` thoughts by score.
 ---
---- Usage:
----   local got = require("got")
----   return got.run(ctx)
+--- Default Graph-of-Operations pipeline:
 ---
---- ctx.task (required): The problem to solve
---- ctx.k_generate: Branches per Generate (default: 3)
---- ctx.keep_best: Nodes to keep after pruning (default: 2)
---- ctx.max_refine: Max refinement attempts (default: 2)
---- ctx.gen_tokens: Max tokens for generation (default: 300)
---- ctx.agg_tokens: Max tokens for aggregation (default: 500)
---- ctx.refine_tokens: Max tokens for refinement (default: 400)
+--- ```text
+--- Generate(k) → Score → KeepBest(n) → Refine → Aggregate → Refine → Answer
+--- ```
+---
+--- ## References
+---
+--- - Besta, M. et al. (2024). "Graph of Thoughts: Solving Elaborate
+---   Problems with Large Language Models". AAAI 2024.
+---   https://arxiv.org/abs/2308.09687
 
 local S = require("alc_shapes")
 local T = S.T
@@ -41,9 +44,7 @@ local M = {}
 M.meta = {
     name = "got",
     version = "0.1.0",
-    description = "Graph of Thoughts — DAG-structured reasoning with aggregation, "
-        .. "refinement, and multi-path synthesis. Enables thought merging "
-        .. "impossible in tree-based approaches (ToT).",
+    description = "Graph of Thoughts: DAG reasoning with aggregation, refinement, and synthesis.",
     category = "reasoning",
 }
 
