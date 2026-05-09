@@ -1,78 +1,61 @@
---- recipe_ranking_funnel — Verified 3-stage ranking funnel
+--- recipe_ranking_funnel(RecipeRankingFunnel) — verified 3-stage ranking funnel
 ---
---- Recipe package: composes listwise_rank and pairwise_rank into a
---- cost-efficient funnel for ranking large candidate sets (N ≥ 20).
---- Applies the information retrieval classic pattern:
----   Recall (cheap) → Precision (medium) → Final Rank (expensive)
+--- Recipe package that composes `listwise_rank` and `pairwise_rank`
+--- into a cost-efficient funnel for ranking large candidate sets
+--- (`N ≥ 20`), applying the IR classic
+--- `Recall (cheap) → Precision (medium) → Final Rank (expensive)`
+--- pattern.
 ---
---- Pipeline:
----   Stage 1: listwise_rank  — Coarse screening. Rank all N candidates
----                              via sliding-window listwise permutation.
----                              Keep top_k1 (default: ceil(N/3)).
----                              Cost: O(N / window_size) LLM calls.
+--- ## Usage
 ---
----   Stage 2: Multi-axis LLM scoring — Score surviving candidates on
----                              multiple quality axes (correctness,
----                              completeness, relevance). Rank by
----                              average score. Keep top_k2 (default:
----                              min(top_k1, 5)).
----                              Cost: top_k1 LLM calls.
----                              ACTIVATION: with default top_k1 =
----                              ceil(N/3) and top_k2 = min(top_k1, 5),
----                              Stage 2 only fires when top_k1 > 5,
----                              i.e. N >= 16. For N ≤ 15 with defaults,
----                              #survivors_1 == top_k2 so Stage 2 is
----                              skipped (flagged in stages[2].name =
----                              "scoring_skipped"). To force Stage 2 on
----                              smaller N, pass ctx.top_k2 explicitly
----                              lower than top_k1.
+--- ```lua
+--- local funnel = require("recipe_ranking_funnel")
+--- return funnel.run(ctx)
+--- ```
 ---
----   Stage 3: pairwise_rank   — Precise pairwise comparison of the
----                              final top_k2 candidates in allpair
----                              mode with bidirectional position-bias
----                              cancellation. Produces the final ranking.
----                              Cost: top_k2 * (top_k2-1) LLM calls.
+--- ## Algorithm
 ---
---- Why this composition:
----   - listwise_rank is the cheapest way to screen — 1 LLM call per
----     window, no calibration problem (orderings, not scores).
----   - Multi-axis scoring provides a middle-ground evaluation that
----     considers multiple quality dimensions before the expensive
----     pairwise stage.
----   - pairwise_rank is the most accurate LLM-as-judge method
----     (Qin et al. NAACL 2024) but O(N²) — prohibitive for large N.
----     Applying it only to top_k2 ≤ 5 keeps cost manageable.
+--- 1. `listwise_rank` — coarse screening. Rank all N candidates via
+---    sliding-window listwise permutation; keep `top_k1` (default
+---    `ceil(N/3)`). Cost: `O(N / window_size)` LLM calls.
+--- 2. Multi-axis LLM scoring — score survivors on quality axes
+---    (correctness, completeness, relevance), rank by average, keep
+---    `top_k2` (default `min(top_k1, 5)`). Cost: `top_k1` LLM calls.
+---    With defaults, Stage 2 fires only when `top_k1 > 5` (i.e.
+---    `N >= 16`); otherwise `#survivors_1 == top_k2` and Stage 2 is
+---    skipped (flagged as `scoring_skipped`). Pass `ctx.top_k2`
+---    explicitly lower than `top_k1` to force it on smaller N.
+--- 3. `pairwise_rank` — precise pairwise comparison of the final
+---    `top_k2` candidates in `allpair` mode with bidirectional
+---    position-bias cancellation. Cost: `top_k2 · (top_k2 - 1)` LLM
+---    calls.
 ---
---- Caveats:
----   The recipe encodes known failure modes discovered through testing.
----   See M.caveats for the full list. Key examples:
----   - listwise window_size < ceil(N/2) loses top candidates
----   - N < 6 makes the funnel overhead counterproductive
----   - pairwise allpair on N > 12 has cost explosion
+--- The composition reflects: `listwise_rank` screens cheapest (1 LLM
+--- call per window, no calibration problem); multi-axis scoring is a
+--- middle-ground evaluation; `pairwise_rank` is the most accurate
+--- LLM-as-judge method but `O(N²)` — applying it only to `top_k2 ≤ 5`
+--- keeps cost manageable.
 ---
---- Verified results:
----   Not yet populated. Run alc_eval with a ranking scenario and
----   fill M.verified from the actual eval record.
+--- ## Caveats
 ---
---- References:
----   Sun et al., "Is ChatGPT Good at Search?" (EMNLP 2023)
----   Qin et al., "Large Language Models are Effective Text Rankers
----     with Pairwise Ranking Prompting" (NAACL 2024)
----   Inoue et al., "Wider or Deeper? Scaling LLM Inference-Time
----     Compute with Adaptive Branching Tree Search" (NeurIPS 2025)
+--- See `M.caveats` for the full list. Key items: `listwise window_size
+--- < ceil(N/2)` loses top candidates; `N < 6` makes the funnel
+--- overhead counterproductive; `pairwise allpair` on `N > 12`
+--- explodes.
 ---
---- Usage:
----   local funnel = require("recipe_ranking_funnel")
----   return funnel.run(ctx)
+--- ## Empirical validation
 ---
---- ctx.task (required): The ranking criterion
---- ctx.candidates (required): Array of candidate texts to rank
---- ctx.top_k1: Stage 1→2 cutoff (default: ceil(N/3))
---- ctx.top_k2: Stage 2→3 cutoff (default: min(top_k1, 5))
---- ctx.window_size: listwise_rank window (default: 20)
---- ctx.scoring_axes: Custom axes for Stage 2 (default: 3 standard axes)
---- ctx.gen_tokens: Max tokens per LLM call in Stage 1 (listwise) and
----     Stage 2 (scoring). (default: 400)
+--- Not yet populated. Run `alc_eval` with a ranking scenario and fill
+--- `M.verified` from the actual eval record.
+---
+--- ## References
+---
+--- - Sun, W. et al. (2023). "Is ChatGPT Good at Search?". EMNLP 2023.
+--- - Qin, Z. et al. (2024). "Large Language Models are Effective Text
+---   Rankers with Pairwise Ranking Prompting". NAACL 2024.
+--- - Inoue, Y. et al. (2025). "Wider or Deeper? Scaling LLM
+---   Inference-Time Compute with Adaptive Branching Tree Search".
+---   NeurIPS 2025.
 --- ctx.judge_gen_tokens: Max tokens per pairwise judgement call in
 ---     Stage 3 (and in the N<6 direct-pairwise bypass). Pairwise
 ---     judgements only need a short verdict (e.g. "A>B"), so this
