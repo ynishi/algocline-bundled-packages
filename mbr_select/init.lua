@@ -1,38 +1,42 @@
---- mbr_select — Minimum Bayes Risk Selection
+--- mbr_select(MBRSelect) — Minimum Bayes Risk candidate selection
 ---
 --- Selects the candidate that minimizes expected loss across all other
 --- candidates. Instead of picking "the best" directly (which requires an
 --- absolute quality oracle), MBR picks the candidate most agreed-upon by
---- all others — the one with minimum expected risk.
+--- the others — the one with minimum expected risk.
 ---
---- Key difference from rank:
----   rank       — single-elimination tournament with pairwise LLM-as-Judge.
----                O(N log N) comparisons. Subject to bracket luck: a strong
----                candidate can be eliminated by a flawed matchup.
----                Position bias in A/B comparisons affects results.
----   mbr_select — computes pairwise similarity for ALL pairs, selects the
----                candidate with highest total agreement. O(N²/2) comparisons
----                (symmetric). No bracket luck. Mathematically optimal under
----                Bayes decision theory.
+--- ## Usage
 ---
---- Mathematical foundation:
----   MBR selects: argmin_y E_{y'~P}[L(y, y')]
----   where L is a loss function (1 - similarity).
----   Equivalently: argmax_y E_{y'~P}[similarity(y, y')]
----   This is the Bayes-optimal decision under the candidate distribution.
+--- ```lua
+--- local mbr = require("mbr_select")
+--- return mbr.run(ctx)
+--- ```
 ---
---- Based on: "Regularized Best-of-N Sampling with Minimum Bayes Risk"
---- (NAACL 2025). Also: MBR decoding literature (Eikema & Aziz, 2020)
+--- ## Theoretical foundations
 ---
---- Usage:
----   local mbr = require("mbr_select")
----   return mbr.run(ctx)
+--- ```math
+--- argmin_y E_{y'~P}[L(y, y')]   ≡   argmax_y E_{y'~P}[similarity(y, y')]
+--- ```
 ---
---- ctx.task (required): The task to generate candidates for
---- ctx.n: Number of candidates to generate (default: 5)
---- ctx.criteria: Similarity criteria (default: "substantive agreement")
---- ctx.gen_tokens: Max tokens per candidate (default: 400)
---- ctx.sim_tokens: Max tokens per similarity judgment (default: 80)
+--- where `L = 1 - similarity`. This is the Bayes-optimal decision under
+--- the candidate distribution.
+---
+--- ## Comparison with related packages
+---
+--- - `rank` — single-elimination tournament with pairwise LLM-as-Judge.
+---   `O(N log N)` comparisons. Subject to bracket luck: a strong
+---   candidate can be eliminated by a flawed matchup; A/B position bias
+---   affects results.
+--- - `mbr_select` — computes pairwise similarity for all pairs and
+---   selects the candidate with highest total agreement. `O(N²/2)`
+---   symmetric comparisons. No bracket luck and mathematically optimal
+---   under Bayes decision theory.
+---
+--- ## References
+---
+--- - "Regularized Best-of-N Sampling with Minimum Bayes Risk" (NAACL
+---   2025).
+--- - Eikema, B., Aziz, W. (2020). MBR decoding literature.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -43,9 +47,7 @@ local M = {}
 M.meta = {
     name = "mbr_select",
     version = "0.1.0",
-    description = "Minimum Bayes Risk selection — picks the candidate with "
-        .. "highest expected agreement across all others. Bayes-optimal "
-        .. "selection without bracket luck or position bias.",
+    description = "Minimum Bayes Risk selection: pick candidate with highest pairwise agreement.",
     category = "selection",
 }
 
