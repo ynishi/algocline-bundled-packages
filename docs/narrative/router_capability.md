@@ -8,14 +8,22 @@ source: router_capability/init.lua
 generated: gen_docs (V0)
 ---
 
-# router_capability — Capability-based Registry Router
+# router_capability(RouterCapability) — capability-based registry router
 
-> Extracts task requirements via LLM, then scores against agent capabilities using Jaccard similarity. Based on Dynamic Agent Registry pattern.
+> Extracts task requirements via LLM and scores them against agent capabilities using Jaccard similarity. Based on the Dynamic Agent Registry pattern.
 
 ## Contents
 
+- [Usage](#usage)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local router = require("router_capability")
+return router.run(ctx)
+```
 
 ## Parameters {#parameters}
 

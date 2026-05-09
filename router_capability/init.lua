@@ -1,14 +1,15 @@
---- router_capability — Capability-based Registry Router
---- Extracts task requirements via LLM, then scores against agent capabilities
---- using Jaccard similarity. Based on Dynamic Agent Registry pattern.
+--- router_capability(RouterCapability) — capability-based registry router
 ---
---- Usage:
----   local router = require("router_capability")
----   return router.run(ctx)
+--- Extracts task requirements via LLM and scores them against agent
+--- capabilities using Jaccard similarity. Based on the Dynamic Agent
+--- Registry pattern.
 ---
---- ctx.task        (required): Task description
---- ctx.registry    (optional): Agent registry [{name, capabilities, description, cost}, ...]
---- ctx.max_results (optional): Number of top matches to return (default: 3)
+--- ## Usage
+---
+--- ```lua
+--- local router = require("router_capability")
+--- return router.run(ctx)
+--- ```
 
 local S = require("alc_shapes")
 local T = S.T
