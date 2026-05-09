@@ -9,7 +9,7 @@
 ## aggregation
 
 - [condorcet](narrative/condorcet.md): Condorcet Jury Theorem probability and Anti-Jury detection.
-- [ensemble_div](narrative/ensemble_div.md): Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity E = Ē − Ā for ensemble diversity measurement. Quantifies how much agent disagreement reduces ensemble error (Krogh-Vedelsby NeurIPS 1995...
+- [ensemble_div](narrative/ensemble_div.md): Krogh-Vedelsby ambiguity decomposition for ensemble diversity measurement.
 - [isp_aggregate](narrative/isp_aggregate.md): LLM aggregation via higher-order information (Zhang et al. 2025, arXiv:2510.01499). Paper-faithful ISP (inverse surprising popularity) and OW (optimal weight) aggregators with a calibration/run spl...
 - [kemeny](narrative/kemeny.md): Kemeny-Young rank aggregation — axiomatically unique consensus ranking that minimizes total Kendall tau distance. Merges multiple agent rankings into optimal consensus with Condorcet consistency ...
 - [pbft](narrative/pbft.md): PBFT-inspired 3-phase LLM consensus — propose, validate, commit with BFT quorum guarantees (Castro-Liskov 1999)
@@ -27,7 +27,7 @@
 
 ## combinator
 
-- [deliberate](narrative/deliberate.md): Structured deliberation — abstract principles, expert consultation, debate, ranked decision
+- [deliberate](narrative/deliberate.md): Structured deliberation: abstract principles, consult, debate, ranked decision.
 - [pre_mortem](narrative/pre_mortem.md): Feasibility-gated proposal filtering — prerequisite verification before rating
 - [review_and_investigate](narrative/review_and_investigate.md): Deep code review with investigation — detect, verify, explore, diagnose, research, prescribe
 
@@ -64,7 +64,7 @@
 
 - [anti_cascade](narrative/anti_cascade.md): Pipeline error cascade detection via per-step independent re-derivation.
 - [bft](narrative/bft.md): Byzantine Fault Tolerance quorum thresholds and impossibility bounds.
-- [dissent](narrative/dissent.md): Consensus inertia prevention — forces adversarial challenge before finalizing multi-agent agreement. Prevents groupthink lock-in. Generalizes the Consensus Inertia countermeasure from 'From Spark...
+- [dissent](narrative/dissent.md): Forced adversarial challenge to prevent multi-agent consensus inertia.
 - [lineage](narrative/lineage.md): Pipeline-spanning claim lineage tracking — extracts claims per step, traces inter-step dependencies, detects conflicts and ungrounded claims. Generalizes the lineage graph governance layer from '...
 
 ## intent
@@ -157,7 +157,7 @@
 
 - [ab_select](narrative/ab_select.md): Multi-fidelity Thompson sampling over a fixed candidate pool.
 - [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance, frontier extraction, and layered ranking.
-- [cs_pruner](narrative/cs_pruner.md): Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill using empirical-Bernstein CS (Howard et al. 2021). Evaluates candidates across a multi-dimensional rubric and kills each on...
+- [cs_pruner](narrative/cs_pruner.md): Anytime-valid candidate pruning via empirical-Bernstein confidence sequences.
 - [f_race](narrative/f_race.md): Friedman race partial-data pruner. Block-wise ranking of candidates over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman + Nemenyi post-h...
 - [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking — RankGPT-style permutation generation in 1 LLM call. Resolves the calibration problem of pointwise scoring. Sliding window for large N.
 - [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection — picks the candidate with highest expected agreement across all others. Bayes-optimal selection without bracket luck or position bias.

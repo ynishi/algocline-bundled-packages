@@ -1,50 +1,53 @@
---- ensemble_div — Ambiguity Decomposition (Krogh-Vedelsby 1995)
+--- ensemble_div(EnsembleDiv) — Krogh-Vedelsby ambiguity decomposition
 ---
---- Pure-computation utility for ensemble diversity measurement.
---- Implements the fundamental identity: E = E_bar - A_bar
+--- Pure-computation utility for ensemble diversity measurement that
+--- implements the fundamental identity `E = E_bar - A_bar`. The
+--- identity holds without any independence assumption and for arbitrary
+--- weight distributions; it is exact, not an approximation.
 ---
----   E     = ensemble squared error = (V - t)²
----   E_bar = weighted average individual error = Σ w_a · (V^a - t)²
----   A_bar = ambiguity (diversity) = Σ w_a · (V^a - V)²
+--- ## Usage
 ---
---- This identity holds WITHOUT any independence assumption and for
---- arbitrary weight distributions. It is exact, not an approximation.
+--- ```lua
+--- local ed = require("ensemble_div")
+--- local r = ed.decompose({0.8, 0.6, 0.9}, 1.0)
+--- -- r.E, r.E_bar, r.A_bar, r.identity_holds
+--- ```
 ---
---- Key insight: A_bar > 0 ⟹ E < E_bar (ensemble always beats the
+--- ## Theoretical foundations
+---
+--- Where:
+---
+--- ```math
+--- E     = ensemble squared error = (V - t)²
+--- E_bar = weighted average individual error = Σ w_a · (V^a - t)²
+--- A_bar = ambiguity (diversity) = Σ w_a · (V^a - V)²
+--- ```
+---
+--- Key insight: `A_bar > 0 ⟹ E < E_bar` (the ensemble always beats the
 --- weighted average of individuals when there is any disagreement).
 ---
---- Theory:
----   Krogh, Vedelsby. "Neural Network Ensembles, Cross Validation,
----   and Active Learning". NeurIPS 7, pp.231-238, 1995 (Eq. 6).
+--- The decomposition answers the fundamental multi-agent question "does
+--- adding another agent actually help?":
 ---
----   Hong, Page. "Groups of diverse problem solvers can outperform
----   groups of high-ability problem solvers". PNAS 101(46),
----   pp.16385-16389, 2004. (Same identity restated as the Diversity
----   Prediction Theorem: crowd error = avg error - diversity.)
+--- - Diversity monitoring: `A_bar` measures how much agents disagree.
+---   If `A_bar ≈ 0`, agents are redundant. Diversity is the only
+---   mechanism by which ensembles reduce error.
+--- - Ensemble health: `decompose` verifies the identity in real time,
+---   providing a live diagnostic of ensemble quality.
+--- - Weight optimization: non-uniform weights (e.g. from `mwu` or `ucb`)
+---   are fully supported. The identity holds for arbitrary weights.
+--- - Composable with `panel`, `moa`, `sc` as a diagnostic layer.
+--- - Connects to `condorcet` (independence assumption) and `inverse_u`
+---   (diminishing returns): low diversity often co-occurs with high
+---   correlation and inverse-U scaling.
 ---
---- Multi-Agent / Swarm context:
----   This decomposition answers the fundamental question of multi-agent
----   systems: "Does adding another agent actually help?"
+--- ## References
 ---
----   - Diversity monitoring: A_bar measures how much agents disagree.
----     If A_bar ≈ 0, agents are redundant (same model/prompt producing
----     near-identical outputs). Diversity is the ONLY mechanism by which
----     ensembles reduce error — without it, more agents are pure waste.
----   - Ensemble health: decompose() verifies the identity E = E_bar - A_bar
----     in real time, providing a live diagnostic of ensemble quality.
----   - Weight optimization: non-uniform weights (e.g. from mwu or ucb)
----     are fully supported. The identity holds for arbitrary weights.
----   - Composable with panel, moa, sc as a diagnostic layer: run
----     decompose() on agent outputs to measure whether the ensemble
----     is actually benefiting from diversity or just adding cost.
----   - Connects to condorcet (independence assumption) and inverse_u
----     (diminishing returns): low diversity often co-occurs with
----     high correlation and inverse-U scaling.
----
---- Usage:
----   local ed = require("ensemble_div")
----   local r = ed.decompose({0.8, 0.6, 0.9}, 1.0)
----   -- r.E, r.E_bar, r.A_bar, r.identity_holds
+--- - Krogh, A., Vedelsby, J. (1995). "Neural Network Ensembles, Cross
+---   Validation, and Active Learning". NeurIPS 7, pp.231-238.
+--- - Hong, L., Page, S. E. (2004). "Groups of diverse problem solvers
+---   can outperform groups of high-ability problem solvers". PNAS
+---   101(46), pp.16385-16389.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -55,10 +58,7 @@ local M = {}
 M.meta = {
     name = "ensemble_div",
     version = "0.1.0",
-    description = "Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity "
-        .. "E = Ē − Ā for ensemble diversity measurement. Quantifies "
-        .. "how much agent disagreement reduces ensemble error "
-        .. "(Krogh-Vedelsby NeurIPS 1995, Hong-Page PNAS 2004).",
+    description = "Krogh-Vedelsby ambiguity decomposition for ensemble diversity measurement.",
     category = "aggregation",
 }
 
