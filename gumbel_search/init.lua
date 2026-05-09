@@ -1,40 +1,45 @@
---- gumbel_search — Gumbel Top-k + Sequential Halving Tree Search
+--- gumbel_search(GumbelSearch) — Gumbel Top-k + Sequential Halving budget-optimal search
 ---
---- Budget-optimal tree search that combines two theoretically grounded
---- techniques: Gumbel Top-k for unbiased candidate sampling without
---- replacement, and Sequential Halving for optimal budget allocation
---- when comparing candidates.
+--- Budget-optimal tree search that combines Gumbel Top-k for unbiased
+--- candidate sampling without replacement and Sequential Halving for
+--- optimal budget allocation when comparing candidates.
 ---
---- Key difference from ab_mcts / tot:
----   ab_mcts  — Thompson Sampling with adaptive branching (wider vs deeper).
----              Excels at exploration-exploitation balance with unlimited budget.
----              Beta posteriors require multiple visits to converge.
----   tot      — Fixed DFS/BFS strategy. Structured but budget allocation is
----              not optimized; may waste evaluations on poor candidates.
----   gumbel_search — **Fixed-budget optimal pure exploration**. Sequential
----              Halving provably minimizes simple regret under budget constraint.
----              Gumbel noise ensures unbiased candidate ranking.
----              Outperforms standard decoding with just 5-15 simulations (~500 tokens).
----              Best for "I have exactly B evaluation budget, find the best answer."
+--- ## Usage
 ---
---- Mathematical guarantees:
----   Sequential Halving: O(N/log(N)) simple regret bound (Karnin et al., 2013).
----     Optimal among algorithms that don't use arm means.
----   Gumbel Top-k: unbiased non-replacement sampling from categorical distributions
----     (Kool et al., 2019). Equivalent to sorting by value + Gumbel noise.
+--- ```lua
+--- local gs = require("gumbel_search")
+--- return gs.run(ctx)
+--- ```
 ---
---- Based on: "Revisiting Tree Search for LLMs: Gumbel and Sequential Halving
---- for Budget-Scalable Reasoning" (2026, arXiv:2603.21162)
---- Also: Karnin et al., "Almost Optimal Exploration in Multi-Armed Bandits" (ICML 2013)
+--- ## Theoretical foundations
 ---
---- Usage:
----   local gs = require("gumbel_search")
----   return gs.run(ctx)
+--- - Sequential Halving achieves an `O(N/log N)` simple-regret bound
+---   (Karnin et al., 2013) and is optimal among algorithms that do not
+---   use arm means.
+--- - Gumbel Top-k provides unbiased non-replacement sampling from
+---   categorical distributions (Kool et al., 2019); equivalent to
+---   sorting by value plus Gumbel noise.
+--- - The combination is fixed-budget optimal pure exploration; best when
+---   the question is "I have exactly B evaluation budget, find the best
+---   answer." Outperforms standard decoding with 5-15 simulations
+---   (~500 tokens).
 ---
---- ctx.task (required): The problem to solve
---- ctx.initial_candidates: Number of initial candidates (default: 8)
---- ctx.gen_tokens: Max tokens for generation (default: 400)
---- ctx.eval_tokens: Max tokens for evaluation (default: 100)
+--- ## Comparison with related packages
+---
+--- - `ab_mcts` — Thompson Sampling with adaptive branching; Beta
+---   posteriors need multiple visits and benefit from unlimited budget.
+--- - `tot` — fixed DFS/BFS; structured but budget allocation is not
+---   optimized.
+--- - `gumbel_search` — fixed-budget optimal pure exploration via
+---   Sequential Halving + Gumbel Top-k.
+---
+--- ## References
+---
+--- - "Revisiting Tree Search for LLMs: Gumbel and Sequential Halving for
+---   Budget-Scalable Reasoning" (2026). https://arxiv.org/abs/2603.21162
+--- - Karnin, Z. et al. (2013). "Almost Optimal Exploration in
+---   Multi-Armed Bandits". ICML 2013.
+--- - Kool, W. et al. (2019). "Stochastic Beams and Where to Find Them".
 
 local S = require("alc_shapes")
 local T = S.T
@@ -45,9 +50,7 @@ local M = {}
 M.meta = {
     name = "gumbel_search",
     version = "0.1.0",
-    description = "Budget-optimal tree search — Sequential Halving for optimal "
-        .. "budget allocation + Gumbel Top-k for unbiased sampling. Provably "
-        .. "minimizes simple regret under fixed evaluation budget.",
+    description = "Budget-optimal search via Sequential Halving and Gumbel Top-k sampling.",
     category = "reasoning",
 }
 
