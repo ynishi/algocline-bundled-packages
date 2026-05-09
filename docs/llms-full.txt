@@ -81,14 +81,73 @@ Returns:
 <!-- ── ab_select.md ── -->
 
 
-# ab_select — Adaptive Branching Selection (multi-fidelity Thompson sampling)
+# ab_select(AB-Select) — selects the best candidate via multi-fidelity Thompson sampling
 
-> Selects the best candidate from a pool using staged evaluators of increasing cost. Thompson Sampling decides which candidate receives the next, more expensive evaluation, allocating expensive evaluations only to candidates whose Beta posterior suggests they are promising.
+> Selects the best candidate from a fixed pool using staged evaluators of increasing cost. Thompson Sampling decides which candidate receives the next, more expensive evaluation, allocating expensive evaluators only to candidates whose Beta posterior suggests they are promising.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ab_select = require("ab_select")
+return ab_select.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+AB-MCTS adapted to a fixed pool (no GEN node, no kill):
+
+1. Generate N candidate answers from `ctx.task`.
+2. Initialize Beta(α₀, β₀) per candidate.
+3. While budget remains and at least one candidate has an unevaluated
+   level affordable under remaining budget:
+   - Sample θᵢ ~ Beta(αᵢ, βᵢ) for each affordable candidate.
+   - Pick i* = argmax θᵢ.
+   - Evaluate i* at its lowest unevaluated fidelity level.
+   - Normalize: s = clamp(score / score_hi, 0, 1).
+   - Bayesian update: αᵢ ← αᵢ + s ; βᵢ ← βᵢ + (1 - s).
+4. Rank by posterior mean αᵢ / (αᵢ + βᵢ); return best.
+
+## Caveats {#caveats}
+
+There is no mid-flight kill. Thompson Sampling naturally starves
+candidates with low posteriors by reducing the probability they are
+picked. AB-MCTS (Inoue et al.) does not include a kill mechanism, and
+our calibration analysis shows that any fixed credible-bound threshold
+is depth-dependent and statistically unsound. See `pairwise_rank` /
+`listwise_rank` / `setwise_rank` for theory-backed pruning when
+calibration of absolute scores cannot be assumed.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `ab_mcts` builds reasoning paths in a tree; uses an LLM both to
+  generate new nodes and evaluate them (2*B+1 LLM calls). Answers
+  "what is a good reasoning path?".
+- `gumbel_search` uses a fixed flat pool with a single evaluator and
+  Sequential Halving. Cannot exploit a cheap-vs-expensive evaluator
+  structure.
+- `mbr_select` uses a fixed flat pool with pairwise similarity and no
+  budget allocation.
+- `ab_select` uses a fixed flat pool with a multi-fidelity evaluator
+  cascade (cheap → expensive). Thompson Sampling allocates the
+  expensive evaluator only to candidates worth the cost.
+  Multi-fidelity is the unique axis vs every other selection package
+  in this repository.
+
+## References {#references}
+
+- Inoue, Y. et al. (2025). "Wider or Deeper? Scaling LLM
+  Inference-Time Compute with Adaptive Branching Tree Search".
+  NeurIPS 2025 Spotlight. https://arxiv.org/abs/2503.04412
 
 ## Parameters {#parameters}
 
