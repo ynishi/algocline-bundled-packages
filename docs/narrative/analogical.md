@@ -8,14 +8,37 @@ source: analogical/init.lua
 generated: gen_docs (V0)
 ---
 
-# Analogical — reasoning by self-generated analogies
+# analogical(Analogical) — reasoning by self-generated analogies
 
-> Instead of solving directly, generates relevant analogous problems, solves them, extracts transferable patterns, then applies to the original.
+> Instead of solving the task directly, generates relevant analogous problems, solves them, extracts transferable patterns, and applies the patterns to the original task.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local analogical = require("analogical")
+return analogical.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate `n_analogies` distinct analogous problems from the original
+   task, optionally biased by `domain_hint`.
+2. Solve each analogous problem.
+3. Extract transferable reasoning patterns shared across the analogies.
+4. Apply the patterns to the original task to produce the final answer.
+
+## References {#references}
+
+- Yasunaga, M. et al. (2023). "Large Language Models as Analogical
+  Reasoners". https://arxiv.org/abs/2310.01714
 
 ## Parameters {#parameters}
 

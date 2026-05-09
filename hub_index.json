@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:49:18Z",
+  "updated_at": "2026-05-09T02:49:48Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -67,7 +67,7 @@
       "version": "0.1.0",
       "description": "Analogical prompting — self-generate analogies, extract patterns, apply to original",
       "category": "reasoning",
-      "docstring": "Analogical — reasoning by self-generated analogies\nInstead of solving directly, generates relevant analogous problems,\nsolves them, extracts transferable patterns, then applies to the original.\n\nBased on: Yasunaga et al., \"Large Language Models as Analogical Reasoners\"\n(2023, arXiv:2310.01714)\n\nUsage:\nlocal analogical = require(\"analogical\")\nreturn analogical.run(ctx)\n\nctx.task (required): The problem to solve\nctx.n_analogies: Number of analogies to generate (default: 3)\nctx.domain_hint: Optional domain to draw analogies from",
+      "docstring": "analogical(Analogical) — reasoning by self-generated analogies\n\nInstead of solving the task directly, generates relevant analogous\nproblems, solves them, extracts transferable patterns, and applies the\npatterns to the original task.\n\n## Usage\n\n```lua\nlocal analogical = require(\"analogical\")\nreturn analogical.run(ctx)\n```\n\n## Algorithm\n\n1. Generate `n_analogies` distinct analogous problems from the original\ntask, optionally biased by `domain_hint`.\n2. Solve each analogous problem.\n3. Extract transferable reasoning patterns shared across the analogies.\n4. Apply the patterns to the original task to produce the final answer.\n\n## References\n\n- Yasunaga, M. et al. (2023). \"Large Language Models as Analogical\nReasoners\". https://arxiv.org/abs/2310.01714",
       "source": {
         "type": "unknown"
       },
