@@ -8,7 +8,7 @@
 
 ## aggregation
 
-- [condorcet](narrative/condorcet.md): Condorcet Jury Theorem — majority-vote probability, Anti-Jury detection, optimal panel sizing, and independence verification for multi-agent voting systems (Condorcet 1785, Dietrich-List 2008).
+- [condorcet](narrative/condorcet.md): Condorcet Jury Theorem probability and Anti-Jury detection.
 - [ensemble_div](narrative/ensemble_div.md): Ambiguity Decomposition — Krogh-Vedelsby Eq.6 identity E = Ē − Ā for ensemble diversity measurement. Quantifies how much agent disagreement reduces ensemble error (Krogh-Vedelsby NeurIPS 1995...
 - [isp_aggregate](narrative/isp_aggregate.md): LLM aggregation via higher-order information (Zhang et al. 2025, arXiv:2510.01499). Paper-faithful ISP (inverse surprising popularity) and OW (optimal weight) aggregators with a calibration/run spl...
 - [kemeny](narrative/kemeny.md): Kemeny-Young rank aggregation — axiomatically unique consensus ranking that minimizes total Kendall tau distance. Merges multiple agent rankings into optimal consensus with Condorcet consistency ...
@@ -18,7 +18,7 @@
 
 ## attribution
 
-- [claim_trace](narrative/claim_trace.md): Span-level evidence attribution — trace each claim to supporting source spans for transparent provenance
+- [claim_trace](narrative/claim_trace.md): Span-level evidence attribution: trace each claim to supporting source spans.
 - [shapley](narrative/shapley.md): Shapley Value — axiomatically unique agent contribution attribution via exact O(2^n) computation or Monte Carlo permutation sampling. Identifies essential, redundant, and harmful agents in multi-...
 
 ## collaboration
@@ -47,7 +47,7 @@
 ## exploration
 
 - [aco](narrative/aco.md): Ant Colony Optimization — discrete path search with pheromone-based learning (Dorigo 1996, Gutjahr 2000 convergence)
-- [coevolve](narrative/coevolve.md): Challenger-Solver Co-evolution — adversarial self-play where Challenger generates problems at Solver's ability boundary and Solver evolves to solve them. Automatic search space expansion.
+- [coevolve](narrative/coevolve.md): Challenger-Solver co-evolution self-play that auto-expands the search space.
 - [falsify](narrative/falsify.md): Sequential Falsification — Popper-style hypothesis exploration via active refutation, pruning, and successor derivation. Expands search space through refutation-driven insight.
 - [prompt_breed](narrative/prompt_breed.md): Self-Referential Prompt Evolution — evolves task prompts via genetic operators with meta-mutation (the mutation operators themselves evolve). Double evolutionary loop.
 - [qdaif](narrative/qdaif.md): Quality-Diversity through AI Feedback — MAP-Elites archive with LLM-driven mutation, evaluation, and feature classification. Produces diverse, high-quality solution populations.
@@ -80,12 +80,12 @@
 
 ## optimization
 
-- [cod](narrative/cod.md): Chain-of-Density — iterative information densification with fidelity preservation
+- [cod](narrative/cod.md): Chain-of-Density iterative information densification with fidelity preservation.
 - [optimize](narrative/optimize.md): Modular parameter optimization orchestrator. Composes pluggable search strategies (UCB1, OPRO, EA, greedy), evaluators (evalframe, custom, LLM judge), and stopping criteria (variance, patience, thr...
 
 ## orchestration
 
-- [compute_alloc](narrative/compute_alloc.md): Compute-optimal test-time scaling — dynamically selects reasoning method (parallel/sequential/hybrid) and budget allocation based on problem difficulty. Uses existing packages as components.
+- [compute_alloc](narrative/compute_alloc.md): Compute-optimal test-time scaling: select method and budget by difficulty.
 - [orch_adaptive](narrative/orch_adaptive.md): Adaptive depth orchestration based on task difficulty. Dynamically adjusts phase count, retry budget, and context mode. Combines with router_daao for pre-classified difficulty, or estimates interna...
 - [orch_escalate](narrative/orch_escalate.md): Cascade escalation: start with lightest strategy, escalate to heavier ones if quality is insufficient. Minimizes cost for easy tasks, guarantees quality for hard ones. Based on Cascade Escalation (...
 - [orch_fixpipe](narrative/orch_fixpipe.md): Deterministic fixed pipeline with gate/retry. Phases execute in strict order. Gate NG triggers retry up to max_retries. Based on Lobster (OpenClaw) deterministic workflow pattern.

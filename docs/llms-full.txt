@@ -876,14 +876,38 @@ Returns:
 <!-- ── claim_trace.md ── -->
 
 
-# claim_trace — Span-level evidence attribution for LLM outputs
+# claim_trace(ClaimTrace) — span-level evidence attribution for LLM outputs
 
-> For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike factscore (which only verifies correctness), claim_trace provides provenance: which part of the source supports each claim, enabling transparent attribution.
+> For each claim in an LLM-generated answer, traces it back to specific spans in the source context. Unlike `factscore` (which only verifies correctness), `claim_trace` provides provenance — which part of the source supports each claim — enabling transparent attribution.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local claim_trace = require("claim_trace")
+return claim_trace.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Decompose — extract atomic claims from the answer.
+2. Attribute — for each claim, find supporting span(s) in the source.
+3. Score — compute attribution coverage and precision.
+
+## References {#references}
+
+- Bohnet, B. et al. (2022). "Attributed QA: Evaluation and Modeling
+  for Attributed Large Language Models".
+  https://arxiv.org/abs/2212.08037
+- Gao, T. et al. (2023). "ALCE: Attributed Language Model Evaluation".
+  https://arxiv.org/abs/2305.14627
 
 ## Parameters {#parameters}
 
@@ -989,14 +1013,35 @@ Returns:
 <!-- ── cod.md ── -->
 
 
-# CoD — Chain-of-Density iterative compression
+# cod(CoD) — Chain-of-Density iterative compression
 
-> Iteratively rewrites text to increase information density while maintaining length. Each round adds missing entities/details and removes filler, producing progressively denser output.
+> Iteratively rewrites text to increase information density while preserving length. Each round adds missing entities and details and removes filler, producing progressively denser output.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local cod = require("cod")
+return cod.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate an initial summary at the target length.
+2. For `rounds` iterations, identify missing salient entities and
+   rewrite to incorporate them while removing filler.
+
+## References {#references}
+
+- Adams, G. et al. (2023). "From Sparse to Dense: GPT-4 Summarization
+  with Chain of Density Prompting". https://arxiv.org/abs/2309.04269
 
 ## Parameters {#parameters}
 
@@ -1025,14 +1070,44 @@ Returns:
 <!-- ── coevolve.md ── -->
 
 
-# coevolve — Challenger-Solver Co-evolution
+# coevolve(Coevolve) — challenger-solver co-evolution self-play
 
-> Two LLM roles evolve together: Challenger generates problems at the edge of Solver's ability, Solver attempts to solve them. As Solver improves, Challenger generates harder problems. This adversarial co-evolution automatically expands the exploration space — unlike cooperative methods (panel, rstar) that work within a fixed problem scope.
+> Two LLM roles evolve together: the Challenger generates problems at the edge of the Solver's ability and the Solver attempts to solve them. As the Solver improves, the Challenger generates harder problems. The adversarial co-evolution automatically expands the exploration space, unlike cooperative methods (`panel`, `rstar`) that work within a fixed scope.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local coevolve = require("coevolve")
+return coevolve.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Seed an initial problem set (provided or auto-generated).
+2. For each of `rounds`:
+   - Solve each problem with the Solver.
+   - Analyze success and failure patterns.
+   - Challenger generates new problems targeting weaknesses.
+   - Calibrate difficulty based on the success rate.
+3. Solver answers the original task using accumulated skill.
+
+## References {#references}
+
+- Singh, ... et al. (2025). "Self-Play for LLM Reasoning:
+  Challenger-Solver Co-evolution". https://arxiv.org/abs/2510.27072
+- Faldor, M. et al. (2025). "OMNI-EPIC: Open-endedness via Models of
+  human Notions of Interestingness". ICLR 2025.
+  https://arxiv.org/abs/2405.15568
+- Sukhbaatar, S. et al. (2018). "Intrinsic Motivation and Automatic
+  Curricula via Asymmetric Self-Play". ICLR 2018.
 
 ## Parameters {#parameters}
 
@@ -1064,14 +1139,51 @@ Returns:
 <!-- ── compute_alloc.md ── -->
 
 
-# compute_alloc — Compute-Optimal Test-Time Scaling Allocation
+# compute_alloc(ComputeAlloc) — compute-optimal test-time scaling allocation
 
-> Meta-strategy that dynamically selects the optimal reasoning method and budget allocation based on problem difficulty. Implements the key finding from Snell et al. (ICLR 2025): "scaling test-time compute optimally can be more effective than scaling model parameters."
+> Meta-strategy that dynamically selects the optimal reasoning method and budget allocation based on estimated problem difficulty, building on the finding that scaling test-time compute optimally can be more effective than scaling model parameters.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ca = require("compute_alloc")
+return ca.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Estimate the difficulty of `ctx.task`.
+2. Select a paradigm from `{parallel, sequential, hybrid}` keyed on
+   difficulty (easy=single-shot, medium=parallel `sc`/`usc`,
+   hard=sequential `reflect` plus verify).
+3. Allocate the token budget across the chosen paradigm and dispatch
+   to existing AlgoCline packages.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `orch_escalate` — fixed 3-level cascade (quick → structured →
+  thorough). Always starts light and escalates linearly.
+- `router_daao` — classifies difficulty and routes to a strategy name;
+  classification only, no compute-budget allocation.
+- `compute_alloc` — estimates difficulty, selects a paradigm, and
+  allocates token budget. The key insight is that the optimal method
+  itself changes with difficulty.
+
+## References {#references}
+
+- Snell, C. et al. (2025). "Scaling LLM Test-Time Compute Optimally
+  can be More Effective than Scaling Model Parameters". ICLR 2025.
+  https://arxiv.org/abs/2408.03314
+- "Test-Time Scaling Survey" (2025). https://arxiv.org/abs/2503.24235
 
 ## Parameters {#parameters}
 
@@ -1100,9 +1212,58 @@ Returns:
 <!-- ── condorcet.md ── -->
 
 
-# condorcet — Condorcet Jury Theorem probability calculator
+# condorcet(Condorcet) — Condorcet Jury Theorem probability calculator
 
-> Pure-computation utility for majority-vote probability under independent voters. Detects Anti-Jury conditions (p < 0.5), estimates required group size for target accuracy, and measures inter-agent correlation to verify the independence assumption.
+> Pure-computation utility for majority-vote probability under independent voters. Detects Anti-Jury conditions (p < 0.5), estimates the required group size for a target accuracy, and measures inter-agent correlation to verify the independence assumption.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local condorcet = require("condorcet")
+condorcet.prob_majority(5, 0.7)  -- => ~0.837
+condorcet.is_anti_jury(0.4)      -- => true
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Core formula:
+
+```math
+P(Maj_n) = SUM_{k=ceil(n/2)}^{n} C(n,k) * p^k * (1-p)^{n-k}
+```
+
+Jury Theorem: under Uniform Independence (UI) and Uniform Competence
+`p > 0.5` (UC), `P(Maj_n) → 1` as `n → ∞`. Anti-Jury: if `p < 0.5`,
+`P(Maj_n) → 0` as `n → ∞`, meaning adding more voters makes the group
+worse.
+
+The Jury Theorem is the mathematical foundation for why multi-agent
+voting (`sc`, `panel`, `moa`) can outperform single agents. It also
+explains when it fails:
+
+- Panel sizing: `optimal_n` computes the minimum number of agents
+  needed to reach a target accuracy (e.g. 95%).
+- Anti-Jury detection: `is_anti_jury` catches the dangerous case where
+  agents are worse than random (`p < 0.5`); Self-Consistency and
+  majority vote then degrade with more agents (see `inverse_u`).
+- Independence verification: `correlation` measures pairwise Pearson
+  correlation between agent outputs; high correlation violates UI and
+  weakens the theorem's guarantee.
+- Composable with `sc`, `panel`, `moa`, `pbft` as the theoretical
+  justification for majority-vote aggregation.
+
+## References {#references}
+
+- Condorcet, M. (1785). "Essai sur l'application de l'analyse à la
+  probabilité des décisions rendues à la pluralité des voix".
+- Dietrich, F., List, C. (2008). "Jury Theorems". Stanford
+  Encyclopedia of Philosophy.
 
 ---
 
