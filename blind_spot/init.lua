@@ -1,33 +1,34 @@
---- blind_spot — Self-Correction Blind Spot bypass
+--- blind_spot(BlindSpot) — bypass the self-correction blind spot via externalization
 ---
---- LLMs cannot correct errors in their own outputs but can successfully
---- correct identical errors when presented as coming from external sources.
---- This package exploits that asymmetry: generate an answer, then re-present
+--- LLMs cannot correct errors in their own outputs but successfully correct
+--- identical errors when presented as coming from external sources. This
+--- package exploits the asymmetry by generating an answer and re-presenting
 --- it as a "colleague's draft" for the same LLM to review and correct.
 ---
---- Additionally applies the "Wait" trigger: appending a minimal pause prompt
---- activates dormant correction capabilities (89.3% blind spot reduction
---- observed across 14 open-source models).
+--- ## Usage
 ---
---- Based on: "Self-Correction Bench: Uncovering and Addressing the
----            Self-Correction Blind Spot in Large Language Models"
----            (arXiv 2507.02778, 2025)
+--- ```lua
+--- local blind_spot = require("blind_spot")
+--- return blind_spot.run(ctx)
+--- ```
 ---
---- Pipeline:
----   Step 1: generate   — produce initial answer normally
----   Step 2: externalize — re-present the answer as from an external source
----   Step 3: correct    — ask to find and fix errors in the "external" answer
----   Step 4: wait       — optional "Wait" reflection trigger for final check
+--- ## Algorithm
 ---
---- Usage:
----   local blind_spot = require("blind_spot")
----   return blind_spot.run(ctx)
+--- 1. Generate an initial answer normally.
+--- 2. Re-present the answer as if it came from an external source.
+--- 3. Ask the model to find and fix errors in the "external" answer.
+--- 4. Optionally append a "Wait" reflection trigger for a final check.
 ---
---- ctx.task (required): The task/question to solve
---- ctx.rounds: Number of externalize→correct rounds (default: 1)
---- ctx.wait: Enable "Wait" reflection trigger (default: true)
---- ctx.gen_tokens: Max tokens for generation (default: 600)
---- ctx.correct_tokens: Max tokens for correction (default: 800)
+--- ## Theoretical foundations
+---
+--- The "Wait" trigger activates dormant correction capabilities; the source
+--- paper reports an 89.3% blind-spot reduction across 14 open-source models.
+---
+--- ## References
+---
+--- - "Self-Correction Bench: Uncovering and Addressing the Self-Correction
+---   Blind Spot in Large Language Models". arXiv:2507.02778, 2025.
+---   https://arxiv.org/abs/2507.02778
 
 local S = require("alc_shapes")
 local T = S.T
@@ -38,7 +39,7 @@ local M = {}
 M.meta = {
     name = "blind_spot",
     version = "0.1.0",
-    description = "Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction",
+    description = "Bypass self-correction blind spot by re-presenting output as external source.",
     category = "correction",
 }
 
