@@ -1,28 +1,29 @@
---- Ambig — underspecification detection and clarification pipeline
+--- ambig(Ambig) — detect-clarify-integrate pipeline for underspecified inputs
 ---
---- Three-stage pipeline: detect ambiguity in the input, generate targeted
---- clarification questions for underspecified elements, then integrate
---- responses to produce a fully-specified task.
+--- Three-stage pipeline that detects ambiguity in the input, generates
+--- targeted clarification questions for underspecified elements, then
+--- integrates the user's responses to produce a fully-specified task.
 ---
---- Based on: "Interactive Agents for Underspecified Software Engineering
---- Tasks" (ICLR 2026) — AMBIG-SWE benchmark and Clarify-Before-Code pattern
+--- ## Usage
 ---
---- The algorithm has three phases:
----   Phase 1 (Detect): Classify input as SPECIFIED or UNDERSPECIFIED,
----           identify which elements are ambiguous
----   Phase 2 (Clarify): Generate minimal, targeted clarification questions
----           for each underspecified element
----   Phase 3 (Integrate): Merge original task + clarification responses
----           into a fully-specified task
+--- ```lua
+--- local ambig = require("ambig")
+--- return ambig.run(ctx)
+--- ```
 ---
---- Usage:
----   local ambig = require("ambig")
----   return ambig.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task or request to analyze
---- ctx.detect_tokens: Max tokens for detection phase (default: 500)
---- ctx.clarify_tokens: Max tokens for clarification phase (default: 400)
---- ctx.integrate_tokens: Max tokens for integration phase (default: 500)
+--- 1. **Detect** — classify the input as SPECIFIED or UNDERSPECIFIED and
+---    identify which elements are ambiguous.
+--- 2. **Clarify** — generate minimal, targeted clarification questions for
+---    each underspecified element.
+--- 3. **Integrate** — merge the original task with the clarification
+---    responses into a fully-specified task.
+---
+--- ## References
+---
+--- - "Interactive Agents for Underspecified Software Engineering Tasks",
+---   ICLR 2026 (AMBIG-SWE benchmark, Clarify-Before-Code pattern).
 
 local S = require("alc_shapes")
 local T = S.T

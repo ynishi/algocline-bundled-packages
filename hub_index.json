@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:43:39Z",
+  "updated_at": "2026-05-09T02:49:18Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -55,7 +55,7 @@
       "version": "0.1.0",
       "description": "Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs",
       "category": "intent",
-      "docstring": "Ambig — underspecification detection and clarification pipeline\n\nThree-stage pipeline: detect ambiguity in the input, generate targeted\nclarification questions for underspecified elements, then integrate\nresponses to produce a fully-specified task.\n\nBased on: \"Interactive Agents for Underspecified Software Engineering\nTasks\" (ICLR 2026) — AMBIG-SWE benchmark and Clarify-Before-Code pattern\n\nThe algorithm has three phases:\nPhase 1 (Detect): Classify input as SPECIFIED or UNDERSPECIFIED,\nidentify which elements are ambiguous\nPhase 2 (Clarify): Generate minimal, targeted clarification questions\nfor each underspecified element\nPhase 3 (Integrate): Merge original task + clarification responses\ninto a fully-specified task\n\nUsage:\nlocal ambig = require(\"ambig\")\nreturn ambig.run(ctx)\n\nctx.task (required): The task or request to analyze\nctx.detect_tokens: Max tokens for detection phase (default: 500)\nctx.clarify_tokens: Max tokens for clarification phase (default: 400)\nctx.integrate_tokens: Max tokens for integration phase (default: 500)",
+      "docstring": "ambig(Ambig) — detect-clarify-integrate pipeline for underspecified inputs\n\nThree-stage pipeline that detects ambiguity in the input, generates\ntargeted clarification questions for underspecified elements, then\nintegrates the user's responses to produce a fully-specified task.\n\n## Usage\n\n```lua\nlocal ambig = require(\"ambig\")\nreturn ambig.run(ctx)\n```\n\n## Algorithm\n\n1. **Detect** — classify the input as SPECIFIED or UNDERSPECIFIED and\nidentify which elements are ambiguous.\n2. **Clarify** — generate minimal, targeted clarification questions for\neach underspecified element.\n3. **Integrate** — merge the original task with the clarification\nresponses into a fully-specified task.\n\n## References\n\n- \"Interactive Agents for Underspecified Software Engineering Tasks\",\nICLR 2026 (AMBIG-SWE benchmark, Clarify-Before-Code pattern).",
       "source": {
         "type": "unknown"
       },

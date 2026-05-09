@@ -8,14 +8,38 @@ source: ambig/init.lua
 generated: gen_docs (V0)
 ---
 
-# Ambig — underspecification detection and clarification pipeline
+# ambig(Ambig) — detect-clarify-integrate pipeline for underspecified inputs
 
-> Three-stage pipeline: detect ambiguity in the input, generate targeted clarification questions for underspecified elements, then integrate responses to produce a fully-specified task.
+> Three-stage pipeline that detects ambiguity in the input, generates targeted clarification questions for underspecified elements, then integrates the user's responses to produce a fully-specified task.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ambig = require("ambig")
+return ambig.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. **Detect** — classify the input as SPECIFIED or UNDERSPECIFIED and
+   identify which elements are ambiguous.
+2. **Clarify** — generate minimal, targeted clarification questions for
+   each underspecified element.
+3. **Integrate** — merge the original task with the clarification
+   responses into a fully-specified task.
+
+## References {#references}
+
+- "Interactive Agents for Underspecified Software Engineering Tasks",
+  ICLR 2026 (AMBIG-SWE benchmark, Clarify-Before-Code pattern).
 
 ## Parameters {#parameters}
 
