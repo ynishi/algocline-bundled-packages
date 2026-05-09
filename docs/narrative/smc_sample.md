@@ -8,14 +8,104 @@ source: smc_sample/init.lua
 generated: gen_docs (V0)
 ---
 
-# smc_sample — Sequential Monte Carlo (block-SMC) sampling for LLM quality.
+# smc_sample(SMCSample) — Sequential Monte Carlo (block-SMC) sampling for LLM quality
 
-> Based on: Markovic-Voronov et al., "Sampling for Quality: Training-Free Reward-Guided LLM Decoding via Sequential Monte Carlo" (arXiv:2604.16453v1, 2026-04-07).
+> Implements the paper's Target I (prefix-only variant) of the reward-augmented target distribution abstracted to the BLOCK level so it runs on top of algocline's block-granular `alc.llm` API (token logprobs are not exposed). Under the Target I specialization the incremental weights depend only on the reward potentials and the base-model likelihood term cancels (paper §3.3 / Appendix A.4 Lemma 4).
 
 ## Contents
 
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Injection points](#injection-points)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local smc = require("smc_sample")
+return smc.run({
+    task      = "Write a Python function sum_list(xs).",
+    reward_fn = function(answer, task)
+        -- caller-injected verifier: unit-test / LLM judge / scoring_rule
+        return score_in_unit_interval
+    end,
+    -- all hyperparameters optional (M._defaults applies)
+})
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+Π(x_{1:T} | q) ∝ ∏_t m_t(x_t | q, x_{<t}) · ∏_t ψ_t(x_{1:t}, q)
+w_k = Ψ_k / Ψ_{k-1} = exp(α · (r_new - r_prev))
+```
+
+block-SMC abstraction:
+
+- 1 particle = 1 complete answer (single `alc.llm` call).
+- `ψ_t = exp(α · r(answer))` where `r` is the caller-injected
+  `reward_fn`.
+- K rounds: `{ESS resample, MH rejuvenation, weight-update}`
+  repeated.
+
+## Injection points {#injection-points}
+
+Implementation follows paper §3.4 Algorithm 1 under the block-SMC
+specialization of §A.4. The default path is paper-faithful; all
+deviations are opt-in via explicit `ctx` knobs.
+
+Paper-faithful defaults:
+
+- Weight update runs only at init and on ESS-triggered resample.
+  Between iterations, under fixed `α` the Target I incremental
+  ratio is identically 1, so no between-iter reweight is applied.
+- MH rejuvenation is selective: a slot receives an MH proposal iff
+  it is a duplicate from the most recent resample and its reward is
+  below `τ_R`.
+- `α` is fixed globally (paper §4.1 Setup).
+
+Injection points:
+
+- `reward_fn` — REQUIRED. `(answer, task) → ℝ⁺ ∪ {0}`. Caller's
+  verifier (unit test / LLM judge / scoring rule).
+- `proposal_fn` — v2 opt-in (currently warning-then-ignore in v1).
+- `mh_filter_fn` — `(idx, reward, was_duplicated, τ_R) → boolean`
+  override of the paper's selective predicate. Use
+  `function() return true end` for the legacy "MH every particle"
+  variant (higher cost, correctness-preserving).
+- `mh_reward_threshold` — `τ_R` cutoff for the default filter
+  (default `0.5` for `[0, 1]` rewards; binary graders should set
+  `1.0`).
+- `post_mh_reweight` — `true` applies a legacy `exp(α·Δr)` reweight
+  after each iteration's MH. **Not paper-faithful** — injects a
+  reward-gain bias. Kept only for reproducing pre-0.2.0 runs.
+
+## Caveats {#caveats}
+
+With defaults (`N=16, K=4, S=2`) the entry can issue up to
+`N + K·N·(1+S) = 208` LLM calls (the paper's HumanEval 87.8%
+setting). Lightweight callers should override `n_particles` /
+`n_iterations` / `rejuv_steps` (e.g. `N=4, K=2, S=1 → 20 calls`).
+Paper-faithful selective MH typically runs MH only on iterations
+where ESS-resample fires, so `total_llm_calls` is input-dependent
+and often much less than the worst case.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Category: selection (alongside `sc`, `usc`, `mbr_select`,
+`diverse`, `ab_select`, `gumbel_search`). Encompasses `sc`
+(`α = 0`, equal-weight) and `mbr_select` (similarity reward, 1
+iteration) as special cases of the same probabilistic framework.
+
+## References {#references}
+
+- Markovic-Voronov, ... et al. (2026). "Sampling for Quality:
+  Training-Free Reward-Guided LLM Decoding via Sequential Monte
+  Carlo". https://arxiv.org/abs/2604.16453
 
 ## Parameters {#parameters}
 

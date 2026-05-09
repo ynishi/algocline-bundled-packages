@@ -6583,14 +6583,65 @@ metric).
 <!-- ── setwise_rank.md ── -->
 
 
-# setwise_rank — Setwise Tournament Reranking
+# setwise_rank(SetwiseRank) — setwise tournament reranking
 
-> Ranks N candidates by repeatedly asking the LLM "which is the best among these k items?" and advancing winners through tournament rounds. Each comparison spans a SET (size k) rather than a pair, dramatically reducing LLM calls vs pairwise while keeping the LLM task simpler than listwise (it only picks ONE best, not a full permutation).
+> Ranks N candidates by repeatedly asking the LLM "which is the best among these k items?" and advancing winners through tournament rounds. Each comparison spans a set (size k) rather than a pair, dramatically reducing LLM calls vs pairwise while keeping the LLM task simpler than listwise (pick one best, not a full permutation). The setwise reformulation is free of the absolute-score calibration problem of pointwise judging.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Empirical validation](#empirical-validation)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sr = require("setwise_rank")
+return sr.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+Iterative top-k extraction:
+
+```text
+active ← {1..N}
+for rank = 1 .. top_k do
+  while #active > 1 do
+    partition active into groups of size set_size
+    for each group of size >= 2: LLM picks the best index
+    active ← winners ∪ singleton-groups
+  end
+  ranked[rank] ← active[1]
+  remove ranked[rank] from pool; restart with remaining
+end
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `listwise_rank` — 1 LLM call to rank all; cheapest but limited by
+  context, list-position bias risk.
+- `setwise_rank` — tournament with set comparisons of size `k`;
+  `O(top_k · N / k)` LLM calls. Mid-cost / mid-accuracy. Sweet spot
+  for moderate N (10-50).
+- `pairwise_rank` — pure pairwise (`O(N²)` or `O(N log N)`); highest
+  accuracy.
+
+## Empirical validation {#empirical-validation}
+
+- Setwise with Flan-T5 matches RankGPT (listwise) on TREC-DL19/20.
+- More efficient than pairwise; comparable accuracy to listwise with
+  better robustness to position bias.
+
+## References {#references}
+
+- Zhuang, S. et al. (2024). "A Setwise Approach for Effective and
+  Highly Efficient Zero-shot Ranking with Large Language Models".
+  SIGIR 2024. https://arxiv.org/abs/2310.09497
 
 ## Parameters {#parameters}
 
@@ -6622,23 +6673,109 @@ Returns:
 <!-- ── shapley.md ── -->
 
 
-# shapley — Shapley Value computation for agent contribution attribution
+# shapley(Shapley) — Shapley value computation for agent contribution attribution
 
-> Pure-computation utility for attributing individual agent contributions within a coalition (ensemble/swarm). Implements both exact computation and Monte Carlo permutation sampling approximation.
+> Pure-computation utility for attributing individual agent contributions within a coalition (ensemble or swarm). Implements both exact computation and Monte Carlo permutation sampling.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local shapley = require("shapley")
+
+-- Exact computation (n <= 12)
+local r = shapley.exact({"a","b","c"}, v_fn)
+
+-- Monte Carlo approximation
+local r = shapley.montecarlo({"a","b","c"}, v_fn, {samples=1000})
+
+-- Helper: build v_fn from agent outputs + ground truth
+local v_fn = shapley.accuracy_coalition(outputs, truth)
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+The Shapley value is the unique allocation satisfying four axioms:
+
+1. Efficiency: `Σ φ_i = v(N) - v(∅)`.
+2. Symmetry: `i, j` interchangeable ⟹ `φ_i = φ_j`.
+3. Dummy: `i` contributes nothing ⟹ `φ_i = 0`.
+4. Additivity: `φ_i(v+w) = φ_i(v) + φ_i(w)`.
+
+```math
+φ_i(v) = Σ_{S ⊆ N\{i}} [|S|! · (n-|S|-1)! / n!] · [v(S∪{i}) - v(S)]
+```
+
+Monte Carlo approximation (Ghorbani & Zou 2019): sample random
+permutations `π`, compute the marginal contribution of `i` as
+`v(predecessors_of_i ∪ {i}) - v(predecessors_of_i)`. Convergence
+`O(1/√M)` by CLT.
+
+In a multi-agent swarm not all agents contribute equally; Shapley
+values give a fair attribution. `exact` (n ≤ 12) uses `O(2^n)`
+bitmask enumeration; `montecarlo` is `O(M·n)` with 95% CIs.
+`accuracy_coalition` helper builds a coalition value function from
+binary predictions plus ground truth via majority vote. Composable
+with `panel`, `moa`, `sc` for post-hoc analysis.
+
+## References {#references}
+
+- Shapley, L. S. (1953). "A Value for n-Person Games". Contributions
+  to the Theory of Games II, Annals of Mathematics Studies 28,
+  pp.307-317.
+- Ghorbani, A., Zou, J. (2019). "Data Shapley". AISTATS 2019.
 
 ---
 
 <!-- ── sketch.md ── -->
 
 
-# sketch — Sketch-of-Thought: cognitive-inspired efficient reasoning
+# sketch(Sketch) — Sketch-of-Thought cognitive-inspired efficient reasoning
 
 > Selects one of three cognitive paradigms based on task characteristics, then generates compressed reasoning using that paradigm's notation. Reduces reasoning tokens by 60-84% while maintaining or improving accuracy.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local sketch = require("sketch")
+return sketch.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 1-2 LLM calls:
+
+1. Route — select paradigm via keyword heuristic (0 LLM calls);
+   LLM fallback if ambiguous.
+2. Sketch — generate compressed reasoning and final answer.
+
+Three cognitive paradigms:
+
+- Conceptual Chaining — key concepts linked with arrows (episodic
+  memory).
+- Chunked Symbolism — variables and equations (working memory
+  chunking).
+- Expert Lexicons — domain notation and abbreviations (expert
+  schemas).
+
+## References {#references}
+
+- Aytes, S., Baek, J., Hwang, S. J. (2025). "Sketch-of-Thought:
+  Efficient LLM Reasoning with Adaptive Cognitive-Inspired
+  Sketching". EMNLP 2025. https://arxiv.org/abs/2503.05179
 
 ## Parameters {#parameters}
 
@@ -6665,23 +6802,220 @@ Returns:
 <!-- ── slm_mux.md ── -->
 
 
-# slm_mux — Pure Computation pkg for orchestrating Small Language
+# slm_mux(SLMMux) — complementarity-driven K-subset selection over SLM pool
 
-> Models via complementarity-driven K-subset selection.
+> Pure-computation package for orchestrating Small Language Models via complementarity-driven K-subset selection. Implements paper §3.1 Algorithm 1 (inference-time confidence selection) and §3.2 objective `𝒪(S) = UnionAcc(S) − λ · Contradiction(S)` with exhaustive K-subset search.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Injection points](#injection-points)
+- [Caveats](#caveats)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local mux = require("slm_mux")
+
+-- One per SLM in the pool:
+local profiles = {
+  { samples = { {"A","A","A"}, {"B","C","B"}, ... },
+    correct = { "A", "B", ... } },
+  { samples = { ... }, correct = { ... } },
+  ...
+}
+
+local r = mux.run(profiles, 2)            -- best 2-subset by 𝒪(S)
+local c = mux.confidence({"A","A","B"})   -- → { y_star="A", s=2/3 }
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+Per-model confidence (Algorithm 1):
+
+```math
+f_i(y) = (1/k) · Σ_{j=1}^{k} 𝟙(y_i^(j) = y)
+y_i*   = argmax_y f_i(y)
+s_i    = f_i(y_i*)
+```
+
+Inference-time selection (Algorithm 1):
+
+```math
+S_max = max_{i ∈ S} s_i
+I*    = { i ∈ S : s_i = S_max }
+return y_{i*}*  where i* = (|I*|=1 ? unique : argmax_{i ∈ I*} a_i)
+```
+
+Subset objective (§3.2):
+
+```math
+UnionAcc(S)      = (1/|𝒟|) · Σ_x 𝟙{ ∃ m ∈ S : m(x) is correct }
+Contradiction(S) = (1/|𝒟|) · Σ_x 𝟙{ ∃ m_1 ∈ S consistently wrong
+                                      ∧ ∃ m_2 ∈ S correct on x }
+𝒪(S)            = UnionAcc(S) − λ · Contradiction(S)
+```
+
+K-subset selection: `argmax_{S ⊆ pool, |S|=K} 𝒪(S)` via exhaustive
+enumeration.
+
+Inference-time confidence concentration (out-of-paper reference,
+derived from a Hoeffding union bound on Bernoulli sample-mean
+concentration of `s_i`):
+
+```math
+Pr( î = i* ) ≥ 1 − 2(K−1) · exp( −N · γ² / 2 )
+```
+
+where `N` is sample count per model, `K` is subset size, and
+`γ = p_{i*} − max_{j ≠ i*} p_j > 0` is the true confidence gap.
+
+## Injection points {#injection-points}
+
+Paper-faithful defaults: `λ = 1.0` (§4.3), `search_method =
+"exhaustive"` (§3.2), `consistency_threshold = 0.0`,
+`s_tie_break = "validation_accuracy"`.
+
+REQUIRED:
+
+- `profiles` — array of N SLM profiles
+  `{ samples, correct, validation_accuracy? }`. Caller pre-computes
+  the calibration tensor (paper §4.3 uses 500 questions); pkg never
+  calls `alc.llm`.
+- `k` — subset size `1 ≤ k ≤ N` for `select_subset` / `run`.
+
+OPTIONAL paper-faithful: `lambda`, `tie_break_yi`,
+`subset_tie_break`, `s_tie_break` (paper does not numerically fix
+the tie-break choices; defaults remain paper-faithful).
+
+OPTIONAL non-paper-faithful (loss of paper guarantees):
+
+- `search_method = "greedy_forward" | "greedy_backward"` — practical
+  fallback when `C(N, K)` is prohibitive; loses global optimality.
+- `consistency_threshold > 0.0` — sensitivity analysis only.
+- `partial_coverage` — `error` (default, fail-fast, paper-faithful)
+  vs `skip_missing` / `treat_as_wrong` (not paper-faithful research
+  knobs). `skip_missing` normalises by `effective_M`, breaking
+  exact cross-subset comparability.
+
+## Caveats {#caveats}
+
+Out of scope for v1: online inference orchestration (callers wire
+Algorithm 1 via `sc` / `panel` / `smc_sample` / `particle_infer`),
+calibration data resampling, and auto-tuning of `λ`.
+
+## References {#references}
+
+- Wang, ..., Wan, ..., Kang, ..., Chen, ..., Xie, ..., Krishna, ...,
+  Reddi, ..., Du, ... (2025). "SLM-MUX: Orchestrating Small Language
+  Models for Reasoning". ICLR 2026 Poster.
+  https://arxiv.org/abs/2510.05077
 
 ---
 
 <!-- ── smc_sample.md ── -->
 
 
-# smc_sample — Sequential Monte Carlo (block-SMC) sampling for LLM quality.
+# smc_sample(SMCSample) — Sequential Monte Carlo (block-SMC) sampling for LLM quality
 
-> Based on: Markovic-Voronov et al., "Sampling for Quality: Training-Free Reward-Guided LLM Decoding via Sequential Monte Carlo" (arXiv:2604.16453v1, 2026-04-07).
+> Implements the paper's Target I (prefix-only variant) of the reward-augmented target distribution abstracted to the BLOCK level so it runs on top of algocline's block-granular `alc.llm` API (token logprobs are not exposed). Under the Target I specialization the incremental weights depend only on the reward potentials and the base-model likelihood term cancels (paper §3.3 / Appendix A.4 Lemma 4).
 
 ## Contents
 
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Injection points](#injection-points)
+- [Caveats](#caveats)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local smc = require("smc_sample")
+return smc.run({
+    task      = "Write a Python function sum_list(xs).",
+    reward_fn = function(answer, task)
+        -- caller-injected verifier: unit-test / LLM judge / scoring_rule
+        return score_in_unit_interval
+    end,
+    -- all hyperparameters optional (M._defaults applies)
+})
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+Π(x_{1:T} | q) ∝ ∏_t m_t(x_t | q, x_{<t}) · ∏_t ψ_t(x_{1:t}, q)
+w_k = Ψ_k / Ψ_{k-1} = exp(α · (r_new - r_prev))
+```
+
+block-SMC abstraction:
+
+- 1 particle = 1 complete answer (single `alc.llm` call).
+- `ψ_t = exp(α · r(answer))` where `r` is the caller-injected
+  `reward_fn`.
+- K rounds: `{ESS resample, MH rejuvenation, weight-update}`
+  repeated.
+
+## Injection points {#injection-points}
+
+Implementation follows paper §3.4 Algorithm 1 under the block-SMC
+specialization of §A.4. The default path is paper-faithful; all
+deviations are opt-in via explicit `ctx` knobs.
+
+Paper-faithful defaults:
+
+- Weight update runs only at init and on ESS-triggered resample.
+  Between iterations, under fixed `α` the Target I incremental
+  ratio is identically 1, so no between-iter reweight is applied.
+- MH rejuvenation is selective: a slot receives an MH proposal iff
+  it is a duplicate from the most recent resample and its reward is
+  below `τ_R`.
+- `α` is fixed globally (paper §4.1 Setup).
+
+Injection points:
+
+- `reward_fn` — REQUIRED. `(answer, task) → ℝ⁺ ∪ {0}`. Caller's
+  verifier (unit test / LLM judge / scoring rule).
+- `proposal_fn` — v2 opt-in (currently warning-then-ignore in v1).
+- `mh_filter_fn` — `(idx, reward, was_duplicated, τ_R) → boolean`
+  override of the paper's selective predicate. Use
+  `function() return true end` for the legacy "MH every particle"
+  variant (higher cost, correctness-preserving).
+- `mh_reward_threshold` — `τ_R` cutoff for the default filter
+  (default `0.5` for `[0, 1]` rewards; binary graders should set
+  `1.0`).
+- `post_mh_reweight` — `true` applies a legacy `exp(α·Δr)` reweight
+  after each iteration's MH. **Not paper-faithful** — injects a
+  reward-gain bias. Kept only for reproducing pre-0.2.0 runs.
+
+## Caveats {#caveats}
+
+With defaults (`N=16, K=4, S=2`) the entry can issue up to
+`N + K·N·(1+S) = 208` LLM calls (the paper's HumanEval 87.8%
+setting). Lightweight callers should override `n_particles` /
+`n_iterations` / `rejuv_steps` (e.g. `N=4, K=2, S=1 → 20 calls`).
+Paper-faithful selective MH typically runs MH only on iterations
+where ESS-resample fires, so `total_llm_calls` is input-dependent
+and often much less than the worst case.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Category: selection (alongside `sc`, `usc`, `mbr_select`,
+`diverse`, `ab_select`, `gumbel_search`). Encompasses `sc`
+(`α = 0`, equal-weight) and `mbr_select` (similarity reward, 1
+iteration) as special cases of the same probabilistic framework.
+
+## References {#references}
+
+- Markovic-Voronov, ... et al. (2026). "Sampling for Quality:
+  Training-Free Reward-Guided LLM Decoding via Sequential Monte
+  Carlo". https://arxiv.org/abs/2604.16453
 
 ## Parameters {#parameters}
 
