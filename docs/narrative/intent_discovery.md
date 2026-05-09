@@ -8,14 +8,38 @@ source: intent_discovery/init.lua
 generated: gen_docs (V0)
 ---
 
-# Intent Discovery — exploratory intent formation through action
+# intent_discovery(IntentDiscovery) — exploratory intent formation through action
 
-> Users often approach tasks without fully-formed goals. This strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration.
+> Users often approach tasks without fully-formed goals. The strategy helps users discover their intent by presenting structured options, observing preferences, and progressively concretizing a hierarchy of intents through iterative exploration. Cognitive-science insight: in open-ended problems, people discover what they need by exploring possible outcomes; understanding of a problem and its solutions co-evolve.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local intent_discovery = require("intent_discovery")
+return intent_discovery.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Surface — present structured options that span the solution space.
+2. Observe — capture user preference and reaction.
+3. Concretize — narrow the intent hierarchy based on feedback.
+
+Repeat until the intent is sufficiently concrete or `max_rounds` is
+reached.
+
+## References {#references}
+
+- "DiscoverLLM: From Executing Intents to Discovering Them" (2026).
+  https://arxiv.org/abs/2602.03429
 
 ## Parameters {#parameters}
 

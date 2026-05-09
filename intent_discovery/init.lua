@@ -1,32 +1,33 @@
---- Intent Discovery — exploratory intent formation through action
+--- intent_discovery(IntentDiscovery) — exploratory intent formation through action
 ---
---- Users often approach tasks without fully-formed goals. This strategy
+--- Users often approach tasks without fully-formed goals. The strategy
 --- helps users discover their intent by presenting structured options,
---- observing preferences, and progressively concretizing a hierarchy
---- of intents through iterative exploration.
+--- observing preferences, and progressively concretizing a hierarchy of
+--- intents through iterative exploration. Cognitive-science insight: in
+--- open-ended problems, people discover what they need by exploring
+--- possible outcomes; understanding of a problem and its solutions
+--- co-evolve.
 ---
---- Based on: "DiscoverLLM: From Executing Intents to Discovering Them"
---- (2026, arXiv:2602.03429)
+--- ## Usage
 ---
---- Core insight from cognitive science: in open-ended problems, people
---- discover what they need by exploring possible outcomes. Understanding
---- of a problem and its solutions co-evolve.
+--- ```lua
+--- local intent_discovery = require("intent_discovery")
+--- return intent_discovery.run(ctx)
+--- ```
 ---
---- The algorithm has three phases per round:
----   Phase 1 (Surface): Present structured options that span the solution space
----   Phase 2 (Observe): Capture user preference/reaction
----   Phase 3 (Concretize): Narrow the intent hierarchy based on feedback
----   Repeat until intent is sufficiently concrete or max rounds reached
+--- ## Algorithm
 ---
---- Usage:
----   local intent_discovery = require("intent_discovery")
----   return intent_discovery.run(ctx)
+--- 1. Surface — present structured options that span the solution space.
+--- 2. Observe — capture user preference and reaction.
+--- 3. Concretize — narrow the intent hierarchy based on feedback.
 ---
---- ctx.task (required): The initial (possibly vague) user request
---- ctx.max_rounds: Maximum exploration rounds (default: 3)
---- ctx.n_options: Number of options to present per round (default: 3)
---- ctx.surface_tokens: Max tokens for option generation (default: 600)
---- ctx.concretize_tokens: Max tokens for concretization (default: 500)
+--- Repeat until the intent is sufficiently concrete or `max_rounds` is
+--- reached.
+---
+--- ## References
+---
+--- - "DiscoverLLM: From Executing Intents to Discovering Them" (2026).
+---   https://arxiv.org/abs/2602.03429
 
 local S = require("alc_shapes")
 local T = S.T
