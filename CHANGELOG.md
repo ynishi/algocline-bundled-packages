@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-05-09
+
+### Removed
+
+- **`docs/docstring-convention.md`** (V0 single-spec doc, 335 行):
+  superseded by `refs/pkg-author-conventions.md` which served as
+  the rubric for the v0.22.0 full-compliance sweep (lint 96 → 0
+  across all 117 packages). The V0 spec is fully absorbed into
+  pkg-author-conventions and no longer maintained — keeping the
+  stale copy invites divergence. Only references were inside
+  `CHANGELOG.md` historical entries (kept verbatim as history).
+
 ## [0.22.0] - 2026-05-09
 
 ### Changed
