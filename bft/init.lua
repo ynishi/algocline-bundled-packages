@@ -1,43 +1,42 @@
---- bft — Byzantine Fault Tolerance impossibility bounds
+--- bft(BFT) — Byzantine Fault Tolerance impossibility bounds
 ---
---- Pure-computation utility for BFT quorum thresholds and validation.
---- No LLM calls; used as a governance primitive by higher-level packages
---- (e.g. pbft, dissent, anti_cascade).
+--- Pure-computation utility for BFT quorum thresholds and validation. No
+--- LLM calls; used as a governance primitive by higher-level packages
+--- such as `pbft`, `dissent`, and `anti_cascade`.
 ---
---- Theory:
----   Lamport, Shostak, Pease. "The Byzantine Generals Problem".
----   ACM TOPLAS 4(3), pp.382-401, 1982. DOI:10.1145/357172.357176
+--- ## Usage
 ---
----   Core result (Theorem 1): With oral messages, agreement is possible
----   iff n >= 3f + 1, where n = total nodes, f = faulty nodes.
----   Required quorum: 2f + 1 (any two quorums share >= 1 honest node).
+--- ```lua
+--- local bft = require("bft")
+--- assert(bft.validate(7, 2))          -- 7 >= 3*2+1 = true
+--- assert(bft.threshold(7, 2) == 5)    -- quorum = 2*2+1 = 5
+--- assert(bft.max_faults(7) == 2)      -- floor((7-1)/3) = 2
+--- ```
 ---
----   With signed messages (SM(m), section 4): n >= f + 2 suffices.
+--- ## Theoretical foundations
 ---
---- Multi-Agent / Swarm context:
----   In LLM agent swarms, "Byzantine faults" map to hallucinating,
----   adversarial, or compromised agents that may produce arbitrarily
----   wrong outputs. BFT bounds answer the governance question:
----     "Given N agents, how many can fail before consensus breaks?"
+--- Lamport, Shostak, and Pease's core result (Theorem 1): with oral
+--- messages, agreement is possible iff `n >= 3f + 1`, where `n` is the
+--- total number of nodes and `f` is the number of faulty nodes. The
+--- required quorum is `2f + 1` so that any two quorums share at least one
+--- honest node. With signed messages (SM(m), §4 of the same paper), the
+--- weaker bound `n >= f + 2` suffices.
 ---
----   Practical applications:
----   - Panel sizing: given expected hallucination rate f/n, compute
----     minimum panel size n >= 3f+1 for reliable majority vote
----   - pbft integration: BFT bounds determine quorum thresholds
----     for the 3-phase consensus protocol
----   - Signed-message mode: when agents produce verifiable outputs
----     (e.g. code with unit tests), the weaker n >= f+2 bound applies,
----     allowing smaller panels
+--- In LLM agent swarms, "Byzantine faults" map to hallucinating,
+--- adversarial, or compromised agents that may produce arbitrarily wrong
+--- outputs. BFT bounds answer the governance question "given N agents,
+--- how many can fail before consensus breaks?". Practical uses include
+--- panel sizing (given an expected hallucination rate `f/n`), `pbft`
+--- quorum derivation, and signed-message mode for agents producing
+--- verifiable outputs (e.g. code with unit tests) where the weaker
+--- `n >= f + 2` bound permits smaller panels.
 ---
----   Related: "From Spark to Fire" (Xie et al., AAMAS 2026) shows that
----   single faulty agents can cascade through multi-agent pipelines —
----   BFT bounds quantify the structural resilience of the system.
+--- ## References
 ---
---- Usage:
----   local bft = require("bft")
----   assert(bft.validate(7, 2))          -- 7 >= 3*2+1 = true
----   assert(bft.threshold(7, 2) == 5)    -- quorum = 2*2+1 = 5
----   assert(bft.max_faults(7) == 2)      -- floor((7-1)/3) = 2
+--- - Lamport, L., Shostak, R., Pease, M. (1982). "The Byzantine Generals
+---   Problem". ACM TOPLAS 4(3), pp.382-401.
+---   https://doi.org/10.1145/357172.357176
+--- - Xie, ... et al. (2026). "From Spark to Fire". AAMAS 2026.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -48,10 +47,7 @@ local M = {}
 M.meta = {
     name = "bft",
     version = "0.1.0",
-    description = "Byzantine Fault Tolerance bounds — quorum thresholds "
-        .. "and impossibility validation for multi-agent governance. "
-        .. "Computes minimum panel sizes and fault tolerance limits "
-        .. "(Lamport-Shostak-Pease 1982, Theorem 1: n >= 3f+1).",
+    description = "Byzantine Fault Tolerance quorum thresholds and impossibility bounds.",
     category = "governance",
 }
 
