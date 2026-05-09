@@ -124,7 +124,7 @@
 - [maieutic](narrative/maieutic.md): Maieutic prompting — recursive explanation tree with logical consistency verification
 - [mcts](narrative/mcts.md): Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning
 - [meta_prompt](narrative/meta_prompt.md): Meta-Prompting — orchestrator identifies and dispatches to specialist personas
-- [model_first](narrative/model_first.md): Model-First Reasoning — construct explicit problem model (entities, states, actions, constraints) before solving. Reduces constraint violations in planning and scheduling tasks.
+- [model_first](narrative/model_first.md): Construct explicit problem model (entities/states/constraints) before solving.
 - [php](narrative/php.md): Progressive-Hint Prompting — iterative re-solving with prior answers as hints
 - [plan_solve](narrative/plan_solve.md): Plan-and-Solve — devise an explicit plan, then execute step by step
 - [rstar](narrative/rstar.md): Mutual reasoning verification — two paths cross-verify each other for efficient accuracy
@@ -162,7 +162,7 @@
 - [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking via permutation generation with sliding window.
 - [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection: pick candidate with highest pairwise agreement.
 - [moa](narrative/moa.md): Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement
-- [mwu](narrative/mwu.md): Multiplicative Weights Update — adversarial online agent weight learning with O(√(T ln N)) regret bound. Learns optimal agent mixture weights over time without stochastic assumptions (Littlesto...
+- [mwu](narrative/mwu.md): Multiplicative Weights Update with O(sqrt(T ln N)) adversarial regret bound.
 - [pairwise_rank](narrative/pairwise_rank.md): Pairwise Ranking Prompting (PRP) — pairwise LLM-as-judge comparison with bidirectional position-bias cancellation. Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the calibration problem.
 - [particle_infer](narrative/particle_infer.md): Particle-Filter inference-time scaling (Puri et al. 2025, arXiv:2502.01618). State-Space formulation of LLM generation with PRM-guided every-step softmax resampling and ORM-based final selection. D...
 - [rank](narrative/rank.md): Tournament selection — generate candidates, pairwise LLM-as-Judge ranking

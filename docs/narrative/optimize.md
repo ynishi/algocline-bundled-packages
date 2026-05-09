@@ -8,14 +8,61 @@ source: optimize/init.lua
 generated: gen_docs (V0)
 ---
 
-# optimize — Modular parameter optimization orchestrator
+# optimize(Optimize) — modular parameter optimization orchestrator
 
-> Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in alc.state for incremental optimization across sessions.
+> Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in `alc.state` for incremental optimization across sessions.
 
 ## Contents
 
+- [Usage](#usage)
+- [Architecture](#architecture)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local optimize = require("optimize")
+return optimize.run(ctx)
+```
+
+## Architecture {#architecture}
+
+Automatic Prompt Optimization research identifies 4 core concerns:
+candidate generation, evaluation, selection, and termination. The
+package separates those concerns into composable submodules
+(following promptolution's modular architecture). The orchestrator
+is intentionally thin — it owns only the loop, state persistence,
+and result aggregation; domain logic is delegated to pluggable
+components.
+
+- `optimize/init.lua` — orchestrator (this file): loop, state,
+  results.
+- `optimize/search.lua` — search strategies (`ucb` / `random` /
+  `opro` / `ea` / `greedy`).
+- `optimize/eval.lua` — evaluators (`evalframe` / `custom` /
+  `llm_judge`).
+- `optimize/stop.lua` — stopping criteria (`variance` / `patience` /
+  `threshold` / `improvement`).
+
+## References {#references}
+
+- Khattab, O. et al. (2023). "DSPy: Compiling Declarative Language
+  Model Calls into Self-Improving Pipelines".
+  https://arxiv.org/abs/2310.03714
+- Yang, C. et al. (2023). "Large Language Models as Optimizers"
+  (OPRO). https://arxiv.org/abs/2309.03409
+- Guo, Q. et al. (2024). "EvoPrompt: Connecting LLMs with
+  Evolutionary Algorithms Yields Powerful Prompt Optimizers". ICLR
+  2024. https://arxiv.org/abs/2309.08532
+- Yuksekgonul, M. et al. (2024). "TextGrad: Automatic Differentiation
+  via Text". Nature 2024. https://arxiv.org/abs/2406.07496
+- Hebenstreit, K. et al. (2024). "promptolution: A Unified, Modular
+  Framework for Prompt Optimization".
+  https://arxiv.org/abs/2512.02840
+- APO Survey (2025). "A Systematic Survey of Automatic Prompt
+  Optimization Techniques". https://arxiv.org/abs/2502.16923
 
 ## Parameters {#parameters}
 

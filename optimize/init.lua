@@ -1,60 +1,53 @@
---- optimize — Modular parameter optimization orchestrator
+--- optimize(Optimize) — modular parameter optimization orchestrator
+---
 --- Explores parameter configurations for a target strategy by composing
 --- pluggable search strategies, evaluators, and stopping criteria.
---- Persists history in alc.state for incremental optimization across sessions.
+--- Persists history in `alc.state` for incremental optimization across
+--- sessions.
 ---
---- Design Rationale:
----   Automatic Prompt Optimization (APO) research identifies 4 core concerns
----   in any optimization loop: candidate generation, evaluation, selection,
----   and termination. This package separates those concerns into composable
----   submodules, following the promptolution framework's modular architecture
----   (Hebenstreit et al. 2024, arXiv:2512.02840).
+--- ## Usage
 ---
----   The orchestrator itself is intentionally thin — it owns only the
----   optimization loop, state persistence (via alc.state), and result
----   aggregation. All domain logic is delegated to pluggable components.
----   This mirrors DSPy's separation of program structure from optimizer
----   (Khattab et al. 2023, arXiv:2310.03714).
+--- ```lua
+--- local optimize = require("optimize")
+--- return optimize.run(ctx)
+--- ```
 ---
---- Architecture (4-component separation):
----   optimize/init.lua   — Orchestrator (this file): loop control, state, results
----   optimize/search.lua — Search strategies: ucb, random, opro, ea, greedy
----   optimize/eval.lua   — Evaluators: evalframe, custom, llm_judge
----   optimize/stop.lua   — Stopping criteria: variance, patience, threshold, improvement
+--- ## Architecture
 ---
---- References:
----   [1] Khattab et al. "DSPy: Compiling Declarative Language Model Calls
----       into Self-Improving Pipelines" (2023, arXiv:2310.03714)
----   [2] Yang et al. "Large Language Models as Optimizers" — OPRO
----       (2023, arXiv:2309.03409)
----   [3] Guo et al. "EvoPrompt: Connecting LLMs with Evolutionary Algorithms
----       Yields Powerful Prompt Optimizers" (ICLR 2024, arXiv:2309.08532)
----   [4] Yuksekgonul et al. "TextGrad: Automatic Differentiation via Text"
----       (Nature 2024, arXiv:2406.07496)
----   [5] Hebenstreit et al. "promptolution: A Unified, Modular Framework
----       for Prompt Optimization" (2024, arXiv:2512.02840)
----   [6] APO Survey: "A Systematic Survey of Automatic Prompt Optimization
----       Techniques" (2025, arXiv:2502.16923)
+--- Automatic Prompt Optimization research identifies 4 core concerns:
+--- candidate generation, evaluation, selection, and termination. The
+--- package separates those concerns into composable submodules
+--- (following promptolution's modular architecture). The orchestrator
+--- is intentionally thin — it owns only the loop, state persistence,
+--- and result aggregation; domain logic is delegated to pluggable
+--- components.
 ---
---- Usage:
----   local optimize = require("optimize")
----   return optimize.run(ctx)
+--- - `optimize/init.lua` — orchestrator (this file): loop, state,
+---   results.
+--- - `optimize/search.lua` — search strategies (`ucb` / `random` /
+---   `opro` / `ea` / `greedy`).
+--- - `optimize/eval.lua` — evaluators (`evalframe` / `custom` /
+---   `llm_judge`).
+--- - `optimize/stop.lua` — stopping criteria (`variance` / `patience` /
+---   `threshold` / `improvement`).
 ---
---- ctx.target    (required): Strategy package name (e.g. "biz_kernel")
---- ctx.space     (required): Parameter search space definition
----   { param_name = { type="int"|"float"|"choice", min, max, step, values }, ... }
---- ctx.scenario  (required): Eval scenario (inline table or scenario name string)
---- ctx.rounds    (optional): Max optimization rounds (default: 20)
---- ctx.search    (optional): Search strategy — "ucb"|"random"|"opro"|"ea"|"greedy" or table (default: "ucb")
---- ctx.evaluator (optional): Evaluator — "evalframe"|"custom"|"llm_judge" or table (default: "evalframe")
---- ctx.stop      (optional): Stopping criterion — "variance"|"patience"|"threshold"|"improvement" or table (default: "variance")
---- ctx.stop_config (optional): Config for stopping criterion (e.g. { patience=5 })
---- ctx.name      (optional): Optimization run name for state key (default: ctx.target)
---- ctx.defaults  (optional): Base parameter defaults (merged with arm params)
---- ctx.strategy_opts (optional): Extra opts passed to target strategy
---- ctx.eval_fn   (optional): Custom evaluation function (for evaluator="custom")
---- ctx.auto_card (optional): Emit a Card on completion (default: false)
---- ctx.card_pkg  (optional): Card pkg.name override (default: "optimize_{target}")
+--- ## References
+---
+--- - Khattab, O. et al. (2023). "DSPy: Compiling Declarative Language
+---   Model Calls into Self-Improving Pipelines".
+---   https://arxiv.org/abs/2310.03714
+--- - Yang, C. et al. (2023). "Large Language Models as Optimizers"
+---   (OPRO). https://arxiv.org/abs/2309.03409
+--- - Guo, Q. et al. (2024). "EvoPrompt: Connecting LLMs with
+---   Evolutionary Algorithms Yields Powerful Prompt Optimizers". ICLR
+---   2024. https://arxiv.org/abs/2309.08532
+--- - Yuksekgonul, M. et al. (2024). "TextGrad: Automatic Differentiation
+---   via Text". Nature 2024. https://arxiv.org/abs/2406.07496
+--- - Hebenstreit, K. et al. (2024). "promptolution: A Unified, Modular
+---   Framework for Prompt Optimization".
+---   https://arxiv.org/abs/2512.02840
+--- - APO Survey (2025). "A Systematic Survey of Automatic Prompt
+---   Optimization Techniques". https://arxiv.org/abs/2502.16923
 
 local search_mod = require("optimize.search")
 local eval_mod   = require("optimize.eval")

@@ -4036,14 +4036,41 @@ Returns:
 <!-- ── model_first.md ── -->
 
 
-# model_first — Model-First Reasoning
+# model_first(ModelFirst) — model-first reasoning via explicit problem modeling
 
-> Separates problem representation from problem solving. First constructs an explicit problem model (entities, state variables, actions with preconditions/effects, and constraints), then reasons within that model.
+> Separates problem representation from problem solving. First constructs an explicit problem model (entities, state variables, actions with preconditions/effects, and constraints), then reasons within that model. Unlike `plan_solve` (which generates "what to do"), `model_first` generates "what exists" before any solving, catching constraint violations that an implicit-constraint plan misses.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local mf = require("model_first")
+return mf.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 2-4 LLM calls:
+
+1. Model — construct an explicit problem model (entities, states,
+   actions, constraints). Do not solve yet.
+2. Solve — reason within the model, tracking state transitions.
+3. Verify (optional) — check the solution against all model
+   constraints.
+4. Extract (optional) — produce a concise final answer.
+
+## References {#references}
+
+- Rana, ..., Kumar, ... (2025). "Model-First Reasoning LLM Agents:
+  Reducing Hallucinations through Explicit Problem Modeling".
+  https://arxiv.org/abs/2512.14474
 
 ## Parameters {#parameters}
 
@@ -4073,23 +4100,113 @@ Returns:
 <!-- ── mwu.md ── -->
 
 
-# mwu — Multiplicative Weights Update for adversarial online learning
+# mwu(MWU) — Multiplicative Weights Update for adversarial online learning
 
-> Maintains a weight distribution over N agents (experts/arms) and updates weights multiplicatively based on observed losses. Provides optimal O(√(T ln N)) regret bound against ANY adversarial loss sequence — no stochastic assumption required.
+> Maintains a weight distribution over N agents (experts/arms) and updates weights multiplicatively based on observed losses. Provides an optimal `O(√(T ln N))` regret bound against any adversarial loss sequence — no stochastic assumption required.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local mwu = require("mwu")
+
+-- Stateful updater
+local u = mwu.new({ n = 5, T = 100 })
+u:update({ 0.3, 0.8, 0.1, 0.5, 0.2 })
+local w = u:weights()
+
+-- One-shot from loss matrix
+local r = mwu.solve(loss_matrix)
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+```math
+w_i(t+1) = w_i(t) · (1 - η · ℓ_i(t))
+p_i(t)   = w_i(t) / Σ_j w_j(t)
+Regret_T = Σ_t p(t)·ℓ(t) - min_i Σ_t ℓ_i(t)
+         ≤ (ln N)/η + η·T
+```
+
+The optimal `η = √(ln N / T)` yields `Regret_T ≤ 2√(T ln N)`. MWU is
+the principled way to learn agent weights over time in an adversarial
+environment where tasks can change arbitrarily between rounds.
+Unlike UCB1 (`ucb`), which selects one arm, MWU outputs a full weight
+distribution. Implementation notes:
+
+- Doubling trick: when `T` is unknown in advance, restart with
+  doubled epoch lengths and recalculated `η` to maintain
+  `O(√(T ln N))` regret.
+- Log-space computation: weights are maintained in log space to
+  prevent numerical underflow when agents have extreme loss contrast
+  over many rounds.
+
+Composable with `panel` / `moa` (weight the agent mixture),
+`shapley` (post-hoc attribution), and `scoring_rule` (loss from
+calibration scores).
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `ucb` — stochastic bandits (i.i.d. losses), selects one arm.
+- `mwu` — adversarial setting (arbitrary losses), outputs a weight
+  distribution.
+
+## References {#references}
+
+- Littlestone, N., Warmuth, M. K. (1994). "The Weighted Majority
+  Algorithm". Information and Computation 108(2), pp.212-261.
+- Freund, Y., Schapire, R. E. (1997). "A Decision-Theoretic
+  Generalization of On-Line Learning and an Application to Boosting".
+  JCSS 55(1), pp.119-139.
+- Cesa-Bianchi, N., Lugosi, G. (2006). "Prediction, Learning, and
+  Games". Cambridge University Press, §2.1-2.3.
 
 ---
 
 <!-- ── negation.md ── -->
 
 
-# negation — Adversarial self-test via destruction conditions
+# negation(Negation) — adversarial self-test via destruction conditions
 
-> Given an answer, generates "destruction conditions": specific scenarios or facts that, if true, would invalidate the answer. Then attempts to verify whether any destruction condition actually holds. Surviving answers are strengthened; refuted answers are revised.
+> Given an answer, generates destruction conditions (specific scenarios or facts that would invalidate the answer if true), then attempts to verify whether any condition actually holds. Surviving answers are strengthened; refuted answers are revised.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local negation = require("negation")
+return negation.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate — produce an initial answer (or use `ctx.answer`).
+2. Negate — generate destruction conditions for the answer.
+3. Verify — check whether any condition holds.
+4. Revise — if any condition holds, revise the answer.
+
+## References {#references}
+
+- Huang, J. et al. (2023). "Large Language Models Cannot Self-Correct
+  Reasoning Yet". https://arxiv.org/abs/2310.01798
+- Red-teaming / adversarial testing methodology.
+ctx.max_conditions: Max destruction conditions to generate (default: 5)
+ctx.gen_tokens: Max tokens for generation (default: 600)
+ctx.verify_tokens: Max tokens per condition verification (default: 200)
+ctx.revise_tokens: Max tokens for revision (default: 600)
 
 ## Parameters {#parameters}
 
@@ -4122,14 +4239,31 @@ Returns:
 <!-- ── opinion_abm.md ── -->
 
 
-# opinion_abm — Hegselmann-Krause Bounded Confidence Opinion Dynamics
+# opinion_abm(OpinionABM) — Hegselmann-Krause bounded-confidence opinion dynamics
 
-> N agents hold continuous opinion values in [0,1]. Each step, an agent updates its opinion to the average of all agents whose opinions are within ε (bounded confidence threshold).
+> N agents hold continuous opinion values in `[0, 1]`. Each step an agent updates its opinion to the average of all agents whose opinions are within `ε` (bounded-confidence threshold). The threshold value determines the emergent regime:
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local opinion = require("opinion_abm")
+return opinion.run(ctx)
+```
+
+## References {#references}
+
+- Hegselmann, R., Krause, U. (2002). "Opinion Dynamics and Bounded
+  Confidence: Models, Analysis and Simulation". JASSS 5(3).
+- Rodrigo, ... (2025). "Extending the Hegselmann-Krause Model to
+  include AI Oracles". https://arxiv.org/abs/2502.19701
+ctx.initial_distribution?: "uniform"|"bimodal"|"clustered" (default "uniform")
 
 ## Parameters {#parameters}
 
@@ -4157,14 +4291,61 @@ Returns:
 <!-- ── optimize.md ── -->
 
 
-# optimize — Modular parameter optimization orchestrator
+# optimize(Optimize) — modular parameter optimization orchestrator
 
-> Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in alc.state for incremental optimization across sessions.
+> Explores parameter configurations for a target strategy by composing pluggable search strategies, evaluators, and stopping criteria. Persists history in `alc.state` for incremental optimization across sessions.
 
 ## Contents
 
+- [Usage](#usage)
+- [Architecture](#architecture)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local optimize = require("optimize")
+return optimize.run(ctx)
+```
+
+## Architecture {#architecture}
+
+Automatic Prompt Optimization research identifies 4 core concerns:
+candidate generation, evaluation, selection, and termination. The
+package separates those concerns into composable submodules
+(following promptolution's modular architecture). The orchestrator
+is intentionally thin — it owns only the loop, state persistence,
+and result aggregation; domain logic is delegated to pluggable
+components.
+
+- `optimize/init.lua` — orchestrator (this file): loop, state,
+  results.
+- `optimize/search.lua` — search strategies (`ucb` / `random` /
+  `opro` / `ea` / `greedy`).
+- `optimize/eval.lua` — evaluators (`evalframe` / `custom` /
+  `llm_judge`).
+- `optimize/stop.lua` — stopping criteria (`variance` / `patience` /
+  `threshold` / `improvement`).
+
+## References {#references}
+
+- Khattab, O. et al. (2023). "DSPy: Compiling Declarative Language
+  Model Calls into Self-Improving Pipelines".
+  https://arxiv.org/abs/2310.03714
+- Yang, C. et al. (2023). "Large Language Models as Optimizers"
+  (OPRO). https://arxiv.org/abs/2309.03409
+- Guo, Q. et al. (2024). "EvoPrompt: Connecting LLMs with
+  Evolutionary Algorithms Yields Powerful Prompt Optimizers". ICLR
+  2024. https://arxiv.org/abs/2309.08532
+- Yuksekgonul, M. et al. (2024). "TextGrad: Automatic Differentiation
+  via Text". Nature 2024. https://arxiv.org/abs/2406.07496
+- Hebenstreit, K. et al. (2024). "promptolution: A Unified, Modular
+  Framework for Prompt Optimization".
+  https://arxiv.org/abs/2512.02840
+- APO Survey (2025). "A Systematic Survey of Automatic Prompt
+  Optimization Techniques". https://arxiv.org/abs/2502.16923
 
 ## Parameters {#parameters}
 
