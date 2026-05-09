@@ -1,40 +1,44 @@
---- dissent — Consensus inertia prevention via forced adversarial challenge
+--- dissent(Dissent) — consensus inertia prevention via forced adversarial challenge
 ---
 --- Before finalizing any multi-agent consensus, injects a dedicated
---- adversarial agent that challenges the emerging agreement. Evaluates
---- the dissent's validity and produces a revised consensus only when
---- the challenge has merit. Prevents premature lock-in of incorrect
---- conclusions.
+--- adversarial agent that challenges the emerging agreement, evaluates
+--- the dissent's validity, and produces a revised consensus only when
+--- the challenge has merit. Composable: wrap around `moa`, `panel`,
+--- `sc`, or any strategy that produces a consensus output.
 ---
---- Generalizes the "Consensus Inertia" countermeasure from "From Spark
---- to Fire: Diagnosing and Overcoming the Fragility of Multi-Agent
---- Systems" (Xie et al., AAMAS 2026). The paper found that once a
---- multi-agent group converges on an incorrect answer, baseline systems
---- fail to recover (defense rate 0.32). Forced adversarial challenge
---- at the consensus boundary is one of the key architectural
---- interventions that raises defense to 0.89.
+--- ## Usage
 ---
---- Also related to MAST (Cemri et al., 2025) failure mode F11:
---- "groupthink convergence" where agents reinforce each other's errors.
+--- ```lua
+--- local dissent = require("dissent")
+--- return dissent.run(ctx)
+--- ```
 ---
---- Composable: wrap around moa, panel, sc, or any strategy that
---- produces a consensus output.
+--- ## Algorithm
 ---
---- Pipeline (3-4 LLM calls):
----   Step 1: Adversarial challenge — dedicated dissenter attacks consensus
----   Step 2: Merit evaluation — independent judge assesses dissent validity
----   Step 3: Revision (conditional) — if dissent has merit, revise consensus
----   Step 4: Final synthesis — produce final output with dissent metadata
+--- The pipeline uses 3-4 LLM calls:
 ---
---- Usage:
----   local dissent = require("dissent")
----   return dissent.run(ctx)
+--- 1. Adversarial challenge — a dedicated dissenter attacks the
+---    consensus.
+--- 2. Merit evaluation — an independent judge scores the dissent.
+--- 3. Conditional revision — when the score exceeds `merit_threshold`,
+---    revise the consensus.
+--- 4. Final synthesis — produce the final output with dissent metadata.
 ---
---- ctx.task (required): Original task description
---- ctx.consensus (required): The consensus text to challenge
---- ctx.perspectives (optional): Individual agent outputs that formed consensus
---- ctx.merit_threshold (optional): Score threshold for revision (default: 0.6)
---- ctx.gen_tokens: Max tokens per generation (default: 500)
+--- ## Theoretical foundations
+---
+--- Generalizes the "Consensus Inertia" countermeasure from Xie et al.
+--- The paper finds that once a multi-agent group converges on an
+--- incorrect answer, baseline systems fail to recover (defense rate
+--- 0.32). Forced adversarial challenge at the consensus boundary is one
+--- of the key architectural interventions that raises defense to 0.89.
+--- Also related to MAST failure mode F11: "groupthink convergence" where
+--- agents reinforce each other's errors.
+---
+--- ## References
+---
+--- - Xie, ... et al. (2026). "From Spark to Fire: Diagnosing and
+---   Overcoming the Fragility of Multi-Agent Systems". AAMAS 2026.
+--- - Cemri, ... et al. (2025). MAST failure-mode taxonomy (F11).
 
 local S = require("alc_shapes")
 local T = S.T
@@ -45,11 +49,7 @@ local M = {}
 M.meta = {
     name = "dissent",
     version = "0.1.0",
-    description = "Consensus inertia prevention — forces adversarial challenge "
-        .. "before finalizing multi-agent agreement. Prevents groupthink "
-        .. "lock-in. Generalizes the Consensus Inertia countermeasure from "
-        .. "'From Spark to Fire' (Xie et al., AAMAS 2026). "
-        .. "Composable with moa, panel, sc.",
+    description = "Forced adversarial challenge to prevent multi-agent consensus inertia.",
     category = "governance",
 }
 
