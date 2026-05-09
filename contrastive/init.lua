@@ -1,17 +1,27 @@
---- contrastive — learn from correct AND incorrect reasoning
---- Generates both a correct reasoning path and a plausible-but-wrong path,
---- then contrasts them to strengthen the final answer. The only strategy
---- that explicitly models failure modes.
+--- contrastive(Contrastive) — learn from correct and incorrect reasoning
 ---
---- Based on: Chia et al., "Contrastive Chain-of-Thought Prompting"
---- (2023, arXiv:2311.09277)
+--- Generates both a correct reasoning path and a plausible-but-wrong path
+--- then contrasts them to strengthen the final answer. Explicitly models
+--- failure modes alongside the success path.
 ---
---- Usage:
----   local contrastive = require("contrastive")
----   return contrastive.run(ctx)
+--- ## Usage
 ---
---- ctx.task (required): The problem to solve
---- ctx.n_contrasts: Number of contrast pairs (default: 2)
+--- ```lua
+--- local contrastive = require("contrastive")
+--- return contrastive.run(ctx)
+--- ```
+---
+--- ## Algorithm
+---
+--- 1. For `n_contrasts` pairs, generate one correct chain-of-thought and
+---    one plausible-but-wrong chain-of-thought.
+--- 2. Contrast the pairs to highlight failure modes.
+--- 3. Produce a final answer informed by the contrast.
+---
+--- ## References
+---
+--- - Chia, Y. K. et al. (2023). "Contrastive Chain-of-Thought Prompting".
+---   https://arxiv.org/abs/2311.09277
 
 local S = require("alc_shapes")
 local T = S.T
@@ -22,7 +32,7 @@ local M = {}
 M.meta = {
     name = "contrastive",
     version = "0.1.0",
-    description = "Contrastive CoT — generate correct and incorrect reasoning, learn from contrast",
+    description = "Contrastive CoT: generate correct and wrong chains and learn from the contrast.",
     category = "reasoning",
 }
 
