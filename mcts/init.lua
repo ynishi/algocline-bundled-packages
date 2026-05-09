@@ -1,33 +1,39 @@
---- MCTS — Monte Carlo Tree Search reasoning
---- Applies MCTS to LLM reasoning: selection (UCB1), expansion (generate),
---- simulation (rollout to conclusion), backpropagation (update scores).
---- Explores deep reasoning trees more efficiently than exhaustive search.
+--- mcts(MCTS) — Monte Carlo Tree Search reasoning
 ---
---- Optional Reflection mechanism (ctx.reflection = true): when a simulation
---- scores below the reflection threshold, the LLM generates a 1-sentence
---- diagnosis of why that path failed. These reflections are accumulated and
---- injected into subsequent expansion prompts, helping the search avoid
---- repeating the same mistakes.
+--- Applies MCTS to LLM reasoning with selection (UCB1), expansion
+--- (generate), simulation (rollout to conclusion), and backpropagation
+--- (update scores). Explores deep reasoning trees more efficiently than
+--- exhaustive search.
 ---
---- Based on:
----   [1] Hao et al. "Reasoning with Language Model is Planning with
----       World Model" (RAP, 2023, arXiv:2305.14992)
----   [2] Zhou et al. "Language Agent Tree Search Unifies Reasoning, Acting,
----       and Planning in Language Models" (LATS, ICML 2024, arXiv:2310.04406)
----   [3] Xu et al. "CogMCTS: Cognitive-Guided Monte Carlo Tree Search"
----       (2025, arXiv:2512.08609)
+--- ## Usage
 ---
---- Usage:
----   local mcts = require("mcts")
----   return mcts.run(ctx)
+--- ```lua
+--- local mcts = require("mcts")
+--- return mcts.run(ctx)
+--- ```
 ---
---- ctx.task (required): The problem to solve
---- ctx.iterations: Number of MCTS iterations (default: 6)
---- ctx.max_depth: Maximum tree depth per rollout (default: 3)
---- ctx.exploration: UCB1 exploration constant (default: 1.41)
---- ctx.reflection: Enable reflection on low-score paths (default: false)
---- ctx.reflection_threshold: Score below which reflection triggers (default: 4)
---- ctx.max_reflections: Maximum stored reflections (default: 5)
+--- ## Algorithm
+---
+--- 1. Selection — descend with UCB1 to a promising leaf.
+--- 2. Expansion — generate new children with the LLM.
+--- 3. Simulation — roll out to a conclusion and score it.
+--- 4. Backpropagation — propagate the score back up to the root.
+---
+--- Optional reflection mechanism (`ctx.reflection = true`): when a
+--- simulation scores below the reflection threshold, the LLM generates a
+--- one-sentence diagnosis of why the path failed. The reflections are
+--- accumulated and injected into subsequent expansion prompts to help
+--- the search avoid repeating the same mistakes.
+---
+--- ## References
+---
+--- - Hao, S. et al. (2023). "Reasoning with Language Model is Planning
+---   with World Model" (RAP). https://arxiv.org/abs/2305.14992
+--- - Zhou, A. et al. (2024). "Language Agent Tree Search Unifies
+---   Reasoning, Acting, and Planning in Language Models" (LATS).
+---   ICML 2024. https://arxiv.org/abs/2310.04406
+--- - Xu, ... et al. (2025). "CogMCTS: Cognitive-Guided Monte Carlo Tree
+---   Search". https://arxiv.org/abs/2512.08609
 
 local S = require("alc_shapes")
 local T = S.T

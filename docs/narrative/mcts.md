@@ -8,14 +8,47 @@ source: mcts/init.lua
 generated: gen_docs (V0)
 ---
 
-# MCTS — Monte Carlo Tree Search reasoning
+# mcts(MCTS) — Monte Carlo Tree Search reasoning
 
-> Applies MCTS to LLM reasoning: selection (UCB1), expansion (generate), simulation (rollout to conclusion), backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
+> Applies MCTS to LLM reasoning with selection (UCB1), expansion (generate), simulation (rollout to conclusion), and backpropagation (update scores). Explores deep reasoning trees more efficiently than exhaustive search.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local mcts = require("mcts")
+return mcts.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Selection — descend with UCB1 to a promising leaf.
+2. Expansion — generate new children with the LLM.
+3. Simulation — roll out to a conclusion and score it.
+4. Backpropagation — propagate the score back up to the root.
+
+Optional reflection mechanism (`ctx.reflection = true`): when a
+simulation scores below the reflection threshold, the LLM generates a
+one-sentence diagnosis of why the path failed. The reflections are
+accumulated and injected into subsequent expansion prompts to help
+the search avoid repeating the same mistakes.
+
+## References {#references}
+
+- Hao, S. et al. (2023). "Reasoning with Language Model is Planning
+  with World Model" (RAP). https://arxiv.org/abs/2305.14992
+- Zhou, A. et al. (2024). "Language Agent Tree Search Unifies
+  Reasoning, Acting, and Planning in Language Models" (LATS).
+  ICML 2024. https://arxiv.org/abs/2310.04406
+- Xu, ... et al. (2025). "CogMCTS: Cognitive-Guided Monte Carlo Tree
+  Search". https://arxiv.org/abs/2512.08609
 
 ## Parameters {#parameters}
 
