@@ -8,14 +8,38 @@ source: p_tts/init.lua
 generated: gen_docs (V0)
 ---
 
-# p_tts — Plan-Test-Then-Solve (constraint-first reasoning)
+# p_tts(PTTS) — Plan-Test-Then-Solve constraint-first reasoning
 
-> Before solving, generates expected properties and test cases the answer must satisfy. Then solves while checking against those constraints. Finally verifies the solution against all generated test cases.
+> Before solving, generates expected properties and test cases the answer must satisfy, solves while staying aware of those constraints, and verifies the solution against the test cases. Unlike `decompose` (splits into subtasks) or `reflect` (post-hoc critique), `p_tts` generates verifiable constraints before solving for a specification-driven approach.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local p_tts = require("p_tts")
+return p_tts.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Plan — analyze the task and identify key requirements.
+2. Test — generate verifiable properties and constraints.
+3. Solve — produce a solution while aware of the constraints.
+4. Verify — check the solution against each constraint.
+5. Repair — fix any violations, up to `max_repairs`.
+
+## References {#references}
+
+- Zhang, S. et al. (2023). "Planning with Large Language Models for
+  Code Generation". https://arxiv.org/abs/2303.05510
+- Test-driven development methodology applied to reasoning.
 
 ## Parameters {#parameters}
 

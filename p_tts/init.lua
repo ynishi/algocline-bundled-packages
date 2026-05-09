@@ -1,35 +1,32 @@
---- p_tts — Plan-Test-Then-Solve (constraint-first reasoning)
+--- p_tts(PTTS) — Plan-Test-Then-Solve constraint-first reasoning
 ---
---- Before solving, generates expected properties and test cases the answer
---- must satisfy. Then solves while checking against those constraints.
---- Finally verifies the solution against all generated test cases.
+--- Before solving, generates expected properties and test cases the
+--- answer must satisfy, solves while staying aware of those constraints,
+--- and verifies the solution against the test cases. Unlike `decompose`
+--- (splits into subtasks) or `reflect` (post-hoc critique), `p_tts`
+--- generates verifiable constraints before solving for a
+--- specification-driven approach.
 ---
---- Unlike decompose (splits into subtasks) or reflect (post-hoc critique),
---- p_tts generates verifiable constraints BEFORE solving, creating a
---- specification-driven approach to reasoning.
+--- ## Usage
 ---
---- Based on: "Planning with Large Language Models for Code Generation"
----            (Zhang et al., arXiv 2303.05510, 2023)
----            + test-driven development methodology applied to reasoning
----            + "Specification-Driven LLM Reasoning" concepts
+--- ```lua
+--- local p_tts = require("p_tts")
+--- return p_tts.run(ctx)
+--- ```
 ---
---- Pipeline:
----   Step 1: plan       — analyze task and identify key requirements
----   Step 2: test       — generate verifiable properties/constraints
----   Step 3: solve      — solve while aware of constraints
----   Step 4: verify     — check solution against each constraint
----   Step 5: repair     — fix violations (if any)
+--- ## Algorithm
 ---
---- Usage:
----   local p_tts = require("p_tts")
----   return p_tts.run(ctx)
+--- 1. Plan — analyze the task and identify key requirements.
+--- 2. Test — generate verifiable properties and constraints.
+--- 3. Solve — produce a solution while aware of the constraints.
+--- 4. Verify — check the solution against each constraint.
+--- 5. Repair — fix any violations, up to `max_repairs`.
 ---
---- ctx.task (required): The task/question to solve
---- ctx.max_constraints: Max constraints to generate (default: 6)
---- ctx.max_repairs: Max repair attempts (default: 2)
---- ctx.plan_tokens: Max tokens for planning (default: 400)
---- ctx.gen_tokens: Max tokens for solving (default: 600)
---- ctx.verify_tokens: Max tokens per constraint check (default: 150)
+--- ## References
+---
+--- - Zhang, S. et al. (2023). "Planning with Large Language Models for
+---   Code Generation". https://arxiv.org/abs/2303.05510
+--- - Test-driven development methodology applied to reasoning.
 
 local S = require("alc_shapes")
 local T = S.T
