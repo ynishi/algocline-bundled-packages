@@ -3,19 +3,39 @@ name: deliberate
 version: 0.1.0
 category: combinator
 result_shape: "shape { abstractions: any, confidence: number, confidence_escalated: boolean, debates: array of any, expert_analysis: string, expert_consultations: any, options: array of any, principles: string, ranking_matches: array of shape { a: number, b: number, reason: string, winner: number }, recommendation: shape { debate_outcome: string, description?: string, name?: string, ranking_wins: number }, total_options: number }"
-description: "Structured deliberation — abstract principles, expert consultation, debate, ranked decision"
+description: "Structured deliberation: abstract principles, consult, debate, ranked decision."
 source: deliberate/init.lua
 generated: gen_docs (V0)
 ---
 
-# deliberate — structured multi-phase deliberation for complex decisions
+# deliberate(Deliberate) — structured multi-phase deliberation for complex decisions
 
-> Combinator package: orchestrates step_back, meta_prompt, triad, calibrate, rank to perform principled decision-making.
+> Combinator package that orchestrates `step_back`, `meta_prompt`, `triad`, `calibrate`, and `rank` to perform principled decision-making across multiple phases.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local deliberate = require("deliberate")
+return deliberate.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Abstract — `step_back` extracts underlying principles and criteria.
+2. Consult — `meta_prompt` lets domain experts analyze the decision
+   space.
+3. Generate — enumerate options from expert insights, or use the
+   options provided in `ctx.options`.
+4. Debate — `triad` runs an adversarial debate per option pair.
+5. Confidence — `calibrate` gates on debate quality.
+6. Rank — `rank` runs a pairwise tournament to select the best option.
 
 ## Parameters {#parameters}
 

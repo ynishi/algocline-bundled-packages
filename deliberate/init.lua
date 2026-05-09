@@ -1,25 +1,26 @@
---- deliberate — structured multi-phase deliberation for complex decisions
+--- deliberate(Deliberate) — structured multi-phase deliberation for complex decisions
 ---
---- Combinator package: orchestrates step_back, meta_prompt, triad,
---- calibrate, rank to perform principled decision-making.
+--- Combinator package that orchestrates `step_back`, `meta_prompt`,
+--- `triad`, `calibrate`, and `rank` to perform principled decision-making
+--- across multiple phases.
 ---
---- Pipeline:
----   Phase 1: Abstract    — step_back: extract underlying principles and criteria
----   Phase 2: Consult     — meta_prompt: domain experts analyze the decision space
----   Phase 3: Generate    — enumerate options from expert insights (or use provided)
----   Phase 4: Debate      — triad: adversarial debate per option pair
----   Phase 5: Confidence  — calibrate: gate on debate quality
----   Phase 6: Rank        — rank: pairwise tournament to select best option
+--- ## Usage
 ---
---- Usage:
----   local deliberate = require("deliberate")
----   return deliberate.run(ctx)
+--- ```lua
+--- local deliberate = require("deliberate")
+--- return deliberate.run(ctx)
+--- ```
 ---
---- ctx.task (required): The decision question
---- ctx.options: Pre-defined options table (optional; auto-generated if absent)
---- ctx.max_options: Max options to consider (default: 4)
---- ctx.debate_rounds: Triad debate rounds per comparison (default: 2)
---- ctx.confidence_threshold: Calibrate threshold (default: 0.7)
+--- ## Algorithm
+---
+--- 1. Abstract — `step_back` extracts underlying principles and criteria.
+--- 2. Consult — `meta_prompt` lets domain experts analyze the decision
+---    space.
+--- 3. Generate — enumerate options from expert insights, or use the
+---    options provided in `ctx.options`.
+--- 4. Debate — `triad` runs an adversarial debate per option pair.
+--- 5. Confidence — `calibrate` gates on debate quality.
+--- 6. Rank — `rank` runs a pairwise tournament to select the best option.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -30,7 +31,7 @@ local M = {}
 M.meta = {
     name = "deliberate",
     version = "0.1.0",
-    description = "Structured deliberation — abstract principles, expert consultation, debate, ranked decision",
+    description = "Structured deliberation: abstract principles, consult, debate, ranked decision.",
     category = "combinator",
 }
 
