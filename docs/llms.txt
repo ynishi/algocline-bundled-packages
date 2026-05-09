@@ -41,7 +41,7 @@
 
 ## evaluation
 
-- [critic](narrative/critic.md): Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas
+- [critic](narrative/critic.md): Rubric-based per-dimension scoring with targeted revision of weak areas.
 - [scoring_rule](narrative/scoring_rule.md): Proper Scoring Rules — Brier, logarithmic, spherical scores + ECE calibration measurement for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy (Brier 1...
 
 ## exploration
@@ -112,7 +112,7 @@
 - [analogical](narrative/analogical.md): Analogical prompting — self-generate analogies, extract patterns, apply to original
 - [bot](narrative/bot.md): Identify problem type, apply thought template, verify (Buffer of Thoughts).
 - [coa](narrative/coa.md): Chain-of-Abstraction — reason with abstract placeholders, then ground via parallel knowledge resolution. Decouples reasoning structure from concrete facts.
-- [contrastive](narrative/contrastive.md): Contrastive CoT — generate correct and incorrect reasoning, learn from contrast
+- [contrastive](narrative/contrastive.md): Contrastive CoT: generate correct and wrong chains and learn from the contrast.
 - [cot](narrative/cot.md): Iterative chain-of-thought — cumulative reasoning steps, then synthesis
 - [cumulative](narrative/cumulative.md): Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation
 - [diverse](narrative/diverse.md): DiVERSe — diverse reasoning paths with step-level verification and selection
@@ -156,7 +156,7 @@
 ## selection
 
 - [ab_select](narrative/ab_select.md): Multi-fidelity Thompson sampling over a fixed candidate pool.
-- [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance — frontier extraction, dominance testing, and layered ranking for agent strategy selection on accuracy/cost/diversity trade-offs (Kapoor et al. 'AI Agents That Ma...
+- [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance, frontier extraction, and layered ranking.
 - [cs_pruner](narrative/cs_pruner.md): Confidence-sequence partial-data pruner. Anytime-valid per-candidate kill using empirical-Bernstein CS (Howard et al. 2021). Evaluates candidates across a multi-dimensional rubric and kills each on...
 - [f_race](narrative/f_race.md): Friedman race partial-data pruner. Block-wise ranking of candidates over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman + Nemenyi post-h...
 - [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking — RankGPT-style permutation generation in 1 LLM call. Resolves the calibration problem of pointwise scoring. Sliding window for large N.
@@ -194,7 +194,7 @@
 ## validation
 
 - [conformal_vote](narrative/conformal_vote.md): Split conformal prediction gate for multi-agent deliberation
-- [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual faithfulness verification — tests whether reasoning causally depends on inputs by simulating condition changes. Detects pattern-matching and unfaithful CoT.
+- [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual simulation to verify causal faithfulness of a reasoning chain.
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
 - [eval_guard](narrative/eval_guard.md): Evaluation safety gates for multi-agent systems — self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight che...
 - [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring

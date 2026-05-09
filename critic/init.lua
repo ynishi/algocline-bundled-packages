@@ -1,32 +1,30 @@
---- critic — Rubric-based structured evaluation and targeted revision
+--- critic(Critic) — rubric-based structured evaluation and targeted revision
 ---
---- Unlike reflect (freeform self-critique), critic evaluates on predefined
---- rubric dimensions (accuracy, logic, completeness, etc.), assigns per-
---- dimension scores, generates targeted feedback, and revises only the
---- weakest areas. Produces a structured quality profile.
+--- Unlike `reflect` (freeform self-critique), `critic` evaluates on
+--- pre-defined rubric dimensions (accuracy, logic, completeness, ...),
+--- assigns per-dimension scores, generates targeted feedback, and
+--- revises only the weakest areas, producing a structured quality
+--- profile.
 ---
---- Based on: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"
----            (Zheng et al., arXiv 2306.05685, 2023)
----            + rubric-based evaluation methodology from education research
+--- ## Usage
 ---
---- Pipeline:
----   Step 1: generate  — produce initial answer
----   Step 2: evaluate  — score each rubric dimension independently
----   Step 3: revise    — targeted revision of dimensions below threshold
----   Step 4: re-score  — verify improvement (optional)
+--- ```lua
+--- local critic = require("critic")
+--- return critic.run(ctx)
+--- ```
 ---
---- Usage:
----   local critic = require("critic")
----   return critic.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The task/question to solve
---- ctx.answer: Pre-supplied answer to evaluate (default: nil → auto-generate)
---- ctx.rubric: Table of dimension names (default: see DEFAULT_RUBRIC)
---- ctx.threshold: Minimum acceptable score per dimension (default: 7)
---- ctx.max_revisions: Maximum revision rounds (default: 2)
---- ctx.gen_tokens: Max tokens for generation (default: 600)
---- ctx.eval_tokens: Max tokens per dimension evaluation (default: 200)
---- ctx.revise_tokens: Max tokens for revision (default: 600)
+--- 1. Generate an initial answer (or use `ctx.answer`).
+--- 2. Evaluate each rubric dimension independently with a numeric score.
+--- 3. Revise dimensions whose score is below `threshold`.
+--- 4. Optionally re-score to verify improvement, up to `max_revisions`.
+---
+--- ## References
+---
+--- - Zheng, L. et al. (2023). "Judging LLM-as-a-Judge with MT-Bench and
+---   Chatbot Arena". https://arxiv.org/abs/2306.05685
+--- - Rubric-based evaluation methodology from education research.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -37,7 +35,7 @@ local M = {}
 M.meta = {
     name = "critic",
     version = "0.1.0",
-    description = "Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas",
+    description = "Rubric-based per-dimension scoring with targeted revision of weak areas.",
     category = "evaluation",
 }
 

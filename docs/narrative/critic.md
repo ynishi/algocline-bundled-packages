@@ -3,19 +3,42 @@ name: critic
 version: 0.1.0
 category: evaluation
 result_shape: "shape { answer: string, avg_score: number, history: array of shape { answer: string, avg_score: number, round: number, scores: array of shape { dimension: string, feedback: string, raw: string, score: number }, weak_count: number }, initial_answer: string, revisions: number, rubric: array of shape { description: string, name: string }, scores: table, threshold: number }"
-description: "Rubric-based structured evaluation — per-dimension scoring with targeted revision of weak areas"
+description: "Rubric-based per-dimension scoring with targeted revision of weak areas."
 source: critic/init.lua
 generated: gen_docs (V0)
 ---
 
-# critic — Rubric-based structured evaluation and targeted revision
+# critic(Critic) — rubric-based structured evaluation and targeted revision
 
-> Unlike reflect (freeform self-critique), critic evaluates on predefined rubric dimensions (accuracy, logic, completeness, etc.), assigns per- dimension scores, generates targeted feedback, and revises only the weakest areas. Produces a structured quality profile.
+> Unlike `reflect` (freeform self-critique), `critic` evaluates on pre-defined rubric dimensions (accuracy, logic, completeness, ...), assigns per-dimension scores, generates targeted feedback, and revises only the weakest areas, producing a structured quality profile.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local critic = require("critic")
+return critic.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate an initial answer (or use `ctx.answer`).
+2. Evaluate each rubric dimension independently with a numeric score.
+3. Revise dimensions whose score is below `threshold`.
+4. Optionally re-score to verify improvement, up to `max_revisions`.
+
+## References {#references}
+
+- Zheng, L. et al. (2023). "Judging LLM-as-a-Judge with MT-Bench and
+  Chatbot Arena". https://arxiv.org/abs/2306.05685
+- Rubric-based evaluation methodology from education research.
 
 ## Parameters {#parameters}
 
