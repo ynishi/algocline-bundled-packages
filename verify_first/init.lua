@@ -1,28 +1,32 @@
---- verify_first — Verification-First prompting
+--- verify_first(VerifyFirst) — verification-first prompting
 ---
---- Provides a candidate answer (trivial, random, or CoT-generated), then
---- instructs the LLM to verify it before generating the real answer.
---- "Reverse reasoning" is cognitively easier than forward generation and
---- reduces logical errors by overcoming egocentric bias.
+--- Provides a candidate answer (trivial, random, or CoT-generated),
+--- then instructs the LLM to verify it before generating the real
+--- answer. Reverse reasoning is cognitively easier than forward
+--- generation and reduces logical errors by overcoming egocentric
+--- bias. Supports iterative mode (Iter-VF): a Markovian
+--- verify→extract→re-verify loop that scales test-time compute without
+--- context overflow.
 ---
---- Supports iterative mode (Iter-VF): Markovian verify→extract→re-verify
---- loop that scales test-time compute without context overflow.
+--- ## Usage
 ---
---- Based on: "Asking LLMs to Verify First is Almost Free Lunch"
----           (arXiv 2511.21734, 2025)
+--- ```lua
+--- local verify_first = require("verify_first")
+--- return verify_first.run(ctx)
+--- ```
 ---
---- Pipeline:
----   Step 1: generate   — produce an initial candidate answer (CoT or trivial)
----   Step 2: verify     — "A possible answer is X. First verify if X is correct,
----                          then think step by step to find the answer."
----   Step 3 (Iter-VF):   repeat Step 2 with extracted answer from previous round
+--- ## Algorithm
 ---
---- Usage:
----   local verify_first = require("verify_first")
----   return verify_first.run(ctx)
+--- 1. Generate — produce an initial candidate answer (CoT or trivial).
+--- 2. Verify — "a possible answer is X; first verify if X is correct,
+---    then think step by step to find the answer".
+--- 3. Iter-VF (optional) — repeat step 2 with the extracted answer
+---    from the previous round.
 ---
---- ctx.task (required): The task/question to solve
---- ctx.candidate: Pre-supplied candidate answer (default: nil → auto-generate)
+--- ## References
+---
+--- - "Asking LLMs to Verify First is Almost Free Lunch" (2025).
+---   https://arxiv.org/abs/2511.21734
 --- ctx.trivial: Use trivial candidate "1" instead of CoT (default: false)
 --- ctx.iterations: Number of Iter-VF rounds (default: 1, i.e. single VF)
 --- ctx.gen_tokens: Max tokens for generation (default: 600)

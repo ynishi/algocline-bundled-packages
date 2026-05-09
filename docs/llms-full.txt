@@ -7664,14 +7664,29 @@ Returns:
 <!-- ── triad.md ── -->
 
 
-# Triad — adversarial 3-role debate with judge arbitration
+# triad(Triad) — adversarial 3-role debate with judge arbitration
 
-> Three distinct roles: Proponent (argues for), Opponent (argues against), Judge (arbitrates). Multiple rounds of attack/defense, then final verdict.
+> Three distinct roles: Proponent (argues for), Opponent (argues against), and Judge (arbitrates). Multiple rounds of attack and defense, then a final verdict.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local triad = require("triad")
+return triad.run(ctx)
+```
+
+## References {#references}
+
+- Du, Y. et al. (2023). "Improving Factuality and Reasoning in
+  Language Models through Multiagent Debate".
+  https://arxiv.org/abs/2305.14325
 
 ## Parameters {#parameters}
 
@@ -7750,14 +7765,40 @@ Returns:
 <!-- ── usc.md ── -->
 
 
-# USC — Universal Self-Consistency
+# usc(USC) — Universal Self-Consistency for free-form generation
 
-> Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one.
+> Extends standard Self-Consistency (SC) to free-form generation tasks. Instead of majority voting on extracted answers (which requires structured answer formats), USC concatenates all candidate responses and asks the LLM to select the most consistent one. Mathematically, majority vote is a special case of USC where the consistency function is exact string match.
 
 ## Contents
 
+- [Usage](#usage)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local usc = require("usc")
+return usc.run(ctx)
+```
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+- `sc` — extracts short answers, clusters by string similarity, and
+  majority votes. Only works when answers have a canonical form
+  (numbers, options, etc.).
+- `usc` — presents all full responses to the LLM and asks it to
+  judge consistency. Works on any task: open-ended QA,
+  summarization, code generation, etc.
+
+## References {#references}
+
+- Chen, X. et al. (2024). "Universal Self-Consistency for Large
+  Language Model Generation". ICML 2024 (Google DeepMind).
+  https://arxiv.org/abs/2311.17311
+ctx.select_tokens: Max tokens for selection response (default: 500)
 
 ## Parameters {#parameters}
 
@@ -7784,14 +7825,41 @@ Returns:
 <!-- ── verify_first.md ── -->
 
 
-# verify_first — Verification-First prompting
+# verify_first(VerifyFirst) — verification-first prompting
 
-> Provides a candidate answer (trivial, random, or CoT-generated), then instructs the LLM to verify it before generating the real answer. "Reverse reasoning" is cognitively easier than forward generation and reduces logical errors by overcoming egocentric bias.
+> Provides a candidate answer (trivial, random, or CoT-generated), then instructs the LLM to verify it before generating the real answer. Reverse reasoning is cognitively easier than forward generation and reduces logical errors by overcoming egocentric bias. Supports iterative mode (Iter-VF): a Markovian verify→extract→re-verify loop that scales test-time compute without context overflow.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local verify_first = require("verify_first")
+return verify_first.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate — produce an initial candidate answer (CoT or trivial).
+2. Verify — "a possible answer is X; first verify if X is correct,
+   then think step by step to find the answer".
+3. Iter-VF (optional) — repeat step 2 with the extracted answer
+   from the previous round.
+
+## References {#references}
+
+- "Asking LLMs to Verify First is Almost Free Lunch" (2025).
+  https://arxiv.org/abs/2511.21734
+ctx.trivial: Use trivial candidate "1" instead of CoT (default: false)
+ctx.iterations: Number of Iter-VF rounds (default: 1, i.e. single VF)
+ctx.gen_tokens: Max tokens for generation (default: 600)
+ctx.verify_tokens: Max tokens for verification (default: 800)
 
 ## Parameters {#parameters}
 
