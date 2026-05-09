@@ -1,28 +1,25 @@
---- hybrid_abm — LLM-as-Parameterizer Agent-Based Model strategy
+--- hybrid_abm(HybridABM) — LLM-as-parameterizer agent-based model strategy
 ---
---- Hybrid architecture: LLM extracts simulation parameters (Phase A),
---- Pure Lua ABM runs Monte Carlo (Phase B+C), sensitivity sweep (Phase D).
+--- Hybrid architecture: an LLM extracts simulation parameters (Phase A),
+--- a pure-Lua ABM runs Monte Carlo (Phases B and C), and a sensitivity
+--- sweep (Phase D) tests robustness. The LLM is excellent at extracting
+--- domain parameters from natural-language descriptions but terrible at
+--- running simulations; ABM is the inverse. Combining them gives better
+--- results than either alone.
 ---
---- Based on: FCLAgent (arXiv:2510.12189) — "judgment = LLM, execution = rules"
---- decoupling. JASSS position paper (arXiv:2507.19364) modular hybrid recommendation.
+--- ## Usage
 ---
---- The key insight: LLM is excellent at extracting domain parameters from
---- natural language descriptions, but terrible at running simulations.
---- ABM is excellent at simulating emergent behavior from simple rules.
---- Combining them gives better results than either alone.
+--- ```lua
+--- local hybrid = require("hybrid_abm")
+--- return hybrid.run(ctx)
+--- ```
 ---
---- Usage:
----   local hybrid = require("hybrid_abm")
----   return hybrid.run(ctx)
+--- ## References
 ---
---- ctx.task (required): Description of what to simulate
---- ctx.param_prompt (required): LLM prompt template (%s = task)
---- ctx.param_schema: { {name, min, max, default}, ... }
---- ctx.sim_fn (required): function(params, seed) → result table
---- ctx.extract (required): string[] — keys to aggregate
---- ctx.classify_fn?: function(agg) → equilibrium table
---- ctx.runs?: number (default 200)
---- ctx.sweep_params?: string[] (default: from param_schema)
+--- - FCLAgent (2025). "judgment = LLM, execution = rules" decoupling.
+---   https://arxiv.org/abs/2510.12189
+--- - JASSS position paper (2025). Modular hybrid recommendation.
+---   https://arxiv.org/abs/2507.19364
 --- ctx.sweep_runs?: number (default 50, for quick eval per perturbation)
 ---
 --- Shape policy (why hybrid_abm is NOT S.instrument-decorated):
