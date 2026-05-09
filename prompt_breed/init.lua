@@ -1,48 +1,46 @@
---- prompt_breed — Self-Referential Prompt Evolution
+--- prompt_breed(PromptBreed) — self-referential prompt evolution
 ---
---- Evolves a population of task prompts (instructions) using genetic operators,
---- with a unique twist: the mutation operators themselves (mutation prompts)
---- also evolve. This double loop — task-prompt evolution + meta-mutation
---- evolution — enables the system to discover increasingly effective ways
---- to explore prompt space.
+--- Evolves a population of task prompts using genetic operators with a
+--- unique twist: the mutation operators themselves (mutation prompts)
+--- also evolve. The double loop — task-prompt evolution + meta-mutation
+--- evolution — discovers increasingly effective ways to explore prompt
+--- space.
 ---
---- Unlike optimize/ea (parameter-level evolution) or optimize/opro (history-
---- based proposal), prompt_breed operates on natural-language instructions
---- with self-referential meta-evolution: the way prompts are mutated improves
---- alongside the prompts themselves.
+--- ## Usage
 ---
---- Based on:
----   [1] Fernando et al. "PromptBreeder: Self-Referential Self-Improvement
----       via Prompt Evolution" (2023, arXiv:2309.16797)
----       GSM8K zero-shot: 83.9% (vs OPRO 80.2%)
----   [2] Guo et al. "Connecting LLMs with Evolutionary Algorithms Yields
----       Powerful Prompt Optimizers" — EvoPrompt
----       (ICLR 2024, arXiv:2309.08532)
----       BBH: +25% over human-designed prompts
----   [3] Xu et al. "PromptWizard: Task-Aware Agent-driven Prompt Optimization"
----       (ACL Findings 2025)
+--- ```lua
+--- local prompt_breed = require("prompt_breed")
+--- return prompt_breed.run(ctx)
+--- ```
 ---
---- Pipeline (population × generations × 2 LLM calls + hyper-mutations):
----   Init       — generate initial task prompts + mutation prompts
----   Loop (per generation):
----     Evaluate   — score each task prompt via evaluator
----     Select     — tournament selection of parents
----     Mutate     — apply mutation prompt to parent → child
----     Replace    — elitist replacement (child beats parent)
----     Hyper-mut  — occasionally evolve the mutation prompts themselves
----   Final: return best prompt
+--- ## Algorithm
 ---
---- Usage:
----   local prompt_breed = require("prompt_breed")
----   return prompt_breed.run(ctx)
+--- 1. Init — generate initial task prompts and mutation prompts.
+--- 2. For each generation:
+---    - Evaluate — score each task prompt via the evaluator.
+---    - Select — tournament selection of parents.
+---    - Mutate — apply mutation prompt to parent to produce a child.
+---    - Replace — elitist replacement (child beats parent).
+---    - Hyper-mutation — occasionally evolve the mutation prompts.
+--- 3. Return the best prompt.
 ---
---- ctx.task (required): Task description for prompt evaluation
---- ctx.evaluator (required): Evaluation prompt/criteria for scoring
---- ctx.population_size: Number of task prompts (default: 6)
---- ctx.generations: Evolution generations (default: 8)
---- ctx.mutation_pool: Number of mutation prompts (default: 3)
---- ctx.hyper_mutation_rate: Probability of meta-mutation (default: 0.15)
---- ctx.crossover_rate: Probability of crossover vs mutation (default: 0.3)
+--- ## Comparison with related packages
+---
+--- Unlike `optimize/ea` (parameter-level evolution) or `optimize/opro`
+--- (history-based proposal), `prompt_breed` operates on natural-language
+--- instructions with self-referential meta-evolution: the way prompts
+--- are mutated improves alongside the prompts themselves.
+---
+--- ## References
+---
+--- - Fernando, C. et al. (2023). "PromptBreeder: Self-Referential
+---   Self-Improvement via Prompt Evolution".
+---   https://arxiv.org/abs/2309.16797
+--- - Guo, Q. et al. (2024). "Connecting LLMs with Evolutionary
+---   Algorithms Yields Powerful Prompt Optimizers" (EvoPrompt). ICLR
+---   2024. https://arxiv.org/abs/2309.08532
+--- - Xu, ... et al. (2025). "PromptWizard: Task-Aware Agent-driven
+---   Prompt Optimization". ACL Findings 2025.
 
 local S = require("alc_shapes")
 local T = S.T

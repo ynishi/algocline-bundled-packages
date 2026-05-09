@@ -8,14 +8,54 @@ source: prompt_breed/init.lua
 generated: gen_docs (V0)
 ---
 
-# prompt_breed — Self-Referential Prompt Evolution
+# prompt_breed(PromptBreed) — self-referential prompt evolution
 
-> Evolves a population of task prompts (instructions) using genetic operators, with a unique twist: the mutation operators themselves (mutation prompts) also evolve. This double loop — task-prompt evolution + meta-mutation evolution — enables the system to discover increasingly effective ways to explore prompt space.
+> Evolves a population of task prompts using genetic operators with a unique twist: the mutation operators themselves (mutation prompts) also evolve. The double loop — task-prompt evolution + meta-mutation evolution — discovers increasingly effective ways to explore prompt space.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local prompt_breed = require("prompt_breed")
+return prompt_breed.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Init — generate initial task prompts and mutation prompts.
+2. For each generation:
+   - Evaluate — score each task prompt via the evaluator.
+   - Select — tournament selection of parents.
+   - Mutate — apply mutation prompt to parent to produce a child.
+   - Replace — elitist replacement (child beats parent).
+   - Hyper-mutation — occasionally evolve the mutation prompts.
+3. Return the best prompt.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Unlike `optimize/ea` (parameter-level evolution) or `optimize/opro`
+(history-based proposal), `prompt_breed` operates on natural-language
+instructions with self-referential meta-evolution: the way prompts
+are mutated improves alongside the prompts themselves.
+
+## References {#references}
+
+- Fernando, C. et al. (2023). "PromptBreeder: Self-Referential
+  Self-Improvement via Prompt Evolution".
+  https://arxiv.org/abs/2309.16797
+- Guo, Q. et al. (2024). "Connecting LLMs with Evolutionary
+  Algorithms Yields Powerful Prompt Optimizers" (EvoPrompt). ICLR
+  2024. https://arxiv.org/abs/2309.08532
+- Xu, ... et al. (2025). "PromptWizard: Task-Aware Agent-driven
+  Prompt Optimization". ACL Findings 2025.
 
 ## Parameters {#parameters}
 
