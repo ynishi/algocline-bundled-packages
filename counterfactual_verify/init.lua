@@ -1,30 +1,35 @@
---- counterfactual_verify — Causal faithfulness verification via counterfactual simulation
+--- counterfactual_verify(CounterfactualVerify) — causal faithfulness via counterfactual simulation
 ---
 --- Tests whether a reasoning chain is genuinely faithful to its inputs by
---- checking: "If the input changed, would the conclusion change accordingly?"
---- Unlike cove (factual correctness) or verify_first (reverse verification),
---- this detects pattern-matching and memorization by testing causal dependence
---- between premises and conclusions.
+--- asking: if the input changed, would the conclusion change accordingly?
+--- Unlike `cove` (factual correctness) or `verify_first` (reverse
+--- verification), this entry detects pattern-matching and memorization by
+--- testing causal dependence between premises and conclusions.
 ---
---- Based on: Hase et al., "Counterfactual Simulation Training for
---- Chain-of-Thought Faithfulness" (arXiv:2602.20710, 2026)
+--- ## Usage
 ---
---- Pipeline (2 + 3*N LLM calls, N = counterfactuals):
----   Step 1: Solve         — generate CoT + answer for original problem
----   Step 2: Counterfactual — generate N variants by changing one condition each
----   Step 3: Predict       — from original CoT, predict answer under each variant
----   Step 4: Solve CF      — solve each variant independently (parallel)
----   Step 5: Judge         — compare predicted vs actual for each variant
----   Step 6: Verdict       — if unfaithful, re-solve with explicit grounding
+--- ```lua
+--- local cf = require("counterfactual_verify")
+--- return cf.run(ctx)
+--- ```
 ---
---- Usage:
----   local cf = require("counterfactual_verify")
----   return cf.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.n_counterfactuals: Number of counterfactual variants (default: 2)
---- ctx.gen_tokens: Max tokens for solving (default: 600)
---- ctx.cf_tokens: Max tokens for counterfactual generation (default: 400)
+--- For `N = n_counterfactuals` the entry uses 2 + 3*N LLM calls:
+---
+--- 1. Solve — generate the chain-of-thought and answer for the original
+---    problem.
+--- 2. Counterfactual — generate `N` variants by changing one condition.
+--- 3. Predict — from the original CoT, predict the answer under each
+---    variant.
+--- 4. Solve CF — solve each variant independently in parallel.
+--- 5. Judge — compare predicted vs actual answers per variant.
+--- 6. Verdict — if unfaithful, re-solve with explicit grounding.
+---
+--- ## References
+---
+--- - Hase, P. et al. (2026). "Counterfactual Simulation Training for
+---   Chain-of-Thought Faithfulness". https://arxiv.org/abs/2602.20710
 
 local S = require("alc_shapes")
 local T = S.T
@@ -35,9 +40,7 @@ local M = {}
 M.meta = {
     name = "counterfactual_verify",
     version = "0.1.0",
-    description = "Counterfactual faithfulness verification — tests whether "
-        .. "reasoning causally depends on inputs by simulating condition changes. "
-        .. "Detects pattern-matching and unfaithful CoT.",
+    description = "Counterfactual simulation to verify causal faithfulness of a reasoning chain.",
     category = "validation",
 }
 
