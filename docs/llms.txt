@@ -33,7 +33,7 @@
 
 ## correction
 
-- [blind_spot](narrative/blind_spot.md): Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction
+- [blind_spot](narrative/blind_spot.md): Bypass self-correction blind spot by re-presenting output as external source.
 
 ## debugging
 
@@ -110,7 +110,7 @@
 
 - [ab_mcts](narrative/ab_mcts.md): Adaptive branching MCTS with Thompson Sampling — wider/deeper per node
 - [analogical](narrative/analogical.md): Analogical prompting — self-generate analogies, extract patterns, apply to original
-- [bot](narrative/bot.md): Buffer of Thoughts — identify problem type, apply thought template, verify
+- [bot](narrative/bot.md): Identify problem type, apply thought template, verify (Buffer of Thoughts).
 - [coa](narrative/coa.md): Chain-of-Abstraction — reason with abstract placeholders, then ground via parallel knowledge resolution. Decouples reasoning structure from concrete facts.
 - [contrastive](narrative/contrastive.md): Contrastive CoT — generate correct and incorrect reasoning, learn from contrast
 - [cot](narrative/cot.md): Iterative chain-of-thought — cumulative reasoning steps, then synthesis
@@ -174,7 +174,7 @@
 ## simulation
 
 - [abm](narrative/abm.md): Agent-based modeling framework with Monte Carlo and sensitivity sweep.
-- [boids_abm](narrative/boids_abm.md): Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization. Based on Reynolds (1987).
+- [boids_abm](narrative/boids_abm.md): Reynolds boids flocking simulation (separation, alignment, cohesion).
 - [epidemic_abm](narrative/epidemic_abm.md): SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0. Emergent epidemic curves, herd immunity thresholds, and stochastic extinction.
 - [evogame_abm](narrative/evogame_abm.md): Evolutionary Game Theory ABM — iterated games with selection and mutation. Prisoner's Dilemma, Hawk-Dove, or custom payoff matrices. Based on Axelrod (1984).
 - [hybrid_abm](narrative/hybrid_abm.md): LLM-as-Parameterizer ABM — LLM extracts sim parameters, Pure Lua ABM runs Monte Carlo simulation + sensitivity sweep. Based on FCLAgent (arXiv:2510.12189) hybrid architecture.

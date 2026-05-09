@@ -8,13 +8,35 @@ source: calibrate/init.lua
 generated: gen_docs (V0)
 ---
 
-# Calibrate — confidence-gated adaptive reasoning
+# calibrate(Calibrate) — confidence-gated adaptive reasoning
 
-> Asks LLM to solve a task and self-assess confidence. If confidence is below threshold, escalates to a heavier strategy (ensemble, panel, or custom fallback).
+> Asks the LLM to solve a task and self-assess its confidence. When confidence is below the threshold the entry escalates to a heavier strategy (ensemble, panel, or a custom fallback).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local calibrate = require("calibrate")
+return calibrate.run(ctx)      -- full gated escalation
+return calibrate.assess(ctx)   -- confidence assessment only (1 call)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate an initial attempt and a self-reported confidence score.
+2. If confidence is at or above `threshold`, return the initial answer.
+3. Otherwise escalate via the configured `fallback` (ensemble, panel,
+   or retry) with `fallback_opts`.
+
+## References {#references}
+
+- "CISC: Confidence-Informed Self-Consistency". ACL Findings 2025.
 
 ## Result {#result}
 

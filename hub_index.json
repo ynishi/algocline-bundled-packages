@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T02:51:53Z",
+  "updated_at": "2026-05-09T02:55:38Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -113,9 +113,9 @@
     {
       "name": "blind_spot",
       "version": "0.1.0",
-      "description": "Self-Correction Blind Spot bypass — re-present own output as external source to trigger genuine error correction",
+      "description": "Bypass self-correction blind spot by re-presenting output as external source.",
       "category": "correction",
-      "docstring": "blind_spot — Self-Correction Blind Spot bypass\n\nLLMs cannot correct errors in their own outputs but can successfully\ncorrect identical errors when presented as coming from external sources.\nThis package exploits that asymmetry: generate an answer, then re-present\nit as a \"colleague's draft\" for the same LLM to review and correct.\n\nAdditionally applies the \"Wait\" trigger: appending a minimal pause prompt\nactivates dormant correction capabilities (89.3% blind spot reduction\nobserved across 14 open-source models).\n\nBased on: \"Self-Correction Bench: Uncovering and Addressing the\nSelf-Correction Blind Spot in Large Language Models\"\n(arXiv 2507.02778, 2025)\n\nPipeline:\nStep 1: generate   — produce initial answer normally\nStep 2: externalize — re-present the answer as from an external source\nStep 3: correct    — ask to find and fix errors in the \"external\" answer\nStep 4: wait       — optional \"Wait\" reflection trigger for final check\n\nUsage:\nlocal blind_spot = require(\"blind_spot\")\nreturn blind_spot.run(ctx)\n\nctx.task (required): The task/question to solve\nctx.rounds: Number of externalize→correct rounds (default: 1)\nctx.wait: Enable \"Wait\" reflection trigger (default: true)\nctx.gen_tokens: Max tokens for generation (default: 600)\nctx.correct_tokens: Max tokens for correction (default: 800)",
+      "docstring": "blind_spot(BlindSpot) — bypass the self-correction blind spot via externalization\n\nLLMs cannot correct errors in their own outputs but successfully correct\nidentical errors when presented as coming from external sources. This\npackage exploits the asymmetry by generating an answer and re-presenting\nit as a \"colleague's draft\" for the same LLM to review and correct.\n\n## Usage\n\n```lua\nlocal blind_spot = require(\"blind_spot\")\nreturn blind_spot.run(ctx)\n```\n\n## Algorithm\n\n1. Generate an initial answer normally.\n2. Re-present the answer as if it came from an external source.\n3. Ask the model to find and fix errors in the \"external\" answer.\n4. Optionally append a \"Wait\" reflection trigger for a final check.\n\n## Theoretical foundations\n\nThe \"Wait\" trigger activates dormant correction capabilities; the source\npaper reports an 89.3% blind-spot reduction across 14 open-source models.\n\n## References\n\n- \"Self-Correction Bench: Uncovering and Addressing the Self-Correction\nBlind Spot in Large Language Models\". arXiv:2507.02778, 2025.\nhttps://arxiv.org/abs/2507.02778",
       "source": {
         "type": "unknown"
       },
@@ -125,9 +125,9 @@
     {
       "name": "boids_abm",
       "version": "0.1.0",
-      "description": "Boids flocking model — separation, alignment, cohesion produce emergent flocking behavior. Tunable weights for Hybrid LLM parameter optimization. Based on Reynolds (1987).",
+      "description": "Reynolds boids flocking simulation (separation, alignment, cohesion).",
       "category": "simulation",
-      "docstring": "boids_abm — Boids Flocking Model\n\nN agents (boids) in 2D continuous space follow three simple rules:\n1. Separation: steer away from nearby boids to avoid crowding\n2. Alignment: steer towards the average heading of nearby boids\n3. Cohesion: steer towards the average position of nearby boids\n\nEmergent phenomena: flocking, lane formation, obstacle avoidance,\npredator evasion. The balance of three weights determines flock\nstructure (tight swarm, loose stream, scattered individuals).\n\nBased on:\nReynolds, \"Flocks, Herds, and Schools: A Distributed Behavioral\nModel\", SIGGRAPH 1987\n\nUsage:\nlocal boids = require(\"boids_abm\")\nreturn boids.run(ctx)\n\nctx.task?: string Description\nctx.n_boids?: number (default 50)\nctx.steps?: number (default 100)\nctx.separation_weight?: number (default 1.5)\nctx.alignment_weight?: number (default 1.0)\nctx.cohesion_weight?: number (default 1.0)\nctx.perception_radius?: number (default 50)\nctx.max_speed?: number (default 4)\nctx.max_force?: number Steering force limit (default 0.3)\nctx.world_size?: number Side length of square world (default 300)\nctx.runs?: number MC runs (default 100)",
+      "docstring": "boids_abm(BoidsABM) — Reynolds boids flocking simulation\n\nN agents (boids) in 2D continuous space follow Reynolds' three rules to\nproduce emergent flocking, lane formation, obstacle avoidance, and\npredator evasion. The balance of the three weights determines flock\nstructure (tight swarm, loose stream, or scattered individuals).\n\n## Usage\n\n```lua\nlocal boids = require(\"boids_abm\")\nreturn boids.run(ctx)\n```\n\n## Algorithm\n\n1. Separation — steer away from nearby boids to avoid crowding.\n2. Alignment — steer towards the average heading of nearby boids.\n3. Cohesion — steer towards the average position of nearby boids.\n\n## References\n\n- Reynolds, C. W. (1987). \"Flocks, Herds, and Schools: A Distributed\nBehavioral Model\". SIGGRAPH 1987.",
       "source": {
         "type": "unknown"
       },
@@ -137,9 +137,9 @@
     {
       "name": "bot",
       "version": "0.1.0",
-      "description": "Buffer of Thoughts — identify problem type, apply thought template, verify",
+      "description": "Identify problem type, apply thought template, verify (Buffer of Thoughts).",
       "category": "reasoning",
-      "docstring": "bot — Buffer of Thoughts: template-based meta-reasoning\n\nIdentifies the problem type, retrieves an appropriate thought template\n(structured reasoning pattern), instantiates it for the specific problem,\nthen verifies the result. Efficient because it leverages pre-defined\nreasoning patterns rather than discovering them from scratch each time.\n\nBased on: Yang et al., \"Buffer of Thoughts: Thought-Augmented Reasoning\nwith Large Language Models\" (2024, arXiv:2406.04271)\n\nPipeline (3-4 LLM calls):\nStep 1: Distill  — identify problem type and retrieve thought template\nStep 2: Instantiate — apply template to the specific problem\nStep 3: Verify   — check the instantiated reasoning\nStep 4: Answer   — produce final answer (merged with Step 3 if clean)\n\nUsage:\nlocal bot = require(\"bot\")\nreturn bot.run(ctx)\n\nctx.task (required): The problem to solve\nctx.templates: Custom template library (optional; uses built-in if absent)\nctx.gen_tokens: Max tokens per step (default: 500)",
+      "docstring": "bot(BoT) — Buffer of Thoughts template-based meta-reasoning\n\nIdentifies the problem type, retrieves an appropriate thought template\n(a structured reasoning pattern), instantiates it for the specific\nproblem, and verifies the result. Efficient because it leverages\npre-defined patterns rather than discovering them from scratch.\n\n## Usage\n\n```lua\nlocal bot = require(\"bot\")\nreturn bot.run(ctx)\n```\n\n## Algorithm\n\nThe pipeline uses 3-4 LLM calls:\n\n1. Distill — identify the problem type and retrieve a thought template.\n2. Instantiate — apply the template to the specific problem.\n3. Verify — check the instantiated reasoning.\n4. Answer — produce the final answer (merged with step 3 when clean).\n\n## References\n\n- Yang, L. et al. (2024). \"Buffer of Thoughts: Thought-Augmented\nReasoning with Large Language Models\". https://arxiv.org/abs/2406.04271",
       "source": {
         "type": "unknown"
       },
@@ -151,7 +151,7 @@
       "version": "0.2.0",
       "description": "Confidence-gated reasoning — fast path when confident, escalation when not",
       "category": "meta",
-      "docstring": "Calibrate — confidence-gated adaptive reasoning\n\nAsks LLM to solve a task and self-assess confidence.\nIf confidence is below threshold, escalates to a heavier\nstrategy (ensemble, panel, or custom fallback).\n\nBased on: CISC — Confidence-Informed Self-Consistency\n(ACL Findings 2025)\n\nUsage:\nlocal calibrate = require(\"calibrate\")\nreturn calibrate.run(ctx)        -- full gated escalation\nreturn calibrate.assess(ctx)     -- confidence assessment only (1 call)\n\nctx.task (required): The task to solve\nctx.threshold: Confidence threshold 0.0-1.0 (default: 0.7) [run only]\nctx.fallback: Strategy on low confidence — \"ensemble\", \"panel\", \"retry\" (default: \"ensemble\") [run only]\nctx.fallback_opts: Options passed to fallback strategy (default: {}) [run only]\nctx.gen_tokens: Max tokens for initial attempt (default: 400)",
+      "docstring": "calibrate(Calibrate) — confidence-gated adaptive reasoning\n\nAsks the LLM to solve a task and self-assess its confidence. When\nconfidence is below the threshold the entry escalates to a heavier\nstrategy (ensemble, panel, or a custom fallback).\n\n## Usage\n\n```lua\nlocal calibrate = require(\"calibrate\")\nreturn calibrate.run(ctx)      -- full gated escalation\nreturn calibrate.assess(ctx)   -- confidence assessment only (1 call)\n```\n\n## Algorithm\n\n1. Generate an initial attempt and a self-reported confidence score.\n2. If confidence is at or above `threshold`, return the initial answer.\n3. Otherwise escalate via the configured `fallback` (ensemble, panel,\nor retry) with `fallback_opts`.\n\n## References\n\n- \"CISC: Confidence-Informed Self-Consistency\". ACL Findings 2025.",
       "source": {
         "type": "unknown"
       },

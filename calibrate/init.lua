@@ -1,22 +1,27 @@
---- Calibrate — confidence-gated adaptive reasoning
+--- calibrate(Calibrate) — confidence-gated adaptive reasoning
 ---
---- Asks LLM to solve a task and self-assess confidence.
---- If confidence is below threshold, escalates to a heavier
---- strategy (ensemble, panel, or custom fallback).
+--- Asks the LLM to solve a task and self-assess its confidence. When
+--- confidence is below the threshold the entry escalates to a heavier
+--- strategy (ensemble, panel, or a custom fallback).
 ---
---- Based on: CISC — Confidence-Informed Self-Consistency
---- (ACL Findings 2025)
+--- ## Usage
 ---
---- Usage:
----   local calibrate = require("calibrate")
----   return calibrate.run(ctx)        -- full gated escalation
----   return calibrate.assess(ctx)     -- confidence assessment only (1 call)
+--- ```lua
+--- local calibrate = require("calibrate")
+--- return calibrate.run(ctx)      -- full gated escalation
+--- return calibrate.assess(ctx)   -- confidence assessment only (1 call)
+--- ```
 ---
---- ctx.task (required): The task to solve
---- ctx.threshold: Confidence threshold 0.0-1.0 (default: 0.7) [run only]
---- ctx.fallback: Strategy on low confidence — "ensemble", "panel", "retry" (default: "ensemble") [run only]
---- ctx.fallback_opts: Options passed to fallback strategy (default: {}) [run only]
---- ctx.gen_tokens: Max tokens for initial attempt (default: 400)
+--- ## Algorithm
+---
+--- 1. Generate an initial attempt and a self-reported confidence score.
+--- 2. If confidence is at or above `threshold`, return the initial answer.
+--- 3. Otherwise escalate via the configured `fallback` (ensemble, panel,
+---    or retry) with `fallback_opts`.
+---
+--- ## References
+---
+--- - "CISC: Confidence-Informed Self-Consistency". ACL Findings 2025.
 
 local M = {}
 

@@ -575,14 +575,43 @@ Returns:
 <!-- ── blind_spot.md ── -->
 
 
-# blind_spot — Self-Correction Blind Spot bypass
+# blind_spot(BlindSpot) — bypass the self-correction blind spot via externalization
 
-> LLMs cannot correct errors in their own outputs but can successfully correct identical errors when presented as coming from external sources. This package exploits that asymmetry: generate an answer, then re-present it as a "colleague's draft" for the same LLM to review and correct.
+> LLMs cannot correct errors in their own outputs but successfully correct identical errors when presented as coming from external sources. This package exploits the asymmetry by generating an answer and re-presenting it as a "colleague's draft" for the same LLM to review and correct.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local blind_spot = require("blind_spot")
+return blind_spot.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate an initial answer normally.
+2. Re-present the answer as if it came from an external source.
+3. Ask the model to find and fix errors in the "external" answer.
+4. Optionally append a "Wait" reflection trigger for a final check.
+
+## Theoretical foundations {#theoretical-foundations}
+
+The "Wait" trigger activates dormant correction capabilities; the source
+paper reports an 89.3% blind-spot reduction across 14 open-source models.
+
+## References {#references}
+
+- "Self-Correction Bench: Uncovering and Addressing the Self-Correction
+  Blind Spot in Large Language Models". arXiv:2507.02778, 2025.
+  https://arxiv.org/abs/2507.02778
 
 ## Parameters {#parameters}
 
@@ -612,14 +641,35 @@ Returns:
 <!-- ── boids_abm.md ── -->
 
 
-# boids_abm — Boids Flocking Model
+# boids_abm(BoidsABM) — Reynolds boids flocking simulation
 
-> N agents (boids) in 2D continuous space follow three simple rules:   1. Separation: steer away from nearby boids to avoid crowding   2. Alignment: steer towards the average heading of nearby boids   3. Cohesion: steer towards the average position of nearby boids
+> N agents (boids) in 2D continuous space follow Reynolds' three rules to produce emergent flocking, lane formation, obstacle avoidance, and predator evasion. The balance of the three weights determines flock structure (tight swarm, loose stream, or scattered individuals).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local boids = require("boids_abm")
+return boids.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Separation — steer away from nearby boids to avoid crowding.
+2. Alignment — steer towards the average heading of nearby boids.
+3. Cohesion — steer towards the average position of nearby boids.
+
+## References {#references}
+
+- Reynolds, C. W. (1987). "Flocks, Herds, and Schools: A Distributed
+  Behavioral Model". SIGGRAPH 1987.
 
 ## Parameters {#parameters}
 
@@ -652,14 +702,38 @@ Returns:
 <!-- ── bot.md ── -->
 
 
-# bot — Buffer of Thoughts: template-based meta-reasoning
+# bot(BoT) — Buffer of Thoughts template-based meta-reasoning
 
-> Identifies the problem type, retrieves an appropriate thought template (structured reasoning pattern), instantiates it for the specific problem, then verifies the result. Efficient because it leverages pre-defined reasoning patterns rather than discovering them from scratch each time.
+> Identifies the problem type, retrieves an appropriate thought template (a structured reasoning pattern), instantiates it for the specific problem, and verifies the result. Efficient because it leverages pre-defined patterns rather than discovering them from scratch.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local bot = require("bot")
+return bot.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 3-4 LLM calls:
+
+1. Distill — identify the problem type and retrieve a thought template.
+2. Instantiate — apply the template to the specific problem.
+3. Verify — check the instantiated reasoning.
+4. Answer — produce the final answer (merged with step 3 when clean).
+
+## References {#references}
+
+- Yang, L. et al. (2024). "Buffer of Thoughts: Thought-Augmented
+  Reasoning with Large Language Models". https://arxiv.org/abs/2406.04271
 
 ## Parameters {#parameters}
 
@@ -688,13 +762,35 @@ Returns:
 <!-- ── calibrate.md ── -->
 
 
-# Calibrate — confidence-gated adaptive reasoning
+# calibrate(Calibrate) — confidence-gated adaptive reasoning
 
-> Asks LLM to solve a task and self-assess confidence. If confidence is below threshold, escalates to a heavier strategy (ensemble, panel, or custom fallback).
+> Asks the LLM to solve a task and self-assess its confidence. When confidence is below the threshold the entry escalates to a heavier strategy (ensemble, panel, or a custom fallback).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local calibrate = require("calibrate")
+return calibrate.run(ctx)      -- full gated escalation
+return calibrate.assess(ctx)   -- confidence assessment only (1 call)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate an initial attempt and a self-reported confidence score.
+2. If confidence is at or above `threshold`, return the initial answer.
+3. Otherwise escalate via the configured `fallback` (ensemble, panel,
+   or retry) with `fallback_opts`.
+
+## References {#references}
+
+- "CISC: Confidence-Informed Self-Consistency". ACL Findings 2025.
 
 ## Result {#result}
 
