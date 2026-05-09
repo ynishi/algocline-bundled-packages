@@ -1,148 +1,109 @@
---- slm_mux — Pure Computation pkg for orchestrating Small Language
---- Models via complementarity-driven K-subset selection.
+--- slm_mux(SLMMux) — complementarity-driven K-subset selection over SLM pool
 ---
---- Based on:
----   Wang, Wan, Kang, Chen, Xie, Krishna, Reddi, Du
----   "SLM-MUX: Orchestrating Small Language Models for Reasoning"
----   (arXiv:2510.05077, 2025-10-06; ICLR 2026 Poster)
+--- Pure-computation package for orchestrating Small Language Models via
+--- complementarity-driven K-subset selection. Implements paper §3.1
+--- Algorithm 1 (inference-time confidence selection) and §3.2 objective
+--- `𝒪(S) = UnionAcc(S) − λ · Contradiction(S)` with exhaustive K-subset
+--- search.
 ---
---- Implements paper §3.1 Algorithm 1 (inference-time confidence
---- selection) and §3.2 𝒪(S) = UnionAcc(S) − λ · Contradiction(S) with
---- exhaustive K-subset search.
+--- ## Usage
 ---
---- Core formulas (paper §3.1, §3.2):
+--- ```lua
+--- local mux = require("slm_mux")
 ---
----   Per-model confidence (Algorithm 1, Lines 6-7):
----     f_i(y) = (1/k) · Σ_{j=1}^{k} 𝟙(y_i^(j) = y)
----     y_i*   = argmax_y f_i(y)
----     s_i    = f_i(y_i*)
+--- -- One per SLM in the pool:
+--- local profiles = {
+---   { samples = { {"A","A","A"}, {"B","C","B"}, ... },
+---     correct = { "A", "B", ... } },
+---   { samples = { ... }, correct = { ... } },
+---   ...
+--- }
 ---
----   Inference-time selection (Algorithm 1, Lines 9-13):
----     S_max = max_{i ∈ S} s_i
----     I*    = { i ∈ S : s_i = S_max }
----     return y_{i*}*  where i* = (|I*|=1 ? unique : argmax_{i ∈ I*} a_i)
+--- local r = mux.run(profiles, 2)            -- best 2-subset by 𝒪(S)
+--- local c = mux.confidence({"A","A","B"})   -- → { y_star="A", s=2/3 }
+--- ```
 ---
----   Subset objective (§3.2):
----     UnionAcc(S)      = (1/|𝒟|) · Σ_x 𝟙{ ∃ m ∈ S : m(x) is correct }
----     Contradiction(S) = (1/|𝒟|) · Σ_x 𝟙{ ∃ m_1 ∈ S consistently wrong on x
----                                          ∧ ∃ m_2 ∈ S correct on x }
----     𝒪(S)            = UnionAcc(S) − λ · Contradiction(S)
+--- ## Theoretical foundations
 ---
----   K-subset selection (§3.2):
----     argmax_{S ⊆ pool, |S|=K} 𝒪(S)  via exhaustive enumeration.
+--- Per-model confidence (Algorithm 1):
 ---
----   Inference-time confidence concentration (out-of-paper reference;
----   not stated in arXiv:2510.05077, derived from standard Hoeffding
----   union bound on Bernoulli sample-mean concentration of s_i):
----     Pr( î = i* ) ≥ 1 − 2(K−1) · exp( −N · γ² / 2 )
----     where N = sample count per model used to estimate s_i,
----           K = subset size,
----           p_i = population argmax frequency of model i
----                 (s_i is its sample-based estimate),
----           γ = p_{i*} − max_{j ≠ i*} p_j > 0  (true confidence gap).
----     Sample-size guidance reference only — the paper itself does not
----     derive a concentration bound on Algorithm 1's selection event.
+--- ```math
+--- f_i(y) = (1/k) · Σ_{j=1}^{k} 𝟙(y_i^(j) = y)
+--- y_i*   = argmax_y f_i(y)
+--- s_i    = f_i(y_i*)
+--- ```
 ---
---- ═══ PAPER FIDELITY & INJECTION POINTS ═══════════════════════════════
---- Paper-faithful defaults:
----   * λ = 1.0                        (paper §4.3)
----   * search_method = "exhaustive"   (paper §3.2 explicit)
----   * consistency_threshold = 0.0    (= "y_star is wrong only" Contradiction)
----   * s_tie_break = "validation_accuracy"  (paper §3.1 Algorithm 1)
+--- Inference-time selection (Algorithm 1):
 ---
---- REQUIRED injection points:
----   * profiles  — REQUIRED. Array of N SLM profiles, each shaped
----                 { samples = string[][M][k], correct = string[M],
----                   validation_accuracy? = number ∈ [0,1] }.
----                 Caller pre-computes the calibration tensor (paper §4.3
----                 uses 500 questions). pkg never calls alc.llm.
----   * k         — REQUIRED. Subset size 1 ≤ k ≤ N for select_subset/run.
+--- ```math
+--- S_max = max_{i ∈ S} s_i
+--- I*    = { i ∈ S : s_i = S_max }
+--- return y_{i*}*  where i* = (|I*|=1 ? unique : argmax_{i ∈ I*} a_i)
+--- ```
 ---
---- OPTIONAL paper-faithful injection points:
----   * lambda                — Contradiction weight (default 1.0, §4.3).
----   * tie_break_yi          — argmax_y f_i(y) tie-break:
----                             "lexicographic" (default) | "first_in_samples"
----                             | "uniform_random". Paper §3.1 does not
----                             numerically fix this; defaults remain
----                             paper-faithful.
----   * subset_tie_break      — 𝒪(S) tie across subsets:
----                             "first_found" (default) | "smaller_K"
----                             | "lexicographic_on_indices". Paper §3.2
----                             does not specify.
----                             NOTE: select_subset enumerates fixed K
----                             only, so "smaller_K" is a no-op in the
----                             current API; preserved in the enum for
----                             consistency with future variable-K APIs.
----   * s_tie_break           — s_i tie at inference: "validation_accuracy"
----                             (default, paper-faithful) is the only safe
----                             value; any other choice breaks Algorithm 1.
+--- Subset objective (§3.2):
 ---
---- OPTIONAL non-paper-faithful injection points (caller must accept the
----                                                  loss of paper guarantees):
----   * search_method = "greedy_forward" | "greedy_backward"
----                       — Forward / backward greedy K-subset search.
----                         **NOT paper-faithful**: §3.2 explicitly uses
----                         exhaustive search. Loses globally-optimal
----                         guarantee on 𝒪(S). Practical fallback when
----                         C(N, K) becomes prohibitive (caller's call).
----                         Per-step 𝒪 ties are resolved via the same
----                         `subset_tie_break` mode as exhaustive search,
----                         under eps-tolerant comparison.
----   * consistency_threshold > 0.0
----                       — Treat m as "consistently wrong" only when its
----                         most-common-wrong answer dominates with
----                         frequency s_i ≥ τ.
----                         **NOT paper-faithful**: §3.2's formal
----                         Contradiction does not use a frequency
----                         threshold. Provided for sensitivity analysis.
----   * partial_coverage  — Behaviour when a profile is missing entries on
----                         some calibration questions. Default "error"
----                         (fail-fast) is paper-faithful (paper assumes
----                         full coverage). "skip_missing" /
----                         "treat_as_wrong" are NOT paper-faithful research
----                         knobs.
----                         CAVEAT (skip_missing only): UnionAcc / Contradiction
----                         are normalised by `effective_M` (= number of
----                         calibration questions with at least one observed
----                         model in the subset), which can differ across
----                         subsets when different profiles cover different
----                         questions. 𝒪(S₁) vs 𝒪(S₂) comparison is therefore
----                         only an approximation under this mode — the
----                         paper §3.2 |𝒟| is fixed and shared across S.
----                         "treat_as_wrong" keeps |𝒟| fixed (missing →
----                         wrong) and preserves cross-subset comparability.
+--- ```math
+--- UnionAcc(S)      = (1/|𝒟|) · Σ_x 𝟙{ ∃ m ∈ S : m(x) is correct }
+--- Contradiction(S) = (1/|𝒟|) · Σ_x 𝟙{ ∃ m_1 ∈ S consistently wrong
+---                                       ∧ ∃ m_2 ∈ S correct on x }
+--- 𝒪(S)            = UnionAcc(S) − λ · Contradiction(S)
+--- ```
 ---
---- NOT IN v1 (documented shortfalls):
----   * Online inference orchestration (the test-time inference loop
----     that wires Algorithm 1 to a real LLM). slm_mux exposes
----     subset selection and per-model confidence as pure primitives;
----     callers drive test-time inference with sc / panel / smc_sample /
----     particle_infer, etc.
----   * Calibration data resampling / cross-validation. Caller-side.
----   * Auto-tuning of λ. Caller chooses λ per their dataset / use case.
---- ═══════════════════════════════════════════════════════════════════════
+--- K-subset selection: `argmax_{S ⊆ pool, |S|=K} 𝒪(S)` via exhaustive
+--- enumeration.
 ---
---- Usage:
+--- Inference-time confidence concentration (out-of-paper reference,
+--- derived from a Hoeffding union bound on Bernoulli sample-mean
+--- concentration of `s_i`):
 ---
----   local mux = require("slm_mux")
+--- ```math
+--- Pr( î = i* ) ≥ 1 − 2(K−1) · exp( −N · γ² / 2 )
+--- ```
 ---
----   -- One per SLM in the pool:
----   local profiles = {
----     { samples = { {"A","A","A"}, {"B","C","B"}, ... },
----       correct = { "A", "B", ... } },
----     { samples = { ... }, correct = { ... } },
----     ...
----   }
+--- where `N` is sample count per model, `K` is subset size, and
+--- `γ = p_{i*} − max_{j ≠ i*} p_j > 0` is the true confidence gap.
 ---
----   local r = mux.run(profiles, 2)        -- best 2-subset by 𝒪(S)
----   -- r.selected_indices = { 1, 3 }       (e.g.)
----   -- r.objective        = 0.62
----   -- r.union_acc / r.contradiction / r.search_log / ...
+--- ## Injection points
 ---
----   -- Per-model primitive:
----   local c = mux.confidence({"A","A","B"})   -- → { y_star="A", s=2/3 }
+--- Paper-faithful defaults: `λ = 1.0` (§4.3), `search_method =
+--- "exhaustive"` (§3.2), `consistency_threshold = 0.0`,
+--- `s_tie_break = "validation_accuracy"`.
 ---
---- Category: selection.
+--- REQUIRED:
+---
+--- - `profiles` — array of N SLM profiles
+---   `{ samples, correct, validation_accuracy? }`. Caller pre-computes
+---   the calibration tensor (paper §4.3 uses 500 questions); pkg never
+---   calls `alc.llm`.
+--- - `k` — subset size `1 ≤ k ≤ N` for `select_subset` / `run`.
+---
+--- OPTIONAL paper-faithful: `lambda`, `tie_break_yi`,
+--- `subset_tie_break`, `s_tie_break` (paper does not numerically fix
+--- the tie-break choices; defaults remain paper-faithful).
+---
+--- OPTIONAL non-paper-faithful (loss of paper guarantees):
+---
+--- - `search_method = "greedy_forward" | "greedy_backward"` — practical
+---   fallback when `C(N, K)` is prohibitive; loses global optimality.
+--- - `consistency_threshold > 0.0` — sensitivity analysis only.
+--- - `partial_coverage` — `error` (default, fail-fast, paper-faithful)
+---   vs `skip_missing` / `treat_as_wrong` (not paper-faithful research
+---   knobs). `skip_missing` normalises by `effective_M`, breaking
+---   exact cross-subset comparability.
+---
+--- ## Caveats
+---
+--- Out of scope for v1: online inference orchestration (callers wire
+--- Algorithm 1 via `sc` / `panel` / `smc_sample` / `particle_infer`),
+--- calibration data resampling, and auto-tuning of `λ`.
+---
+--- ## References
+---
+--- - Wang, ..., Wan, ..., Kang, ..., Chen, ..., Xie, ..., Krishna, ...,
+---   Reddi, ..., Du, ... (2025). "SLM-MUX: Orchestrating Small Language
+---   Models for Reasoning". ICLR 2026 Poster.
+---   https://arxiv.org/abs/2510.05077
 
 local S = require("alc_shapes")
 local T = S.T
