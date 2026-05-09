@@ -1,35 +1,32 @@
---- review_and_investigate — deep code review with fact-checking and root-cause analysis
+--- review_and_investigate(ReviewAndInvestigate) — deep code review with root-cause analysis
 ---
---- Combinator package: orchestrates reflect, calibrate, factscore, triad,
---- panel, rank to perform multi-phase investigative code review.
+--- Combinator package that orchestrates `reflect`, `calibrate`,
+--- `factscore`, `triad`, `panel`, and `rank` to perform multi-phase
+--- investigative code review. Because `alc.llm()` returns to the Host
+--- (Coding Agent) via MCP Sampling, each phase prompt can instruct the
+--- Host's `Grep` / `Read` / `Bash` tools to actually explore the
+--- codebase and return fact-based findings.
 ---
---- Key insight: alc.llm() returns to the Host (Coding Agent) via MCP Sampling.
---- The Host has Grep/Read/Bash tools, so each phase prompt can instruct the Host
---- to actually explore the codebase and return fact-based findings.
+--- ## Usage
 ---
---- Pipeline:
----   Phase 1:   Detect         — scan code, extract issue themes (structured JSON)
----   Phase 1.5: Context Filter — early elimination of intentional-design themes based on ctx.context (lightweight LLM YES/NO)
----   Phase 2:   Verify         — fact-check each theme against actual code (confirmed/false_positive)
----   Phase 3: Explore   — comprehensive codebase search for related occurrences
----   Phase 4: Diagnose  — identify root cause (surface symptom → structural cause)
----              └─ calibrate: low confidence → Deep analysis via triad/panel
----   Phase 5: Research  — best-practice lookup, gap analysis
----   Phase 6: Prescribe — enumerate fix options, rate by policy, rank pairwise
+--- ```lua
+--- local ri = require("review_and_investigate")
+--- return ri.run(ctx)
+--- ```
 ---
---- Usage:
----   local ri = require("review_and_investigate")
----   return ri.run(ctx)
+--- ## Algorithm
 ---
---- ctx.code (required): Source code or diff to review
---- ctx.context: Additional context about the codebase (free text).
----   Injected into Phase 1/2/4 prompts so the LLM understands design
----   constraints, framework requirements, known trade-offs, etc.
----   Example: "rmcp framework constraint requires Result<String,String>. Local dev tool."
---- ctx.policy: Review policy table (default: built-in)
----   { priorities = {"non_breaking", "correctness", "testability", ...} }
---- ctx.deep_threshold: Confidence threshold for deep analysis (default: 0.6)
---- ctx.max_fixes: Max fix candidates per theme (default: 3)
+--- 1. Detect — scan code, extract issue themes (structured JSON).
+--- 2. Context Filter — early elimination of intentional-design themes
+---    based on `ctx.context` (lightweight LLM YES/NO).
+--- 3. Verify — fact-check each theme against actual code
+---    (`confirmed` / `false_positive`).
+--- 4. Explore — comprehensive codebase search for related occurrences.
+--- 5. Diagnose — identify root cause (surface symptom → structural
+---    cause). `calibrate` low confidence escalates to deep analysis via
+---    `triad` / `panel`.
+--- 6. Research — best-practice lookup and gap analysis.
+--- 7. Prescribe — enumerate fix options, rate by policy, rank pairwise.
 
 local S = require("alc_shapes")
 local T = S.T

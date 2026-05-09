@@ -8,14 +8,37 @@ source: review_and_investigate/init.lua
 generated: gen_docs (V0)
 ---
 
-# review_and_investigate — deep code review with fact-checking and root-cause analysis
+# review_and_investigate(ReviewAndInvestigate) — deep code review with root-cause analysis
 
-> Combinator package: orchestrates reflect, calibrate, factscore, triad, panel, rank to perform multi-phase investigative code review.
+> Combinator package that orchestrates `reflect`, `calibrate`, `factscore`, `triad`, `panel`, and `rank` to perform multi-phase investigative code review. Because `alc.llm()` returns to the Host (Coding Agent) via MCP Sampling, each phase prompt can instruct the Host's `Grep` / `Read` / `Bash` tools to actually explore the codebase and return fact-based findings.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local ri = require("review_and_investigate")
+return ri.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Detect — scan code, extract issue themes (structured JSON).
+2. Context Filter — early elimination of intentional-design themes
+   based on `ctx.context` (lightweight LLM YES/NO).
+3. Verify — fact-check each theme against actual code
+   (`confirmed` / `false_positive`).
+4. Explore — comprehensive codebase search for related occurrences.
+5. Diagnose — identify root cause (surface symptom → structural
+   cause). `calibrate` low confidence escalates to deep analysis via
+   `triad` / `panel`.
+6. Research — best-practice lookup and gap analysis.
+7. Prescribe — enumerate fix options, rate by policy, rank pairwise.
 
 ## Parameters {#parameters}
 
