@@ -1,20 +1,20 @@
---- Maieutic — recursive explanation tree with logical consistency filtering
+--- maieutic(Maieutic) — recursive explanation tree with logical consistency filtering
 ---
 --- Given a proposition, generates supporting and opposing explanations
 --- recursively (depth-limited tree), then checks logical consistency
 --- between parent-child pairs to filter contradictions.
 ---
---- Based on: Jung et al., "Maieutic Prompting: Logically Consistent
---- Reasoning with Recursive Explanations" (2022, arXiv:2205.11822)
+--- ## Usage
 ---
---- Usage:
----   local maieutic = require("maieutic")
----   return maieutic.run(ctx)
+--- ```lua
+--- local maieutic = require("maieutic")
+--- return maieutic.run(ctx)
+--- ```
 ---
---- ctx.proposition (required): The claim to analyze
---- ctx.max_depth: Tree depth (default: 2)
---- ctx.gen_tokens: Max tokens per explanation (default: 300)
---- ctx.consistency_tokens: Max tokens per consistency check (default: 100)
+--- ## References
+---
+--- - Jung, J. et al. (2022). "Maieutic Prompting: Logically Consistent
+---   Reasoning with Recursive Explanations". https://arxiv.org/abs/2205.11822
 
 local S = require("alc_shapes")
 local T = S.T

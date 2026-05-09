@@ -8,14 +8,28 @@ source: maieutic/init.lua
 generated: gen_docs (V0)
 ---
 
-# Maieutic — recursive explanation tree with logical consistency filtering
+# maieutic(Maieutic) — recursive explanation tree with logical consistency filtering
 
 > Given a proposition, generates supporting and opposing explanations recursively (depth-limited tree), then checks logical consistency between parent-child pairs to filter contradictions.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local maieutic = require("maieutic")
+return maieutic.run(ctx)
+```
+
+## References {#references}
+
+- Jung, J. et al. (2022). "Maieutic Prompting: Logically Consistent
+  Reasoning with Recursive Explanations". https://arxiv.org/abs/2205.11822
 
 ## Parameters {#parameters}
 
