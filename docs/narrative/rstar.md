@@ -8,14 +8,39 @@ source: rstar/init.lua
 generated: gen_docs (V0)
 ---
 
-# rstar — Mutual reasoning verification via self-play
+# rstar(RStar) — mutual reasoning verification via self-play
 
 > Generates two independent reasoning paths, then each path verifies the other. Disagreements trigger a resolution round. Achieves MCTS-level accuracy at a fraction of the cost by replacing tree search with targeted mutual critique.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local rstar = require("rstar")
+return rstar.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 4-6 LLM calls:
+
+1. Generate Path A — independent reasoning attempt.
+2. Generate Path B — independent reasoning attempt (parallel).
+3. Cross-verify — A verifies B and B verifies A (parallel).
+4. Resolve — on disagreement, synthesize the final answer.
+
+## References {#references}
+
+- Qi, Z. et al. (2024). "Mutual Reasoning Makes Smaller LLMs
+  Stronger Problem-Solvers" (rStar).
+  https://arxiv.org/abs/2408.06195
 
 ## Parameters {#parameters}
 

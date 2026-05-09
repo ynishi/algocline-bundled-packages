@@ -1,26 +1,31 @@
---- rstar — Mutual reasoning verification via self-play
+--- rstar(RStar) — mutual reasoning verification via self-play
 ---
 --- Generates two independent reasoning paths, then each path verifies
---- the other. Disagreements trigger a resolution round. Achieves MCTS-level
---- accuracy at a fraction of the cost by replacing tree search with
---- targeted mutual critique.
+--- the other. Disagreements trigger a resolution round. Achieves
+--- MCTS-level accuracy at a fraction of the cost by replacing tree
+--- search with targeted mutual critique.
 ---
---- Based on: Qi et al., "Mutual Reasoning Makes Smaller LLMs Stronger
---- Problem-Solvers" (rStar, 2024, arXiv:2408.06195)
+--- ## Usage
 ---
---- Pipeline (4-6 LLM calls):
----   Step 1: Generate Path A — independent reasoning attempt
----   Step 2: Generate Path B — independent reasoning attempt (parallel)
----   Step 3: Cross-verify    — A verifies B, B verifies A (parallel)
----   Step 4: Resolve         — if disagreement, synthesize final answer
+--- ```lua
+--- local rstar = require("rstar")
+--- return rstar.run(ctx)
+--- ```
 ---
---- Usage:
----   local rstar = require("rstar")
----   return rstar.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.gen_tokens: Max tokens per reasoning path (default: 400)
---- ctx.verify_tokens: Max tokens per verification (default: 300)
+--- The pipeline uses 4-6 LLM calls:
+---
+--- 1. Generate Path A — independent reasoning attempt.
+--- 2. Generate Path B — independent reasoning attempt (parallel).
+--- 3. Cross-verify — A verifies B and B verifies A (parallel).
+--- 4. Resolve — on disagreement, synthesize the final answer.
+---
+--- ## References
+---
+--- - Qi, Z. et al. (2024). "Mutual Reasoning Makes Smaller LLMs
+---   Stronger Problem-Solvers" (rStar).
+---   https://arxiv.org/abs/2408.06195
 
 local S = require("alc_shapes")
 local T = S.T
