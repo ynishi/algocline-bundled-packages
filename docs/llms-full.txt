@@ -5105,14 +5105,38 @@ Returns:
 <!-- ── plan_solve.md ── -->
 
 
-# plan_solve — Plan-and-Solve prompting
+# plan_solve(PlanSolve) — Plan-and-Solve prompting
 
-> Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full decompose (no parallel subtask dispatch).
+> Devises an explicit step-by-step plan before execution, then carries out each step sequentially. More structured than Chain-of-Thought, lighter than full `decompose` (no parallel subtask dispatch).
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local plan_solve = require("plan_solve")
+return plan_solve.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 2-3 LLM calls:
+
+1. Plan — devise a numbered plan of reasoning steps.
+2. Execute — carry out the plan step by step.
+3. Extract (optional) — produce a concise final answer.
+
+## References {#references}
+
+- Wang, L. et al. (2023). "Plan-and-Solve Prompting: Improving
+  Zero-Shot Chain-of-Thought Reasoning by Large Language Models".
+  https://arxiv.org/abs/2305.04091
 
 ## Parameters {#parameters}
 
@@ -5139,14 +5163,39 @@ Returns:
 <!-- ── pre_mortem.md ── -->
 
 
-# pre_mortem — feasibility-gated proposal filtering
+# pre_mortem(PreMortem) — feasibility-gated proposal filtering
 
-> Combinator package: orchestrates factscore, contrastive, calibrate to validate proposals BEFORE output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes/filters proposals with unverified prerequisites.
+> Combinator package that orchestrates `factscore`, `contrastive`, and `calibrate` to validate proposals before output. Decomposes each proposal into prerequisite assumptions, checks verification status, generates rejection reasons pre-emptively, and demotes or filters proposals with unverified prerequisites.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local pre_mortem = require("pre_mortem")
+return pre_mortem.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. `factscore` — decompose each proposal into atomic prerequisites
+   and label each as SUPPORTED / UNSUPPORTED / UNCERTAIN.
+2. `contrastive` — for each proposal generate "why it would be
+   adopted" vs "why it would be rejected" reasoning pairs.
+3. `calibrate` — judge VERDICT (adopt / reject) with CONFIDENCE as a
+   meta-reliability gate. High confidence + adopt → accepted, high
+   confidence + reject → rejected, low confidence →
+   `needs_investigation` (escalate).
+4. `rank` — pairwise tournament of accepted proposals to produce a
+   final ordering by effectiveness.
+ctx.n_contrasts: Number of contrastive pairs per proposal (default: 1)
+ctx.extract_tokens: Max tokens for prerequisite extraction (default: 500)
+ctx.verify_tokens: Max tokens per prerequisite verification (default: 200)
 
 ## Parameters {#parameters}
 
@@ -5178,14 +5227,36 @@ Returns:
 <!-- ── prism.md ── -->
 
 
-# Prism — cognitive-load-aware intent decomposition and logical clarification
+# prism(Prism) — cognitive-load-aware intent decomposition and clarification
 
 > Decomposes complex user intents into structured sub-intents, identifies logical dependencies among them, and generates clarification questions in dependency order to minimize user cognitive load.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local prism = require("prism")
+return prism.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Decompose — break the task into atomic sub-intents.
+2. Dependency — identify logical dependencies between sub-intents.
+3. Clarify — generate clarification questions in topological order,
+   then integrate responses into a fully-specified task.
+
+## References {#references}
+
+- "Prism: Towards Lowering User Cognitive Load in LLMs via Complex
+  Intent Understanding" (2026). https://arxiv.org/abs/2601.08653
 
 ## Parameters {#parameters}
 
@@ -5214,14 +5285,54 @@ Returns:
 <!-- ── prompt_breed.md ── -->
 
 
-# prompt_breed — Self-Referential Prompt Evolution
+# prompt_breed(PromptBreed) — self-referential prompt evolution
 
-> Evolves a population of task prompts (instructions) using genetic operators, with a unique twist: the mutation operators themselves (mutation prompts) also evolve. This double loop — task-prompt evolution + meta-mutation evolution — enables the system to discover increasingly effective ways to explore prompt space.
+> Evolves a population of task prompts using genetic operators with a unique twist: the mutation operators themselves (mutation prompts) also evolve. The double loop — task-prompt evolution + meta-mutation evolution — discovers increasingly effective ways to explore prompt space.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local prompt_breed = require("prompt_breed")
+return prompt_breed.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Init — generate initial task prompts and mutation prompts.
+2. For each generation:
+   - Evaluate — score each task prompt via the evaluator.
+   - Select — tournament selection of parents.
+   - Mutate — apply mutation prompt to parent to produce a child.
+   - Replace — elitist replacement (child beats parent).
+   - Hyper-mutation — occasionally evolve the mutation prompts.
+3. Return the best prompt.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+Unlike `optimize/ea` (parameter-level evolution) or `optimize/opro`
+(history-based proposal), `prompt_breed` operates on natural-language
+instructions with self-referential meta-evolution: the way prompts
+are mutated improves alongside the prompts themselves.
+
+## References {#references}
+
+- Fernando, C. et al. (2023). "PromptBreeder: Self-Referential
+  Self-Improvement via Prompt Evolution".
+  https://arxiv.org/abs/2309.16797
+- Guo, Q. et al. (2024). "Connecting LLMs with Evolutionary
+  Algorithms Yields Powerful Prompt Optimizers" (EvoPrompt). ICLR
+  2024. https://arxiv.org/abs/2309.08532
+- Xu, ... et al. (2025). "PromptWizard: Task-Aware Agent-driven
+  Prompt Optimization". ACL Findings 2025.
 
 ## Parameters {#parameters}
 
@@ -5253,14 +5364,43 @@ Returns:
 <!-- ── qdaif.md ── -->
 
 
-# qdaif — Quality-Diversity through AI Feedback
+# qdaif(QDAIF) — Quality-Diversity through AI Feedback (MAP-Elites)
 
-> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by: (1) seeding the archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality and feature placement via LLM, (5) inserting into the archive if superior.
+> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by seeding the archive, selecting elites, mutating via LLM, evaluating quality and feature placement via LLM, and inserting into the archive when superior. Unlike `optimize` (single best) or `diverse` (sample then pick), `qdaif` structurally maintains a population of elite solutions across a feature space, ensuring quality and diversity simultaneously.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local qdaif = require("qdaif")
+return qdaif.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Seed — generate initial candidates.
+2. For each of `iterations` cycles:
+   - Select — pick an elite from the archive (empty-cell priority).
+   - Mutate — LLM generates a variant of the selected elite.
+   - Evaluate — LLM scores quality and assigns the feature bin.
+   - Insert — replace the archive cell if the new candidate is
+     better.
+3. Return the archive and the best elite.
+
+## References {#references}
+
+- Bradley, H. et al. (2024). "Quality-Diversity through AI Feedback".
+  ICLR 2024. https://arxiv.org/abs/2310.13032
+- Lehman, J. et al. "Evolution through Large Models" (OpenELM).
+- Mouret, J.-B., Clune, J. (2015). "Illuminating search spaces by
+  mapping elites". https://arxiv.org/abs/1504.04909
 
 ## Parameters {#parameters}
 

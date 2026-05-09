@@ -1,41 +1,38 @@
---- qdaif — Quality-Diversity through AI Feedback
+--- qdaif(QDAIF) — Quality-Diversity through AI Feedback (MAP-Elites)
 ---
---- Maintains a MAP-Elites archive (feature-space × quality grid) using only
---- LLM calls. Generates diverse, high-quality solutions by: (1) seeding the
---- archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality
---- and feature placement via LLM, (5) inserting into the archive if superior.
+--- Maintains a MAP-Elites archive (feature-space × quality grid) using
+--- only LLM calls. Generates diverse, high-quality solutions by seeding
+--- the archive, selecting elites, mutating via LLM, evaluating quality
+--- and feature placement via LLM, and inserting into the archive when
+--- superior. Unlike `optimize` (single best) or `diverse` (sample then
+--- pick), `qdaif` structurally maintains a population of elite solutions
+--- across a feature space, ensuring quality and diversity simultaneously.
 ---
---- Unlike optimize (single best) or diverse (sample then pick), qdaif
---- structurally maintains a population of elite solutions across a feature
---- space, ensuring both quality AND diversity simultaneously.
+--- ## Usage
 ---
---- Based on:
----   [1] Bradley et al. "Quality-Diversity through AI Feedback"
----       (ICLR 2024, arXiv:2310.13032)
----   [2] Lehman et al. "Evolution through Large Models"
----       (OpenELM, OpenReview)
----   [3] Mouret & Clune "Illuminating search spaces by mapping elites"
----       (2015, arXiv:1504.04909)
+--- ```lua
+--- local qdaif = require("qdaif")
+--- return qdaif.run(ctx)
+--- ```
 ---
---- Pipeline (seed_count + iterations × 2 LLM calls + 1 synthesis):
----   Seed     — generate initial candidates
----   Loop:
----     Select   — pick elite from archive (empty-cell priority)
----     Mutate   — LLM generates variant of selected elite
----     Evaluate — LLM scores quality + assigns feature bin
----     Insert   — replace archive cell if new candidate is better
----   Final: return archive + best elite
+--- ## Algorithm
 ---
---- Usage:
----   local qdaif = require("qdaif")
----   return qdaif.run(ctx)
+--- 1. Seed — generate initial candidates.
+--- 2. For each of `iterations` cycles:
+---    - Select — pick an elite from the archive (empty-cell priority).
+---    - Mutate — LLM generates a variant of the selected elite.
+---    - Evaluate — LLM scores quality and assigns the feature bin.
+---    - Insert — replace the archive cell if the new candidate is
+---      better.
+--- 3. Return the archive and the best elite.
 ---
---- ctx.task (required): The problem to solve / domain description
---- ctx.features (required): Feature axes definition
----   e.g. { { name = "style", bins = {"formal", "casual", "technical"} } }
---- ctx.iterations: Mutation-evaluation cycles (default: 20)
---- ctx.seed_count: Initial candidates to generate (default: 5)
---- ctx.elite_tokens: Max tokens for candidate generation (default: 400)
+--- ## References
+---
+--- - Bradley, H. et al. (2024). "Quality-Diversity through AI Feedback".
+---   ICLR 2024. https://arxiv.org/abs/2310.13032
+--- - Lehman, J. et al. "Evolution through Large Models" (OpenELM).
+--- - Mouret, J.-B., Clune, J. (2015). "Illuminating search spaces by
+---   mapping elites". https://arxiv.org/abs/1504.04909
 
 local S = require("alc_shapes")
 local T = S.T

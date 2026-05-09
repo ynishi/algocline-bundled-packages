@@ -8,14 +8,43 @@ source: qdaif/init.lua
 generated: gen_docs (V0)
 ---
 
-# qdaif — Quality-Diversity through AI Feedback
+# qdaif(QDAIF) — Quality-Diversity through AI Feedback (MAP-Elites)
 
-> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by: (1) seeding the archive, (2) selecting elites, (3) mutating via LLM, (4) evaluating quality and feature placement via LLM, (5) inserting into the archive if superior.
+> Maintains a MAP-Elites archive (feature-space × quality grid) using only LLM calls. Generates diverse, high-quality solutions by seeding the archive, selecting elites, mutating via LLM, evaluating quality and feature placement via LLM, and inserting into the archive when superior. Unlike `optimize` (single best) or `diverse` (sample then pick), `qdaif` structurally maintains a population of elite solutions across a feature space, ensuring quality and diversity simultaneously.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local qdaif = require("qdaif")
+return qdaif.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Seed — generate initial candidates.
+2. For each of `iterations` cycles:
+   - Select — pick an elite from the archive (empty-cell priority).
+   - Mutate — LLM generates a variant of the selected elite.
+   - Evaluate — LLM scores quality and assigns the feature bin.
+   - Insert — replace the archive cell if the new candidate is
+     better.
+3. Return the archive and the best elite.
+
+## References {#references}
+
+- Bradley, H. et al. (2024). "Quality-Diversity through AI Feedback".
+  ICLR 2024. https://arxiv.org/abs/2310.13032
+- Lehman, J. et al. "Evolution through Large Models" (OpenELM).
+- Mouret, J.-B., Clune, J. (2015). "Illuminating search spaces by
+  mapping elites". https://arxiv.org/abs/1504.04909
 
 ## Parameters {#parameters}
 
