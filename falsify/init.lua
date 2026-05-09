@@ -1,37 +1,36 @@
---- falsify — Sequential Falsification for Hypothesis Exploration
+--- falsify(Falsify) — sequential falsification for hypothesis exploration
 ---
---- Explores hypothesis space via Popper's falsificationism: generate hypotheses,
---- attempt to refute each one, prune the refuted, derive new hypotheses from
---- the refutation insights. Unlike verify_first (checks consistency) or cove
---- (verification chain), falsify actively ATTACKS hypotheses and uses refutation
---- failures as evidence of robustness, while refutation successes drive the
---- generation of improved successor hypotheses.
+--- Explores hypothesis space via Popper's falsificationism: generate
+--- hypotheses, attempt to refute each one, prune the refuted, and derive
+--- new hypotheses from the refutation insights. Unlike `verify_first`
+--- (checks consistency) or `cove` (verification chain), `falsify`
+--- actively attacks hypotheses and uses refutation failures as evidence
+--- of robustness while refutation successes drive successor generation.
 ---
---- Based on:
----   [1] Sourati et al. "Automated Hypothesis Validation with Agentic
----       Sequential Falsifications" (2025, arXiv:2502.09858)
----   [2] Yamada et al. "AI Scientist v2: Agentic Tree Search for
----       Scientific Discovery" (2025, arXiv:2504.08066)
----   [3] Popper "The Logic of Scientific Discovery" (1959)
+--- ## Usage
 ---
---- Pipeline (initial + max_rounds × hypotheses × 2 LLM calls + 1 synthesis):
----   Seed       — generate initial hypotheses
----   Loop (per round):
----     Falsify    — attempt to refute each active hypothesis (1 LLM call)
----     Judge      — was the refutation successful? (1 LLM call)
----     Prune      — remove refuted hypotheses
----     Derive     — generate successor hypotheses from refutation insights
----   Final: synthesize surviving hypotheses into answer
+--- ```lua
+--- local falsify = require("falsify")
+--- return falsify.run(ctx)
+--- ```
 ---
---- Usage:
----   local falsify = require("falsify")
----   return falsify.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem or question to investigate
---- ctx.initial_hypotheses: Number of seed hypotheses (default: 4)
---- ctx.max_rounds: Maximum falsification rounds (default: 3)
---- ctx.derive_on_refute: Generate successors from refuted hypotheses (default: true)
---- ctx.max_hypotheses: Upper bound on active hypotheses (default: 12)
+--- 1. Seed — generate initial hypotheses.
+--- 2. For each of `max_rounds` rounds:
+---    - Falsify — attempt to refute each active hypothesis (1 LLM call).
+---    - Judge — was the refutation successful? (1 LLM call).
+---    - Prune — remove refuted hypotheses.
+---    - Derive — generate successor hypotheses from refutation insights.
+--- 3. Synthesize the surviving hypotheses into a final answer.
+---
+--- ## References
+---
+--- - Sourati, J. et al. (2025). "Automated Hypothesis Validation with
+---   Agentic Sequential Falsifications". https://arxiv.org/abs/2502.09858
+--- - Yamada, Y. et al. (2025). "AI Scientist v2: Agentic Tree Search for
+---   Scientific Discovery". https://arxiv.org/abs/2504.08066
+--- - Popper, K. (1959). "The Logic of Scientific Discovery".
 
 local S = require("alc_shapes")
 local T = S.T
@@ -42,9 +41,7 @@ local M = {}
 M.meta = {
     name = "falsify",
     version = "0.1.0",
-    description = "Sequential Falsification — Popper-style hypothesis exploration "
-        .. "via active refutation, pruning, and successor derivation. "
-        .. "Expands search space through refutation-driven insight.",
+    description = "Popper-style sequential falsification of hypotheses with successor derivation.",
     category = "exploration",
 }
 
