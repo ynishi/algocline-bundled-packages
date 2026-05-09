@@ -1,49 +1,49 @@
---- cost_pareto — Multi-objective Pareto dominance computation
+--- cost_pareto(CostPareto) — multi-objective Pareto dominance computation
 ---
 --- Pure-computation utility for comparing candidates on multiple
---- objectives (accuracy, cost, diversity, latency, etc.) using
---- Pareto dominance and frontier extraction.
+--- objectives (accuracy, cost, diversity, latency, etc.) via Pareto
+--- dominance and frontier extraction. The convention is that all
+--- objectives are higher-is-better; for cost, pass the negative or
+--- inverse (e.g. `-cost` or `1/cost`).
 ---
---- Theory:
----   Pareto optimality (Vilfredo Pareto, 1896): candidate A dominates
----   candidate B iff A is at least as good as B on ALL objectives and
----   strictly better on at least one. The Pareto frontier is the set
----   of all non-dominated candidates.
+--- ## Usage
 ---
----   Applied to AI agents by:
----   Kapoor, Stroebl, Siegel, Nadgir, Narayanan (Princeton).
----   "AI Agents That Matter". arXiv:2407.01502, 2024.
+--- ```lua
+--- local cp = require("cost_pareto")
+--- local a = {accuracy = 0.93, neg_cost = -2.45}
+--- local b = {accuracy = 0.88, neg_cost = -134.50}
+--- cp.dominates(a, b) -- => true (a dominates b)
+--- ```
 ---
----   Key finding: HumanEval warming baseline ($2.45 / 93.2%) Pareto-
----   dominates LATS ($134.50 / 88.0%) and Reflexion ($3.90 / 87.8%).
+--- ## Theoretical foundations
 ---
---- Multi-Agent / Swarm context:
----   Multi-agent strategies often improve accuracy at massive cost
----   increases. Pareto analysis prevents the trap of chasing marginal
----   accuracy gains with disproportionate resource expenditure.
+--- Pareto optimality (Pareto, 1896): candidate A dominates candidate B
+--- iff A is at least as good as B on all objectives and strictly better
+--- on at least one. The Pareto frontier is the set of non-dominated
+--- candidates. Multi-agent strategies often improve accuracy at large
+--- cost increases; Pareto analysis prevents chasing marginal accuracy
+--- gains with disproportionate resource expenditure. The Princeton "AI
+--- Agents That Matter" paper reports a HumanEval warming baseline
+--- ($2.45 / 93.2%) Pareto-dominating LATS ($134.50 / 88.0%) and
+--- Reflexion ($3.90 / 87.8%).
 ---
----   - Strategy selection: frontier() extracts non-dominated agent
----     configurations from a candidate pool. Only Pareto-optimal
----     configurations should be considered for deployment.
----   - Baseline gate: is_dominated() checks if a complex multi-agent
----     strategy is Pareto-dominated by a simple baseline (e.g.,
----     single-agent + Self-Consistency). If dominated, the complex
----     strategy should be rejected regardless of absolute accuracy.
----   - Layered ranking: layers() assigns candidates to Pareto layers
----     (layer 0 = frontier, layer 1 = next frontier, etc.) for
----     progressive elimination in tournament-style agent selection.
----   - Connects to eval_guard (N5 baseline gate), inverse_u (more
----     agents at declining accuracy = dominated), and mwu (weight
----     allocation should favor Pareto-optimal agents).
+--- The entries are designed for:
 ---
---- Convention: ALL objectives are "higher is better". For cost,
---- pass the negative or inverse (e.g., -cost or 1/cost).
+--- - `frontier` — extract non-dominated configurations for deployment.
+--- - `is_dominated` — baseline gate; reject complex strategies dominated
+---   by a simple baseline regardless of absolute accuracy.
+--- - `layers` — assign candidates to Pareto layers (layer 0 = frontier,
+---   layer 1 = next frontier, etc.) for tournament-style elimination.
 ---
---- Usage:
----   local cp = require("cost_pareto")
----   local a = {accuracy = 0.93, neg_cost = -2.45}
----   local b = {accuracy = 0.88, neg_cost = -134.50}
----   cp.dominates(a, b) -- => true (a dominates b)
+--- Composes with `eval_guard` (baseline gate), `inverse_u` (more agents
+--- at declining accuracy = dominated), and `mwu` (weight allocation
+--- should favor Pareto-optimal agents).
+---
+--- ## References
+---
+--- - Pareto, V. (1896). "Cours d'économie politique".
+--- - Kapoor, S., Stroebl, B., Siegel, Z., Nadgir, N., Narayanan, A.
+---   (2024). "AI Agents That Matter". https://arxiv.org/abs/2407.01502
 
 local S = require("alc_shapes")
 local T = S.T
@@ -54,10 +54,7 @@ local M = {}
 M.meta = {
     name = "cost_pareto",
     version = "0.1.0",
-    description = "Multi-objective Pareto dominance — frontier extraction, "
-        .. "dominance testing, and layered ranking for agent strategy "
-        .. "selection on accuracy/cost/diversity trade-offs "
-        .. "(Kapoor et al. 'AI Agents That Matter', 2024).",
+    description = "Multi-objective Pareto dominance, frontier extraction, and layered ranking.",
     category = "selection",
 }
 
