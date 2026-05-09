@@ -2511,14 +2511,30 @@ adding another agent actually help?":
 <!-- ── epidemic_abm.md ── -->
 
 
-# epidemic_abm — SIR Agent-Based Epidemic Model
+# epidemic_abm(EpidemicABM) — SIR agent-based epidemic simulation
 
-> N agents transition between Susceptible → Infected → Recovered states. Each step, infected agents probabilistically transmit to susceptible contacts, and recover with probability γ.
+> N agents transition between Susceptible → Infected → Recovered states. At each step, infected agents probabilistically transmit to susceptible contacts and recover with probability γ. Emergent phenomena include the epidemic threshold (`R0 = β/γ > 1`), herd immunity, wave dynamics, and stochastic extinction.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local epidemic = require("epidemic_abm")
+return epidemic.run(ctx)
+```
+
+## References {#references}
+
+- Kermack, W. O., McKendrick, A. G. (1927). "A Contribution to the
+  Mathematical Theory of Epidemics". Proc. Royal Society A.
+- Epstein, J. M. (2006). "Generative Social Science: Studies in
+  Agent-Based Computational Modeling". Princeton.
 
 ## Parameters {#parameters}
 
@@ -2548,23 +2564,88 @@ Returns:
 <!-- ── eval_guard.md ── -->
 
 
-# eval_guard — Evaluation safety gates (N2 + N3 + N4 Red Lines)
+# eval_guard(EvalGuard) — multi-agent evaluation safety gates (N2/N3/N4)
 
-> Pure-computation gate checks for evaluation safety in multi-agent systems. Each gate returns (passed, reason) and can be used independently or combined via check_all().
+> Pure-computation gate checks for evaluation safety in multi-agent systems. Each gate returns `(passed, reason)` and can be used independently or combined via `check_all`. N1 (inverse-U scaling) and N5 (Pareto dominance) live in `inverse_u` and `cost_pareto`; this package handles structural checks.
+
+## Contents
+
+- [Usage](#usage)
+- [Theoretical foundations](#theoretical-foundations)
+- [References](#references)
+
+## Usage {#usage}
+
+```lua
+local eg = require("eval_guard")
+local ok, reason = eg.self_critique({has_external_grader = false})
+local report = eg.check_all({
+  has_external_grader = false,
+  has_baseline = true,
+  metric_type = "absolute",
+})
+```
+
+## Theoretical foundations {#theoretical-foundations}
+
+The bundled gates encode three documented multi-agent evaluation
+failure modes:
+
+- N2 `self_critique` — intrinsic self-correction degrades accuracy
+  without an external grader (Huang et al., ICLR 2024). The gate
+  enforces that self-correction always has a ground-truth signal
+  (unit test, symbolic check, cross-model verification).
+- N3 `baseline` — multi-agent must run with a same-budget SC/CoT
+  baseline for a fair comparison; without it, complex multi-agent
+  setups often lose to single-agent + Self-Consistency.
+- N4 `contamination` — absolute accuracy on standard benchmarks is
+  unreliable due to data contamination. The gate requires a hold-out
+  delta plus cost plus Pareto as the evaluation criterion set.
+
+`check_all` runs all three gates and produces a combined report
+suitable for automated pipeline enforcement. Composable with
+`scoring_rule` (calibration measurement after gates pass) and
+`cost_pareto` (N5 Pareto dominance).
+
+## References {#references}
+
+- Huang, J. et al. (2024). "Large Language Models Cannot Self-Correct
+  Reasoning Yet". ICLR 2024.
+- Wang, Q. et al. (2024). ACL 2024 Findings.
+- Kapoor, S. et al. (2024). "AI Agents That Matter".
+  https://arxiv.org/abs/2407.01502
+- Zhu, K. et al. (2024). EMNLP 2024 (benchmark decontamination).
 
 ---
 
 <!-- ── evogame_abm.md ── -->
 
 
-# evogame_abm — Evolutionary Game Theory ABM
+# evogame_abm(EvoGameABM) — evolutionary game theory agent-based simulation
 
-> N agents with strategies play iterated games (Prisoner's Dilemma by default). Each generation: random pairing → payoff calculation → selection → mutation. Emergent phenomena: cooperation/defection equilibria, cyclic dominance, strategy invasion dynamics.
+> N strategy-bearing agents play iterated games (Prisoner's Dilemma by default). Each generation runs random pairing, payoff calculation, selection, and mutation, producing emergent cooperation/defection equilibria, cyclic dominance, and strategy-invasion dynamics.
 
 ## Contents
 
+- [Usage](#usage)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local evogame = require("evogame_abm")
+return evogame.run(ctx)
+```
+
+## References {#references}
+
+- Axelrod, R. (1984). "The Evolution of Cooperation". Basic Books.
+- Nowak, M. A., May, R. M. (1992). "Evolutionary Games and Spatial
+  Chaos". Nature 359.
+- Mao, S. et al. (2025). "ALYMPICS: LLM Agents Meet Game Theory".
+  COLING 2025.
 
 ## Parameters {#parameters}
 
@@ -2594,219 +2675,124 @@ Returns:
 <!-- ── f_race.md ── -->
 
 
-# f_race — Friedman Race Partial-Data Pruner
+# f_race(FRace) — Friedman Race partial-data candidate pruner
 
-> Given N candidate answers and a D-dimensional rubric, this package evaluates (candidate × dimension) pairs in BLOCK order (one rubric dimension at a time across all alive candidates), maintains a rank matrix, and ELIMINATES candidates whose mean rank is significantly worse than the best survivor by a Friedman + Nemenyi post-hoc test.
+> Given N candidate answers and a D-dimensional rubric, evaluates `(candidate × dimension)` pairs in block order (one rubric dimension at a time across all alive candidates), maintains a rank matrix, and eliminates candidates whose mean rank is significantly worse than the best survivor by a Friedman + Nemenyi post-hoc test.
 
 ## Contents
 
-  - [Why F-Race for this scale](#why-f-race-for-this-scale)
-  - [Detection power — read this before choosing the rubric type](#detection-power-read-this-before-choosing-the-rubric-type)
-  - [Empirical validation (N=6, D=20, min_blocks=5, δ=0.05, binary rubric)](#empirical-validation-n-6-d-20-min-blocks-5-0-05-binary-rubric)
-  - [Theoretical foundations](#theoretical-foundations)
-  - [Kill rate limit (important)](#kill-rate-limit-important)
-  - [Post-hoc multiplicity and sequential testing](#post-hoc-multiplicity-and-sequential-testing)
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [Empirical validation](#empirical-validation)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
 
-### Why F-Race for this scale {#why-f-race-for-this-scale}
+## Usage {#usage}
 
-At the operating point of this codebase (N≈6 candidates, D≈20 rubric
-dimensions), Empirical-Bernstein Confidence Sequences (cs_pruner)
-cannot fire: their variance-independent floor radius_floor(t=20) ≈
-0.43 makes a kill mathematically impossible for any mean-gap < 0.86.
+```lua
+local f_race = require("f_race")
+return f_race.run(ctx)
+```
 
-F-Race operates on RANKS, not raw scores. The Friedman χ² statistic
+## Algorithm {#algorithm}
 
-    Q = (12 / (B·N(N+1))) · Σ_j R_j²  -  3·B·(N+1)
+1. Generate N candidates.
+2. For each rubric dimension `k = 1..D` (one block):
+   - Query the judge in parallel for every alive candidate's score on
+     `k`. Score `∈ [0, 1]` (PASS/FAIL or numeric).
+   - Rank the alive candidates within the block (average ranks on
+     ties; highest score gets rank `N_alive`).
+   - Append the rank vector to the history.
+   - If `B >= min_blocks_before_race`, compute Friedman `Q`. If
+     `Q > χ²_{N_alive - 1, 1-δ}`, eliminate every candidate whose
+     rank-sum is more than the Nemenyi critical difference below the
+     best.
+3. Return ranking by mean rank (alive first, then eliminated).
 
-with B = blocks observed and R_j = rank-sum of cand j, lets the
-Nemenyi post-hoc reject a pairwise difference iff
+## Caveats {#caveats}
 
-    |R_i - R_j| > (q_{∞,N,α}/√2) · √(B·N(N+1)/6)
+F-Race operates on ranks, not raw scores. At the operating point of
+this codebase (`N≈6`, `D≈20`), Empirical-Bernstein Confidence
+Sequences (`cs_pruner`) cannot fire: their variance-independent floor
+`radius_floor(t=20) ≈ 0.43` makes a kill impossible for any mean gap
+below 0.86.
 
-where q_{∞,N,α} is the Studentized range quantile (Tukey). For N=6,
-α=0.05 the constant is q/√2 ≈ 2.850 (NOT the normal z=1.96 — see
-the implementation note in nemenyi_critical_diff for the history).
+Detection power depends on whether scores are continuous or binary.
+For binary PASS/FAIL the per-block pairwise rank gap is exactly 3
+when one PASSes and the other FAILs:
 
-### Detection power — read this before choosing the rubric type {#detection-power-read-this-before-choosing-the-rubric-type}
+```math
+E[R_i - R_j | one block]  = 3 · (p_i - p_j) = 3·Δ
+Var[R_i - R_j | one block] ≤ 9
+```
 
-The detection power depends critically on whether scores are CONTINUOUS
-or BINARY (PASS/FAIL). Both regimes are analyzed below for N=6, δ=0.05
-using the correct Studentized-range constant c = q_{∞,6,0.05}/√2 = 2.850.
-
-#### A. Continuous scores in [0, 1] (Likert ≥ 5 levels recommended)
-
-Under a normal-approximation model the required block count to detect
-a true mean-gap Δ between two candidates scales as
-
-    B_continuous(Δ)  ~  c² · (N(N+1)/6) · σ_block² / Δ²
-
-where σ_block² is the per-block variance of the pairwise rank gap
-(depends on the rubric distribution; ≤ N²/12 ≈ 3 in the worst case).
-This is a rough envelope only — exact values depend on the score
-distribution and should be measured empirically per task.
-
-#### B. Binary PASS/FAIL scores
-
-With binary scores in each block the pairwise rank gap is exactly 3
-when one PASSes and the other FAILs, and 0 otherwise:
-
-    E[R_i - R_j | one block]  =  3 · (p_i - p_j)  =  3·Δ
-    Var[R_i - R_j | one block]  ≤  9
-
-where Δ = p_i - p_j is the true PASS-rate gap. The Nemenyi post-hoc
-requires Σ_blocks (R_i - R_j) > c · √(B·N(N+1)/6) = c·√(7B) with
-c = 2.850 at N=6, δ=0.05:
-
-    3·B·Δ  >  2.850 · √(7B)
-    ⇒  B  >  (2.514 / Δ)²  ≈  6.32 / Δ²
-
-    Δ        Required B
-    0.7      13     ← detectable within D=20
-    0.5      26     ← NOT detectable at D=20
-    0.4      40     ← NOT detectable at D=20
-    0.3      71     ← NOT detectable at D=20
-
-**PASS/FAIL rubrics at N=6 can only resolve PASS-rate gaps Δ ≥ 0.7
-within the default D=20 dimensions.** Smaller gaps require more
-dimensions, a finer-grained rubric, or fewer candidates.
-
-#### Recommendation
-
-For the small-N×D regime targeted by this package, use a Likert rubric
-(3 or 5 levels). This package exposes `f_race.LIKERT5_RUBRIC` as a
-ready-to-use 5-level template. Pass it via `ctx.rubric` to enable
-finer discrimination at the cost of a slightly more complex evaluator
-prompt.
-
-The PASS/FAIL `DEFAULT_RUBRIC` is retained for backwards compatibility
-and for cases where the score gap is large (Δ ≥ 0.4).
-
-### Empirical validation (N=6, D=20, min_blocks=5, δ=0.05, binary rubric) {#empirical-validation-n-6-d-20-min-blocks-5-0-05-binary-rubric}
-
-50 trials × 6 gap scenarios with a deterministic Bernoulli mock judge
-(candidates drawn as Bernoulli(p_i) per block):
-
-    Δ      Fire rate   Avg kills   First kill    Avg evals   Saving
-    0.8    100%        2.58        block  7.7     96.4       19.7%
-    0.7    100%        2.02        block  8.4    102.6       14.5%
-    0.5     84%        1.10        block 13.2    113.1        5.8%
-    0.3     22%        0.24        block 13.9    118.6        1.2%
-    0.1      6%        0.06        block 17.7    119.9        0.1%
-    0.0      0%        0.00        —             120.0        0.0%
-
-Δ=0 produced ZERO spurious kills across 50 trials, consistent with
-δ=0.05 Type I control under repeated testing. Observed first-kill
-blocks are EARLIER than the expected-value lower bound
-B_min ≈ 6.32/Δ² because the bound ignores variance-driven upside
-fluctuations — treat B_min as a pessimistic floor, not a point
-prediction. At Δ=0.5 the bound says B=26 > D=20 (nominally
-"undetectable") yet 84% of trials still fire thanks to variance.
-
-The package complements cs_pruner: use cs_pruner.layer2 (Successive
-Halving) for coarse drops, and f_race when fine discrimination is
-needed at the small-N×D scale.
-
-### Theoretical foundations {#theoretical-foundations}
-
-  Friedman, M. (1937) "The use of ranks to avoid the assumption of
-    normality implicit in the analysis of variance," J. Am. Stat.
-    Assoc. 32(200): 675–701.
-  Birattari, Stützle, Paquete, Varrentrapp (2002) "A racing algorithm
-    for configuring metaheuristics," GECCO, §3 — original F-Race.
-  Nemenyi, P. B. (1963) "Distribution-free Multiple Comparisons,"
-    PhD thesis, Princeton University — post-hoc pairwise comparison
-    after Friedman (normal-approximation z form used here).
-  Demšar, J. (2006) "Statistical Comparisons of Classifiers over
-    Multiple Data Sets," JMLR 7:1–30 — modern reference for the
-    Friedman + Nemenyi pipeline as implemented here.
-
-Algorithm:
-  1. Generate N candidates.
-  2. For each rubric dimension k = 1..D (= one block):
-       a. Query the judge in parallel for every alive candidate's
-          score on dimension k. Score ∈ [0, 1] (PASS/FAIL or numeric).
-       b. Rank the alive candidates within this block (average ranks
-          on ties; lower-is-worse, so highest score gets rank N_alive).
-       c. Append the rank vector to the history.
-       d. If B >= min_blocks_before_race, compute Friedman Q. If
-          Q > χ²_{N_alive - 1, 1-δ}, eliminate every candidate whose
-          rank-sum is more than the Nemenyi critical difference below
-          the best.
-  3. Return ranking by mean rank (alive first, then eliminated).
-
-Usage:
-  local f_race = require("f_race")
-  return f_race.run(ctx)
-
-### Kill rate limit (important) {#kill-rate-limit-important}
+The Nemenyi post-hoc requires
+`Σ_blocks (R_i - R_j) > c · √(B·N(N+1)/6)` with
+`c = q_{∞,6,0.05}/√2 = 2.850`, giving `B > (2.514 / Δ)² ≈ 6.32 / Δ²`.
+A PASS/FAIL rubric at `N=6` can therefore only resolve PASS-rate gaps
+`Δ ≥ 0.7` within the default `D=20` dimensions; smaller gaps need
+more dimensions or a finer rubric. Use the bundled
+`f_race.LIKERT5_RUBRIC` for finer discrimination.
 
 Each elimination event resets `rank_history` (because the alive set
 changes and the Friedman statistic must be computed over a uniform
-set of candidates). After a reset the algorithm must re-accumulate
-`min_blocks_before_race` blocks before the next race check can fire.
+set). After a reset the algorithm re-accumulates
+`min_blocks_before_race` blocks before the next race check can fire,
+so the maximum number of race rounds within `D` dimensions is roughly
+`⌊D / min_blocks_before_race⌋` (at most 4 with defaults).
 
-⇒ The maximum number of race rounds within D dimensions is roughly
-    ⌊D / min_blocks_before_race⌋.
+The Nemenyi critical difference absorbs pairwise FWER via the
+Studentized range distribution, so no extra Bonferroni is needed at a
+single time point. However the implementation tests at every block
+beyond `min_blocks_before_race`, which is repeated testing and
+inflates time-aggregated Type I error above the nominal δ. This is
+not anytime-valid in the formal Howard (2021) sense. Inflation is
+bounded by `≈ ⌊D/min_blocks⌋ + resets`, so with `D=20`,
+`min_blocks=5` the effective α is at most a small constant multiple
+of δ. Tighten `delta` (e.g. 0.01) if strict δ control is required, or
+enable `alpha_spending`.
 
-With the defaults (D=20, min_blocks_before_race=5) this caps the
-algorithm at **at most 4 elimination rounds**. If you need more
-aggressive pruning, lower `min_blocks_before_race` (at the cost of
-less stable Friedman estimates) or increase D.
+## Empirical validation {#empirical-validation}
 
-### Post-hoc multiplicity and sequential testing {#post-hoc-multiplicity-and-sequential-testing}
+50 trials × 6 gap scenarios with a deterministic Bernoulli mock judge
+(`N=6`, `D=20`, `min_blocks=5`, `δ=0.05`, binary rubric):
 
-The Nemenyi critical difference already absorbs the pairwise FWER
-via the Studentized range distribution (q_{∞,k,α}/√2), so no extra
-Bonferroni step is needed at a single time point. The Friedman global
-test gates the post-hoc as in Demšar (2006).
+```text
+Δ      Fire rate   Avg kills   First kill    Avg evals   Saving
+0.8    100%        2.58        block  7.7     96.4       19.7%
+0.7    100%        2.02        block  8.4    102.6       14.5%
+0.5     84%        1.10        block 13.2    113.1        5.8%
+0.3     22%        0.24        block 13.9    118.6        1.2%
+0.1      6%        0.06        block 17.7    119.9        0.1%
+0.0      0%        0.00        —             120.0        0.0%
+```
 
-However, this implementation applies the test at every block beyond
-`min_blocks_before_race`, which is REPEATED testing of the same null
-and inflates the time-aggregated Type I error above the nominal δ.
-This is NOT corrected by the warmup window and is NOT anytime-valid
-in the formal Howard 2021 sense. The inflation is bounded by the
-number of look-ahead opportunities (≈ ⌊D/min_blocks⌋ + resets), so
-in practice with D=20, min_blocks=5 the effective α is at most a
-small constant multiple of δ. Tighten `delta` (e.g. 0.01) if strict
-δ control is required.
+`Δ=0` produced zero spurious kills across 50 trials, consistent with
+δ=0.05 Type I control under repeated testing.
 
-Parameters:
-  ctx.task (required)              Problem statement
-  ctx.n_candidates (default 6)     Number of candidates
-  ctx.rubric (default 20-dim)      List of {name, criterion}
-  ctx.delta (default 0.05)         Significance level for Friedman test.
-                                   Resolved to the largest tabulated α
-                                   that is ≤ delta. Tabulated levels:
-                                   0.05, 0.025, 0.0125, 0.01, 0.005,
-                                   0.0025, 0.001 (conservative rounding).
-  ctx.min_blocks_before_race (5)   Warmup: no elimination before this B
-  ctx.score_domain (default {0,1}) Used only for clipping
-  ctx.gen_tokens (default 400)     Max tokens per candidate generation
-  ctx.on_kill                      function(candidate_index, state)
-  ctx.on_survive                   function(candidate_index, state)
-  ctx.alpha_spending (default false)
-                                   Opt-in sequential testing correction.
-                                   When true, the Friedman test is gated
-                                   to fixed checkpoints spaced
-                                   `min_blocks_before_race` apart, and
-                                   the internal δ is downgraded one
-                                   table step (0.05 → 0.01) whenever
-                                   the per-segment look budget K_max =
-                                   ⌊D/min_blocks⌋ ≥ 2. Coarse Bonferroni-
-                                   via-table-step; recommended whenever
-                                   strict δ control matters.
+## Comparison with related packages {#comparison-with-related-packages}
 
-Comparison with related packages:
-  cs_pruner       — anytime-valid CS, requires t in the hundreds.
-  gumbel_search   — Sequential Halving, batched.
-  listwise_rank   — post-hoc full ranking, no early stop.
-  pairwise_rank   — pairwise tournament, no statistical test.
-  f_race          — block-by-block ranks + Friedman + Nemenyi
-                    post-hoc. Sequential (NOT anytime-valid); see
-                    "Post-hoc multiplicity and sequential testing"
-                    above for the caveat on repeated testing.
+- `cs_pruner` — anytime-valid CS, requires `t` in the hundreds.
+- `gumbel_search` — Sequential Halving, batched.
+- `listwise_rank` — post-hoc full ranking, no early stop.
+- `pairwise_rank` — pairwise tournament, no statistical test.
+- `f_race` — block-by-block ranks + Friedman + Nemenyi post-hoc.
+  Sequential (not anytime-valid); see Caveats.
+
+## References {#references}
+
+- Friedman, M. (1937). "The use of ranks to avoid the assumption of
+  normality implicit in the analysis of variance". J. Am. Stat.
+  Assoc. 32(200): 675-701.
+- Birattari, M., Stützle, T., Paquete, L., Varrentrapp, K. (2002).
+  "A racing algorithm for configuring metaheuristics". GECCO §3.
+- Nemenyi, P. B. (1963). "Distribution-free Multiple Comparisons".
+  PhD thesis, Princeton University.
+- Demšar, J. (2006). "Statistical Comparisons of Classifiers over
+  Multiple Data Sets". JMLR 7:1-30.
 
 ## Parameters {#parameters}
 
@@ -2929,14 +2915,40 @@ Returns:
 <!-- ── faithful.md ── -->
 
 
-# faithful — Faithful Chain-of-Thought with formal verification
+# faithful(Faithful) — faithful chain-of-thought with formal verification
 
-> Translates natural language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
+> Translates natural-language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural-language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local faithful = require("faithful")
+return faithful.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 3-4 LLM calls:
+
+1. Reason — natural-language chain-of-thought.
+2. Formalize — translate reasoning to a formal representation.
+3. Verify — check the formal representation for correctness.
+4. Answer — produce the final answer grounded in verification.
+
+## References {#references}
+
+- Lyu, Q. et al. (2023). "Faithful Chain-of-Thought Reasoning".
+  https://arxiv.org/abs/2301.13379
+- Gao, L. et al. (2023). "PAL: Program-Aided Language Models".
+  https://arxiv.org/abs/2211.10435
 
 ## Parameters {#parameters}
 

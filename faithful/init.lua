@@ -1,27 +1,32 @@
---- faithful — Faithful Chain-of-Thought with formal verification
+--- faithful(Faithful) — faithful chain-of-thought with formal verification
 ---
---- Translates natural language reasoning into a formal representation
+--- Translates natural-language reasoning into a formal representation
 --- (code, logic, or structured proof) for verification, then produces
---- a natural language answer grounded in the verified formal output.
+--- a natural-language answer grounded in the verified formal output.
 --- Catches reasoning errors that are invisible in natural language.
 ---
---- Based on: Lyu et al., "Faithful Chain-of-Thought Reasoning" (2023,
---- arXiv:2301.13379) + Gao et al., "PAL: Program-Aided Language Models"
---- (2023, arXiv:2211.10435)
+--- ## Usage
 ---
---- Pipeline (3-4 LLM calls):
----   Step 1: Reason     — natural language chain-of-thought
----   Step 2: Formalize  — translate reasoning to formal representation
----   Step 3: Verify     — check formal representation for correctness
----   Step 4: Answer     — produce final answer grounded in verification
+--- ```lua
+--- local faithful = require("faithful")
+--- return faithful.run(ctx)
+--- ```
 ---
---- Usage:
----   local faithful = require("faithful")
----   return faithful.run(ctx)
+--- ## Algorithm
 ---
---- ctx.task (required): The problem to solve
---- ctx.format: Formal representation type — "code", "logic", or "auto" (default: "auto")
---- ctx.gen_tokens: Max tokens per step (default: 500)
+--- The pipeline uses 3-4 LLM calls:
+---
+--- 1. Reason — natural-language chain-of-thought.
+--- 2. Formalize — translate reasoning to a formal representation.
+--- 3. Verify — check the formal representation for correctness.
+--- 4. Answer — produce the final answer grounded in verification.
+---
+--- ## References
+---
+--- - Lyu, Q. et al. (2023). "Faithful Chain-of-Thought Reasoning".
+---   https://arxiv.org/abs/2301.13379
+--- - Gao, L. et al. (2023). "PAL: Program-Aided Language Models".
+---   https://arxiv.org/abs/2211.10435
 
 local S = require("alc_shapes")
 local T = S.T

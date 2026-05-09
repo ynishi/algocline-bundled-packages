@@ -158,7 +158,7 @@
 - [ab_select](narrative/ab_select.md): Multi-fidelity Thompson sampling over a fixed candidate pool.
 - [cost_pareto](narrative/cost_pareto.md): Multi-objective Pareto dominance, frontier extraction, and layered ranking.
 - [cs_pruner](narrative/cs_pruner.md): Anytime-valid candidate pruning via empirical-Bernstein confidence sequences.
-- [f_race](narrative/f_race.md): Friedman race partial-data pruner. Block-wise ranking of candidates over rubric dimensions; eliminates candidates whose mean rank is significantly worse than the best by a Friedman + Nemenyi post-h...
+- [f_race](narrative/f_race.md): Friedman race partial-data pruner with Nemenyi post-hoc elimination.
 - [listwise_rank](narrative/listwise_rank.md): Zero-shot listwise reranking — RankGPT-style permutation generation in 1 LLM call. Resolves the calibration problem of pointwise scoring. Sliding window for large N.
 - [mbr_select](narrative/mbr_select.md): Minimum Bayes Risk selection — picks the candidate with highest expected agreement across all others. Bayes-optimal selection without bracket luck or position bias.
 - [moa](narrative/moa.md): Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement
@@ -175,7 +175,7 @@
 
 - [abm](narrative/abm.md): Agent-based modeling framework with Monte Carlo and sensitivity sweep.
 - [boids_abm](narrative/boids_abm.md): Reynolds boids flocking simulation (separation, alignment, cohesion).
-- [epidemic_abm](narrative/epidemic_abm.md): SIR Agent-Based epidemic model — stochastic individual-level disease transmission with tunable R0. Emergent epidemic curves, herd immunity thresholds, and stochastic extinction.
+- [epidemic_abm](narrative/epidemic_abm.md): SIR agent-based epidemic simulation with tunable R0.
 - [evogame_abm](narrative/evogame_abm.md): Evolutionary Game Theory ABM — iterated games with selection and mutation. Prisoner's Dilemma, Hawk-Dove, or custom payoff matrices. Based on Axelrod (1984).
 - [hybrid_abm](narrative/hybrid_abm.md): LLM-as-Parameterizer ABM — LLM extracts sim parameters, Pure Lua ABM runs Monte Carlo simulation + sensitivity sweep. Based on FCLAgent (arXiv:2510.12189) hybrid architecture.
 - [opinion_abm](narrative/opinion_abm.md): Hegselmann-Krause Bounded Confidence opinion dynamics — agents update opinions by averaging nearby opinions within threshold ε. Emergent consensus, polarization, or fragmentation.
@@ -196,7 +196,7 @@
 - [conformal_vote](narrative/conformal_vote.md): Split conformal prediction gate for multi-agent deliberation
 - [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual simulation to verify causal faithfulness of a reasoning chain.
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
-- [eval_guard](narrative/eval_guard.md): Evaluation safety gates for multi-agent systems — self-critique guard (N2, Huang ICLR 2024), baseline enforcement (N3, Wang-Kapoor 2024), contamination shield (N4, Zhu EMNLP 2024). Pre-flight che...
+- [eval_guard](narrative/eval_guard.md): Multi-agent evaluation safety gates (self-critique / baseline / contamination).
 - [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring
 - [inverse_u](narrative/inverse_u.md): Inverse-U scaling detection — detects non-monotonic accuracy-vs-N curves where adding more agents degrades performance. Safety gate for multi-agent scaling (Chen et al. NeurIPS 2024, Theorem 2).
 - [negation](narrative/negation.md): Adversarial self-test — generate destruction conditions and verify answer survival

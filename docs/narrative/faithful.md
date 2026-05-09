@@ -8,14 +8,40 @@ source: faithful/init.lua
 generated: gen_docs (V0)
 ---
 
-# faithful — Faithful Chain-of-Thought with formal verification
+# faithful(Faithful) — faithful chain-of-thought with formal verification
 
-> Translates natural language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
+> Translates natural-language reasoning into a formal representation (code, logic, or structured proof) for verification, then produces a natural-language answer grounded in the verified formal output. Catches reasoning errors that are invisible in natural language.
 
 ## Contents
 
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local faithful = require("faithful")
+return faithful.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+The pipeline uses 3-4 LLM calls:
+
+1. Reason — natural-language chain-of-thought.
+2. Formalize — translate reasoning to a formal representation.
+3. Verify — check the formal representation for correctness.
+4. Answer — produce the final answer grounded in verification.
+
+## References {#references}
+
+- Lyu, Q. et al. (2023). "Faithful Chain-of-Thought Reasoning".
+  https://arxiv.org/abs/2301.13379
+- Gao, L. et al. (2023). "PAL: Program-Aided Language Models".
+  https://arxiv.org/abs/2211.10435
 
 ## Parameters {#parameters}
 
