@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`card_analysis` package** (new, category=`debugging`, 118th package):
+  default analyzer pkg dispatched by the host MCP tool
+  `alc_card_analyze` (`algocline-app::DEFAULT_CARD_ANALYZE_PKG =
+  "card_analysis"`). Reads a Card body + samples sidecar, detects
+  failure samples across 4 heuristic OR paths
+  (`admission=fail` / `status∈{fail,error}` / `passed=false` /
+  `score<0.5`) with no-signal fallback (entire sample pool when
+  no heuristic matches), then issues one `alc.llm` call requesting
+  STRICT JSON. `alc.json_extract` parses the response into the
+  host-side typed struct
+  `algocline-app::service::card::CardAnalyzeResult` shape:
+  `{ pattern, suggested_change, confidence, failure_count?,
+  sample_count? }`. On parse failure the raw LLM output is preserved
+  in `_raw_llm` (compacted to 2000 chars) with `confidence=0.0`.
+  Migrated from POC at `~/.algocline/packages/card_analysis/init.lua`
+  with bundled refinements: `M.spec` added with inline `T.shape`
+  for both input and result, `S.instrument(M, "run")` wrapper
+  applied, docstring refined to bundled D1 + `## Usage` /
+  `## Algorithm` / `## Failure detection` / `## Output` /
+  `## Caveats` / `## References` per pkg-author-conventions §F.
+  Test coverage: `tests/test_card_analysis.lua` (5 cases / 6 tests:
+  happy path / input validation / empty samples sentinel / 4 failure
+  heuristic paths + no-signal fallback / LLM unparseable fallback;
+  all 6/6 PASS via mlua-probe-mcp).
+
 ## [0.22.1] - 2026-05-09
 
 ### Removed

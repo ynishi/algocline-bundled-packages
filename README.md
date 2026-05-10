@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (117)
+## Packages (118)
 
 ### Reasoning
 
@@ -148,6 +148,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[step_verify](step_verify/)** | Step-level reasoning verification (PRM-style). Scores each intermediate reasoning step for logical correctness, identifies the first point of failure, and re-derives from the last correct step. Unlike cove (fact-checking) or factscore (claim verification), targets logical validity of reasoning chains | PRM Survey (2025), ThinkPRM (2025), DiVeRSe |
 | **[negation](negation/)** | Adversarial self-test. Generates destruction conditions (edge cases, counterexamples) and verifies the answer survives them. External challenge unlike reflect's internal critique | Huang et al. (2023) |
 | **[bisect](bisect/)** | Binary search for reasoning errors. Locates the first incorrect step in O(log n), then regenerates from that point. Surgical error correction | arXiv:2410.08146 (2024) |
+| **[card_analysis](card_analysis/)** | Card failure pattern analyzer. Reads a Card body + samples sidecar, detects failures across 4 heuristics (admission/status/passed/score), and asks the LLM for one-line pattern + concrete suggested_change. Default analyzer dispatched by the host MCP tool `alc_card_analyze` | algocline `alc_card_analyze` host contract |
 | **[blind_spot](blind_spot/)** | Self-Correction Blind Spot bypass. Re-presents the model's own output as an external source to trigger genuine error correction, overcoming self-correction failure modes | arXiv:2507.02778 (2025) |
 | **[claim_trace](claim_trace/)** | Span-level evidence attribution. Traces each claim to supporting source spans for transparent provenance. Composable post-filter for any generation | Bohnet et al. (2022), Gao et al. (2023) |
 | **[critic](critic/)** | Rubric-based structured evaluation. Per-dimension scoring with targeted revision of weak areas. More systematic than reflect's free-form critique | Zheng et al. (2023) |
