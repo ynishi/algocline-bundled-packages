@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-09T05:22:40Z",
+  "updated_at": "2026-05-10T07:05:49Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -152,6 +152,18 @@
       "description": "Confidence-gated reasoning — fast path when confident, escalation when not",
       "category": "meta",
       "docstring": "calibrate(Calibrate) — confidence-gated adaptive reasoning\n\nAsks the LLM to solve a task and self-assess its confidence. When\nconfidence is below the threshold the entry escalates to a heavier\nstrategy (ensemble, panel, or a custom fallback).\n\n## Usage\n\n```lua\nlocal calibrate = require(\"calibrate\")\nreturn calibrate.run(ctx)      -- full gated escalation\nreturn calibrate.assess(ctx)   -- confidence assessment only (1 call)\n```\n\n## Algorithm\n\n1. Generate an initial attempt and a self-reported confidence score.\n2. If confidence is at or above `threshold`, return the initial answer.\n3. Otherwise escalate via the configured `fallback` (ensemble, panel,\nor retry) with `fallback_opts`.\n\n## References\n\n- \"CISC: Confidence-Informed Self-Consistency\". ACL Findings 2025.",
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "card_analysis",
+      "version": "0.1.0",
+      "description": "Card failure analyzer — single-card improvement hint generator",
+      "category": "debugging",
+      "docstring": "card_analysis(CardAnalysis) — Card failure analyzer with one-line improvement hint\n\nReads a Card body + its samples sidecar, detects failure samples\nacross common shape conventions, asks the LLM for one structured\nimprovement hint (pattern + suggested_change + confidence).\n\nThis is the default analyzer pkg dispatched by the host MCP tool\n`alc_card_analyze` (algocline `DEFAULT_CARD_ANALYZE_PKG = \"card_analysis\"`).\nThe host loads the Card body and samples sidecar into ctx; this pkg\nruns the LLM-based pattern analysis and writes the result back.\n\n## Usage\n\nNormally invoked via the host MCP tool:\n\n```jsonc\nalc_card_analyze({ card_id: \"<id>\", pkg: \"card_analysis\" })\n```\n\nDirect Lua usage (testing / custom hosts):\n\n```lua\nlocal card_analysis = require(\"card_analysis\")\nreturn card_analysis.run({\ncard_id = \"...\",\ncard    = <full card body>,\nsamples = { ... },  -- raw samples.jsonl rows\n})\n```\n\n## Algorithm\n\nThree-step single-shot analyzer:\n\n1. **Failure detection** — scan `ctx.samples` for failure rows using\na multi-heuristic OR (admission/status/passed/score), then build\nthe analysis pool (failures, or all samples on no-signal fallback).\n2. **Prompt build** — render the first ≤8 failures with a stable\nfield projection (`name` / `case` / `input` / `prompt` / `expected`\n/ `response` / `detail` / `score` / `grades`), each value compacted\nto ≤400 chars, plus Card metadata (`pkg.name` / `scenario.name`\n/ `model.id`).\n3. **LLM + JSON parse** — single `alc.llm` call requesting STRICT JSON;\n`alc.json_extract` parses the response. On parse failure the raw\noutput is preserved verbatim (compacted) in `_raw_llm` and a\nsentinel result is returned with `confidence = 0.0`.\n\n## Failure detection\n\nSample shapes vary across pkgs. The analyzer recognizes any of:\n\n* `admission == \"fail\"`            (flow_design / flow_refine_orch)\n* `status   == \"fail\" | \"error\"`   (status-based pkgs)\n* `passed   == false`              (recipe_safe_panel pattern)\n* `score    < 0.5`                 (numeric grader)\n\nIf none of those signals are present, the pkg falls back to \"all\nsamples are interesting\" and lets the LLM judge.\n\n## Output (`ctx.result`)\n\n```jsonc\n{\n\"pattern\":          \"<one-line failure pattern summary>\",\n\"suggested_change\": \"<concrete prompt or Lua-level change>\",\n\"confidence\":       0.0–1.0,\n\"failure_count\":    <int>,    // optional (always present in current impl)\n\"sample_count\":     <int>     // optional (always present in current impl)\n}\n```\n\nThe output shape is locked to the host-side typed struct\n`algocline-app::service::card::CardAnalyzeResult` so the result\nround-trips through MCP without re-encoding.\n\n## Caveats\n\n- Single LLM call by design; no chain / no self-critique. Higher-quality\nanalysis loops belong in a separate pkg (e.g. recipe-style multi-step).\n- The first 8 failures are sampled when the failure pool exceeds 8;\nlater failures are not visible to the LLM in this version.\n- On `samples == 0`, returns a no-samples sentinel without calling the\nLLM (cost-free guard).\n\n## References\n\n- Host MCP tool contract: `algocline-mcp::service::alc_card_analyze`\n(algocline crate, ctx contract literal in tool description).\n- Host result struct: `algocline-app::service::card::CardAnalyzeResult`.",
       "source": {
         "type": "unknown"
       },

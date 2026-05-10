@@ -163,6 +163,18 @@
 
 ---@alias AlcPkgResult_calibrate AlcResultCalibrated
 
+---@class AlcPkgInput_card_analysis
+---@field card any @Full Card body (host-loaded from card_id)
+---@field card_id string @Card identifier (host-provided)
+---@field samples any[] @samples sidecar rows (host-loaded; may be empty)
+
+---@class AlcPkgResult_card_analysis
+---@field confidence number @0.0..=1.0 diagnostic confidence
+---@field failure_count? number @Detected failure sample count (Option<u64> on host side)
+---@field pattern string @One-line failure pattern summary
+---@field sample_count? number @Total samples processed (Option<u64> on host side)
+---@field suggested_change string @Concrete change proposal (1-3 sentences, actionable)
+
 ---@class AlcPkgInput_cascade
 ---@field gen_tokens? number @Max tokens per generation call (default 400)
 ---@field max_level? number @Maximum cascade level to attempt (default 3)

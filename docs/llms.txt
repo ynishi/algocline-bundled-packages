@@ -38,6 +38,7 @@
 ## debugging
 
 - [bisect](narrative/bisect.md): Binary search to locate the first incorrect step in a reasoning chain.
+- [card_analysis](narrative/card_analysis.md): Card failure analyzer — single-card improvement hint generator
 
 ## evaluation
 
