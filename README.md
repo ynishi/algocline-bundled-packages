@@ -88,7 +88,6 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[ucb](ucb/)** | UCB1 hypothesis exploration. Generates, scores, and refines hypotheses using UCB1 selection | — |
 | **[rank](rank/)** | Best-of-N sampling with tournament selection. Pairwise comparison via LLM-as-Judge | Zheng et al. (2023) |
 | **[triad](triad/)** | Three-role adversarial debate. Proponent, opponent, and judge engage in multi-round argumentation | Du et al. (2023) |
-| **[moa](moa/)** | Mixture of Agents. Layered multi-agent aggregation — each layer's agents see all previous layer outputs for cross-pollination and refinement | Wang et al. (2024) |
 | **[ab_select](ab_select/)** | Adaptive Branching Selection. Multi-fidelity Thompson sampling over a fixed candidate pool — cheap→expensive evaluator cascade allocates expensive evaluations only to promising candidates. Unique multi-fidelity axis vs other selection packages | Inoue et al. "AB-MCTS" (NeurIPS 2025 Spotlight) |
 | **[listwise_rank](listwise_rank/)** | Zero-shot listwise reranking. Single-LLM-call permutation generation with sliding window for large N. Resolves the calibration problem of pointwise scoring (LLMs cannot output well-calibrated absolute scores). SOTA on TREC-DL/BEIR | Sun et al. "RankGPT" (EMNLP 2023), Pradeep et al. "RankZephyr" (2023) |
 | **[pairwise_rank](pairwise_rank/)** | Pairwise Ranking Prompting (PRP). Bidirectional pairwise comparisons (queries both A,B and B,A to cancel position bias) with Copeland-style aggregation. Highest-accuracy LLM reranker — Flan-UL2 20B with PRP matches GPT-4 on TREC-DL. Modes: allpair (O(N²)) or sorting (O(N log N)) | Qin et al. (NAACL 2024 Findings) |
@@ -108,6 +107,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[condorcet](condorcet/)** | Condorcet Jury Theorem. Majority-vote probability, Anti-Jury detection, optimal panel sizing, and independence verification for multi-agent voting systems. Quantifies when adding agents helps vs hurts | Condorcet (1785), Dietrich & List (2008) |
 | **[ensemble_div](ensemble_div/)** | Ambiguity Decomposition. Krogh-Vedelsby identity E = Ē − Ā — the ensemble always beats the weighted average of individuals when there is any disagreement. Quantifies how much agent diversity reduces ensemble error | Krogh & Vedelsby (NeurIPS 1995), Hong & Page (PNAS 2004) |
 | **[kemeny](kemeny/)** | Kemeny-Young rank aggregation. Axiomatically unique consensus ranking that minimizes total Kendall tau distance. Exact for m ≤ 8, Borda fallback for larger candidate sets. Condorcet-consistent | Kemeny (1959), Young & Levenglick (1978) |
+| **[moa](moa/)** | Mixture-of-Agents (paper-explicit). L=3 layers × n=6 proposers per layer (Wang §3 main config; MoA-Lite L=2 for cost). Each layer applies the Aggregate-and-Synthesize prompt (Table 1 verbatim) — `y_i = ⊕[A_{i,j}(x_i)] + x_1`. Caller supplies `proposers` (paper-faithful, distinct models) or `personas` (X alt path, single model + persona rotation). Total L·(n+1) LLM calls | Wang et al. (arXiv:2406.04692, 2024) |
 | **[pbft](pbft/)** | Practical Byzantine Fault Tolerance. 3-phase LLM consensus (propose → prepare → commit) with BFT quorum guarantees. Tolerates f Byzantine agents given n ≥ 3f+1 | Castro & Liskov (OSDI 1999) |
 | **[isp_aggregate](isp_aggregate/)** | Paper-faithful ISP / OW / OW-I aggregation via an M×N calibration tensor (pairwise conditional `P̂(A_i=s\|A_j=a)` per §4.3). Pure-helper split mirrors conformal_vote (calibrate → run). Non-paper-faithful `meta_prompt_sp` INJECT for calibration-free settings (Prelec-Seung-McCoy 2017 style). MMLU: OW-I vs MV +1.05pt overall / +3.36pt disagreement subset (§5.4 Table 3; OW-L ties with OW-I in paper but is STUB in v1) | Zhang et al. arXiv:2510.01499 (2025) |
 
@@ -563,7 +563,7 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 |---|---|---|
 | pre_mortem | ~19/proposal + ranking | Feasibility-gate proposals, then rank accepted ones |
 | ucb | ~11 | UCB1 hypothesis exploration |
-| moa | ~4-8 | Layered multi-agent aggregation |
+| moa | L×(n+1) | Mixture-of-Agents (L proposer layers + 1 aggregator per layer; default L=3, n=6 → 21; MoA-Lite L=2, n=6 → 14; paper Wang 2024) |
 | panel | ~5-8 | Multi-perspective deliberation |
 | rstar | ~4-6 | Mutual reasoning verification (2 paths cross-verify) |
 | cove | ~4-6 | Chain-of-verification |

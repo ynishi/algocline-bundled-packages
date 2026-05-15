@@ -86,6 +86,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Resolves the v0.1.0 internal inconsistency where the package cited
     Du 2023 while implementing a different paper's methodology.
 
+- **`moa` package — paper-explicit rewrite (v0.1.0 → v0.2.0, breaking
+  result shape + category change `selection` → `aggregation`)**. v0.1.0
+  cited Wang 2024 but implemented a hardcoded-5-PERSONA single-model
+  loop with no Aggregate-and-Synthesize prompt and no clear mapping to
+  the paper's §2.2 equation. v0.2.0 is paper-explicit:
+  - Algorithm: For each layer i = 1..L, n proposers produce responses
+    `A_{i,1..n}(x_i)`, then the aggregator applies the Aggregate-and-
+    Synthesize prompt: `y_i = ⊕[A_{i,j}(x_i)] + x_1`, `x_{i+1} = y_i`.
+    The final layer's aggregator output is the answer.
+    Total LLM calls = L · (n + 1).
+  - Defaults (L from Wang §3 main exp): L = 3 layers, n = 6 proposers.
+    MoA-Lite (L = 2) supported via `n_layers` override. (X) infrastructure
+    defaults: temperature = 0.7 (matches paper's single-proposer ablation
+    value; main exp not explicitly stated), proposer_tokens = 512,
+    aggregator_tokens = 2048.
+  - `AS_PROMPT_TEMPLATE` (L) verbatim from Wang 2024 Table 1:
+    `"You have been provided with a set of responses from various
+    open-source models … critically evaluate … synthesize … refined,
+    accurate, and comprehensive reply … well-structured, coherent …"`
+  - Spec entries (3): `build_proposer_prompt` (pure), `build_aggregator_
+    prompt` (pure), `run` (Strategy). All `S.instrument`-decorated.
+    Internal helpers exposed via `M._internal`:
+    `format_responses_for_aggregator`, `resolve_proposers`.
+  - EXTENSION POINTS: REQUIRED `ctx.task` + one of `ctx.proposers`
+    (paper-faithful path, array of `{model, system?}` specs) OR
+    `ctx.personas` (alt path, single model + persona rotation). v0.1.0's
+    hardcoded `PERSONAS` is removed — the alt-path makes persona-style
+    callability explicit and opt-in. (L)-override: `n_layers`. (X)
+    infrastructure: `temperature` / `proposer_tokens` / `aggregator_tokens`
+    / template overrides / `system_prompt`. Overriding `aggregator_prompt`
+    invalidates the AS_PROMPT (L) guarantee.
+  - Result shape (breaking from v0.1.0): `{answer, n_layers, n_proposers,
+    layers[{layer, proposers[{proposer, model?, text}], aggregated}],
+    total_llm_calls}`. v0.1.0's `n_agents` / `total_calls` /
+    `layer_outputs` fields are renamed to `n_proposers` /
+    `total_llm_calls` / `layers` with richer per-layer record shape
+    (now includes the explicit aggregator output per layer).
+  - Category: `selection` → `aggregation` (paper §2.2 is explicitly
+    aggregation: the Aggregate-and-Synthesize operator ⊕).
+  - Paper proposer models (Wang §3 main exp, Together AI tier):
+    Qwen1.5-110B-Chat, Qwen1.5-72B-Chat, WizardLM-8x22B,
+    LLaMA-3-70B-Instruct, Mixtral-8x22B-v0.1, dbrx-instruct.
+    These are (L) for reproducing paper results but NOT hardcoded by
+    the pkg (would bind to a specific API tier and exclude OSS / local
+    callers); caller supplies them via `proposers`.
+  - Test coverage: `tests/test_moa.lua` (36/36 PASS) covers meta / spec /
+    `_defaults` / AS_PROMPT_TEMPLATE verbatim / `build_proposer_prompt`
+    (layer-1 + layer-2+ + override + reject) / `build_aggregator_prompt`
+    (AS_PROMPT application + override + empty reject) / `_internal` helpers
+    (`resolve_proposers` paper-path + alt-path + neither reject) / run
+    end-to-end (L·(n+1) call count + `x_{i+1}=y_i` propagation +
+    per-layer aggregator + model id propagation + per-proposer system
+    prompt + temperature/tokens propagation + error paths).
+  - `scripts/e2e/moa.lua` rewritten for the new signature (MoA-Lite
+    L=2 / 2 personas / smoke test path).
+
 ## [0.23.0] - 2026-05-10
 
 ### Added

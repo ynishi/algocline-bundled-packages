@@ -1,38 +1,132 @@
---- moa(MoA) — Mixture-of-Agents layered multi-agent aggregation
+--- moa — Mixture-of-Agents (Wang 2024) — L-layer, n-proposer aggregation
 ---
---- Multiple agents generate responses independently, then a second layer
---- of agents improves on those responses by referencing all of them.
---- Unlike a single-round `panel`, MoA uses iterative layers where each
---- layer's agents see all previous-layer outputs, enabling
---- cross-pollination of ideas and progressive refinement.
+--- ## Primary citation
 ---
---- ## Usage
+--- Wang, J., Wang, J., Athiwaratkun, B., Zhang, C., & Zou, J. (2024).
+--- "Mixture-of-Agents Enhances Large Language Model Capabilities".
+--- arXiv:2406.04692.
+--- https://arxiv.org/abs/2406.04692
 ---
---- ```lua
---- local moa = require("moa")
---- return moa.run(ctx)
+--- ## Algorithm (Wang 2024 §2.2)
+---
+--- Layered aggregation. For each layer i, n proposer agents A_{i,1..n}
+--- generate responses to the current input x_i, and an aggregator ⊕
+--- synthesizes them into y_i, which becomes the next layer's input:
+---
+--- ```
+---   y_i     = ⊕_{j=1}^{n}[A_{i,j}(x_i)] + x_1
+---   x_{i+1} = y_i
 --- ```
 ---
---- ## Algorithm
+--- where ⊕ denotes applying the **Aggregate-and-Synthesize** prompt
+--- (Table 1) to the n proposer outputs, and `+` is text concatenation.
 ---
---- For `n_layers` layers (4-8 LLM calls typical):
+--- The default MoA configuration runs **L=3 layers** with **n=6 proposers
+--- per layer** (Wang 2024 §3 main experiment). MoA-Lite uses **L=2** for
+--- cost efficiency. The final layer's aggregator output is the answer.
 ---
---- 1. Layer 1 — `n_agents` agents generate independent responses in
----    parallel.
---- 2. Layer 2..N — each agent sees all previous-layer responses and
----    produces an improved response in parallel.
---- 3. Final — the aggregator synthesizes the best answer from the last
----    layer.
+--- ## Defaults (Wang 2024 §3)
 ---
---- ## Empirical validation
+--- | Symbol     | Value | Label | Source                                          |
+--- |------------|-------|-------|-------------------------------------------------|
+--- | L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
+--- | n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
+--- | temp       | 0.7   | (X)   | Paper §3 reports 0.7 only for single-proposer   |
+--- |            |       |       | ablation; main exp temperature not stated.      |
+--- |            |       |       | Pkg uses 0.7 as a default chosen to match the   |
+--- |            |       |       | one stated paper value (X — paper not fixed).   |
+--- | max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
+--- |            |       |       | provenance: AS_PROMPT requires synthesizing all |
+--- |            |       |       | proposer outputs, so a larger budget than       |
+--- |            |       |       | per-proposer is required by construction.       |
 ---
---- The source paper reports an AlpacaEval 2.0 LC win rate of 65.8% (SOTA
---- at publication).
+--- The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — verbatim
+--- from Wang 2024 Table 1.
 ---
---- ## References
+--- ## Proposer models (paper main experiment, Wang 2024 §3)
 ---
---- - Wang, J. et al. (2024). "Mixture-of-Agents Enhances Large Language
----   Model Capabilities". https://arxiv.org/abs/2406.04692
+--- The main MoA experiment uses these 6 open-source proposers (all
+--- accessible via Together AI):
+---
+---   - Qwen1.5-110B-Chat
+---   - Qwen1.5-72B-Chat
+---   - WizardLM-8x22B
+---   - LLaMA-3-70B-Instruct
+---   - Mixtral-8x22B-v0.1
+---   - dbrx-instruct
+---
+--- These models are (L) for reproducing paper results, but they are NOT
+--- hard-coded by this pkg — the caller MUST supply `proposers` (REQUIRED
+--- extension point). Hard-coding 6 specific Together AI model IDs would
+--- bind the pkg to a specific API tier and exclude OSS / local-model
+--- callers.
+---
+--- ## Entry contract
+---
+--- See `M.spec` below for the formal machine-readable contract:
+---
+--- - `build_proposer_prompt`   — pure, direct-args. returns { prompt, system }
+--- - `build_aggregator_prompt` — pure, direct-args. returns { prompt, system }
+--- - `run`                     — Strategy, ctx-threading. orchestrates L · n + L LLM calls
+---
+--- Two pure helpers are LLM-independent and unit-testable. `run` is the
+--- only LLM-mediated entry.
+---
+--- ## EXTENSION POINTS
+---
+--- ```
+--- ┌──────────────────────────────────────────────────────────────────────┐
+--- │ REQUIRED                                                             │
+--- │   ctx.task                  (string)         problem / user query    │
+--- │   ctx.proposers             (array, paper-faithful PATH) — list of   │
+--- │       specs, each { model = string [, system = string] }; pkg makes  │
+--- │       one LLM call per proposer per layer                            │
+--- │     OR                                                               │
+--- │   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
+--- │       array of system-prompt strings; pkg uses a single model and    │
+--- │       rotates personas per proposer. Convenient for OSS callers      │
+--- │       without 6 distinct models; departs from Wang §3 multi-model    │
+--- │       guarantee.                                                     │
+--- ├──────────────────────────────────────────────────────────────────────┤
+--- │ (L)-override OPTION                                                  │
+--- │   ctx.n_layers              (number ≥ 1)     override L=3 default    │
+--- ├──────────────────────────────────────────────────────────────────────┤
+--- │ (X) infrastructure (paper does not specify or specifies only         │
+--- │ ablation)                                                            │
+--- │   ctx.temperature           (number)         per-LLM temperature     │
+--- │   ctx.proposer_tokens       (number)         max tokens per proposer │
+--- │   ctx.aggregator_tokens     (number)         max tokens per aggreg.  │
+--- │   ctx.proposer_prompt       (string template) override proposer body │
+--- │   ctx.aggregator_prompt     (string template) override AS_PROMPT     │
+--- │   ctx.system_prompt         (string)         override proposer sys.  │
+--- ├──────────────────────────────────────────────────────────────────────┤
+--- │ Stability tier:                                                      │
+--- │   stable     : n_layers / temperature / proposer_tokens / aggreg_t   │
+--- │   v2-opt-in  : proposer_prompt / aggregator_prompt / system_prompt   │
+--- │                (template format may evolve in future versions)       │
+--- │   experimental : personas (single-model fallback, paper guarantee    │
+--- │                  not held)                                           │
+--- └──────────────────────────────────────────────────────────────────────┘
+--- ```
+---
+--- Overriding `aggregator_prompt` invalidates the AS_PROMPT_TEMPLATE
+--- (L) guarantee. Caller is responsible for keeping ⊕ semantics consistent.
+---
+--- ## Comparison with related packages
+---
+--- vs `panel` (sequential multi-role discussion): panel uses heterogeneous
+--- caller-supplied roles per turn; one model per turn. moa runs n
+--- proposers in parallel and applies an explicit Aggregate-and-Synthesize
+--- step.
+---
+--- vs `dmad` (Du 2023 Multi-Agent Debate): dmad has N agents debating
+--- (each agent sees others' previous-round answers) for R rounds and
+--- aggregates by majority vote. moa is layered hierarchical aggregation
+--- with an explicit synthesizer prompt at each layer boundary.
+---
+--- vs `sc` (Self-Consistency, Wang 2022): sc samples N independent paths
+--- from one model with majority voting. moa uses N distinct models /
+--- personas and an LLM-as-judge aggregator at each layer.
 
 local S = require("alc_shapes")
 local T = S.T
@@ -42,183 +136,364 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name = "moa",
-    version = "0.1.0",
-    description = "Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement",
-    category = "selection",
+    version = "0.2.0",
+    description = "Mixture-of-Agents (Wang 2024) — L-layer × n-proposer aggregation with Aggregate-and-Synthesize",
+    category = "aggregation",
 }
 
----@type AlcSpec
-M.spec = {
-    entries = {
-        run = {
-            input = T.shape({
-                task       = T.string:describe("Task description"),
-                n_agents   = T.number:is_optional()
-                    :describe("Agents per layer (default: 3, capped to #PERSONAS=5)"),
-                n_layers   = T.number:is_optional()
-                    :describe("Number of improvement layers (default: 2)"),
-                gen_tokens = T.number:is_optional()
-                    :describe("Max tokens per agent response (default: 400)"),
-                agg_tokens = T.number:is_optional()
-                    :describe("Max tokens for final aggregation (default: 500)"),
-            }),
-            result = T.shape({
-                answer        = T.string:describe("Final synthesized answer"),
-                n_agents      = T.number:describe("Agents per layer actually used"),
-                n_layers      = T.number:describe("Layers actually executed"),
-                total_calls   = T.number
-                    :describe("Total LLM invocations (agents * layers + 1 aggregation)"),
-                layer_outputs = T.array_of(T.array_of(T.string))
-                    :describe("Per-layer agent outputs ([layer_idx][agent_idx])"),
-            }),
-        },
-    },
+-- Centralized defaults per Wang 2024 §3.
+--   n_layers          = 3     (L) "We use 3 MoA layers" (§3 main config)
+--   n_proposers       = 6     (L) main exp uses 6 open-source proposers
+--                                 (caller must supply; this number is
+--                                 reference-only, REQUIRED extension point)
+--   temperature       = 0.7   (X) paper §3 reports 0.7 only for single-
+--                                 proposer ablation; main exp not stated.
+--                                 Default chosen to match the one
+--                                 stated paper value.
+--   proposer_tokens   = 512   (X) infrastructure, paper not specified.
+--   aggregator_tokens = 2048  (X) infrastructure, larger to accommodate
+--                                 synthesizing n proposer outputs.
+M._defaults = {
+    n_layers          = 3,
+    n_proposers       = 6,
+    temperature       = 0.7,
+    proposer_tokens   = 512,
+    aggregator_tokens = 2048,
 }
 
---- Agent personas for diversity.
-local PERSONAS = {
-    "You are an analytical expert who prioritizes logical rigor and precision.",
-    "You are a creative problem solver who considers unconventional approaches.",
-    "You are a domain specialist who draws on deep practical knowledge.",
-    "You are a critical thinker who tests assumptions and considers edge cases.",
-    "You are a systems thinker who considers interactions and second-order effects.",
-}
+-- (L) Aggregate-and-Synthesize prompt, Wang 2024 Table 1 verbatim.
+M.AS_PROMPT_TEMPLATE = "You have been provided with a set of responses from various open-source models to the latest user query. Your task is to synthesize these responses into a single, high-quality response. It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. Your response should not simply replicate the given answers but should offer a refined, accurate, and comprehensive reply to the instruction. Ensure your response is well-structured, coherent, and adheres to the highest standards of accuracy and reliability.\n\nResponses from models:\n%s"
+
+-- (X) Default proposer system prompt. Paper does not specify a system
+-- prompt for proposers (each proposer is a separate model with its own
+-- system style). When a single-model `personas` fallback is used, the
+-- per-persona string overrides this default.
+M.DEFAULT_PROPOSER_SYSTEM = "You are a helpful, accurate assistant. Respond to the user's query thoroughly."
+
+-- ─── Shape declarations ───
+
+local prompt_pair_shape = T.shape({
+    prompt = T.string:describe("LLM user prompt"),
+    system = T.string:describe("LLM system prompt"),
+}, { open = true })
+
+local proposer_spec_shape = T.shape({
+    model  = T.string:is_optional()
+        :describe("Caller-supplied model identifier (semantic, opaque to pkg)"),
+    system = T.string:is_optional()
+        :describe("Per-proposer system prompt override"),
+}, { open = true })
+
+local proposer_response_shape = T.shape({
+    proposer = T.number:describe("1-based proposer index j"),
+    model    = T.string:is_optional():describe("Echo of caller-supplied model id"),
+    text     = T.string:describe("LLM output"),
+}, { open = true })
+
+local layer_record_shape = T.shape({
+    layer        = T.number:describe("1-based layer index i"),
+    proposers    = T.array_of(proposer_response_shape)
+        :describe("Per-proposer outputs at this layer"),
+    aggregated   = T.string:describe("Aggregator (⊕) output for this layer"),
+}, { open = true })
+
+local proposer_input_shape = T.shape({
+    task            = T.string:describe("Problem statement (required)"),
+    aggregated_prev = T.string:is_optional()
+        :describe("Aggregated output from previous layer (omit at layer 1)"),
+    proposer_prompt = T.string:is_optional():describe("Override proposer template (X)"),
+    system_prompt   = T.string:is_optional():describe("Override proposer system prompt (X)"),
+}, { open = true })
+
+local aggregator_input_shape = T.shape({
+    proposer_responses = T.array_of(T.string)
+        :describe("This layer's n proposer outputs (non-empty)"),
+    aggregator_prompt  = T.string:is_optional()
+        :describe("Override AS_PROMPT_TEMPLATE (X — invalidates paper guarantee)"),
+}, { open = true })
+
+local run_input_shape = T.shape({
+    task              = T.string:describe("Problem statement (required)"),
+    proposers         = T.array_of(proposer_spec_shape):is_optional()
+        :describe("Paper-faithful PATH: array of proposer specs (each layer reuses the same list)"),
+    personas          = T.array_of(T.string):is_optional()
+        :describe("Non-paper-faithful ALT PATH: array of system-prompt strings (single model)"),
+    n_layers          = T.number:is_optional()
+        :describe("Number of layers L (default: " .. M._defaults.n_layers .. ", (L) Wang §3)"),
+    temperature       = T.number:is_optional()
+        :describe("LLM temperature (default: " .. M._defaults.temperature .. ", (X) paper not fixed)"),
+    proposer_tokens   = T.number:is_optional()
+        :describe("Max tokens per proposer (default: " .. M._defaults.proposer_tokens .. ", (X) infrastructure)"),
+    aggregator_tokens = T.number:is_optional()
+        :describe("Max tokens per aggregator (default: " .. M._defaults.aggregator_tokens .. ", (X) infrastructure)"),
+    proposer_prompt   = T.string:is_optional():describe("Override proposer prompt (X)"),
+    aggregator_prompt = T.string:is_optional():describe("Override AS_PROMPT_TEMPLATE (X)"),
+    system_prompt     = T.string:is_optional():describe("Override proposer system prompt (X)"),
+}, { open = true })
+
+local run_result_shape = T.shape({
+    answer          = T.string:describe("Final aggregator output from layer L"),
+    n_layers        = T.number:describe("L actually executed"),
+    n_proposers     = T.number:describe("n actually used (from proposers / personas length)"),
+    layers          = T.array_of(layer_record_shape)
+        :describe("Per-layer records: proposer outputs + aggregator output"),
+    total_llm_calls = T.number:describe("Total LLM calls (= L · (n + 1))"),
+}, { open = true })
+
+-- ─── Validation helpers ───
+
+local function require_string(value, name, entry)
+    if type(value) ~= "string" or value == "" then
+        error(string.format("moa.%s: %s must be a non-empty string", entry, name), 3)
+    end
+end
+
+local function require_table(value, name, entry)
+    if type(value) ~= "table" then
+        error(string.format("moa.%s: %s must be a table", entry, name), 3)
+    end
+end
+
+local function require_non_empty_array(value, name, entry)
+    require_table(value, name, entry)
+    if #value == 0 then
+        error(string.format("moa.%s: %s must be a non-empty array", entry, name), 3)
+    end
+end
+
+local function require_positive_int(value, name, entry, minval)
+    minval = minval or 1
+    if type(value) ~= "number" or value < minval or math.floor(value) ~= value then
+        error(string.format(
+            "moa.%s: %s must be an integer >= %d, got %s",
+            entry, name, minval, tostring(value)), 3)
+    end
+end
+
+-- ─── Internal helpers (not in spec, exposed via M._internal for tests) ───
+
+--- Format proposer responses into the body that fills AS_PROMPT_TEMPLATE.
+--- Paper Table 1 shows the responses are listed; this pkg numbers them
+--- "1.", "2.", … for unambiguous reference.
+local function format_responses_for_aggregator(responses)
+    local lines = {}
+    for i, resp in ipairs(responses) do
+        lines[#lines + 1] = string.format("%d. %s", i, resp)
+    end
+    return table.concat(lines, "\n\n")
+end
+
+--- Resolve proposer list:
+---   - if ctx.proposers given (paper-faithful), use it as-is
+---   - else if ctx.personas given (alt path), wrap each persona as {system=persona}
+---   - else error (one of the two REQUIRED extension points)
+local function resolve_proposers(ctx)
+    if ctx.proposers ~= nil then
+        require_non_empty_array(ctx.proposers, "proposers", "run")
+        return ctx.proposers, "proposers"
+    end
+    if ctx.personas ~= nil then
+        require_non_empty_array(ctx.personas, "personas", "run")
+        local specs = {}
+        for i, persona in ipairs(ctx.personas) do
+            if type(persona) ~= "string" or persona == "" then
+                error(string.format(
+                    "moa.run: personas[%d] must be a non-empty string", i), 3)
+            end
+            specs[i] = { system = persona }
+        end
+        return specs, "personas"
+    end
+    error("moa.run: one of ctx.proposers (paper-faithful) or ctx.personas (alt path) is REQUIRED", 3)
+end
+
+-- ─── Pure entries ───
+
+--- Build the user prompt for a proposer at any layer.
+---
+--- At layer 1: only the task is shown.
+--- At layer 2+: the previous layer's aggregated output is included as
+--- prior context so the proposer can build on it (the paper feeds the
+--- aggregated y_{i-1} back as x_i for the next layer).
+---@param args table { task, aggregated_prev?, proposer_prompt?, system_prompt? }
+---@return table { prompt, system }
+function M.build_proposer_prompt(args)
+    require_table(args, "args", "build_proposer_prompt")
+    require_string(args.task, "task", "build_proposer_prompt")
+
+    local system = args.system_prompt or M.DEFAULT_PROPOSER_SYSTEM
+
+    if args.proposer_prompt then
+        local prompt
+        if args.aggregated_prev and args.aggregated_prev ~= "" then
+            prompt = string.format(args.proposer_prompt, args.task, args.aggregated_prev)
+        else
+            prompt = string.format(args.proposer_prompt, args.task, "")
+        end
+        return { prompt = prompt, system = system }
+    end
+
+    if args.aggregated_prev and args.aggregated_prev ~= "" then
+        return {
+            prompt = string.format(
+                "Query: %s\n\nA prior aggregated response is provided below as additional context:\n\n%s\n\nProduce your best answer to the query.",
+                args.task, args.aggregated_prev),
+            system = system,
+        }
+    end
+    return {
+        prompt = string.format("Query: %s\n\nProduce your best answer.", args.task),
+        system = system,
+    }
+end
+
+--- Build the aggregator prompt = AS_PROMPT_TEMPLATE applied to the n
+--- proposer responses for one layer. This is the ⊕ operator in §2.2.
+---@param args table { proposer_responses, aggregator_prompt? }
+---@return table { prompt, system }
+function M.build_aggregator_prompt(args)
+    require_table(args, "args", "build_aggregator_prompt")
+    require_non_empty_array(args.proposer_responses, "proposer_responses", "build_aggregator_prompt")
+
+    local responses_text = format_responses_for_aggregator(args.proposer_responses)
+    local template = args.aggregator_prompt or M.AS_PROMPT_TEMPLATE
+    return {
+        prompt = string.format(template, responses_text),
+        -- AS_PROMPT-style aggregators don't need a separate system message
+        -- (the instruction is in the user prompt). We send an empty
+        -- system; callers can override at run level.
+        system = "",
+    }
+end
+
+-- ─── Strategy entry ───
 
 ---@param ctx AlcCtx
 ---@return AlcCtx
 function M.run(ctx)
-    local task = ctx.task or error("ctx.task is required")
-    local n_agents = ctx.n_agents or 3
-    local n_layers = ctx.n_layers or 2
-    local gen_tokens = ctx.gen_tokens or 400
-    local agg_tokens = ctx.agg_tokens or 500
-
-    -- Cap agents to available personas
-    if n_agents > #PERSONAS then n_agents = #PERSONAS end
-
-    local layer_outputs = {}
-
-    -- ─── Layer 1: Independent generation ───
-    alc.log("info", string.format(
-        "moa: Layer 1 — %d agents generating independently", n_agents
-    ))
-
-    local agent_indices = {}
-    for i = 1, n_agents do
-        agent_indices[i] = i
+    if type(ctx) ~= "table" then
+        error("moa.run: ctx must be a table", 2)
     end
+    if alc == nil then
+        error("moa.run: alc host is not available", 2)
+    end
+    require_string(ctx.task, "task", "run")
 
-    -- Layer 1: all agents generate in parallel (1 round-trip via alc.llm_batch)
-    local layer1 = alc.parallel(agent_indices, function(i)
-        return {
-            prompt = string.format("Task: %s\n\nProvide a thorough, well-reasoned answer.", task),
-            system = PERSONAS[i],
-            max_tokens = gen_tokens,
-        }
-    end)
+    local proposer_specs, path_kind = resolve_proposers(ctx)
+    local n_proposers = #proposer_specs
+    local n_layers = ctx.n_layers or M._defaults.n_layers
+    local temperature = ctx.temperature or M._defaults.temperature
+    local proposer_tokens = ctx.proposer_tokens or M._defaults.proposer_tokens
+    local aggregator_tokens = ctx.aggregator_tokens or M._defaults.aggregator_tokens
+    require_positive_int(n_layers, "n_layers", "run", 1)
+    require_positive_int(proposer_tokens, "proposer_tokens", "run", 1)
+    require_positive_int(aggregator_tokens, "aggregator_tokens", "run", 1)
 
-    layer_outputs[1] = layer1
+    local layers = {}
+    local total_llm_calls = 0
+    local prev_aggregated = nil
 
-    alc.log("info", "moa: Layer 1 complete")
+    alc.log("info", string.format(
+        "moa: L=%d × n=%d (%s path)", n_layers, n_proposers, path_kind))
 
-    -- ─── Subsequent layers: improve with cross-reference ───
-    local prev_responses = layer1
-
-    for layer = 2, n_layers do
-        alc.log("info", string.format(
-            "moa: Layer %d — %d agents improving with cross-reference",
-            layer, n_agents
-        ))
-
-        -- Format previous layer responses for reference
-        local ref_text = ""
-        for j, resp in ipairs(prev_responses) do
-            ref_text = ref_text .. string.format(
-                "--- Agent %d's response ---\n%s\n\n", j, resp
-            )
+    for layer_i = 1, n_layers do
+        -- ─── Layer i: n proposers in parallel ───
+        local layer_responses = {}
+        for j = 1, n_proposers do
+            local spec = proposer_specs[j]
+            local pair = M.build_proposer_prompt({
+                task            = ctx.task,
+                aggregated_prev = prev_aggregated,
+                proposer_prompt = ctx.proposer_prompt,
+                system_prompt   = spec.system or ctx.system_prompt,
+            })
+            local llm_opts = {
+                max_tokens  = proposer_tokens,
+                temperature = temperature,
+            }
+            if pair.system and pair.system ~= "" then
+                llm_opts.system = pair.system
+            end
+            if spec.model then llm_opts.model = spec.model end
+            local resp = alc.llm(pair.prompt, llm_opts)
+            require_string(resp, string.format("proposer[%d] response", j), "run")
+            layer_responses[j] = {
+                proposer = j,
+                model = spec.model,
+                text = resp,
+            }
+            total_llm_calls = total_llm_calls + 1
         end
 
-        -- Layer N: all agents improve in parallel (1 round-trip via alc.llm_batch)
-        local layer_n = alc.parallel(agent_indices, function(i)
-            return {
-                prompt = string.format(
-                    "Task: %s\n\n"
-                        .. "Other agents have provided these responses:\n\n%s"
-                        .. "Considering all the above responses, provide an "
-                        .. "improved answer that:\n"
-                        .. "- Incorporates the strongest points from each response\n"
-                        .. "- Corrects any errors you identify\n"
-                        .. "- Fills gaps that others missed\n"
-                        .. "- Resolves contradictions between responses",
-                    task, ref_text
-                ),
-                system = PERSONAS[i] .. " You have access to other agents' "
-                    .. "work. Build upon their insights while applying your "
-                    .. "unique perspective to improve the answer.",
-                max_tokens = gen_tokens,
-            }
-        end)
-
-        layer_outputs[layer] = layer_n
-        prev_responses = layer_n
-
-        alc.log("info", string.format("moa: Layer %d complete", layer))
-    end
-
-    -- ─── Final aggregation ───
-    alc.log("info", "moa: aggregating final answer")
-
-    local final_ref = ""
-    for j, resp in ipairs(prev_responses) do
-        final_ref = final_ref .. string.format(
-            "--- Agent %d ---\n%s\n\n", j, resp
-        )
-    end
-
-    local final_answer = alc.llm(
-        string.format(
-            "Task: %s\n\n"
-                .. "Multiple expert agents have refined their answers "
-                .. "through %d layers of cross-referencing:\n\n%s"
-                .. "Synthesize the definitive answer:\n"
-                .. "- Where agents agree, state with confidence\n"
-                .. "- Where agents disagree, determine the correct position "
-                .. "by evaluating reasoning quality\n"
-                .. "- Ensure completeness — no important point should be lost",
-            task, n_layers, final_ref
-        ),
-        {
-            system = "You are a master synthesizer. Produce the best possible "
-                .. "answer by combining insights from all agents. Prioritize "
-                .. "accuracy and completeness.",
-            max_tokens = agg_tokens,
+        -- ─── Aggregator (⊕) ───
+        local response_texts = {}
+        for j = 1, n_proposers do
+            response_texts[j] = layer_responses[j].text
+        end
+        local agg_pair = M.build_aggregator_prompt({
+            proposer_responses = response_texts,
+            aggregator_prompt  = ctx.aggregator_prompt,
+        })
+        local agg_opts = {
+            max_tokens  = aggregator_tokens,
+            temperature = temperature,
         }
-    )
+        if agg_pair.system and agg_pair.system ~= "" then
+            agg_opts.system = agg_pair.system
+        end
+        local aggregated = alc.llm(agg_pair.prompt, agg_opts)
+        require_string(aggregated, string.format("layer[%d] aggregator", layer_i), "run")
+        total_llm_calls = total_llm_calls + 1
 
-    -- Compute stats
-    local total_calls = 0
-    for _, outputs in ipairs(layer_outputs) do
-        total_calls = total_calls + #outputs
+        layers[layer_i] = {
+            layer = layer_i,
+            proposers = layer_responses,
+            aggregated = aggregated,
+        }
+        prev_aggregated = aggregated
     end
-    total_calls = total_calls + 1  -- aggregation call
 
     alc.log("info", string.format(
-        "moa: complete — %d layers, %d agents/layer, %d total LLM calls",
-        n_layers, n_agents, total_calls
-    ))
+        "moa: complete — L=%d, n=%d, %d LLM calls",
+        n_layers, n_proposers, total_llm_calls))
 
     ctx.result = {
-        answer = final_answer,
-        n_agents = n_agents,
-        n_layers = n_layers,
-        total_calls = total_calls,
-        layer_outputs = layer_outputs,
+        answer          = prev_aggregated,
+        n_layers        = n_layers,
+        n_proposers     = n_proposers,
+        layers          = layers,
+        total_llm_calls = total_llm_calls,
     }
     return ctx
 end
 
--- Malli-style self-decoration (see alc_shapes/README). inline T.shape
--- for both input and result; wrapper validates in ALC_SHAPE_CHECK=1.
-M.run = S.instrument(M, "run")
+---@type AlcSpec
+M.spec = {
+    entries = {
+        build_proposer_prompt = {
+            args   = proposer_input_shape,
+            result = prompt_pair_shape,
+        },
+        build_aggregator_prompt = {
+            args   = aggregator_input_shape,
+            result = prompt_pair_shape,
+        },
+        run = {
+            input  = run_input_shape,
+            result = run_result_shape,
+        },
+    },
+}
+
+-- Test hooks (not part of public spec contract)
+M._internal = {
+    format_responses_for_aggregator = format_responses_for_aggregator,
+    resolve_proposers = resolve_proposers,
+}
+
+-- Self-decoration for ALC_SHAPE_CHECK=1 dev mode.
+M.run                   = S.instrument(M, "run")
+M.build_proposer_prompt = S.instrument(M, "build_proposer_prompt")
+M.build_aggregator_prompt = S.instrument(M, "build_aggregator_prompt")
 
 return M

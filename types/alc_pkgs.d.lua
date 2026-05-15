@@ -779,18 +779,23 @@
 ---@field total_experts number @Count of experts actually consulted (may be < max_experts due to parsing fallback)
 
 ---@class AlcPkgInput_moa
----@field agg_tokens? number @Max tokens for final aggregation (default: 500)
----@field gen_tokens? number @Max tokens per agent response (default: 400)
----@field n_agents? number @Agents per layer (default: 3, capped to #PERSONAS=5)
----@field n_layers? number @Number of improvement layers (default: 2)
----@field task string @Task description
+---@field aggregator_prompt? string @Override AS_PROMPT_TEMPLATE (X)
+---@field aggregator_tokens? number @Max tokens per aggregator (default: 2048, (X) infrastructure)
+---@field n_layers? number @Number of layers L (default: 3, (L) Wang §3)
+---@field personas? string[] @Non-paper-faithful ALT PATH: array of system-prompt strings (single model)
+---@field proposer_prompt? string @Override proposer prompt (X)
+---@field proposer_tokens? number @Max tokens per proposer (default: 512, (X) infrastructure)
+---@field proposers? { model?: string, system?: string }[] @Paper-faithful PATH: array of proposer specs (each layer reuses the same list)
+---@field system_prompt? string @Override proposer system prompt (X)
+---@field task string @Problem statement (required)
+---@field temperature? number @LLM temperature (default: 0.7, (X) paper not fixed)
 
 ---@class AlcPkgResult_moa
----@field answer string @Final synthesized answer
----@field layer_outputs string[][] @Per-layer agent outputs ([layer_idx][agent_idx])
----@field n_agents number @Agents per layer actually used
----@field n_layers number @Layers actually executed
----@field total_calls number @Total LLM invocations (agents * layers + 1 aggregation)
+---@field answer string @Final aggregator output from layer L
+---@field layers { aggregated: string, layer: number, proposers: { model?: string, proposer: number, text: string }[] }[] @Per-layer records: proposer outputs + aggregator output
+---@field n_layers number @L actually executed
+---@field n_proposers number @n actually used (from proposers / personas length)
+---@field total_llm_calls number @Total LLM calls (= L · (n + 1))
 
 ---@class AlcPkgInput_model_first
 ---@field extract? boolean @Extract concise final answer (default true)

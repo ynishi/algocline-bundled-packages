@@ -1,63 +1,169 @@
 ---
 name: moa
-version: 0.1.0
-category: selection
-result_shape: "shape { answer: string, layer_outputs: array of array of string, n_agents: number, n_layers: number, total_calls: number }"
-description: "Mixture of Agents — layered multi-agent aggregation with cross-referencing improvement"
+version: 0.2.0
+category: aggregation
+result_shape: "shape { answer: string, layers: array of shape { aggregated: string, layer: number, proposers: array of shape { model?: string, proposer: number, text: string } }, n_layers: number, n_proposers: number, total_llm_calls: number }"
+description: "Mixture-of-Agents (Wang 2024) — L-layer × n-proposer aggregation with Aggregate-and-Synthesize"
 source: moa/init.lua
 generated: gen_docs (V0)
 ---
 
-# moa(MoA) — Mixture-of-Agents layered multi-agent aggregation
-
-> Multiple agents generate responses independently, then a second layer of agents improves on those responses by referencing all of them. Unlike a single-round `panel`, MoA uses iterative layers where each layer's agents see all previous-layer outputs, enabling cross-pollination of ideas and progressive refinement.
+# moa — Mixture-of-Agents (Wang 2024) — L-layer, n-proposer aggregation
 
 ## Contents
 
-- [Usage](#usage)
-- [Algorithm](#algorithm)
-- [Empirical validation](#empirical-validation)
-- [References](#references)
+- [Primary citation](#primary-citation)
+- [Algorithm (Wang 2024 §2.2)](#algorithm-wang-2024-2-2)
+- [Defaults (Wang 2024 §3)](#defaults-wang-2024-3)
+- [Proposer models (paper main experiment, Wang 2024 §3)](#proposer-models-paper-main-experiment-wang-2024-3)
+- [Entry contract](#entry-contract)
+- [EXTENSION POINTS](#extension-points)
+- [Comparison with related packages](#comparison-with-related-packages)
 - [Parameters](#parameters)
 - [Result](#result)
 
-## Usage {#usage}
+## Primary citation {#primary-citation}
 
-```lua
-local moa = require("moa")
-return moa.run(ctx)
+Wang, J., Wang, J., Athiwaratkun, B., Zhang, C., & Zou, J. (2024).
+"Mixture-of-Agents Enhances Large Language Model Capabilities".
+arXiv:2406.04692.
+https://arxiv.org/abs/2406.04692
+
+## Algorithm (Wang 2024 §2.2) {#algorithm-wang-2024-2-2}
+
+Layered aggregation. For each layer i, n proposer agents A_{i,1..n}
+generate responses to the current input x_i, and an aggregator ⊕
+synthesizes them into y_i, which becomes the next layer's input:
+
+```
+  y_i     = ⊕_{j=1}^{n}[A_{i,j}(x_i)] + x_1
+  x_{i+1} = y_i
 ```
 
-## Algorithm {#algorithm}
+where ⊕ denotes applying the **Aggregate-and-Synthesize** prompt
+(Table 1) to the n proposer outputs, and `+` is text concatenation.
 
-For `n_layers` layers (4-8 LLM calls typical):
+The default MoA configuration runs **L=3 layers** with **n=6 proposers
+per layer** (Wang 2024 §3 main experiment). MoA-Lite uses **L=2** for
+cost efficiency. The final layer's aggregator output is the answer.
 
-1. Layer 1 — `n_agents` agents generate independent responses in
-   parallel.
-2. Layer 2..N — each agent sees all previous-layer responses and
-   produces an improved response in parallel.
-3. Final — the aggregator synthesizes the best answer from the last
-   layer.
+## Defaults (Wang 2024 §3) {#defaults-wang-2024-3}
 
-## Empirical validation {#empirical-validation}
+| Symbol     | Value | Label | Source                                          |
+|------------|-------|-------|-------------------------------------------------|
+| L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
+| n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
+| temp       | 0.7   | (X)   | Paper §3 reports 0.7 only for single-proposer   |
+|            |       |       | ablation; main exp temperature not stated.      |
+|            |       |       | Pkg uses 0.7 as a default chosen to match the   |
+|            |       |       | one stated paper value (X — paper not fixed).   |
+| max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
+|            |       |       | provenance: AS_PROMPT requires synthesizing all |
+|            |       |       | proposer outputs, so a larger budget than       |
+|            |       |       | per-proposer is required by construction.       |
 
-The source paper reports an AlpacaEval 2.0 LC win rate of 65.8% (SOTA
-at publication).
+The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — verbatim
+from Wang 2024 Table 1.
 
-## References {#references}
+## Proposer models (paper main experiment, Wang 2024 §3) {#proposer-models-paper-main-experiment-wang-2024-3}
 
-- Wang, J. et al. (2024). "Mixture-of-Agents Enhances Large Language
-  Model Capabilities". https://arxiv.org/abs/2406.04692
+The main MoA experiment uses these 6 open-source proposers (all
+accessible via Together AI):
+
+  - Qwen1.5-110B-Chat
+  - Qwen1.5-72B-Chat
+  - WizardLM-8x22B
+  - LLaMA-3-70B-Instruct
+  - Mixtral-8x22B-v0.1
+  - dbrx-instruct
+
+These models are (L) for reproducing paper results, but they are NOT
+hard-coded by this pkg — the caller MUST supply `proposers` (REQUIRED
+extension point). Hard-coding 6 specific Together AI model IDs would
+bind the pkg to a specific API tier and exclude OSS / local-model
+callers.
+
+## Entry contract {#entry-contract}
+
+See `M.spec` below for the formal machine-readable contract:
+
+- `build_proposer_prompt`   — pure, direct-args. returns { prompt, system }
+- `build_aggregator_prompt` — pure, direct-args. returns { prompt, system }
+- `run`                     — Strategy, ctx-threading. orchestrates L · n + L LLM calls
+
+Two pure helpers are LLM-independent and unit-testable. `run` is the
+only LLM-mediated entry.
+
+## EXTENSION POINTS {#extension-points}
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ REQUIRED                                                             │
+│   ctx.task                  (string)         problem / user query    │
+│   ctx.proposers             (array, paper-faithful PATH) — list of   │
+│       specs, each { model = string [, system = string] }; pkg makes  │
+│       one LLM call per proposer per layer                            │
+│     OR                                                               │
+│   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
+│       array of system-prompt strings; pkg uses a single model and    │
+│       rotates personas per proposer. Convenient for OSS callers      │
+│       without 6 distinct models; departs from Wang §3 multi-model    │
+│       guarantee.                                                     │
+├──────────────────────────────────────────────────────────────────────┤
+│ (L)-override OPTION                                                  │
+│   ctx.n_layers              (number ≥ 1)     override L=3 default    │
+├──────────────────────────────────────────────────────────────────────┤
+│ (X) infrastructure (paper does not specify or specifies only         │
+│ ablation)                                                            │
+│   ctx.temperature           (number)         per-LLM temperature     │
+│   ctx.proposer_tokens       (number)         max tokens per proposer │
+│   ctx.aggregator_tokens     (number)         max tokens per aggreg.  │
+│   ctx.proposer_prompt       (string template) override proposer body │
+│   ctx.aggregator_prompt     (string template) override AS_PROMPT     │
+│   ctx.system_prompt         (string)         override proposer sys.  │
+├──────────────────────────────────────────────────────────────────────┤
+│ Stability tier:                                                      │
+│   stable     : n_layers / temperature / proposer_tokens / aggreg_t   │
+│   v2-opt-in  : proposer_prompt / aggregator_prompt / system_prompt   │
+│                (template format may evolve in future versions)       │
+│   experimental : personas (single-model fallback, paper guarantee    │
+│                  not held)                                           │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Overriding `aggregator_prompt` invalidates the AS_PROMPT_TEMPLATE
+(L) guarantee. Caller is responsible for keeping ⊕ semantics consistent.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `panel` (sequential multi-role discussion): panel uses heterogeneous
+caller-supplied roles per turn; one model per turn. moa runs n
+proposers in parallel and applies an explicit Aggregate-and-Synthesize
+step.
+
+vs `dmad` (Du 2023 Multi-Agent Debate): dmad has N agents debating
+(each agent sees others' previous-round answers) for R rounds and
+aggregates by majority vote. moa is layered hierarchical aggregation
+with an explicit synthesizer prompt at each layer boundary.
+
+vs `sc` (Self-Consistency, Wang 2022): sc samples N independent paths
+from one model with majority voting. moa uses N distinct models /
+personas and an LLM-as-judge aggregator at each layer.
 
 ## Parameters {#parameters}
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.agg_tokens` | number | optional | Max tokens for final aggregation (default: 500) |
-| `ctx.gen_tokens` | number | optional | Max tokens per agent response (default: 400) |
-| `ctx.n_agents` | number | optional | Agents per layer (default: 3, capped to #PERSONAS=5) |
-| `ctx.n_layers` | number | optional | Number of improvement layers (default: 2) |
-| `ctx.task` | string | **required** | Task description |
+| `ctx.aggregator_prompt` | string | optional | Override AS_PROMPT_TEMPLATE (X) |
+| `ctx.aggregator_tokens` | number | optional | Max tokens per aggregator (default: 2048, (X) infrastructure) |
+| `ctx.n_layers` | number | optional | Number of layers L (default: 3, (L) Wang §3) |
+| `ctx.personas` | array of string | optional | Non-paper-faithful ALT PATH: array of system-prompt strings (single model) |
+| `ctx.proposer_prompt` | string | optional | Override proposer prompt (X) |
+| `ctx.proposer_tokens` | number | optional | Max tokens per proposer (default: 512, (X) infrastructure) |
+| `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Paper-faithful PATH: array of proposer specs (each layer reuses the same list) |
+| `ctx.system_prompt` | string | optional | Override proposer system prompt (X) |
+| `ctx.task` | string | **required** | Problem statement (required) |
+| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) paper not fixed) |
 
 ## Result {#result}
 
@@ -65,8 +171,8 @@ Returns:
 
 | key | type | optional | description |
 |---|---|---|---|
-| `answer` | string | — | Final synthesized answer |
-| `layer_outputs` | array of array of string | — | Per-layer agent outputs ([layer_idx][agent_idx]) |
-| `n_agents` | number | — | Agents per layer actually used |
-| `n_layers` | number | — | Layers actually executed |
-| `total_calls` | number | — | Total LLM invocations (agents * layers + 1 aggregation) |
+| `answer` | string | — | Final aggregator output from layer L |
+| `layers` | array of shape { aggregated: string, layer: number, proposers: array of shape { model?: string, proposer: number, text: string } } | — | Per-layer records: proposer outputs + aggregator output |
+| `n_layers` | number | — | L actually executed |
+| `n_proposers` | number | — | n actually used (from proposers / personas length) |
+| `total_llm_calls` | number | — | Total LLM calls (= L · (n + 1)) |
