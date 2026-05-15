@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (119)
+## Packages (120)
 
 ### Reasoning
 
@@ -108,6 +108,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[ensemble_div](ensemble_div/)** | Ambiguity Decomposition. Krogh-Vedelsby identity E = Ē − Ā — the ensemble always beats the weighted average of individuals when there is any disagreement. Quantifies how much agent diversity reduces ensemble error | Krogh & Vedelsby (NeurIPS 1995), Hong & Page (PNAS 2004) |
 | **[kemeny](kemeny/)** | Kemeny-Young rank aggregation. Axiomatically unique consensus ranking that minimizes total Kendall tau distance. Exact for m ≤ 8, Borda fallback for larger candidate sets. Condorcet-consistent | Kemeny (1959), Young & Levenglick (1978) |
 | **[moa](moa/)** | Mixture-of-Agents (paper-explicit). L=3 layers × n=6 proposers per layer (Wang §3 main config; MoA-Lite L=2 for cost). Each layer applies the Aggregate-and-Synthesize prompt (Table 1 verbatim) — `y_i = ⊕[A_{i,j}(x_i)] + x_1`. Caller supplies `proposers` (paper-faithful, distinct models) or `personas` (X alt path, single model + persona rotation). Total L·(n+1) LLM calls | Wang et al. (arXiv:2406.04692, 2024) |
+| **[reconcile](reconcile/)** | ReConcile (paper-explicit) — round-table consensus with confidence-weighted voting. N=3 agents × R=3 max rounds (Chen §3). Each round: every agent emits (answer, explanation, confidence ∈ [0,1]); agents see others' triples in the next round; consensus check after each round triggers early stop. Final vote uses §B.5 5-bucket calibrated weights {0.1, 0.3, 0.5, 0.8, 1.0} (L verbatim from repo `utils.py::trans_confidence`) applied to §4 argmax formula `â = arg max_a Σ_i f(p_i)·𝟙(a_i=a)`. Caller supplies `agents` (paper-faithful) or `personas` (X alt path). Total N to N·(R+1) LLM calls | Chen, Saha & Bansal (arXiv:2309.13007, 2023) |
 | **[pbft](pbft/)** | Practical Byzantine Fault Tolerance. 3-phase LLM consensus (propose → prepare → commit) with BFT quorum guarantees. Tolerates f Byzantine agents given n ≥ 3f+1 | Castro & Liskov (OSDI 1999) |
 | **[isp_aggregate](isp_aggregate/)** | Paper-faithful ISP / OW / OW-I aggregation via an M×N calibration tensor (pairwise conditional `P̂(A_i=s\|A_j=a)` per §4.3). Pure-helper split mirrors conformal_vote (calibrate → run). Non-paper-faithful `meta_prompt_sp` INJECT for calibration-free settings (Prelec-Seung-McCoy 2017 style). MMLU: OW-I vs MV +1.05pt overall / +3.36pt disagreement subset (§5.4 Table 3; OW-L ties with OW-I in paper but is STUB in v1) | Zhang et al. arXiv:2510.01499 (2025) |
 
@@ -608,6 +609,7 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | cumulative | ~3×rounds+1 | Cumulative reasoning (propose+verify+conclude per round + final report) |
 | diverse | ~2×N+1 | DiVERSe (N reasoning paths × score + final answer, default N=5 → ~11) |
 | dmad | N×(R+1) | Multi-Agent Debate (N agents propose + R rounds of debate, default N=3 / R=2 → 9; paper Du 2023) |
+| reconcile | N to N×(R+1) | ReConcile round-table consensus with confidence-weighted voting (N init + up to N×R discussion, early-stop on consensus; default N=3 / R=3 → 3 to 12; paper Chen 2023) |
 | hegelian | 1+2×N | Hegelian dialectic (bootstrap thesis + antithesis+synthesis per iteration, default N=5 → 11) |
 | least_to_most | ~N+2 | Least-to-Most (decompose + N subproblems + synthesis) |
 | mcts | ~budget×2+1 | MCTS (expand+simulate per node + conclusion, default budget=8 → ~17) |

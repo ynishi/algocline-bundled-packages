@@ -40,6 +40,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_new_packages.lua` adds minimal meta section (2 tests, 34
   total PASS).
 
+### Added
+
+- **`reconcile` package** (new, category=`aggregation`, 120th package).
+  Round-table consensus with confidence-weighted voting (Chen, Saha &
+  Bansal 2023, arXiv:2309.13007 "ReConcile: Round-Table Conference
+  Improves Reasoning via Consensus among Diverse LLMs"). Implements
+  §3 / Algorithm 1 in 3 phases: Phase 1 (init — each agent emits answer
+  + explanation + confidence p ∈ [0,1]); Phase 2 (discussion — up to R
+  rounds, each agent sees others' triples and may revise); Phase 3 (vote
+  — confidence-weighted argmax per §4: `â = arg max_a Σ_i f(p_i)·𝟙(a_i=a)`).
+  Consensus check after each round triggers early stop. Defaults follow
+  Chen §3: N = 3 agents (L), R = 3 max rounds (L), convincing_count = 4
+  (L §4 footnote "4 in our experiments"). The confidence calibration
+  f(·) uses the §B.5 5-bucket scale verbatim from repo
+  `dinobby/ReConcile/utils.py::trans_confidence`:
+  `p ≤ 0.6 → 0.1`, `0.6 < p < 0.8 → 0.3`, `0.8 ≤ p < 0.9 → 0.5`,
+  `0.9 ≤ p < 1.0 → 0.8`, `p = 1.0 → 1.0`. Spec entries (5, all
+  S.instrument-decorated): pure helpers `confidence_to_weight` /
+  `compute_weighted_argmax` / `check_consensus` / `build_discussion_prompt`
+  + `run` (Strategy). All pure entries use `args` direct-args mode.
+  EXTENSION POINTS: REQUIRED `ctx.task` + one of `ctx.agents`
+  (paper-faithful, array of `{model, system?}` specs) OR `ctx.personas`
+  (alt path, single model + persona rotation). (L)-override:
+  `max_rounds` / `convincing_count`. (X) infrastructure: `gen_tokens` /
+  `temperature` / template overrides / `parse_fn` / `confidence_buckets`.
+  Total LLM calls range from N (init consensus) to N·(R+1) (no
+  consensus, full R rounds). Distinct from `dmad` (no confidence
+  weighting, no early-stop) and `moa` (deterministic vote, no aggregator
+  LLM). Test coverage: `tests/test_reconcile.lua` (48/48 PASS) covers
+  meta / spec / `_defaults` / 5-bucket boundary cases / weighted argmax
+  + tie-break + tally / consensus predicate / discussion prompt
+  (convincing_count cap + override + reject) / `_internal` helpers
+  (normalize / coerce / parse_agent_response / resolve_agents / format
+  others block) / run end-to-end (init consensus path / discussion
+  rounds path / no-consensus full-R weighted-vote fallback / history
+  shape / weight propagation / model id propagation / error paths).
+
 ### Changed
 
 - **`dmad` package — paper-explicit rewrite (v0.1.0 → v0.2.0, breaking

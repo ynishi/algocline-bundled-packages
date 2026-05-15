@@ -1111,6 +1111,27 @@
 
 ---@alias AlcPkgResult_recipe_safe_panel AlcResultSafePaneled
 
+---@class AlcPkgInput_reconcile
+---@field agents? { model?: string, system?: string }[] @Paper-faithful PATH: array of agent specs
+---@field convincing_count? number @Convincing-sample count (default: 4, (L) Chen §4 footnote)
+---@field discussion_prompt? string @Override Phase 2 prompt (X)
+---@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
+---@field init_prompt? string @Override Phase 1 prompt (X)
+---@field max_rounds? number @Max discussion rounds R (default: 3, (L) Chen §3)
+---@field personas? string[] @Non-paper-faithful ALT PATH: persona system prompts
+---@field system_prompt? string @Override system prompt (X)
+---@field task string @Problem statement (required)
+---@field temperature? number @LLM temperature (default: API default, (X) paper not fixed)
+
+---@class AlcPkgResult_reconcile
+---@field answer string @Final team answer (normalized form of winning bucket)
+---@field consensus boolean @true if all agents agreed at termination round; false if R+1 rounds exhausted
+---@field history { agent: number, answer: string, confidence: number, explanation: string, normalized: string, raw_text?: string, round: number, weight: number }[][] @history[r+1][i] = agent i's response at round r
+---@field n_agents number @N actually used
+---@field rounds_used number @Number of rounds completed (1..R+1; 1 = consensus at init phase)
+---@field tally { answer: string, count: number, weight: number }[] @Vote tally at termination round
+---@field total_llm_calls number @Total LLM calls actually made
+
 ---@class AlcPkgInput_reflect
 ---@field critique_tokens? number @Max tokens for critique (default: 300)
 ---@field gen_tokens? number @Max tokens for generation (default: 500)

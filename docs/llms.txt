@@ -14,6 +14,7 @@
 - [kemeny](narrative/kemeny.md): Kemeny-Young optimal rank aggregation minimizing total Kendall tau distance.
 - [moa](narrative/moa.md): Mixture-of-Agents (Wang 2024) — L-layer × n-proposer aggregation with Aggregate-and-Synthesize
 - [pbft](narrative/pbft.md): PBFT-inspired 3-phase LLM consensus — propose, validate, commit with BFT quorum guarantees (Castro-Liskov 1999)
+- [reconcile](narrative/reconcile.md): ReConcile (Chen 2023) — round-table consensus with §B.5 confidence-weighted voting and early-stop
 - [sc](narrative/sc.md): Independent multi-path sampling with majority vote aggregation
 - [usc](narrative/usc.md): Universal Self-Consistency — LLM-based consistency selection across free-form responses. Extends SC to open-ended tasks where majority vote is inapplicable.
 
