@@ -79,8 +79,10 @@ When consensus is reached, the loop terminates early.
 | gen_tokens        | 600   | (X)   | Paper does not specify; infrastructure|
 | temperature       | nil   | (X)   | Paper does not fix; API default used  |
 
-The **5-bucket confidence calibration** is (L) verbatim from repo
-`utils.py::trans_confidence`:
+The **5-bucket confidence calibration** is (L) — Lua transcription
+of repo `utils.py::trans_confidence`; same boundary values, same
+weights, top-to-bottom first-match evaluation (see
+`M.CONFIDENCE_BUCKETS` for the shape contract):
 
   p ≤ 0.6        → 0.1
   0.6 < p < 0.8  → 0.3
@@ -107,12 +109,14 @@ only LLM-mediated entry.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ REQUIRED                                                             │
 │   ctx.task                  (string)         problem / question      │
-│   ctx.agents                (array, paper-faithful PATH) — list of   │
-│       specs, each { model = string [, system = string] }             │
+│   ctx.agents                (array, diverse-LLM PATH; matches Chen  │
+│       §3 main config) — list of specs, each                          │
+│       { model = string [, system = string] }                         │
 │     OR                                                               │
-│   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
-│       array of system-prompt strings; single model + persona         │
-│       rotation. Departs from §3 diverse-LLM guarantee.               │
+│   ctx.personas              (array, single-model rotation PATH;     │
+│       outside Chen §3's diverse-LLM setup) — array of system-prompt  │
+│       strings; single model + persona rotation. Sacrifices the       │
+│       paper's distinct-LLM diversity property.                       │
 ├──────────────────────────────────────────────────────────────────────┤
 │ (L)-override OPTION                                                  │
 │   ctx.max_rounds            (number ≥ 1)     override R=3 default    │
@@ -157,16 +161,18 @@ voting, simpler stop condition.
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.agents` | array of shape { model?: string, system?: string } | optional | Paper-faithful PATH: array of agent specs |
+| `ctx.agents` | array of shape { model?: string, system?: string } | optional | Diverse-LLM PATH (Chen §3 main config): array of agent specs |
+| `ctx.confidence_buckets` | array of shape { lo: number, lo_op?: string, weight: number } | optional | Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract. |
 | `ctx.convincing_count` | number | optional | Convincing-sample count (default: 4, (L) Chen §4 footnote) |
 | `ctx.discussion_prompt` | string | optional | Override Phase 2 prompt (X) |
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
 | `ctx.init_prompt` | string | optional | Override Phase 1 prompt (X) |
 | `ctx.max_rounds` | number | optional | Max discussion rounds R (default: 3, (L) Chen §3) |
-| `ctx.personas` | array of string | optional | Non-paper-faithful ALT PATH: persona system prompts |
+| `ctx.parse_fn` | any | optional | Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X) |
+| `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Chen §3 main config): persona system prompts |
 | `ctx.system_prompt` | string | optional | Override system prompt (X) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) paper not fixed) |
+| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) Chen §3 does not state a value) |
 
 ## Result {#result}
 

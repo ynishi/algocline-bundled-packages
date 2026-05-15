@@ -782,13 +782,13 @@
 ---@field aggregator_prompt? string @Override AS_PROMPT_TEMPLATE (X)
 ---@field aggregator_tokens? number @Max tokens per aggregator (default: 2048, (X) infrastructure)
 ---@field n_layers? number @Number of layers L (default: 3, (L) Wang §3)
----@field personas? string[] @Non-paper-faithful ALT PATH: array of system-prompt strings (single model)
+---@field personas? string[] @Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings
 ---@field proposer_prompt? string @Override proposer prompt (X)
 ---@field proposer_tokens? number @Max tokens per proposer (default: 512, (X) infrastructure)
----@field proposers? { model?: string, system?: string }[] @Paper-faithful PATH: array of proposer specs (each layer reuses the same list)
+---@field proposers? { model?: string, system?: string }[] @Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list
 ---@field system_prompt? string @Override proposer system prompt (X)
 ---@field task string @Problem statement (required)
----@field temperature? number @LLM temperature (default: 0.7, (X) paper not fixed)
+---@field temperature? number @LLM temperature (default: 0.7, (X) Wang §3 main config does not state a value)
 
 ---@class AlcPkgResult_moa
 ---@field answer string @Final aggregator output from layer L
@@ -1112,16 +1112,18 @@
 ---@alias AlcPkgResult_recipe_safe_panel AlcResultSafePaneled
 
 ---@class AlcPkgInput_reconcile
----@field agents? { model?: string, system?: string }[] @Paper-faithful PATH: array of agent specs
+---@field agents? { model?: string, system?: string }[] @Diverse-LLM PATH (Chen §3 main config): array of agent specs
+---@field confidence_buckets? { lo: number, lo_op?: string, weight: number }[] @Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract.
 ---@field convincing_count? number @Convincing-sample count (default: 4, (L) Chen §4 footnote)
 ---@field discussion_prompt? string @Override Phase 2 prompt (X)
 ---@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
 ---@field init_prompt? string @Override Phase 1 prompt (X)
 ---@field max_rounds? number @Max discussion rounds R (default: 3, (L) Chen §3)
----@field personas? string[] @Non-paper-faithful ALT PATH: persona system prompts
+---@field parse_fn? any @Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X)
+---@field personas? string[] @Single-model rotation PATH (outside Chen §3 main config): persona system prompts
 ---@field system_prompt? string @Override system prompt (X)
 ---@field task string @Problem statement (required)
----@field temperature? number @LLM temperature (default: API default, (X) paper not fixed)
+---@field temperature? number @LLM temperature (default: API default, (X) Chen §3 does not state a value)
 
 ---@class AlcPkgResult_reconcile
 ---@field answer string @Final team answer (normalized form of winning bucket)

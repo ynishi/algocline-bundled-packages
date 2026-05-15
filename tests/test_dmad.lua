@@ -163,6 +163,32 @@ describe("dmad.DEFAULT_DEBATE_*", function()
         expect(m.DEFAULT_DEBATE_AGENT_BLOCK:find("%%s", 1)).to_not.equal(nil)
     end)
 
+    it("agent_block wraps the response in triple backticks (Du repo gen_gsm.py::construct_message)", function()
+        _G.alc = {}
+        local m = require("dmad")
+        -- Du repo builds per-agent body as:
+        --   "\n\n One agent solution: ```{}```"
+        -- The Lua transcription must preserve the triple-backtick fence,
+        -- not strip it. Earlier versions had `"\n\n One agent solution:
+        -- \n\n %s \n\n"` which dropped the wrapper.
+        expect(m.DEFAULT_DEBATE_AGENT_BLOCK).to.equal("\n\n One agent solution: ```%s```")
+        -- And verify the formatted result wraps the response with the
+        -- backticks the LLM is expected to see.
+        local formatted = string.format(m.DEFAULT_DEBATE_AGENT_BLOCK, "ANSWER")
+        expect(formatted:find("```ANSWER```", 1, true)).to_not.equal(nil)
+    end)
+
+    it("build_debate_prompt embeds each other-response in triple backticks", function()
+        _G.alc = {}
+        local m = require("dmad")
+        local pair = m.build_debate_prompt({
+            task = "What is 2+2?",
+            other_responses = { "FOUR", "QUATRE" },
+        })
+        expect(pair.prompt:find("```FOUR```", 1, true)).to_not.equal(nil)
+        expect(pair.prompt:find("```QUATRE```", 1, true)).to_not.equal(nil)
+    end)
+
     it("suffix asks for updated answer + repeats task + \\boxed{} sentinel", function()
         _G.alc = {}
         local m = require("dmad")

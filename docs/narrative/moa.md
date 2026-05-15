@@ -53,17 +53,21 @@ cost efficiency. The final layer's aggregator output is the answer.
 |------------|-------|-------|-------------------------------------------------|
 | L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
 | n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
-| temp       | 0.7   | (X)   | Paper §3 reports 0.7 only for single-proposer   |
-|            |       |       | ablation; main exp temperature not stated.      |
-|            |       |       | Pkg uses 0.7 as a default chosen to match the   |
-|            |       |       | one stated paper value (X — paper not fixed).   |
+| temp       | 0.7   | (X)   | Wang §3 main config does not state a temperature|
+|            |       |       | for the layered MoA run. 0.7 is the only        |
+|            |       |       | numeric value §3 names (single-proposer         |
+|            |       |       | ablation row); pkg uses 0.7 to anchor the       |
+|            |       |       | default to that one named value rather than an  |
+|            |       |       | implementer-chosen number.                      |
 | max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
 |            |       |       | provenance: AS_PROMPT requires synthesizing all |
 |            |       |       | proposer outputs, so a larger budget than       |
 |            |       |       | per-proposer is required by construction.       |
 
-The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — verbatim
-from Wang 2024 Table 1.
+The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — the
+Lua string literal is identical to Wang 2024 Table 1's English text
+(punctuation / capitalization / line breaks all match; the only
+transformation is the Python `{}` placeholder rendered as Lua `%s`).
 
 ## Proposer models (paper main experiment, Wang 2024 §3) {#proposer-models-paper-main-experiment-wang-2024-3}
 
@@ -100,15 +104,17 @@ only LLM-mediated entry.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ REQUIRED                                                             │
 │   ctx.task                  (string)         problem / user query    │
-│   ctx.proposers             (array, paper-faithful PATH) — list of   │
-│       specs, each { model = string [, system = string] }; pkg makes  │
-│       one LLM call per proposer per layer                            │
+│   ctx.proposers             (array, multi-model PATH; matches Wang  │
+│       §3 main config) — list of specs, each                          │
+│       { model = string [, system = string] }; pkg makes one LLM      │
+│       call per proposer per layer                                    │
 │     OR                                                               │
-│   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
-│       array of system-prompt strings; pkg uses a single model and    │
-│       rotates personas per proposer. Convenient for OSS callers      │
-│       without 6 distinct models; departs from Wang §3 multi-model    │
-│       guarantee.                                                     │
+│   ctx.personas              (array, single-model rotation PATH;     │
+│       outside Wang §3's multi-model setup) — array of system-prompt  │
+│       strings; pkg uses a single model and rotates personas per      │
+│       proposer. Convenient for OSS callers without 6 distinct        │
+│       models; sacrifices the paper's distinct-model diversity        │
+│       property.                                                      │
 ├──────────────────────────────────────────────────────────────────────┤
 │ (L)-override OPTION                                                  │
 │   ctx.n_layers              (number ≥ 1)     override L=3 default    │
@@ -157,13 +163,13 @@ personas and an LLM-as-judge aggregator at each layer.
 | `ctx.aggregator_prompt` | string | optional | Override AS_PROMPT_TEMPLATE (X) |
 | `ctx.aggregator_tokens` | number | optional | Max tokens per aggregator (default: 2048, (X) infrastructure) |
 | `ctx.n_layers` | number | optional | Number of layers L (default: 3, (L) Wang §3) |
-| `ctx.personas` | array of string | optional | Non-paper-faithful ALT PATH: array of system-prompt strings (single model) |
+| `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings |
 | `ctx.proposer_prompt` | string | optional | Override proposer prompt (X) |
 | `ctx.proposer_tokens` | number | optional | Max tokens per proposer (default: 512, (X) infrastructure) |
-| `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Paper-faithful PATH: array of proposer specs (each layer reuses the same list) |
+| `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list |
 | `ctx.system_prompt` | string | optional | Override proposer system prompt (X) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) paper not fixed) |
+| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) Wang §3 main config does not state a value) |
 
 ## Result {#result}
 

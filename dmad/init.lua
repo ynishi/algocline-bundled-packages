@@ -11,7 +11,10 @@
 --- block — repo is treated as the literal source for prompt templates and
 --- default parameters):
 --- https://github.com/composable-models/llm_multiagent_debate
---- — `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT/DEBATE prompt verbatim
+--- — `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT / DEBATE string
+---                        literals lifted into Lua (prefix / per-agent
+---                        block / suffix structure preserved; per-agent
+---                        block keeps the triple-backtick wrapper)
 --- — `gsm/eval_gsm.py`  : `most_frequent` first-wins majority on `\boxed{}`
 ---
 --- ## Algorithm (Du 2023 §3)
@@ -46,10 +49,15 @@
 --- | tokens | 500   | (X)   | Paper does not specify max_tokens. (X) infrastructure;    |
 --- |        |       |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
 ---
---- The INIT and DEBATE prompt templates are (L) — verbatim transcriptions
---- of `gen_gsm.py` strings, including the `\boxed{answer}` sentinel that
---- `extract_boxed` reads back. Overriding the templates (X-mode) invalidates
---- the paper's effect guarantee but the pkg accepts the override.
+--- The INIT and DEBATE prompt templates are (L) — Lua transcriptions of
+--- the corresponding `gen_gsm.py` string literals. The DEBATE template
+--- is built from `prefix + per-agent block (each wraps a response in
+--- ``` triple backticks ```) + suffix`, matching repo `construct_message`
+--- byte-for-byte (modulo Python f-string `{}` ↔ Lua `%s` substitution
+--- and the implicit `\n` semantics). The `\boxed{answer}` sentinel that
+--- `extract_boxed` reads back is preserved. Overriding the templates
+--- (X-mode) invalidates the paper's effect guarantee but the pkg
+--- accepts the override.
 ---
 --- ## Entry contract
 ---
@@ -145,17 +153,23 @@ M._defaults = {
     temperature = nil,
 }
 
--- (L) INIT prompt template, verbatim from `gen_gsm.py`. `%s` is the task.
+-- (L) INIT prompt template — Lua transcription of the `gen_gsm.py`
+-- string literal (Python `{}` → Lua `%s`, no other transformation).
+-- `%s` is the task.
 -- Source: github.com/composable-models/llm_multiagent_debate/gsm/gen_gsm.py
 M.DEFAULT_INIT_TEMPLATE = "Can you solve the following math problem? %s Explain your reasoning. Your final answer should be a single numerical number, in the form \\boxed{answer}, at the end of your response."
 
--- (L) DEBATE prompt template, verbatim from `gen_gsm.py`.
--- Two substitutions: %s = concatenated others' previous-round answers
--- (each wrapped as "One agent solution: \n\n {response} \n\n"),
--- %s = task. Repo's `construct_message` builds the body in two pieces
--- (prefix + per-agent block + suffix); we keep the same shape.
+-- (L) DEBATE prompt template — Lua transcription of Du repo
+-- `gen_gsm.py::construct_message`. Repo builds the body in three pieces
+-- (prefix + per-agent block + suffix); we keep the same shape and the
+-- same string literals. Each entry in `other_responses` is wrapped via
+-- `DEFAULT_DEBATE_AGENT_BLOCK` ("One agent solution: ```{response}```",
+-- triple-backtick fenced, byte-identical to the repo string). The suffix's leading
+-- "\n\n" supplies the gap between consecutive agent blocks.
+-- Two substitutions on the assembled body: %s = others_text (the
+-- concatenated per-agent blocks), %s = task.
 M.DEFAULT_DEBATE_PREFIX = "These are the solutions to the problem from other agents: "
-M.DEFAULT_DEBATE_AGENT_BLOCK = "\n\n One agent solution: \n\n %s \n\n"
+M.DEFAULT_DEBATE_AGENT_BLOCK = "\n\n One agent solution: ```%s```"
 M.DEFAULT_DEBATE_SUFFIX = "\n\n Using the solutions from other agents as additional information, can you provide your answer to the math problem? \n The original math problem is %s. Your final answer should be a single numerical number, in the form \\boxed{answer}, at the end of your response."
 
 -- (X) System prompt. Paper does not specify a system message; repo uses
@@ -354,7 +368,7 @@ end
 ---
 --- Matches Du repo `eval_gsm.py:most_frequent` semantics: highest count
 --- wins; ties broken by earliest occurrence in `answers`. Comparison uses
---- the answer string verbatim (the caller is expected to normalize, e.g.
+--- the answer string as-is (the caller is expected to normalize, e.g.
 --- via `extract_boxed`, before invoking).
 ---@param args table { answers }
 ---@return table { answer, count, tally }

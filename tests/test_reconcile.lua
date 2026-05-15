@@ -168,6 +168,95 @@ describe("reconcile.confidence_to_weight (§B.5 buckets)", function()
         expect(pcall(m.confidence_to_weight, { confidence = -0.1 })).to.equal(false)
         expect(pcall(m.confidence_to_weight, { confidence = 1.5 })).to.equal(false)
     end)
+
+    it("M.CONFIDENCE_BUCKETS is the SoT consumed by the default lookup", function()
+        -- Verify that confidence_to_weight actually walks the M.CONFIDENCE_BUCKETS
+        -- table (not a hardcoded if/elif). Mutating the table at runtime
+        -- must change subsequent return values, proving consumption.
+        _G.alc = {}
+        local m = require("reconcile")
+        local saved = m.CONFIDENCE_BUCKETS
+        m.CONFIDENCE_BUCKETS = {
+            { lo = 0.5, lo_op = "ge", weight = 9.0 },
+            { lo = 0.0, lo_op = "ge", weight = 1.0 },
+        }
+        expect(m.confidence_to_weight({ confidence = 0.7 })).to.equal(9.0)
+        expect(m.confidence_to_weight({ confidence = 0.4 })).to.equal(1.0)
+        m.CONFIDENCE_BUCKETS = saved
+    end)
+
+    it("args.buckets overrides M.CONFIDENCE_BUCKETS without mutation", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        local override = {
+            { lo = 0.5, lo_op = "ge", weight = 7.5 },
+            { lo = 0.0, lo_op = "ge", weight = 2.5 },
+        }
+        expect(m.confidence_to_weight({ confidence = 0.6, buckets = override })).to.equal(7.5)
+        expect(m.confidence_to_weight({ confidence = 0.2, buckets = override })).to.equal(2.5)
+        -- Default unchanged.
+        expect(m.confidence_to_weight({ confidence = 1.0 })).to.equal(1.0)
+    end)
+
+    it("buckets evaluation is top-down first-match", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        -- Overlapping buckets: only the first match should win.
+        local override = {
+            { lo = 0.0, lo_op = "ge", weight = 0.1 },  -- catch-all FIRST
+            { lo = 0.9, lo_op = "ge", weight = 0.8 },  -- never reached
+        }
+        expect(m.confidence_to_weight({ confidence = 0.95, buckets = override })).to.equal(0.1)
+    end)
+
+    it("rejects malformed bucket entries", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        local ok, err = pcall(m.confidence_to_weight, {
+            confidence = 0.7,
+            buckets    = { { lo = "bad", weight = 0.1 } },
+        })
+        expect(ok).to.equal(false)
+        expect(type(err)).to.equal("string")
+    end)
+
+    it("rejects unknown lo_op", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        local ok, err = pcall(m.confidence_to_weight, {
+            confidence = 0.7,
+            buckets    = { { lo = 0.0, lo_op = "lt", weight = 0.1 } },
+        })
+        expect(ok).to.equal(false)
+        expect(type(err)).to.equal("string")
+    end)
+
+    it("rejects empty bucket override", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        expect(pcall(m.confidence_to_weight, { confidence = 0.5, buckets = {} })).to.equal(false)
+    end)
+
+    it("raises when no bucket catches the confidence (no catch-all)", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        local override = {
+            { lo = 0.9, lo_op = "ge", weight = 1.0 },
+            -- No catch-all for p < 0.9
+        }
+        expect(pcall(m.confidence_to_weight, { confidence = 0.5, buckets = override })).to.equal(false)
+    end)
+
+    it("lo_op 'gt' is strict-greater-than", function()
+        _G.alc = {}
+        local m = require("reconcile")
+        local override = {
+            { lo = 0.5, lo_op = "gt", weight = 9.0 },
+            { lo = 0.0, lo_op = "ge", weight = 1.0 },
+        }
+        expect(m.confidence_to_weight({ confidence = 0.5, buckets = override })).to.equal(1.0)
+        expect(m.confidence_to_weight({ confidence = 0.51, buckets = override })).to.equal(9.0)
+    end)
 end)
 
 -- ─── compute_weighted_argmax: §4 formula ───
@@ -632,5 +721,29 @@ describe("reconcile.run", function()
         local ok, err = pcall(m.run, { task = "T", personas = { "A" } })
         expect(ok).to.equal(false)
         expect(err:match("alc host")).to_not.equal(nil)
+    end)
+
+    it("forwards ctx.confidence_buckets into history weights (override path)", function()
+        -- All three agents say "a" with confidence 0.95.
+        -- Default §B.5 → weight 0.8 each. Override → weight 7.0 each.
+        local fixtures = {
+            format_response("a", 0.95),
+            format_response("a", 0.95),
+            format_response("a", 0.95),
+        }
+        local alc_stub = make_alc_stub({ fixtures = fixtures })
+        _G.alc = alc_stub
+        local m = require("reconcile")
+        local ctx = m.run({
+            task = "Q",
+            personas = { "A", "B", "C" },
+            confidence_buckets = {
+                { lo = 0.9, lo_op = "ge", weight = 7.0 },
+                { lo = 0.0, lo_op = "ge", weight = 0.5 },
+            },
+        })
+        expect(ctx.result.history[1][1].weight).to.equal(7.0)
+        expect(ctx.result.history[1][2].weight).to.equal(7.0)
+        expect(ctx.result.history[1][3].weight).to.equal(7.0)
     end)
 end)

@@ -57,8 +57,10 @@
 --- | gen_tokens        | 600   | (X)   | Paper does not specify; infrastructure|
 --- | temperature       | nil   | (X)   | Paper does not fix; API default used  |
 ---
---- The **5-bucket confidence calibration** is (L) verbatim from repo
---- `utils.py::trans_confidence`:
+--- The **5-bucket confidence calibration** is (L) — Lua transcription
+--- of repo `utils.py::trans_confidence`; same boundary values, same
+--- weights, top-to-bottom first-match evaluation (see
+--- `M.CONFIDENCE_BUCKETS` for the shape contract):
 ---
 ---   p ≤ 0.6        → 0.1
 ---   0.6 < p < 0.8  → 0.3
@@ -85,12 +87,14 @@
 --- ┌──────────────────────────────────────────────────────────────────────┐
 --- │ REQUIRED                                                             │
 --- │   ctx.task                  (string)         problem / question      │
---- │   ctx.agents                (array, paper-faithful PATH) — list of   │
---- │       specs, each { model = string [, system = string] }             │
+--- │   ctx.agents                (array, diverse-LLM PATH; matches Chen  │
+--- │       §3 main config) — list of specs, each                          │
+--- │       { model = string [, system = string] }                         │
 --- │     OR                                                               │
---- │   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
---- │       array of system-prompt strings; single model + persona         │
---- │       rotation. Departs from §3 diverse-LLM guarantee.               │
+--- │   ctx.personas              (array, single-model rotation PATH;     │
+--- │       outside Chen §3's diverse-LLM setup) — array of system-prompt  │
+--- │       strings; single model + persona rotation. Sacrifices the       │
+--- │       paper's distinct-LLM diversity property.                       │
 --- ├──────────────────────────────────────────────────────────────────────┤
 --- │ (L)-override OPTION                                                  │
 --- │   ctx.max_rounds            (number ≥ 1)     override R=3 default    │
@@ -156,17 +160,31 @@ M._defaults = {
     temperature      = nil,
 }
 
--- (L) 5-bucket calibrated weight mapping, verbatim from
+-- (L) 5-bucket calibrated weight mapping — Lua transcription of
 -- github.com/dinobby/ReConcile/utils.py::trans_confidence.
--- Bucket order: descending threshold (so the most specific bucket
--- matches first when iterating).
+-- Same boundary values, same weights; same descending threshold layout.
+--
+-- Evaluation contract: buckets are an ORDERED array, evaluated
+-- top-to-bottom by `confidence_to_weight`; the FIRST bucket whose
+-- predicate matches wins. Each bucket has shape:
+--
+--   { lo = number, lo_op = "ge" | "gt", weight = number }
+--
+--   lo     : lower bound of the bucket
+--   lo_op  : comparison operator against `lo`
+--            "ge" (default) → match when `p >= lo`
+--            "gt"           → match when `p >  lo`
+--   weight : f(p) returned when the bucket matches
+--
+-- The last entry SHOULD have `lo = 0.0` / `lo_op = "ge"` as a
+-- catch-all; `confidence_to_weight` raises an error if no bucket
+-- matches.
 M.CONFIDENCE_BUCKETS = {
-    -- { lo, hi_exclusive, weight }, with hi_exclusive=nil meaning "equal to threshold"
-    { threshold = 1.0, weight = 1.0, exact = true },
-    { threshold = 0.9, weight = 0.8 },
-    { threshold = 0.8, weight = 0.5 },
-    { threshold = 0.6, weight = 0.3, strict_greater = true },
-    { threshold = 0.0, weight = 0.1 },  -- floor: any p ≤ 0.6 gets 0.1
+    { lo = 1.0, lo_op = "ge", weight = 1.0 },  -- p = 1.0           → 1.0
+    { lo = 0.9, lo_op = "ge", weight = 0.8 },  -- 0.9 ≤ p < 1.0     → 0.8
+    { lo = 0.8, lo_op = "ge", weight = 0.5 },  -- 0.8 ≤ p < 0.9     → 0.5
+    { lo = 0.6, lo_op = "gt", weight = 0.3 },  -- 0.6 < p < 0.8     → 0.3
+    { lo = 0.0, lo_op = "ge", weight = 0.1 },  -- otherwise (p ≤ 0.6) → 0.1
 }
 
 -- (X) Default system prompt. Paper does not fix; this default frames
@@ -233,9 +251,9 @@ local agent_response_shape = T.shape({
 local run_input_shape = T.shape({
     task              = T.string:describe("Problem statement (required)"),
     agents            = T.array_of(agent_spec_shape):is_optional()
-        :describe("Paper-faithful PATH: array of agent specs"),
+        :describe("Diverse-LLM PATH (Chen §3 main config): array of agent specs"),
     personas          = T.array_of(T.string):is_optional()
-        :describe("Non-paper-faithful ALT PATH: persona system prompts"),
+        :describe("Single-model rotation PATH (outside Chen §3 main config): persona system prompts"),
     max_rounds        = T.number:is_optional()
         :describe("Max discussion rounds R (default: " .. M._defaults.max_rounds .. ", (L) Chen §3)"),
     convincing_count  = T.number:is_optional()
@@ -243,10 +261,18 @@ local run_input_shape = T.shape({
     gen_tokens        = T.number:is_optional()
         :describe("Max tokens per LLM call (default: " .. M._defaults.gen_tokens .. ", (X) infrastructure)"),
     temperature       = T.number:is_optional()
-        :describe("LLM temperature (default: API default, (X) paper not fixed)"),
+        :describe("LLM temperature (default: API default, (X) Chen §3 does not state a value)"),
     init_prompt       = T.string:is_optional():describe("Override Phase 1 prompt (X)"),
     discussion_prompt = T.string:is_optional():describe("Override Phase 2 prompt (X)"),
     system_prompt     = T.string:is_optional():describe("Override system prompt (X)"),
+    parse_fn          = T.any:is_optional()
+        :describe("Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X)"),
+    confidence_buckets = T.array_of(T.shape({
+        lo     = T.number,
+        lo_op  = T.string:is_optional(),
+        weight = T.number,
+    }, { open = true })):is_optional()
+        :describe("Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract."),
 }, { open = true })
 
 local run_result_shape = T.shape({
@@ -387,25 +413,63 @@ local function resolve_agents(ctx)
         end
         return specs, "personas"
     end
-    error("reconcile.run: one of ctx.agents (paper-faithful) or ctx.personas (alt path) is REQUIRED", 3)
+    error("reconcile.run: one of ctx.agents (diverse-LLM PATH; Chen §3 main config) or ctx.personas (single-model rotation PATH) is REQUIRED", 3)
 end
 
 -- ─── Pure entries ───
 
 --- Compute the calibrated voting weight f(p) for a confidence p ∈ [0,1].
---- Implements the §B.5 5-bucket scale verbatim from repo
---- `utils.py::trans_confidence`.
----@param args table { confidence }
+---
+--- Implements the §B.5 5-bucket scale by iterating `M.CONFIDENCE_BUCKETS`
+--- (or the override `args.buckets`) top-to-bottom and returning the
+--- weight of the FIRST bucket whose predicate matches. With the default
+--- table this reproduces repo `utils.py::trans_confidence` byte-for-byte
+--- at the bucket boundaries and weight values:
+---
+---   p = 1.0        → 1.0
+---   0.9 ≤ p < 1.0  → 0.8
+---   0.8 ≤ p < 0.9  → 0.5
+---   0.6 < p < 0.8  → 0.3
+---   p ≤ 0.6        → 0.1
+---
+--- Override path: `args.buckets` accepts an array of
+--- `{ lo, lo_op?, weight }` entries (see `M.CONFIDENCE_BUCKETS`
+--- docstring for the shape contract). Overriding invalidates the §B.5
+--- guarantee.
+---@param args table { confidence, buckets? }
 ---@return number
 function M.confidence_to_weight(args)
     require_table(args, "args", "confidence_to_weight")
     require_number_in_range(args.confidence, "confidence", "confidence_to_weight", 0, 1)
     local p = args.confidence
-    if p == 1.0 then return 1.0 end
-    if p >= 0.9 then return 0.8 end
-    if p >= 0.8 then return 0.5 end
-    if p > 0.6 then return 0.3 end
-    return 0.1
+    local buckets = args.buckets or M.CONFIDENCE_BUCKETS
+    if type(buckets) ~= "table" or #buckets == 0 then
+        error("reconcile.confidence_to_weight: buckets must be a non-empty ordered array", 3)
+    end
+    for i, b in ipairs(buckets) do
+        if type(b) ~= "table"
+            or type(b.lo) ~= "number"
+            or type(b.weight) ~= "number" then
+            error(string.format(
+                "reconcile.confidence_to_weight: buckets[%d] must be { lo:number, lo_op?:string, weight:number }",
+                i), 3)
+        end
+        local op = b.lo_op or "ge"
+        local matches
+        if op == "ge" then
+            matches = (p >= b.lo)
+        elseif op == "gt" then
+            matches = (p > b.lo)
+        else
+            error(string.format(
+                "reconcile.confidence_to_weight: buckets[%d].lo_op must be 'ge' or 'gt', got %q",
+                i, tostring(op)), 3)
+        end
+        if matches then return b.weight end
+    end
+    error(string.format(
+        "reconcile.confidence_to_weight: no bucket matched confidence=%s (the bucket list must include a catch-all, e.g. { lo = 0, lo_op = 'ge', weight = ... })",
+        tostring(p)), 3)
 end
 
 --- Compute the confidence-weighted argmax (§4 Phase 3 formula):
@@ -561,7 +625,10 @@ function M.run(ctx)
             ctx.task)
         local parsed, raw = dispatch_agent(spec, init_prompt)
         total_llm_calls = total_llm_calls + 1
-        local weight = M.confidence_to_weight({ confidence = parsed.confidence })
+        local weight = M.confidence_to_weight({
+            confidence = parsed.confidence,
+            buckets    = ctx.confidence_buckets,  -- nil → default §B.5
+        })
         round0[i] = {
             agent       = i,
             round       = 0,
@@ -603,7 +670,10 @@ function M.run(ctx)
                 })
                 local parsed, raw = dispatch_agent(spec, pair.prompt)
                 total_llm_calls = total_llm_calls + 1
-                local weight = M.confidence_to_weight({ confidence = parsed.confidence })
+                local weight = M.confidence_to_weight({
+            confidence = parsed.confidence,
+            buckets    = ctx.confidence_buckets,  -- nil → default §B.5
+        })
                 cur[i] = {
                     agent       = i,
                     round       = r,
@@ -650,8 +720,14 @@ M.spec = {
         confidence_to_weight = {
             args   = T.shape({
                 confidence = T.number:describe("Self-reported confidence in [0,1]"),
+                buckets    = T.array_of(T.shape({
+                    lo     = T.number,
+                    lo_op  = T.string:is_optional(),
+                    weight = T.number,
+                }, { open = true })):is_optional()
+                    :describe("Override §B.5 5-bucket calibration (X — invalidates paper guarantee)"),
             }, { open = true }),
-            result = T.number:describe("Calibrated weight from §B.5 5-bucket scale"),
+            result = T.number:describe("Calibrated weight from §B.5 5-bucket scale (or override)"),
         },
         compute_weighted_argmax = {
             args   = T.shape({

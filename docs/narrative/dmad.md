@@ -33,7 +33,10 @@ Canonical reference implementation (paper has no numbered Algorithm
 block — repo is treated as the literal source for prompt templates and
 default parameters):
 https://github.com/composable-models/llm_multiagent_debate
-— `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT/DEBATE prompt verbatim
+— `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT / DEBATE string
+                       literals lifted into Lua (prefix / per-agent
+                       block / suffix structure preserved; per-agent
+                       block keeps the triple-backtick wrapper)
 — `gsm/eval_gsm.py`  : `most_frequent` first-wins majority on `\boxed{}`
 
 ## Algorithm (Du 2023 §3) {#algorithm-du-2023-3}
@@ -68,10 +71,15 @@ Total LLM calls: N + N·R = N·(R+1). Default 3·(2+1) = 9.
 | tokens | 500   | (X)   | Paper does not specify max_tokens. (X) infrastructure;    |
 |        |       |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
 
-The INIT and DEBATE prompt templates are (L) — verbatim transcriptions
-of `gen_gsm.py` strings, including the `\boxed{answer}` sentinel that
-`extract_boxed` reads back. Overriding the templates (X-mode) invalidates
-the paper's effect guarantee but the pkg accepts the override.
+The INIT and DEBATE prompt templates are (L) — Lua transcriptions of
+the corresponding `gen_gsm.py` string literals. The DEBATE template
+is built from `prefix + per-agent block (each wraps a response in
+``` triple backticks ```) + suffix`, matching repo `construct_message`
+byte-for-byte (modulo Python f-string `{}` ↔ Lua `%s` substitution
+and the implicit `\n` semantics). The `\boxed{answer}` sentinel that
+`extract_boxed` reads back is preserved. Overriding the templates
+(X-mode) invalidates the paper's effect guarantee but the pkg
+accepts the override.
 
 ## Entry contract {#entry-contract}
 

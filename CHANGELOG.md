@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`dmad.DEFAULT_DEBATE_AGENT_BLOCK` — per-agent block triple-backtick
+  wrapper restored**: v0.2.0 ship value was
+  `"\n\n One agent solution: \n\n %s \n\n"`, missing the triple-backtick
+  fence that Du repo `gsm/gen_gsm.py::construct_message` uses to wrap
+  each other-agent response (`"\n\n One agent solution: \`\`\`{}\`\`\`"`).
+  The docstring claimed the value was lifted from `gen_gsm.py` while the
+  literal had been altered — a §7 violation (claiming (L) status while
+  the value diverges from the cited source). The Lua string literal is
+  now byte-identical to the Python source modulo the `{}` ↔ `%s`
+  substitution. Runtime impact was minor (LLMs still parsed prior-round
+  answers either way) but the (L) provenance assertion was wrong.
+
+### Changed
+
+- **`reconcile.confidence_to_weight` — override path actually wired in**.
+  v0.1.0 docstring listed `ctx.confidence_buckets` as an (X) extension
+  point and exported `M.CONFIDENCE_BUCKETS` as the §B.5 reference table,
+  but the implementation used a hardcoded if/elif chain that consulted
+  neither. The function now iterates `M.CONFIDENCE_BUCKETS`
+  (or `args.buckets` / `ctx.confidence_buckets` when provided)
+  top-to-bottom and returns the weight of the first matching bucket.
+  `M.CONFIDENCE_BUCKETS` shape changed (still §B.5-equivalent): each
+  entry is `{ lo, lo_op?, weight }` with `lo_op ∈ {"ge","gt"}`; the
+  list is evaluated top-to-bottom with first-match-wins semantics.
+  `run` forwards `ctx.confidence_buckets` per-call. `M.spec.entries.
+  confidence_to_weight` and `M.spec.entries.run.input` carry the new
+  optional `buckets` / `confidence_buckets` fields. Default behaviour
+  (no override) is bit-for-bit equivalent to the previous v0.1.0
+  hardcoded chain on every confidence value. Test coverage adds 9
+  cases: SoT-via-table consumption, override no-mutation, top-down
+  first-match, malformed-bucket rejection, unknown-lo_op rejection,
+  empty override rejection, missing-catch-all rejection, lo_op="gt"
+  strict semantics, plus an `m.run` end-to-end test that
+  `ctx.confidence_buckets` propagates into per-agent weights.
+
+### Vocabulary
+
+Removed `paper-faithful` / `non-paper-faithful` / `verbatim` / `paper
+not fixed` as bare provenance labels from `dmad/init.lua`,
+`moa/init.lua`, `reconcile/init.lua`, and the `[Unreleased]` CHANGELOG
+entries below, per `CLAUDE.md` "論文実装 pkg の実装規律" §8 (banned
+default vocabulary). Replacement phrasing names the structural
+property concretely — e.g. `multi-model PATH (Wang §3 main config)` /
+`single-model rotation PATH (outside Wang §3's multi-model setup)` /
+`Lua transcription of Table 1 with `%s` substituting `{}`` — so that
+provenance and divergence are auditable from the docstring alone.
+Behaviour is unchanged.
+
 ### Added
 
 - **`hegelian` package** (new, category=`reasoning`, 119th package): Self-
@@ -27,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `S.instrument`. EXTENSION POINTS expose (L)-override knobs (tau_0 /
   tau_a / N) and (X) infrastructure knobs (gen_tokens / prompt templates
   / system prompts) with stability tier annotation. Replaces the
-  non-paper-faithful "rebuttal" stage previously mixed into `dmad/`
+  "rebuttal" stage (not present in Du 2023) previously mixed into `dmad/`
   v0.1.0 (commit `54faaa5`, 2026-03-15) — the Hegelian methodology had
   been implemented in dmad/ alongside the Du 2023 citation despite Du's
   paper not describing a dialectic. dmad/ rewrite to pure Du 2023
@@ -53,16 +103,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Consensus check after each round triggers early stop. Defaults follow
   Chen §3: N = 3 agents (L), R = 3 max rounds (L), convincing_count = 4
   (L §4 footnote "4 in our experiments"). The confidence calibration
-  f(·) uses the §B.5 5-bucket scale verbatim from repo
-  `dinobby/ReConcile/utils.py::trans_confidence`:
+  f(·) uses the §B.5 5-bucket scale, a Lua transcription of repo
+  `dinobby/ReConcile/utils.py::trans_confidence` (same boundary
+  values, same weights):
   `p ≤ 0.6 → 0.1`, `0.6 < p < 0.8 → 0.3`, `0.8 ≤ p < 0.9 → 0.5`,
   `0.9 ≤ p < 1.0 → 0.8`, `p = 1.0 → 1.0`. Spec entries (5, all
   S.instrument-decorated): pure helpers `confidence_to_weight` /
   `compute_weighted_argmax` / `check_consensus` / `build_discussion_prompt`
   + `run` (Strategy). All pure entries use `args` direct-args mode.
   EXTENSION POINTS: REQUIRED `ctx.task` + one of `ctx.agents`
-  (paper-faithful, array of `{model, system?}` specs) OR `ctx.personas`
-  (alt path, single model + persona rotation). (L)-override:
+  (diverse-LLM PATH; Chen §3 main config — array of
+  `{model, system?}` specs) OR `ctx.personas` (single-model rotation
+  PATH; outside Chen §3's diverse-LLM setup). (L)-override:
   `max_rounds` / `convincing_count`. (X) infrastructure: `gen_tokens` /
   `temperature` / template overrides / `parse_fn` / `confidence_buckets`.
   Total LLM calls range from N (init consensus) to N·(R+1) (no
@@ -92,10 +144,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     extracted answers. Total LLM calls = N·(R+1).
   - Defaults (L from Du repo `gsm/gen_gsm.py`): N = 3 agents, R = 2
     rounds. Default 9 LLM calls per run.
-  - Prompt templates (L verbatim from `gen_gsm.py`): `DEFAULT_INIT_TEMPLATE`
-    ("Can you solve the following math problem? %s …  \\boxed{answer} …"),
-    `DEFAULT_DEBATE_PREFIX` / `DEFAULT_DEBATE_AGENT_BLOCK` /
-    `DEFAULT_DEBATE_SUFFIX` (paper repo `construct_message` shape).
+  - Prompt templates (L) — Lua transcription of `gen_gsm.py` string
+    literals (Python `{}` → Lua `%s`, no other transformation):
+    `DEFAULT_INIT_TEMPLATE` ("Can you solve the following math problem?
+    %s … \\boxed{answer} …"), `DEFAULT_DEBATE_PREFIX` /
+    `DEFAULT_DEBATE_AGENT_BLOCK` (per-agent block keeps the triple-
+    backtick wrapper `\`\`\`{response}\`\`\`` from
+    `construct_message`) / `DEFAULT_DEBATE_SUFFIX`.
   - Spec entries (5): 4 pure helpers (`build_init_prompt` /
     `build_debate_prompt` / `extract_boxed` / `aggregate_majority`) +
     `run` Strategy. Pure helpers use `args` direct-args mode and are
@@ -112,7 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `rebuttal` are removed — callers that depend on Hegelian semantics
     must switch to `require("hegelian")` (Abdali 2025 paper-explicit).
   - Test coverage: `tests/test_dmad.lua` (50/50 PASS) covers meta / spec /
-    defaults / template verbatim assertions / pure helpers (default +
+    defaults / template literal-equality assertions / pure helpers (default +
     override + validation) / `aggregate_majority` (strict majority +
     first-wins tie-break + tally + reject) / `extract_boxed` (last-match
     + trim + fallback) / `run` end-to-end with mock alc (N·(R+1) call
@@ -138,7 +193,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     defaults: temperature = 0.7 (matches paper's single-proposer ablation
     value; main exp not explicitly stated), proposer_tokens = 512,
     aggregator_tokens = 2048.
-  - `AS_PROMPT_TEMPLATE` (L) verbatim from Wang 2024 Table 1:
+  - `AS_PROMPT_TEMPLATE` (L) — Lua string literal identical to Wang 2024
+    Table 1 (punctuation / capitalization / line breaks all match; only
+    Python `{}` rendered as Lua `%s`):
     `"You have been provided with a set of responses from various
     open-source models … critically evaluate … synthesize … refined,
     accurate, and comprehensive reply … well-structured, coherent …"`
@@ -147,8 +204,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Internal helpers exposed via `M._internal`:
     `format_responses_for_aggregator`, `resolve_proposers`.
   - EXTENSION POINTS: REQUIRED `ctx.task` + one of `ctx.proposers`
-    (paper-faithful path, array of `{model, system?}` specs) OR
-    `ctx.personas` (alt path, single model + persona rotation). v0.1.0's
+    (multi-model PATH; Wang §3 main config — array of
+    `{model, system?}` specs) OR `ctx.personas` (single-model rotation
+    PATH; outside Wang §3's multi-model setup). v0.1.0's
     hardcoded `PERSONAS` is removed — the alt-path makes persona-style
     callability explicit and opt-in. (L)-override: `n_layers`. (X)
     infrastructure: `temperature` / `proposer_tokens` / `aggregator_tokens`
@@ -169,10 +227,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the pkg (would bind to a specific API tier and exclude OSS / local
     callers); caller supplies them via `proposers`.
   - Test coverage: `tests/test_moa.lua` (36/36 PASS) covers meta / spec /
-    `_defaults` / AS_PROMPT_TEMPLATE verbatim / `build_proposer_prompt`
+    `_defaults` / AS_PROMPT_TEMPLATE literal-equality / `build_proposer_prompt`
     (layer-1 + layer-2+ + override + reject) / `build_aggregator_prompt`
     (AS_PROMPT application + override + empty reject) / `_internal` helpers
-    (`resolve_proposers` paper-path + alt-path + neither reject) / run
+    (`resolve_proposers` multi-model + single-model rotation + neither reject) / run
     end-to-end (L·(n+1) call count + `x_{i+1}=y_i` propagation +
     per-layer aggregator + model id propagation + per-proposer system
     prompt + temperature/tokens propagation + error paths).

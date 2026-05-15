@@ -2536,7 +2536,10 @@ Canonical reference implementation (paper has no numbered Algorithm
 block — repo is treated as the literal source for prompt templates and
 default parameters):
 https://github.com/composable-models/llm_multiagent_debate
-— `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT/DEBATE prompt verbatim
+— `gsm/gen_gsm.py`   : N=3 agents, R=2 rounds, INIT / DEBATE string
+                       literals lifted into Lua (prefix / per-agent
+                       block / suffix structure preserved; per-agent
+                       block keeps the triple-backtick wrapper)
 — `gsm/eval_gsm.py`  : `most_frequent` first-wins majority on `\boxed{}`
 
 ## Algorithm (Du 2023 §3) {#algorithm-du-2023-3}
@@ -2571,10 +2574,15 @@ Total LLM calls: N + N·R = N·(R+1). Default 3·(2+1) = 9.
 | tokens | 500   | (X)   | Paper does not specify max_tokens. (X) infrastructure;    |
 |        |       |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
 
-The INIT and DEBATE prompt templates are (L) — verbatim transcriptions
-of `gen_gsm.py` strings, including the `\boxed{answer}` sentinel that
-`extract_boxed` reads back. Overriding the templates (X-mode) invalidates
-the paper's effect guarantee but the pkg accepts the override.
+The INIT and DEBATE prompt templates are (L) — Lua transcriptions of
+the corresponding `gen_gsm.py` string literals. The DEBATE template
+is built from `prefix + per-agent block (each wraps a response in
+``` triple backticks ```) + suffix`, matching repo `construct_message`
+byte-for-byte (modulo Python f-string `{}` ↔ Lua `%s` substitution
+and the implicit `\n` semantics). The `\boxed{answer}` sentinel that
+`extract_boxed` reads back is preserved. Overriding the templates
+(X-mode) invalidates the paper's effect guarantee but the pkg
+accepts the override.
 
 ## Entry contract {#entry-contract}
 
@@ -4421,17 +4429,21 @@ cost efficiency. The final layer's aggregator output is the answer.
 |------------|-------|-------|-------------------------------------------------|
 | L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
 | n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
-| temp       | 0.7   | (X)   | Paper §3 reports 0.7 only for single-proposer   |
-|            |       |       | ablation; main exp temperature not stated.      |
-|            |       |       | Pkg uses 0.7 as a default chosen to match the   |
-|            |       |       | one stated paper value (X — paper not fixed).   |
+| temp       | 0.7   | (X)   | Wang §3 main config does not state a temperature|
+|            |       |       | for the layered MoA run. 0.7 is the only        |
+|            |       |       | numeric value §3 names (single-proposer         |
+|            |       |       | ablation row); pkg uses 0.7 to anchor the       |
+|            |       |       | default to that one named value rather than an  |
+|            |       |       | implementer-chosen number.                      |
 | max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
 |            |       |       | provenance: AS_PROMPT requires synthesizing all |
 |            |       |       | proposer outputs, so a larger budget than       |
 |            |       |       | per-proposer is required by construction.       |
 
-The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — verbatim
-from Wang 2024 Table 1.
+The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — the
+Lua string literal is identical to Wang 2024 Table 1's English text
+(punctuation / capitalization / line breaks all match; the only
+transformation is the Python `{}` placeholder rendered as Lua `%s`).
 
 ## Proposer models (paper main experiment, Wang 2024 §3) {#proposer-models-paper-main-experiment-wang-2024-3}
 
@@ -4468,15 +4480,17 @@ only LLM-mediated entry.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ REQUIRED                                                             │
 │   ctx.task                  (string)         problem / user query    │
-│   ctx.proposers             (array, paper-faithful PATH) — list of   │
-│       specs, each { model = string [, system = string] }; pkg makes  │
-│       one LLM call per proposer per layer                            │
+│   ctx.proposers             (array, multi-model PATH; matches Wang  │
+│       §3 main config) — list of specs, each                          │
+│       { model = string [, system = string] }; pkg makes one LLM      │
+│       call per proposer per layer                                    │
 │     OR                                                               │
-│   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
-│       array of system-prompt strings; pkg uses a single model and    │
-│       rotates personas per proposer. Convenient for OSS callers      │
-│       without 6 distinct models; departs from Wang §3 multi-model    │
-│       guarantee.                                                     │
+│   ctx.personas              (array, single-model rotation PATH;     │
+│       outside Wang §3's multi-model setup) — array of system-prompt  │
+│       strings; pkg uses a single model and rotates personas per      │
+│       proposer. Convenient for OSS callers without 6 distinct        │
+│       models; sacrifices the paper's distinct-model diversity        │
+│       property.                                                      │
 ├──────────────────────────────────────────────────────────────────────┤
 │ (L)-override OPTION                                                  │
 │   ctx.n_layers              (number ≥ 1)     override L=3 default    │
@@ -4525,13 +4539,13 @@ personas and an LLM-as-judge aggregator at each layer.
 | `ctx.aggregator_prompt` | string | optional | Override AS_PROMPT_TEMPLATE (X) |
 | `ctx.aggregator_tokens` | number | optional | Max tokens per aggregator (default: 2048, (X) infrastructure) |
 | `ctx.n_layers` | number | optional | Number of layers L (default: 3, (L) Wang §3) |
-| `ctx.personas` | array of string | optional | Non-paper-faithful ALT PATH: array of system-prompt strings (single model) |
+| `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings |
 | `ctx.proposer_prompt` | string | optional | Override proposer prompt (X) |
 | `ctx.proposer_tokens` | number | optional | Max tokens per proposer (default: 512, (X) infrastructure) |
-| `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Paper-faithful PATH: array of proposer specs (each layer reuses the same list) |
+| `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list |
 | `ctx.system_prompt` | string | optional | Override proposer system prompt (X) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) paper not fixed) |
+| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) Wang §3 main config does not state a value) |
 
 ## Result {#result}
 
@@ -6433,8 +6447,10 @@ When consensus is reached, the loop terminates early.
 | gen_tokens        | 600   | (X)   | Paper does not specify; infrastructure|
 | temperature       | nil   | (X)   | Paper does not fix; API default used  |
 
-The **5-bucket confidence calibration** is (L) verbatim from repo
-`utils.py::trans_confidence`:
+The **5-bucket confidence calibration** is (L) — Lua transcription
+of repo `utils.py::trans_confidence`; same boundary values, same
+weights, top-to-bottom first-match evaluation (see
+`M.CONFIDENCE_BUCKETS` for the shape contract):
 
   p ≤ 0.6        → 0.1
   0.6 < p < 0.8  → 0.3
@@ -6461,12 +6477,14 @@ only LLM-mediated entry.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ REQUIRED                                                             │
 │   ctx.task                  (string)         problem / question      │
-│   ctx.agents                (array, paper-faithful PATH) — list of   │
-│       specs, each { model = string [, system = string] }             │
+│   ctx.agents                (array, diverse-LLM PATH; matches Chen  │
+│       §3 main config) — list of specs, each                          │
+│       { model = string [, system = string] }                         │
 │     OR                                                               │
-│   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
-│       array of system-prompt strings; single model + persona         │
-│       rotation. Departs from §3 diverse-LLM guarantee.               │
+│   ctx.personas              (array, single-model rotation PATH;     │
+│       outside Chen §3's diverse-LLM setup) — array of system-prompt  │
+│       strings; single model + persona rotation. Sacrifices the       │
+│       paper's distinct-LLM diversity property.                       │
 ├──────────────────────────────────────────────────────────────────────┤
 │ (L)-override OPTION                                                  │
 │   ctx.max_rounds            (number ≥ 1)     override R=3 default    │
@@ -6511,16 +6529,18 @@ voting, simpler stop condition.
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.agents` | array of shape { model?: string, system?: string } | optional | Paper-faithful PATH: array of agent specs |
+| `ctx.agents` | array of shape { model?: string, system?: string } | optional | Diverse-LLM PATH (Chen §3 main config): array of agent specs |
+| `ctx.confidence_buckets` | array of shape { lo: number, lo_op?: string, weight: number } | optional | Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract. |
 | `ctx.convincing_count` | number | optional | Convincing-sample count (default: 4, (L) Chen §4 footnote) |
 | `ctx.discussion_prompt` | string | optional | Override Phase 2 prompt (X) |
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
 | `ctx.init_prompt` | string | optional | Override Phase 1 prompt (X) |
 | `ctx.max_rounds` | number | optional | Max discussion rounds R (default: 3, (L) Chen §3) |
-| `ctx.personas` | array of string | optional | Non-paper-faithful ALT PATH: persona system prompts |
+| `ctx.parse_fn` | any | optional | Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X) |
+| `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Chen §3 main config): persona system prompts |
 | `ctx.system_prompt` | string | optional | Override system prompt (X) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) paper not fixed) |
+| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) Chen §3 does not state a value) |
 
 ## Result {#result}
 

@@ -31,17 +31,21 @@
 --- |------------|-------|-------|-------------------------------------------------|
 --- | L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
 --- | n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
---- | temp       | 0.7   | (X)   | Paper §3 reports 0.7 only for single-proposer   |
---- |            |       |       | ablation; main exp temperature not stated.      |
---- |            |       |       | Pkg uses 0.7 as a default chosen to match the   |
---- |            |       |       | one stated paper value (X — paper not fixed).   |
+--- | temp       | 0.7   | (X)   | Wang §3 main config does not state a temperature|
+--- |            |       |       | for the layered MoA run. 0.7 is the only        |
+--- |            |       |       | numeric value §3 names (single-proposer         |
+--- |            |       |       | ablation row); pkg uses 0.7 to anchor the       |
+--- |            |       |       | default to that one named value rather than an  |
+--- |            |       |       | implementer-chosen number.                      |
 --- | max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
 --- |            |       |       | provenance: AS_PROMPT requires synthesizing all |
 --- |            |       |       | proposer outputs, so a larger budget than       |
 --- |            |       |       | per-proposer is required by construction.       |
 ---
---- The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — verbatim
---- from Wang 2024 Table 1.
+--- The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — the
+--- Lua string literal is identical to Wang 2024 Table 1's English text
+--- (punctuation / capitalization / line breaks all match; the only
+--- transformation is the Python `{}` placeholder rendered as Lua `%s`).
 ---
 --- ## Proposer models (paper main experiment, Wang 2024 §3)
 ---
@@ -78,15 +82,17 @@
 --- ┌──────────────────────────────────────────────────────────────────────┐
 --- │ REQUIRED                                                             │
 --- │   ctx.task                  (string)         problem / user query    │
---- │   ctx.proposers             (array, paper-faithful PATH) — list of   │
---- │       specs, each { model = string [, system = string] }; pkg makes  │
---- │       one LLM call per proposer per layer                            │
+--- │   ctx.proposers             (array, multi-model PATH; matches Wang  │
+--- │       §3 main config) — list of specs, each                          │
+--- │       { model = string [, system = string] }; pkg makes one LLM      │
+--- │       call per proposer per layer                                    │
 --- │     OR                                                               │
---- │   ctx.personas              (array, non-paper-faithful ALT PATH) —   │
---- │       array of system-prompt strings; pkg uses a single model and    │
---- │       rotates personas per proposer. Convenient for OSS callers      │
---- │       without 6 distinct models; departs from Wang §3 multi-model    │
---- │       guarantee.                                                     │
+--- │   ctx.personas              (array, single-model rotation PATH;     │
+--- │       outside Wang §3's multi-model setup) — array of system-prompt  │
+--- │       strings; pkg uses a single model and rotates personas per      │
+--- │       proposer. Convenient for OSS callers without 6 distinct        │
+--- │       models; sacrifices the paper's distinct-model diversity        │
+--- │       property.                                                      │
 --- ├──────────────────────────────────────────────────────────────────────┤
 --- │ (L)-override OPTION                                                  │
 --- │   ctx.n_layers              (number ≥ 1)     override L=3 default    │
@@ -161,7 +167,8 @@ M._defaults = {
     aggregator_tokens = 2048,
 }
 
--- (L) Aggregate-and-Synthesize prompt, Wang 2024 Table 1 verbatim.
+-- (L) Aggregate-and-Synthesize prompt — string literal identical to
+-- Wang 2024 Table 1 (only `%s` substitutes the Python `{}` placeholder).
 M.AS_PROMPT_TEMPLATE = "You have been provided with a set of responses from various open-source models to the latest user query. Your task is to synthesize these responses into a single, high-quality response. It is crucial to critically evaluate the information provided in these responses, recognizing that some of it may be biased or incorrect. Your response should not simply replicate the given answers but should offer a refined, accurate, and comprehensive reply to the instruction. Ensure your response is well-structured, coherent, and adheres to the highest standards of accuracy and reliability.\n\nResponses from models:\n%s"
 
 -- (X) Default proposer system prompt. Paper does not specify a system
@@ -215,13 +222,13 @@ local aggregator_input_shape = T.shape({
 local run_input_shape = T.shape({
     task              = T.string:describe("Problem statement (required)"),
     proposers         = T.array_of(proposer_spec_shape):is_optional()
-        :describe("Paper-faithful PATH: array of proposer specs (each layer reuses the same list)"),
+        :describe("Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list"),
     personas          = T.array_of(T.string):is_optional()
-        :describe("Non-paper-faithful ALT PATH: array of system-prompt strings (single model)"),
+        :describe("Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings"),
     n_layers          = T.number:is_optional()
         :describe("Number of layers L (default: " .. M._defaults.n_layers .. ", (L) Wang §3)"),
     temperature       = T.number:is_optional()
-        :describe("LLM temperature (default: " .. M._defaults.temperature .. ", (X) paper not fixed)"),
+        :describe("LLM temperature (default: " .. M._defaults.temperature .. ", (X) Wang §3 main config does not state a value)"),
     proposer_tokens   = T.number:is_optional()
         :describe("Max tokens per proposer (default: " .. M._defaults.proposer_tokens .. ", (X) infrastructure)"),
     aggregator_tokens = T.number:is_optional()
@@ -284,8 +291,9 @@ local function format_responses_for_aggregator(responses)
 end
 
 --- Resolve proposer list:
----   - if ctx.proposers given (paper-faithful), use it as-is
----   - else if ctx.personas given (alt path), wrap each persona as {system=persona}
+---   - if ctx.proposers given (multi-model path), use it as-is
+---   - else if ctx.personas given (single-model rotation path), wrap
+---     each persona as {system=persona}
 ---   - else error (one of the two REQUIRED extension points)
 local function resolve_proposers(ctx)
     if ctx.proposers ~= nil then
@@ -304,7 +312,7 @@ local function resolve_proposers(ctx)
         end
         return specs, "personas"
     end
-    error("moa.run: one of ctx.proposers (paper-faithful) or ctx.personas (alt path) is REQUIRED", 3)
+    error("moa.run: one of ctx.proposers (multi-model PATH; Wang §3 main config) or ctx.personas (single-model rotation PATH) is REQUIRED", 3)
 end
 
 -- ─── Pure entries ───
