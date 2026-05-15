@@ -121,6 +121,7 @@
 - [faithful](narrative/faithful.md): Faithful CoT — formalize reasoning into code/logic for verification, then answer
 - [got](narrative/got.md): Graph of Thoughts: DAG reasoning with aggregation, refinement, and synthesis.
 - [gumbel_search](narrative/gumbel_search.md): Budget-optimal search via Sequential Halving and Gumbel Top-k sampling.
+- [hegelian](narrative/hegelian.md): Hegelian dialectical self-reflection — thesis/antithesis/synthesis with temperature annealing (Abdali 2025)
 - [least_to_most](narrative/least_to_most.md): Decompose into ordered subproblems and solve simplest first, building up.
 - [maieutic](narrative/maieutic.md): Maieutic prompting — recursive explanation tree with logical consistency verification
 - [mcts](narrative/mcts.md): Monte Carlo Tree Search — selection, expansion, simulation, backpropagation for reasoning

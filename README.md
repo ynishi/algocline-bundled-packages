@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (118)
+## Packages (119)
 
 ### Reasoning
 
@@ -69,6 +69,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[cumulative](cumulative/)** | Cumulative Reasoning. Proposer/verifier/reporter loop that accumulates verified facts incrementally until conclusion is reached | Zhang et al. (2024) |
 | **[diverse](diverse/)** | DiVERSe. Generates diverse reasoning paths with step-level verification and selects the best-verified path | Li et al. (2023) |
 | **[dmad](dmad/)** | Dialectical reasoning. Thesis, antithesis, and synthesis for deeper analysis through structured opposition | Du et al. (2023) |
+| **[hegelian](hegelian/)** | Hegelian dialectical self-reflection. Bootstrap thesis T_0 (τ_0=0.7), then iterate antithesis (τ_a=0.5) + synthesis with temperature annealing τ(i)=τ_0·exp(-θ·i) for N=5 iterations. Single-thread asymmetric dialectic with paper-explicit decay schedule. Distinct methodology from `dmad` (Du 2023's multi-agent symmetric debate) | Abdali et al. (Microsoft Research, arXiv:2501.14917, 2025) |
 | **[least_to_most](least_to_most/)** | Least-to-Most prompting. Decomposes into ordered subproblems, solves simplest first, each solution feeds into the next | Zhou et al. (2022) |
 | **[mcts](mcts/)** | Monte Carlo Tree Search. Selection, expansion, simulation, backpropagation for systematic reasoning exploration with LATS-style reflection | RAP (2023), LATS (ICML 2024) |
 | **[meta_prompt](meta_prompt/)** | Meta-Prompting. Orchestrator identifies task type and dispatches to dynamically created specialist personas | Suzgun & Kalai (2024) |
@@ -607,6 +608,7 @@ Use the alc-runner agent to run sc on: "What is the optimal data structure for t
 | cumulative | ~3×rounds+1 | Cumulative reasoning (propose+verify+conclude per round + final report) |
 | diverse | ~2×N+1 | DiVERSe (N reasoning paths × score + final answer, default N=5 → ~11) |
 | dmad | ~2+2×rounds | Dialectical (thesis + antithesis+rebuttal per round + synthesis, default 2 rounds → ~6) |
+| hegelian | 1+2×N | Hegelian dialectic (bootstrap thesis + antithesis+synthesis per iteration, default N=5 → 11) |
 | least_to_most | ~N+2 | Least-to-Most (decompose + N subproblems + synthesis) |
 | mcts | ~budget×2+1 | MCTS (expand+simulate per node + conclusion, default budget=8 → ~17) |
 | meta_prompt | ~N+2 | Meta-Prompting (analysis + N expert consultations + synthesis, default N=3 → ~5) |

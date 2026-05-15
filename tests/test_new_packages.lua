@@ -76,7 +76,7 @@ end
 --- Reset alc and unload packages from cache.
 local function reset()
     _G.alc = nil
-    for _, name in ipairs({ "s2a", "plan_solve", "rstar", "faithful", "moa", "bot" }) do
+    for _, name in ipairs({ "s2a", "plan_solve", "rstar", "faithful", "moa", "bot", "hegelian" }) do
         package.loaded[name] = nil
     end
 end
@@ -526,5 +526,30 @@ describe("bot", function()
         })
         expect(ctx.result.template_key).to.equal("custom")
         expect(ctx.result.template_name).to.equal("Custom Template")
+    end)
+end)
+
+-- ================================================================
+-- hegelian (Abdali 2025 — minimal meta check; detail tests in test_hegelian.lua)
+-- ================================================================
+describe("hegelian", function()
+    lust.after(reset)
+
+    it("has correct meta", function()
+        mock_alc(function() return "mock" end)
+        local m = require("hegelian")
+        expect(m.meta).to_not.equal(nil)
+        expect(m.meta.name).to.equal("hegelian")
+        expect(m.meta.version).to.equal("0.1.0")
+        expect(m.meta.category).to.equal("reasoning")
+    end)
+
+    it("errors without ctx.task", function()
+        mock_alc(function() return "mock" end)
+        package.loaded["hegelian"] = nil
+        local m = require("hegelian")
+        local ok, err = pcall(m.run, {})
+        expect(ok).to.equal(false)
+        expect(err:match("task must be a non%-empty string")).to_not.equal(nil)
     end)
 end)

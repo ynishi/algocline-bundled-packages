@@ -621,6 +621,27 @@
 ---@field total_evaluations number @Total per-candidate evaluations across rounds
 ---@field total_llm_calls number @Total LLM calls (generation + evaluations)
 
+---@class AlcPkgInput_hegelian
+---@field N? number @Max iterations (default: 5, (L) Abdali Table 1)
+---@field antithesis_prompt? string @Override antithesis prompt template (X)
+---@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
+---@field synthesis_prompt? string @Override synthesis prompt template (X)
+---@field system_antithesis? string @Override antithesis system prompt (X)
+---@field system_synthesis? string @Override synthesis system prompt (X)
+---@field system_thesis? string @Override thesis system prompt (X)
+---@field task string @Task or question (required)
+---@field tau_0? number @Initial temperature (default: 0.7, (L) Abdali Table 1)
+---@field tau_a? number @Antithesis temperature (default: 0.5, (L) Abdali Table 1)
+---@field thesis_prompt? string @Override thesis prompt template (X)
+---@field theta? number @Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range)
+
+---@class AlcPkgResult_hegelian
+---@field N number @Number of iterations actually executed
+---@field answer string @Final synthesis S_{N-1}; alias of result.final_synthesis
+---@field final_synthesis string @S_{N-1} — final integrated position
+---@field iterations { antithesis: string, iteration: number, synthesis: string, tau_i: number }[] @Per-iteration log: { i, A_i, τ(i), S_i } for i = 0..N-1
+---@field thesis_0 string @Initial thesis T_0 from bootstrap LLM call
+
 ---@class AlcPkgInput_intent_belief
 ---@field confidence_threshold? number @Stop when top hypothesis exceeds this (default 0.7)
 ---@field diagnose_tokens? number @Max tokens per diagnostic question (default 400)

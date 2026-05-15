@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`hegelian` package** (new, category=`reasoning`, 119th package): Self-
+  reflecting LLM via Hegelian dialectical self-reflection. Primary citation:
+  Abdali et al. (Microsoft Research), "Self-reflecting Large Language
+  Models: A Hegelian Dialectical Approach" (arXiv:2501.14917, 2025).
+  Implements Algorithm 1 §3 — bootstrap thesis T_0 at temperature τ_0,
+  then iterate `for i = 0..N-1: A_i ← M(T_i, τ_a); τ(i) = τ_0·exp(-θ·i);
+  S_i ← M(T_i, A_i, τ(i)); T_{i+1} ← S_i`. Three LLM stages per iteration:
+  thesis bootstrap (single, τ_0 = 0.7), antithesis (per-iter, τ_a = 0.5),
+  synthesis (per-iter, annealed τ(i)). Defaults follow Abdali Table 1:
+  τ_0 = 0.7 (L), τ_a = 0.5 (L), N = 5 (L), θ = 0.3 (X within paper-stated
+  (L) range [0.1, 0.5]). 5 spec entries: pure helpers `temperature_at` /
+  `build_thesis_prompt` / `build_antithesis_prompt` /
+  `build_synthesis_prompt` (LLM-independent, unit-testable) +
+  `run` (Strategy, ctx-threading orchestration, 1 + 2N LLM calls). Each
+  pure entry uses `args` direct-args mode with shape validation via
+  `S.instrument`. EXTENSION POINTS expose (L)-override knobs (tau_0 /
+  tau_a / N) and (X) infrastructure knobs (gen_tokens / prompt templates
+  / system prompts) with stability tier annotation. Replaces the
+  non-paper-faithful "rebuttal" stage previously mixed into `dmad/`
+  v0.1.0 (commit `54faaa5`, 2026-03-15) — the Hegelian methodology had
+  been implemented in dmad/ alongside the Du 2023 citation despite Du's
+  paper not describing a dialectic. dmad/ rewrite to pure Du 2023
+  paper-explicit Multi-Agent Debate is scoped to a separate Issue. Test
+  coverage: `tests/test_hegelian.lua` (57/57 PASS) covers meta / spec /
+  defaults / theta range enforcement / temperature_at paper formula /
+  prompt builders (default + override + validation) / run end-to-end
+  with mock alc (LLM call count, iteration log shape, temperature
+  schedule, thesis-carry-forward invariant, error paths).
+  `tests/test_new_packages.lua` adds minimal meta section (2 tests, 34
+  total PASS).
+
 ## [0.23.0] - 2026-05-10
 
 ### Added
