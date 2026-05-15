@@ -25,20 +25,40 @@
 ---   Antithesis  A_i          per-iteration, temperature τ_a (fixed)
 ---   Synthesis   S_i          per-iteration, temperature τ(i) (annealing)
 ---
+--- ### Stage name mapping vs paper-literal terms
+---
+--- The pkg uses classical Hegelian terms "Thesis / Antithesis / Synthesis"
+--- as a stable English mapping. The paper itself uses different literal
+--- labels in two places:
+---
+---   pkg term       Abdali §3 (main text)    Abdali Algorithm 1 step
+---   -----------    ----------------------   ------------------------
+---   Thesis      ↔  "Understanding"          (bootstrap, before loop)
+---   Antithesis  ↔  "Sublation"              "Generate Opposition"
+---   Synthesis   ↔  "Speculation"            "Cancel & Unify"
+---
+--- Symbols (T_i / A_i / S_i / τ_0 / τ_a / θ / N) match the paper. The
+--- choice of "Thesis/Antithesis/Synthesis" as the pkg-facing names is a
+--- (X) translation decision — the underlying algorithm is paper-literal.
+--- The paper also denotes antithesis temperature as τ_A (opposition
+--- temperature); the pkg uses lowercase τ_a / `tau_a` for Lua identifier
+--- hygiene.
+---
 --- **No "rebuttal" stage exists in the paper** (verified against Abdali §3 /
---- Algorithm 1 / Table 1, 2026-05-15 WebFetch).
+--- Algorithm 1 / Appendix A Table 2, 2026-05-15 WebFetch).
 ---
---- ## Defaults (Abdali 2025 §3 / Table 1)
+--- ## Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters")
 ---
---- | Symbol | Value | Label | Source                          |
---- |--------|-------|-------|---------------------------------|
---- | τ_0    | 0.7   | (L)   | Table 1 "Initial temperature"   |
---- | τ_a    | 0.5   | (L)   | Table 1 "Antithesis temperature"|
---- | θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 1 |
---- | N      | 5     | (L)   | Table 1 "Max iterations"        |
+--- | Symbol | Value | Label | Source                                                |
+--- |--------|-------|-------|-------------------------------------------------------|
+--- | τ_0    | 0.7   | (L)   | Table 2 "Initial temperature"                         |
+--- | τ_a    | 0.5   | (L)   | Table 2 "Opposition temperature" (paper symbol τ_A)   |
+--- | θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 2 |
+--- | N      | 5     | (L)   | Table 2 "Max iterations" (idea generation value;      |
+--- |        |       |       | paper also reports N=3 for math reasoning)            |
 ---
 --- θ default 0.3 is the midpoint of the paper-stated range [0.1, 0.5]
---- (Table 1). 0.3 is NOT itself a literal Table 1 value — only the range is.
+--- (Table 2). 0.3 is NOT itself a literal Table 2 value — only the range is.
 --- Caller is expected to tune θ for their specific model and task. The pkg
 --- enforces θ ∈ [0.1, 0.5] (the paper range) at runtime; values outside
 --- the range are rejected.
@@ -129,11 +149,13 @@ M.meta = {
     category = "reasoning",
 }
 
--- Centralized defaults per Abdali 2025 §3 / Table 1.
---   tau_0      = 0.7  (L) Table 1 "Initial temperature"
---   tau_a      = 0.5  (L) Table 1 "Antithesis temperature"
---   N          = 5    (L) Table 1 "Max iterations"
---   theta      = 0.3  (X) midpoint of paper-stated range [0.1, 0.5] (Table 1);
+-- Centralized defaults per Abdali 2025 Appendix A, Table 2
+-- ("Experimental hyper-parameters").
+--   tau_0      = 0.7  (L) Table 2 "Initial temperature"
+--   tau_a      = 0.5  (L) Table 2 "Opposition temperature" (paper symbol τ_A)
+--   N          = 5    (L) Table 2 "Max iterations" (idea-generation value;
+--                         paper also reports N=3 for math reasoning)
+--   theta      = 0.3  (X) midpoint of paper-stated range [0.1, 0.5] (Table 2);
 --                         specific default is caller's choice within the range.
 --   gen_tokens = 600  (X) infrastructure, paper does not specify token budgets.
 --                         Provenance: in-repo dmad/init.lua v0.1.0 baseline
@@ -147,7 +169,7 @@ M._defaults = {
     gen_tokens = 600,
 }
 
--- (L) Abdali 2025 Table 1: θ ∈ [0.1, 0.5]. Enforced at validation time.
+-- (L) Abdali 2025 Appendix A Table 2: θ ∈ [0.1, 0.5]. Enforced at validation time.
 M._theta_range = { min = 0.1, max = 0.5 }
 
 -- Default prompt templates (X).
@@ -274,11 +296,11 @@ local iteration_entry_shape = T.shape({
 local run_input_shape = T.shape({
     task              = T.string:describe("Task or question (required)"),
     N                 = T.number:is_optional()
-        :describe("Max iterations (default: " .. M._defaults.N .. ", (L) Abdali Table 1)"),
+        :describe("Max iterations (default: " .. M._defaults.N .. ", (L) Abdali Table 2)"),
     tau_0             = T.number:is_optional()
-        :describe("Initial temperature (default: " .. M._defaults.tau_0 .. ", (L) Abdali Table 1)"),
+        :describe("Initial temperature (default: " .. M._defaults.tau_0 .. ", (L) Abdali Table 2)"),
     tau_a             = T.number:is_optional()
-        :describe("Antithesis temperature (default: " .. M._defaults.tau_a .. ", (L) Abdali Table 1)"),
+        :describe("Antithesis/opposition temperature (default: " .. M._defaults.tau_a .. ", (L) Abdali Table 2)"),
     theta             = T.number:is_optional()
         :describe("Decay constant θ ∈ [0.1, 0.5] (default: " .. M._defaults.theta .. ", (X) within paper range)"),
     gen_tokens        = T.number:is_optional()
@@ -360,7 +382,7 @@ local function require_theta_in_range(value, entry)
     require_number(value, "theta", entry)
     if value < M._theta_range.min or value > M._theta_range.max then
         error(string.format(
-            "hegelian.%s: theta must be in [%g, %g] per Abdali 2025 Table 1, got %s",
+            "hegelian.%s: theta must be in [%g, %g] per Abdali 2025 Appendix A Table 2, got %s",
             entry, M._theta_range.min, M._theta_range.max, tostring(value)), 3)
     end
 end

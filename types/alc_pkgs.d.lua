@@ -622,7 +622,7 @@
 ---@field total_llm_calls number @Total LLM calls (generation + evaluations)
 
 ---@class AlcPkgInput_hegelian
----@field N? number @Max iterations (default: 5, (L) Abdali Table 1)
+---@field N? number @Max iterations (default: 5, (L) Abdali Table 2)
 ---@field antithesis_prompt? string @Override antithesis prompt template (X)
 ---@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
 ---@field synthesis_prompt? string @Override synthesis prompt template (X)
@@ -630,8 +630,8 @@
 ---@field system_synthesis? string @Override synthesis system prompt (X)
 ---@field system_thesis? string @Override thesis system prompt (X)
 ---@field task string @Task or question (required)
----@field tau_0? number @Initial temperature (default: 0.7, (L) Abdali Table 1)
----@field tau_a? number @Antithesis temperature (default: 0.5, (L) Abdali Table 1)
+---@field tau_0? number @Initial temperature (default: 0.7, (L) Abdali Table 2)
+---@field tau_a? number @Antithesis/opposition temperature (default: 0.5, (L) Abdali Table 2)
 ---@field thesis_prompt? string @Override thesis prompt template (X)
 ---@field theta? number @Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range)
 

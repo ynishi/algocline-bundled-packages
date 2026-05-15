@@ -100,7 +100,7 @@ end)
 describe("hegelian._defaults", function()
     lust.after(reset)
 
-    it("matches Abdali 2025 Table 1 (L) values: tau_0=0.7, tau_a=0.5, N=5", function()
+    it("matches Abdali 2025 Appendix A Table 2 (L) values: tau_0=0.7, tau_a=0.5, N=5", function()
         _G.alc = {}
         local m = require("hegelian")
         expect(m._defaults.tau_0).to.equal(0.7)
@@ -126,7 +126,7 @@ end)
 describe("hegelian._theta_range", function()
     lust.after(reset)
 
-    it("exposes (L) Abdali Table 1 range [0.1, 0.5]", function()
+    it("exposes (L) Abdali Appendix A Table 2 range [0.1, 0.5]", function()
         _G.alc = {}
         local m = require("hegelian")
         expect(m._theta_range.min).to.equal(0.1)

@@ -3319,7 +3319,8 @@ Returns:
 
 - [Primary citation](#primary-citation)
 - [Algorithm (Abdali 2025 §3, Algorithm 1)](#algorithm-abdali-2025-3-algorithm-1)
-- [Defaults (Abdali 2025 §3 / Table 1)](#defaults-abdali-2025-3-table-1)
+  - [Stage name mapping vs paper-literal terms](#stage-name-mapping-vs-paper-literal-terms)
+- [Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters")](#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters)
 - [Entry contract](#entry-contract)
 - [EXTENSION POINTS](#extension-points)
 - [Comparison with related packages](#comparison-with-related-packages)
@@ -3352,20 +3353,40 @@ Three LLM-mediated stages per iteration:
   Antithesis  A_i          per-iteration, temperature τ_a (fixed)
   Synthesis   S_i          per-iteration, temperature τ(i) (annealing)
 
+### Stage name mapping vs paper-literal terms {#stage-name-mapping-vs-paper-literal-terms}
+
+The pkg uses classical Hegelian terms "Thesis / Antithesis / Synthesis"
+as a stable English mapping. The paper itself uses different literal
+labels in two places:
+
+  pkg term       Abdali §3 (main text)    Abdali Algorithm 1 step
+  -----------    ----------------------   ------------------------
+  Thesis      ↔  "Understanding"          (bootstrap, before loop)
+  Antithesis  ↔  "Sublation"              "Generate Opposition"
+  Synthesis   ↔  "Speculation"            "Cancel & Unify"
+
+Symbols (T_i / A_i / S_i / τ_0 / τ_a / θ / N) match the paper. The
+choice of "Thesis/Antithesis/Synthesis" as the pkg-facing names is a
+(X) translation decision — the underlying algorithm is paper-literal.
+The paper also denotes antithesis temperature as τ_A (opposition
+temperature); the pkg uses lowercase τ_a / `tau_a` for Lua identifier
+hygiene.
+
 **No "rebuttal" stage exists in the paper** (verified against Abdali §3 /
-Algorithm 1 / Table 1, 2026-05-15 WebFetch).
+Algorithm 1 / Appendix A Table 2, 2026-05-15 WebFetch).
 
-## Defaults (Abdali 2025 §3 / Table 1) {#defaults-abdali-2025-3-table-1}
+## Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters") {#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters}
 
-| Symbol | Value | Label | Source                          |
-|--------|-------|-------|---------------------------------|
-| τ_0    | 0.7   | (L)   | Table 1 "Initial temperature"   |
-| τ_a    | 0.5   | (L)   | Table 1 "Antithesis temperature"|
-| θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 1 |
-| N      | 5     | (L)   | Table 1 "Max iterations"        |
+| Symbol | Value | Label | Source                                                |
+|--------|-------|-------|-------------------------------------------------------|
+| τ_0    | 0.7   | (L)   | Table 2 "Initial temperature"                         |
+| τ_a    | 0.5   | (L)   | Table 2 "Opposition temperature" (paper symbol τ_A)   |
+| θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 2 |
+| N      | 5     | (L)   | Table 2 "Max iterations" (idea generation value;      |
+|        |       |       | paper also reports N=3 for math reasoning)            |
 
 θ default 0.3 is the midpoint of the paper-stated range [0.1, 0.5]
-(Table 1). 0.3 is NOT itself a literal Table 1 value — only the range is.
+(Table 2). 0.3 is NOT itself a literal Table 2 value — only the range is.
 Caller is expected to tune θ for their specific model and task. The pkg
 enforces θ ∈ [0.1, 0.5] (the paper range) at runtime; values outside
 the range are rejected.
@@ -3447,7 +3468,7 @@ the correct paper citation (Abdali 2025) and removes the non-paper
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.N` | number | optional | Max iterations (default: 5, (L) Abdali Table 1) |
+| `ctx.N` | number | optional | Max iterations (default: 5, (L) Abdali Table 2) |
 | `ctx.antithesis_prompt` | string | optional | Override antithesis prompt template (X) |
 | `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
 | `ctx.synthesis_prompt` | string | optional | Override synthesis prompt template (X) |
@@ -3455,8 +3476,8 @@ the correct paper citation (Abdali 2025) and removes the non-paper
 | `ctx.system_synthesis` | string | optional | Override synthesis system prompt (X) |
 | `ctx.system_thesis` | string | optional | Override thesis system prompt (X) |
 | `ctx.task` | string | **required** | Task or question (required) |
-| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7, (L) Abdali Table 1) |
-| `ctx.tau_a` | number | optional | Antithesis temperature (default: 0.5, (L) Abdali Table 1) |
+| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7, (L) Abdali Table 2) |
+| `ctx.tau_a` | number | optional | Antithesis/opposition temperature (default: 0.5, (L) Abdali Table 2) |
 | `ctx.thesis_prompt` | string | optional | Override thesis prompt template (X) |
 | `ctx.theta` | number | optional | Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range) |
 
