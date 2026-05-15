@@ -40,6 +40,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/test_new_packages.lua` adds minimal meta section (2 tests, 34
   total PASS).
 
+### Changed
+
+- **`dmad` package — paper-explicit rewrite (v0.1.0 → v0.2.0, breaking
+  result shape)**. v0.1.0 cited Du 2023 (arXiv:2305.14325) but implemented
+  a 4-step Hegelian dialectic (thesis / antithesis / rebuttal / synthesis)
+  that has no source in Du's paper. The Hegelian methodology was extracted
+  to a separate `hegelian/` pkg (Abdali 2025 paper-explicit, see Added
+  above) in commit `e030095` + doc correction `5838927`. dmad v0.2.0 is
+  rewritten as pure Du 2023 Multi-Agent Debate:
+  - Algorithm: N parallel agents propose initial answers (round 0), then
+    for r = 1..R each agent revises after seeing other N-1 agents'
+    previous-round responses. Final aggregation by majority vote on
+    extracted answers. Total LLM calls = N·(R+1).
+  - Defaults (L from Du repo `gsm/gen_gsm.py`): N = 3 agents, R = 2
+    rounds. Default 9 LLM calls per run.
+  - Prompt templates (L verbatim from `gen_gsm.py`): `DEFAULT_INIT_TEMPLATE`
+    ("Can you solve the following math problem? %s …  \\boxed{answer} …"),
+    `DEFAULT_DEBATE_PREFIX` / `DEFAULT_DEBATE_AGENT_BLOCK` /
+    `DEFAULT_DEBATE_SUFFIX` (paper repo `construct_message` shape).
+  - Spec entries (5): 4 pure helpers (`build_init_prompt` /
+    `build_debate_prompt` / `extract_boxed` / `aggregate_majority`) +
+    `run` Strategy. Pure helpers use `args` direct-args mode and are
+    LLM-independent. `aggregate_majority` matches `eval_gsm.py:most_frequent`
+    semantics (first-wins tie-break). `extract_boxed` reads `\boxed{...}`
+    with last-match preference and graceful trim fallback.
+  - EXTENSION POINTS: REQUIRED `ctx.task`; (L)-override `n_agents` /
+    `n_rounds` (overriding invalidates paper effect guarantee); (X)
+    infrastructure `gen_tokens` / `temperature` / template overrides /
+    system_prompt / `extract_fn` (pluggable extractor for non-math tasks).
+  - Result shape (breaking from v0.1.0): `{answer, n_agents, n_rounds,
+    responses[r+1][i], last_answers[i], tally, total_llm_calls,
+    debate_log}`. v0.1.0 fields `thesis` / `antithesis` / `synthesis` /
+    `rebuttal` are removed — callers that depend on Hegelian semantics
+    must switch to `require("hegelian")` (Abdali 2025 paper-explicit).
+  - Test coverage: `tests/test_dmad.lua` (50/50 PASS) covers meta / spec /
+    defaults / template verbatim assertions / pure helpers (default +
+    override + validation) / `aggregate_majority` (strict majority +
+    first-wins tie-break + tally + reject) / `extract_boxed` (last-match
+    + trim + fallback) / `run` end-to-end with mock alc (N·(R+1) call
+    count, debate_log shape, responses indexing, other-agents exclusion
+    of self, temperature propagation, error paths) / Hegelian path
+    removal (no `thesis` / `antithesis` / `synthesis` fields, no
+    `dialectic_mode` branching).
+  - Resolves the v0.1.0 internal inconsistency where the package cited
+    Du 2023 while implementing a different paper's methodology.
+
 ## [0.23.0] - 2026-05-10
 
 ### Added

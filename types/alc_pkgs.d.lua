@@ -481,18 +481,24 @@
 ---@field ranking { avg_score: number, path_id: number, rank: number, steps_verified: number }[] @Paths ordered from best to worst by avg_score
 
 ---@class AlcPkgInput_dmad
----@field gen_tokens? number @Max tokens per thesis/antithesis/rebuttal (default 500)
----@field rounds? number @Number of thesis–antithesis exchange rounds (default 1)
----@field synth_tokens? number @Max tokens for the final synthesis (default 600)
----@field task string @Task or question to analyze (required)
+---@field debate_prompt? string @Override DEBATE template (X)
+---@field gen_tokens? number @Max tokens per LLM call (default: 500, (X) infrastructure)
+---@field init_prompt? string @Override INIT template (X)
+---@field n_agents? number @Number of parallel agents (default: 3, (L) Du repo gen_gsm.py)
+---@field n_rounds? number @Number of debate rounds after init (default: 2, (L) Du repo gen_gsm.py)
+---@field system_prompt? string @Override system prompt (X)
+---@field task string @Problem statement (required)
+---@field temperature? number @LLM temperature (default: API default, (X) infrastructure; paper does not fix)
 
 ---@class AlcPkgResult_dmad
----@field answer string @Final synthesis text; alias of result.synthesis for caller convenience
----@field antithesis string @Last antithesis produced (round N)
----@field debate_log { role: "thesis"|"antithesis"|"rebuttal"|"synthesis", round: number, text: string }[] @Full dialectical transcript in chronological order (thesis → antithesis/rebuttal*rounds → synthesis)
----@field rounds number @Number of rounds actually executed
----@field synthesis string @Integrated position from the dialectic
----@field thesis string @Initial reasoned position (round 0)
+---@field answer string @Final majority-vote answer
+---@field debate_log { agent: number, round: number, text: string }[] @Flat chronological log of (agent, round, text) tuples
+---@field last_answers string[] @Extracted answer per agent at round R
+---@field n_agents number @N actually used
+---@field n_rounds number @R actually used
+---@field responses string[][] @responses[r+1][i] = a_{i,r} (1-based for Lua); responses[1] = init, responses[R+1] = final
+---@field tally { answer: string, count: number }[] @Full vote tally
+---@field total_llm_calls number @Total LLM calls made (= N·(R+1))
 
 ---@class AlcPkgInput_epidemic_abm
 ---@field beta? number @Transmission probability per contact (default 0.3)

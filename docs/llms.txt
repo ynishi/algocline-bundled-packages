@@ -117,7 +117,7 @@
 - [cot](narrative/cot.md): Iterative chain-of-thought — cumulative reasoning steps, then synthesis
 - [cumulative](narrative/cumulative.md): Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation
 - [diverse](narrative/diverse.md): DiVERSe — diverse reasoning paths with step-level verification and selection
-- [dmad](narrative/dmad.md): Dialectical reasoning — thesis, antithesis, and synthesis for deeper analysis
+- [dmad](narrative/dmad.md): Multi-Agent Debate (Du 2023) — N parallel agents, R debate rounds, majority vote
 - [faithful](narrative/faithful.md): Faithful CoT — formalize reasoning into code/logic for verification, then answer
 - [got](narrative/got.md): Graph of Thoughts: DAG reasoning with aggregation, refinement, and synthesis.
 - [gumbel_search](narrative/gumbel_search.md): Budget-optimal search via Sequential Halving and Gumbel Top-k sampling.
