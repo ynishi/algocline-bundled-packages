@@ -153,7 +153,7 @@ M.caveats = {
         .. "degenerates to 'boundary-verified only' (no cross-branch "
         .. "mis-routing detection). Strict verification kicks in only "
         .. "after ab_mcts applies the migration diff in contract.md. "
-        .. "The token tampering test in tests/test_recipe_deep_panel.lua "
+        .. "The token tampering test in recipe_deep_panel/spec/recipe_deep_panel_spec.lua "
         .. "uses a stub that echoes tokens and therefore exercises the "
         .. "flow layer itself, not the real ab_mcts integration.",
     "needs_investigation is a recipe-level flag, not a hard abort. "
@@ -188,7 +188,7 @@ local DEFAULT_APPROACHES = {
 --- Empirical verification status.
 ---
 --- The Stage 1 abort path and the Stage 3a distinctness path are
---- exercised by the accompanying smoke-test (tests/test_recipe_deep_panel.lua)
+--- exercised by the accompanying smoke-test (recipe_deep_panel/spec/recipe_deep_panel_spec.lua)
 --- with mocked alc.llm / ab_mcts.run. Stages 2 (real ab_mcts fan-out),
 --- 3b (ensemble_div.decompose on numeric answers), and 5 (calibrate on
 --- real LLM) require a full e2e run with real backends; those slots

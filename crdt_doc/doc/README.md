@@ -79,7 +79,7 @@ State-based CRDT (CvRDT) requires the merge function `⊔` to satisfy:
 
 These are enforced by construction (OR-Map = ∪ of (key, value, tag) tuples, with
 remove via tombstone; LWW-Register = max by lamport, lexicographic agent
-tiebreak). `tests/test_crdt_doc.lua` exercises all three invariants on
+tiebreak). `crdt_doc/spec/crdt_doc_spec.lua` exercises all three invariants on
 hand-crafted op sets per CRDT type, plus a 3-agent integration test that
 checks convergence across 3 distinct arrival orderings (fixed-order
 convergence tests; random-sequence property testing is future work).

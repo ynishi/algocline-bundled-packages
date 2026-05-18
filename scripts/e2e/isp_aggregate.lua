@@ -7,7 +7,7 @@
 --- single-agent-block interactive flow. This is Prelec-Seung-McCoy
 --- 2017's Surprisingly Popular linear extension — NOT Zhang 2025's
 --- ISP/OW. The paper-faithful default (`method="isp"` + calibration
---- tensor from M.calibrate) is exercised in tests/test_isp_aggregate.lua
+--- tensor from M.calibrate) is exercised in isp_aggregate/spec/isp_aggregate_spec.lua
 --- where kernel correctness can be asserted without a live LLM.
 ---
 --- Here: n=3 agents × 2 calls each (1st-order + 2nd-order meta-prompt)

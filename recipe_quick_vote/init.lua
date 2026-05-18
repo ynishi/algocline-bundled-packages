@@ -146,14 +146,14 @@ M.verified = {
             stage = 1,
             name = "sprt_primitive",
             status = "verified",
-            evidence = { "tests/test_sprt.lua::sprt Monte Carlo α/β verification" },
+            evidence = { "sprt/spec/sprt_spec.lua::sprt Monte Carlo α/β verification" },
         },
         {
             stage = 2,
             name = "sampler_loop_with_gate",
             status = "verified",
             evidence = {
-                "tests/test_recipe_quick_vote.lua:mocked_alc",
+                "recipe_quick_vote/spec/recipe_quick_vote_spec.lua:mocked_alc",
                 "2026-04-19_122754",
             },
         },
