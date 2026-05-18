@@ -35,6 +35,7 @@ M.meta = {
     version = "0.1.0",
     description = "Draft-verify-revise — reduces hallucination via independent fact-checking",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

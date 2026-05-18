@@ -40,6 +40,7 @@ M.meta = {
         .. "Based on N-version approach from Agentic SE Roadmap (arxiv 2509.06216). "
         .. "Mitigates 29.6% regression rate found in SWE-Bench audits.",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

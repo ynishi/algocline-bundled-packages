@@ -131,6 +131,7 @@ M.meta = {
         .. "gumbel_search/ab_mcts (search depth-vs-width): intra-paradigm "
         .. "S↔V split.",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Paper-faithful defaults; paper § references in comments per

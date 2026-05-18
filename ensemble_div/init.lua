@@ -60,6 +60,7 @@ M.meta = {
     version = "0.1.0",
     description = "Krogh-Vedelsby ambiguity decomposition for ensemble diversity measurement.",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -62,6 +62,7 @@ M.meta = {
         .. "cs_pruner (multi-arm anytime-valid elimination) and f_race "
         .. "(Friedman rank elimination).",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- ─── Shape specifications ───

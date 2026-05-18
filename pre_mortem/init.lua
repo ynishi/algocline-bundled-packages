@@ -46,6 +46,7 @@ M.meta = {
     version = "0.1.0",
     description = "Feasibility-gated proposal filtering — prerequisite verification before rating",
     category = "combinator",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -47,6 +47,7 @@ M.meta = {
     version = "0.1.0",
     description = "Meta-Prompting — orchestrator identifies and dispatches to specialist personas",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

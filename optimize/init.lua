@@ -68,6 +68,7 @@ M.meta = {
         .. "evaluators (evalframe, custom, LLM judge), and stopping criteria "
         .. "(variance, patience, threshold). Persists history via alc.state.",
     category = "optimization",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -34,6 +34,7 @@ M.meta = {
         .. "selection and mutation. Prisoner's Dilemma, Hawk-Dove, "
         .. "or custom payoff matrices. Based on Axelrod (1984).",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

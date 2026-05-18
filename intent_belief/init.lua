@@ -37,6 +37,7 @@ M.meta = {
     version = "0.1.0",
     description = "Bayesian intent estimation — hypothesis generation with iterative belief updates via diagnostic questions",
     category = "intent",
+    alc_shapes_compat = "^0.25",
 }
 
 local ranked_hypothesis_shape = T.shape({

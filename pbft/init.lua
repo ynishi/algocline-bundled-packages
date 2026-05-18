@@ -46,6 +46,7 @@ M.meta = {
     description = "PBFT-inspired 3-phase LLM consensus — propose, validate, "
         .. "commit with BFT quorum guarantees (Castro-Liskov 1999)",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -49,6 +49,7 @@ M.meta = {
     version = "0.1.0",
     description = "Compute-optimal test-time scaling: select method and budget by difficulty.",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

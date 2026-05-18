@@ -27,6 +27,7 @@ M.meta = {
     version = "0.1.0",
     description = "Maieutic prompting — recursive explanation tree with logical consistency verification",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

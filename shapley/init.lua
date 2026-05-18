@@ -66,6 +66,7 @@ M.meta = {
         .. "harmful agents in multi-agent ensembles "
         .. "(Shapley 1953, Ghorbani-Zou AISTATS 2019).",
     category = "attribution",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

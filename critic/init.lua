@@ -37,6 +37,7 @@ M.meta = {
     version = "0.1.0",
     description = "Rubric-based per-dimension scoring with targeted revision of weak areas.",
     category = "evaluation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

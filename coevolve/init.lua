@@ -45,6 +45,7 @@ M.meta = {
     version = "0.1.0",
     description = "Challenger-Solver co-evolution self-play that auto-expands the search space.",
     category = "exploration",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Per-round stats emitted to ctx.result.round_stats[] (one entry per round,

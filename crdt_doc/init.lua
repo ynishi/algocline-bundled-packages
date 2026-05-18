@@ -107,6 +107,7 @@ M.meta = {
         .. "to build multi-agent shared state. Based on Shapiro et al. "
         .. "(INRIA RR-7506, 2011).",
     category    = "collaboration",
+    alc_shapes_compat = "^0.25",
 }
 
 -- ── Op shape (declarative, kind-tagged) ──

@@ -35,6 +35,7 @@ M.meta = {
     version = "0.1.0",
     description = "Analogical prompting — self-generate analogies, extract patterns, apply to original",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -99,6 +99,7 @@ M.meta = {
     version     = "0.1.0",
     description = "Card failure analyzer — single-card improvement hint generator",
     category    = "debugging",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

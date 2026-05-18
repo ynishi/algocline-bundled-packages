@@ -54,6 +54,7 @@ M.meta = {
     version = "0.1.0",
     description = "Deep code review with investigation — detect, verify, explore, diagnose, research, prescribe",
     category = "combinator",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Shape sub-definitions. Themes accumulate fields across 6 phases,

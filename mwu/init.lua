@@ -72,6 +72,7 @@ M.meta = {
     version = "0.1.0",
     description = "Multiplicative Weights Update with O(sqrt(T ln N)) adversarial regret bound.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -65,6 +65,7 @@ M.meta = {
     version = "0.1.0",
     description = "Deep-reasoning diverse panel: N x ab_mcts fan-out + diversity + calibrate.",
     category = "recipe",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

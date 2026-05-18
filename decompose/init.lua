@@ -46,6 +46,7 @@ M.meta = {
     version = "0.1.0",
     description = "Task decomposition — LLM-driven split, parallel execution, merge",
     category = "planning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

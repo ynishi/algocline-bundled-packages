@@ -147,6 +147,7 @@ M.meta = {
     version = "0.1.0",
     description = "Hegelian dialectical self-reflection — thesis/antithesis/synthesis with temperature annealing (Abdali 2025)",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults per Abdali 2025 Appendix A, Table 2

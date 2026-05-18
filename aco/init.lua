@@ -44,6 +44,7 @@ M.meta = {
     description = "Ant Colony Optimization — discrete path search with "
         .. "pheromone-based learning (Dorigo 1996, Gutjahr 2000 convergence)",
     category = "exploration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

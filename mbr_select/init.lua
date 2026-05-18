@@ -49,6 +49,7 @@ M.meta = {
     version = "0.1.0",
     description = "Minimum Bayes Risk selection: pick candidate with highest pairwise agreement.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

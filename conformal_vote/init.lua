@@ -67,6 +67,7 @@ M.meta = {
     version = "0.1.0",
     description = "Split conformal prediction gate for multi-agent deliberation",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults. Keep magic numbers here so no entry hard-codes

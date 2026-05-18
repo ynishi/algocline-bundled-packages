@@ -39,6 +39,7 @@ M.meta = {
     version = "0.1.0",
     description = "Plan-Test-Then-Solve — generate constraints before solving, verify solution against specification",
     category = "planning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -56,6 +56,7 @@ M.meta = {
         .. "Highest-accuracy LLM reranker on TREC-DL/BEIR. Resolves the "
         .. "calibration problem.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

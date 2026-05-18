@@ -50,6 +50,7 @@ M.meta = {
         .. "via verbal reinforcement. Each new attempt references accumulated "
         .. "reflections on past failures. reflect polishes; reflexion learns.",
     category = "refinement",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

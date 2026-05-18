@@ -38,6 +38,7 @@ M.meta = {
     version = "0.1.0",
     description = "Mutual reasoning verification — two paths cross-verify each other for efficient accuracy",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

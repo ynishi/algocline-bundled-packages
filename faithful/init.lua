@@ -39,6 +39,7 @@ M.meta = {
     version = "0.1.0",
     description = "Faithful CoT — formalize reasoning into code/logic for verification, then answer",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

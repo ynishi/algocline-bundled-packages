@@ -43,6 +43,7 @@ M.meta = {
         .. "across free-form responses. Extends SC to open-ended tasks where "
         .. "majority vote is inapplicable.",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

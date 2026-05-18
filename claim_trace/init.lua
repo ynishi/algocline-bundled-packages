@@ -37,6 +37,7 @@ M.meta = {
     version = "0.1.0",
     description = "Span-level evidence attribution: trace each claim to supporting source spans.",
     category = "attribution",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

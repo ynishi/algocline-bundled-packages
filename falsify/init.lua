@@ -43,6 +43,7 @@ M.meta = {
     version = "0.1.0",
     description = "Popper-style sequential falsification of hypotheses with successor derivation.",
     category = "exploration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

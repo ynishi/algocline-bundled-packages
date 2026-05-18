@@ -125,6 +125,7 @@ M.meta = {
         .. "ab_select/mbr_select (single-best selection): N→K subset "
         .. "complementarity over a pre-computed calibration tensor.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Paper-faithful defaults; magic numbers live here so no entry hard-codes.

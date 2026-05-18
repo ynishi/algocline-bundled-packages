@@ -47,6 +47,7 @@ M.meta = {
     version = "0.1.0",
     description = "Self-critique loop — generate, critique, revise until convergence",
     category = "refinement",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

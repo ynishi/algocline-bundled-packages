@@ -52,6 +52,7 @@ M.meta = {
     version = "0.1.0",
     description = "Step-Back prompting — abstract the principle first, then solve from principles",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

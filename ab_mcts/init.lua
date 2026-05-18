@@ -52,6 +52,7 @@ M.meta = {
     version = "0.1.0",
     description = "Adaptive branching MCTS with Thompson Sampling — wider/deeper per node",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

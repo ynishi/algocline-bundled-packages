@@ -49,6 +49,7 @@ M.meta = {
     version = "0.1.0",
     description = "Byzantine Fault Tolerance quorum thresholds and impossibility bounds.",
     category = "governance",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

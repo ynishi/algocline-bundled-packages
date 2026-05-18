@@ -48,6 +48,7 @@ M.meta = {
     version = "0.1.0",
     description = "Pipeline error cascade detection via per-step independent re-derivation.",
     category = "governance",
+    alc_shapes_compat = "^0.25",
 }
 
 local step_input_shape = T.shape({

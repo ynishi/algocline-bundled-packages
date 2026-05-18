@@ -57,6 +57,7 @@ M.meta = {
     version = "0.1.0",
     description = "Kemeny-Young optimal rank aggregation minimizing total Kendall tau distance.",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

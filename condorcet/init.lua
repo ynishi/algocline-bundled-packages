@@ -59,6 +59,7 @@ M.meta = {
     version = "0.1.0",
     description = "Condorcet Jury Theorem probability and Anti-Jury detection.",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

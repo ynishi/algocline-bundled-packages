@@ -38,6 +38,7 @@ M.meta = {
         .. "agents update opinions by averaging nearby opinions within threshold ε. "
         .. "Emergent consensus, polarization, or fragmentation.",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

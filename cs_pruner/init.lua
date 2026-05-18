@@ -107,6 +107,7 @@ M.meta = {
     version = "0.1.0",
     description = "Anytime-valid candidate pruning via empirical-Bernstein confidence sequences.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

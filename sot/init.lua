@@ -48,6 +48,7 @@ M.meta = {
     version = "0.1.0",
     description = "Skeleton-of-Thought — outline-first parallel section generation",
     category = "generation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

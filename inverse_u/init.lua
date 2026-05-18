@@ -55,6 +55,7 @@ M.meta = {
     version = "0.1.0",
     description = "Detect inverse-U accuracy scaling when adding more agents (safety gate).",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -52,6 +52,7 @@ M.meta = {
     version = "0.1.0",
     description = "Tree-of-Thought — branching reasoning with evaluation and pruning",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

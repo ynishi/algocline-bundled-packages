@@ -73,6 +73,7 @@ M.meta = {
         .. "multi-axis scoring, pairwise final rank. -87% calls vs naive "
         .. "pairwise on N=8 (verified). Encodes known failure modes as caveats.",
     category = "recipe",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

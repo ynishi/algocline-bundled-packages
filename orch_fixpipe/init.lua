@@ -24,6 +24,7 @@ M.meta = {
         .. "Phases execute in strict order. Gate NG triggers retry up to max_retries. "
         .. "Based on Lobster (OpenClaw) deterministic workflow pattern.",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

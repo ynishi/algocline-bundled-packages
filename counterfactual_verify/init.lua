@@ -42,6 +42,7 @@ M.meta = {
     version = "0.1.0",
     description = "Counterfactual simulation to verify causal faithfulness of a reasoning chain.",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec
