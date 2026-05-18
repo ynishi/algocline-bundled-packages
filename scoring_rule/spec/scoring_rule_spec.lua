@@ -1,0 +1,1 @@
+../../tests/test_scoring_rule.lua

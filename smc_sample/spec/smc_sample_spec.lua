@@ -1,0 +1,1 @@
+../../tests/test_smc_sample.lua
