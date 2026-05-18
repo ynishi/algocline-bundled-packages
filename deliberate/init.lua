@@ -33,6 +33,7 @@ M.meta = {
     version = "0.1.0",
     description = "Structured deliberation: abstract principles, consult, debate, ranked decision.",
     category = "combinator",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

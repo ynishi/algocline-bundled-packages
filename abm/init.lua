@@ -47,6 +47,7 @@ M.meta = {
     version = "0.1.0-beta",
     description = "Agent-based modeling framework with Monte Carlo and sensitivity sweep.",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Frame layer

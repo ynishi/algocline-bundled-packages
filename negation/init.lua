@@ -40,6 +40,7 @@ M.meta = {
     version = "0.1.0",
     description = "Adversarial self-test — generate destruction conditions and verify answer survival",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

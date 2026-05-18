@@ -49,6 +49,7 @@ M.meta = {
         .. "then ground via parallel knowledge resolution. Decouples reasoning "
         .. "structure from concrete facts.",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 local grounding_entry_shape = T.shape({

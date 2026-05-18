@@ -37,6 +37,7 @@ M.meta = {
     version = "0.1.0",
     description = "Identify problem type, apply thought template, verify (Buffer of Thoughts).",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 local template_shape = T.shape({

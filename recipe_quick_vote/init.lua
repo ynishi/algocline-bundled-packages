@@ -75,6 +75,7 @@ M.meta = {
         .. "recipe_safe_panel (fixed n) and recipe_deep_panel "
         .. "(heavy per-branch reasoning).",
     category    = "recipe",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

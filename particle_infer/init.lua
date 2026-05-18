@@ -134,6 +134,7 @@ M.meta = {
     version = "0.1.0",
     description = "Particle-filter inference-time scaling with PRM-guided softmax resampling.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults. Keep magic numbers here; paper citations

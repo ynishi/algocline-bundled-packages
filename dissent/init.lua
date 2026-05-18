@@ -51,6 +51,7 @@ M.meta = {
     version = "0.1.0",
     description = "Forced adversarial challenge to prevent multi-agent consensus inertia.",
     category = "governance",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

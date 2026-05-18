@@ -48,6 +48,7 @@ M.meta = {
         .. "that scores each reasoning step independently. Identifies the first "
         .. "point of failure and re-derives from the last correct step.",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

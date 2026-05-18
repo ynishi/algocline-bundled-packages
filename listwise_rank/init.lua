@@ -59,6 +59,7 @@ M.meta = {
     version = "0.1.0",
     description = "Zero-shot listwise reranking via permutation generation with sliding window.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

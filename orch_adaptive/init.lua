@@ -26,6 +26,7 @@ M.meta = {
     version = "0.1.0",
     description = "Adaptive-depth orchestration: tune phase count and budget by task difficulty.",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

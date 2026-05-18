@@ -47,6 +47,7 @@ M.meta = {
         .. "llm_bound) that persist verify-side state across alc.llm "
         .. "yield boundaries.",
     category    = "substrate",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Public API (flat, module-level pure fn — Neovim/Penlight/OpenResty style).

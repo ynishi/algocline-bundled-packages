@@ -34,6 +34,7 @@ M.meta = {
     version = "0.1.0",
     description = "Contrastive CoT: generate correct and wrong chains and learn from the contrast.",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

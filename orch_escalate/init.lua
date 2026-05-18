@@ -29,6 +29,7 @@ M.meta = {
         .. "Minimizes cost for easy tasks, guarantees quality for hard ones. "
         .. "Based on Cascade Escalation (Microsoft + DAAO cost optimization).",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

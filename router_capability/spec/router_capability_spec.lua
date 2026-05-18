@@ -1,0 +1,1 @@
+../../tests/test_router_capability.lua

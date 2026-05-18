@@ -24,6 +24,7 @@ M.meta = {
         .. "Extracts task requirements via LLM, then scores against agent capabilities "
         .. "using Jaccard similarity. Based on Dynamic Agent Registry pattern.",
     category = "routing",
+    alc_shapes_compat = "^0.25",
 }
 
 local agent_entry_shape = T.shape({

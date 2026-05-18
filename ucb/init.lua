@@ -34,6 +34,7 @@ M.meta = {
     version = "0.1.0",
     description = "UCB1 hypothesis space exploration — generate, score, select, refine",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

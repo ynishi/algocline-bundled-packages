@@ -41,6 +41,7 @@ M.meta = {
     version = "0.1.0",
     description = "Bypass self-correction blind spot by re-presenting output as external source.",
     category = "correction",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

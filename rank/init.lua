@@ -24,6 +24,7 @@ M.meta = {
     version = "0.1.0",
     description = "Tournament selection — generate candidates, pairwise LLM-as-Judge ranking",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

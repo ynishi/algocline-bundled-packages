@@ -25,6 +25,7 @@ M.meta = {
         .. "Task type determines which phases to skip. "
         .. "Based on Thin Agent / Fat Platform (Praetorian).",
     category = "orchestration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

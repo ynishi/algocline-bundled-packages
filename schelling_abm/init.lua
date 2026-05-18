@@ -42,6 +42,7 @@ M.meta = {
         .. "when local same-type fraction falls below tolerance threshold. "
         .. "Mild preferences produce strong emergent segregation.",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

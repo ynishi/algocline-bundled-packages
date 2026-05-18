@@ -54,6 +54,7 @@ M.meta = {
         .. "Pure Lua ABM runs Monte Carlo simulation + sensitivity sweep. "
         .. "Based on FCLAgent (arXiv:2510.12189) hybrid architecture.",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---------------------------------------------------------------------------

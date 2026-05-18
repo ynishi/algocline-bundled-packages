@@ -53,6 +53,7 @@ M.meta = {
     version = "0.2.0",
     description = "Independent multi-path sampling with majority vote aggregation",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

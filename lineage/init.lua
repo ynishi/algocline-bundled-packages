@@ -49,6 +49,7 @@ M.meta = {
     version = "0.1.0",
     description = "Pipeline-spanning claim lineage tracking with conflict and ungrounded detection.",
     category = "governance",
+    alc_shapes_compat = "^0.25",
 }
 
 local input_step_shape = T.shape({

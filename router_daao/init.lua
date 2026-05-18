@@ -28,6 +28,7 @@ M.meta = {
         .. "Classifies task difficulty with a single LLM call, then maps to "
         .. "optimal strategy/depth/parameters via deterministic lookup.",
     category = "routing",
+    alc_shapes_compat = "^0.25",
 }
 
 local profile_shape = T.shape({

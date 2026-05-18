@@ -50,6 +50,7 @@ M.meta = {
         .. "from 'From Spark to Fire' (Xie et al., AAMAS 2026). Same agents, "
         .. "different topology → up to 40% reliability variation.",
     category = "routing",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

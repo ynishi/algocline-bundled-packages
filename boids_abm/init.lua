@@ -35,6 +35,7 @@ M.meta = {
     version = "0.1.0",
     description = "Reynolds boids flocking simulation (separation, alignment, cohesion).",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

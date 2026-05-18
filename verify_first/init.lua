@@ -43,6 +43,7 @@ M.meta = {
     version = "0.1.0",
     description = "Verification-First prompting — verify a candidate answer before generating, reducing logical errors via reverse reasoning",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -109,6 +109,7 @@ M.meta = {
         .. "rule) drives the Target I tempered potential ψ=exp(α·r). "
         .. "Default (N=16,K=4,S=2) issues 208 LLM calls per run.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults. Paper §4.1 HumanEval 87.8% setting. Keep

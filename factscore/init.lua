@@ -54,6 +54,7 @@ M.meta = {
     version = "0.1.0",
     description = "Atomic claim decomposition — per-claim factual verification with scoring",
     category = "validation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

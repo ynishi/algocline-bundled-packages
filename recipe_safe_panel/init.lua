@@ -79,6 +79,7 @@ M.meta = {
         .. "Composes condorcet + sc + inverse_u + calibrate with known "
         .. "failure mode awareness.",
     category = "recipe",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

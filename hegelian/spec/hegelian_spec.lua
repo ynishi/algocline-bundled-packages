@@ -1,0 +1,1 @@
+../../tests/test_hegelian.lua

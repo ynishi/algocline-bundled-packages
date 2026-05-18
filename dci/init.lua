@@ -68,6 +68,7 @@ M.meta = {
     version = "0.1.0",
     description = "Deliberative Collective Intelligence with typed epistemic acts",
     category = "synthesis",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults (issue §13.1). Keep magic numbers here so no

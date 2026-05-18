@@ -29,6 +29,7 @@ M.meta = {
         .. "Zero LLM calls for clear matches, one call for ambiguous cases. "
         .. "Based on Semantic Router pattern (Microsoft Multi-Agent Reference Architecture).",
     category = "routing",
+    alc_shapes_compat = "^0.25",
 }
 
 local rule_shape = T.shape({

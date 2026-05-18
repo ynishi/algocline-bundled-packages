@@ -31,6 +31,7 @@ M.meta = {
     version = "0.2.0",
     description = "Confidence-gated reasoning — fast path when confident, escalation when not",
     category = "meta",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

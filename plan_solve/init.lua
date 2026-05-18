@@ -36,6 +36,7 @@ M.meta = {
     version = "0.1.0",
     description = "Plan-and-Solve — devise an explicit plan, then execute step by step",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

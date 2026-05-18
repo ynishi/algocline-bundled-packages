@@ -145,6 +145,7 @@ M.meta = {
     version = "0.2.0",
     description = "Mixture-of-Agents (Wang 2024) — L-layer × n-proposer aggregation with Aggregate-and-Synthesize",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults per Wang 2024 §3.

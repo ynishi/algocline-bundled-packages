@@ -1,0 +1,1 @@
+../../tests/test_alc_shapes_check.lua

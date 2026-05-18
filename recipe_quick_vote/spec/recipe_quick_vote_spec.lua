@@ -1,0 +1,1 @@
+../../tests/test_recipe_quick_vote.lua

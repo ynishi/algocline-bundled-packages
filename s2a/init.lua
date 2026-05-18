@@ -35,6 +35,7 @@ M.meta = {
     version = "0.1.0",
     description = "System 2 Attention — strip irrelevant context before reasoning to reduce distraction and sycophancy",
     category = "preprocessing",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

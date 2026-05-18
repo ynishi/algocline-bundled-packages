@@ -146,6 +146,7 @@ M.meta = {
     version = "0.1.0",
     description = "ReConcile (Chen 2023) — round-table consensus with §B.5 confidence-weighted voting and early-stop",
     category = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults per Chen 2023 §3 / §4.

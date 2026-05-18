@@ -48,6 +48,7 @@ M.meta = {
         .. "Routes to Conceptual Chaining, Chunked Symbolism, or Expert Lexicons "
         .. "based on task type. 60-84% token reduction vs standard CoT.",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

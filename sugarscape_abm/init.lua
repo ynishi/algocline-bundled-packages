@@ -46,6 +46,7 @@ M.meta = {
         .. "emergent wealth inequality, Pareto-like distributions, "
         .. "and carrying capacity. Based on Epstein & Axtell (1996).",
     category = "simulation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

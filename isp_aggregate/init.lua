@@ -161,6 +161,7 @@ M.meta = {
         .. "of conformal_vote. Non-paper-faithful meta-prompt SP "
         .. "path is an explicit opt-in for calibration-free settings.",
     category    = "aggregation",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults. Keep magic numbers here so no entry hard-codes

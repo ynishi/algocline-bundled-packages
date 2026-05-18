@@ -44,6 +44,7 @@ M.meta = {
     version = "0.1.0",
     description = "Cumulative Reasoning — proposer/verifier/reporter loop with fact accumulation",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

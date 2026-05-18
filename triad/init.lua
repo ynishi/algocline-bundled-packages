@@ -28,6 +28,7 @@ M.meta = {
     version = "0.1.0",
     description = "Adversarial 3-role debate — proponent/opponent/judge with multi-round argumentation",
     category = "adversarial",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

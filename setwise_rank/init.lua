@@ -67,6 +67,7 @@ M.meta = {
         .. "small sets and winners advance. Mid-cost/mid-accuracy sweet "
         .. "spot between listwise and pairwise. Resolves calibration issue.",
     category = "selection",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

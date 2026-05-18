@@ -47,6 +47,7 @@ M.meta = {
         .. "with LLM-driven mutation, evaluation, and feature classification. "
         .. "Produces diverse, high-quality solution populations.",
     category = "exploration",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

@@ -136,6 +136,7 @@ M.meta = {
     version = "0.2.0",
     description = "Multi-Agent Debate (Du 2023) — N parallel agents, R debate rounds, majority vote",
     category = "reasoning",
+    alc_shapes_compat = "^0.25",
 }
 
 -- Centralized defaults per Du 2023 repo `gsm/gen_gsm.py`.

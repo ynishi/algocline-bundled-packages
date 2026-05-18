@@ -33,6 +33,7 @@ M.meta = {
     version = "0.1.0",
     description = "Chain-of-Density iterative information densification with fidelity preservation.",
     category = "optimization",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

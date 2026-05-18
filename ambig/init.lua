@@ -36,6 +36,7 @@ M.meta = {
     version = "0.1.0",
     description = "Underspecification detection — detect-clarify-integrate pipeline for ambiguous inputs",
     category = "intent",
+    alc_shapes_compat = "^0.25",
 }
 
 local element_shape = T.shape({

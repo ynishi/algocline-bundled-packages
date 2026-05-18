@@ -75,6 +75,7 @@ M.meta = {
         .. "prediction quality. Audits whether agent confidence matches "
         .. "actual accuracy (Brier 1950, Gneiting-Raftery JASA 2007).",
     category = "evaluation",
+    alc_shapes_compat = "^0.25",
 }
 
 ---@type AlcSpec

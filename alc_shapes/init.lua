@@ -35,6 +35,7 @@ local instrument = require("alc_shapes.instrument")
 local M = {}
 
 M.VERSION = "0.25.1"
+M.alc_shapes_compat = "^0.25" -- self-compat declaration for gendoc warn-free build
 
 -- ── shape dictionary ─────────────────────────────────────────────────
 

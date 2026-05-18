@@ -55,6 +55,7 @@ M.meta = {
         .. "via genetic operators with meta-mutation (the mutation operators "
         .. "themselves evolve). Double evolutionary loop.",
     category = "exploration",
+    alc_shapes_compat = "^0.25",
 }
 
 local population_entry_shape = T.shape({
