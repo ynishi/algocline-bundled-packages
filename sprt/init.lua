@@ -200,7 +200,7 @@ end
 --- The classical approximations upper-bound the realized error rates
 --- by α* ≤ α / (1 - β) and β* ≤ β / (1 - α), i.e. slightly looser than
 --- the declared (α, β) when overshoot is non-negligible. Grid-verified
---- in tests/test_sprt.lua to stay within 2× of declared rates for the
+--- in sprt/spec/sprt_spec.lua to stay within 2× of declared rates for the
 --- typical operating region (α, β ∈ [0.05, 0.2], p0 ∈ [0.3, 0.6],
 --- p1 ∈ [0.55, 0.9]).
 ---
@@ -272,7 +272,7 @@ end
 --- reproducibility. For parallel tests or sandboxed reproducibility,
 --- either save and restore the global seed at the caller, or batch all
 --- `sprt.simulate` calls inside a single deterministic seeding schedule
---- (e.g. the Monte Carlo loop in `tests/test_sprt.lua`).
+--- (e.g. the Monte Carlo loop in `sprt/spec/sprt_spec.lua`).
 ---
 ---@param cfg table { p0, p1, alpha, beta }
 ---@param p number true Bernoulli success rate in [0, 1]

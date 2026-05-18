@@ -278,7 +278,7 @@ every tier; see the matrix below.
 
 | Tier | Runner | Purpose | Location |
 |---|---|---|---|
-| Unit tests (mocked `_G.alc`) | `lua-debugger` MCP (`mlua-probe-mcp`) | Stage transitions, index mapping, API contracts, cost accounting | `tests/test_recipe_*.lua` |
+| Unit tests (mocked `_G.alc`) | `lua-debugger` MCP (`mlua-probe-mcp`) or `alc_pkg_test pkg=<name>` | Stage transitions, index mapping, API contracts, cost accounting | `recipe_*/spec/recipe_*_spec.lua` |
 | E2E (single-case, live LLM) | `agent-block` / `just e2e <name>` | ReAct-loop + MCP + real LLM on one prompt, with custom graders | `scripts/e2e/<recipe>.lua` |
 | Scenario eval (multi-case pass_rate) | `alc_eval` via `agent-block` | pass@1 over an installed scenario (e.g. `math_basic`) | `scripts/e2e/<recipe>_eval.lua` |
 
@@ -715,7 +715,10 @@ LUA_PATH="./?.lua;./?/init.lua;$LUA_PATH" lua5.4 tests/test_ranking_packages.lua
 
 ### Adding a new test file
 
-1. Create `tests/test_<package>.lua`.
+1. Create `<package>/spec/<package>_spec.lua` (per-package convention — enables
+   `alc_pkg_test pkg=<package>` discovery). Cross-package test files
+   (e.g. `tests/test_ranking_packages.lua`) stay in `tests/` since they do
+   not map to a single package.
 2. Use the standard preamble (matches all existing test files):
 
    ```lua
