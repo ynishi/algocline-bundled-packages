@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-05-18
+
+### Added
+
+- **`<pkg>/spec/<pkg>_spec.lua` per-package test layout**. Each bundled
+  package that previously had a `tests/test_<pkg>.lua` file now hosts
+  its test under its own `spec/` directory. This unlocks
+  `alc_pkg_test pkg=<name>` discovery (algocline MCP) in addition to the
+  existing `mlua-probe-mcp test_launch code_file=<path>` runner — both
+  paths execute the same `lust`-based suites. Cross-package test files
+  (foundations_phase2, ranking_packages, entity_schemas, etc., 10 files)
+  remain in `tests/` since they don't map to a single package.
+- **`M.meta.alc_shapes_compat = "^0.25"` declaration on every bundled
+  package** (plus a self-compat marker on `alc_shapes` itself). After
+  this change, `alc_hub_dist` runs warning-free against algocline core
+  ≥ 0.26 (was 117 "alc_shapes_compat not declared" warnings, now 0).
+  `"^0.25"` = `>=0.25.0, <0.26.0`; the next alc_shapes major bump will
+  surface as a hard dist error, prompting an explicit re-pin per pkg.
+
+### Verified
+
+- `alc_hub_dist` — 120 generated / 0 failed / lint 0 errors / 0 warnings.
+- `alc_pkg_doctor` — `spec_missing: []` for all 105 bundled packages.
+- `alc_pkg_test pkg=<name>` — sample smoke (sc 11/11, dmad 52/52,
+  abm 79/79, moa 36/36, reconcile 57/57, card_analysis 6/6).
+
 ## [0.24.0] - 2026-05-16
 
 ### Fixed
