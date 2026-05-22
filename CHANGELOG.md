@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-05-22
+
+### Added
+
+- **Per-package spec coverage at 100%** (Phase B). 24 previously
+  cross-test-only packages now have their own `<pkg>/spec/<pkg>_spec.lua`
+  with `lust`-based suites (meta / spec / error path + run-mode tests):
+  `contrastive` / `meta_prompt` / `step_back` / `reflect` / `analogical` /
+  `ab_mcts` / `cod` / `blind_spot` / `bisect` / `cove` / `tot` /
+  `least_to_most` / `verify_first` / `cumulative` / `diverse` /
+  `model_first` / `intent_discovery` / `intent_belief` / `php` /
+  `sketch` / `prism` / `ucb` / `panel` / `ambig` / `deliberate` /
+  `robust_qa` / `pre_mortem`. After this change, every bundled pkg is
+  discoverable via `alc_pkg_test pkg=<name>` (algocline MCP).
+- **Cross-cutting test decomposition** (Phase C). Seven cross-package
+  `tests/test_*.lua` files (3,361 lines total) were decomposed into
+  per-pkg specs across 30 packages:
+  - `test_foundations_phase2` → `pbft` / `aco`
+  - `test_governance` → `dissent` / `topo_route`
+    (`lineage` / `anti_cascade` extracted in Phase B)
+  - `test_ranking_packages` → `ab_select` / `listwise_rank` /
+    `pairwise_rank` / `setwise_rank`
+  - `test_foundations` → `bft` / `condorcet` / `ensemble_div` /
+    `inverse_u` / `cost_pareto` / `eval_guard`
+  - `test_new_packages` → `s2a` / `plan_solve` / `rstar` / `faithful` /
+    `bot` (`moa` / `hegelian` extracted in Phase B)
+  - `test_exploration` → `qdaif` / `falsify` / `prompt_breed` /
+    `coevolve` / `mcts` (+ `optimize.search:breed` strategy appended
+    to existing `optimize_spec.lua`)
+  - `test_tier1_2` → `usc` / `step_verify` / `compute_alloc` /
+    `gumbel_search` / `mbr_select` / `reflexion`
+- **`tools/test_audit.lua` + `just test-audit` recipes** (Phase A). A
+  coverage matrix tool that joins `<pkg>/spec/` presence with
+  `tests/test_*.lua` `require("<pkg>")` mentions, surfacing per-pkg test
+  coverage with priority sort (paper-explicit weighting). Used to drive
+  Phase B/C planning.
+
+### Removed
+
+- Seven cross-package test files (`tests/test_foundations_phase2.lua` /
+  `test_governance.lua` / `test_ranking_packages.lua` /
+  `test_foundations.lua` / `test_new_packages.lua` / `test_exploration.lua` /
+  `test_tier1_2.lua`). All content migrated to per-pkg specs. Remaining
+  `tests/test_*.lua` (entity_schemas / spec_resolver / shapes_conformance)
+  and `tests/flow/test_integ_*.lua` are cross-cutting by design and stay
+  in `tests/`.
+
+### Verified
+
+- `alc_hub_dist` — 120 generated / 0 failed / lint 0 errors / 0 warnings.
+- All new specs pass via `just alc-pkg-test-file <path>` smoke and
+  `mcp__algocline__alc_pkg_test pkg=<name>` discovery.
+
 ## [0.25.0] - 2026-05-18
 
 ### Added
