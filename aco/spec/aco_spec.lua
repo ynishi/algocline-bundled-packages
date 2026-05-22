@@ -1,12 +1,20 @@
---- Tests for Phase 2 foundation packages (pbft, aco).
---- pbft requires LLM mocking. aco has both pure engine tests and mocked LLM tests.
+--- Tests for aco (F5 — Dorigo 1996 + Gutjahr 2000 Ant Colony Optimization).
+--- Pure-engine + LLM-integrated tests.
+--- Extracted from tests/test_foundations_phase2.lua (Phase C decomposition).
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
-local REPO = os.getenv("PWD") or "."
+local function repo_root_from_package_path()
+    for entry in package.path:gmatch("[^;]+") do
+        local prefix = entry:match("^(.-)/%?%.lua$")
+        if prefix and prefix ~= "" and prefix:sub(1, 1) == "/" then
+            return prefix
+        end
+    end
+    return "."
+end
+local REPO = repo_root_from_package_path()
 package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
-
--- ─── Mock helpers ───
 
 local function mock_alc(llm_fn)
     local call_log = {}
@@ -23,137 +31,8 @@ end
 
 local function reset_modules()
     _G.alc = nil
-    package.loaded["pbft"] = nil
-    package.loaded["bft"] = nil
     package.loaded["aco"] = nil
 end
-
--- ═══════════════════════════════════════════════════════════════════
--- pbft (F2 — Castro-Liskov 1999)
--- ═══════════════════════════════════════════════════════════════════
-
-describe("pbft", function()
-    lust.after(reset_modules)
-
-    it("runs 3-phase consensus with quorum (f=0, n=3)", function()
-        -- Phase 1: 3 proposals, Phase 2: 3 votes, Phase 3: maybe synthesis
-        local call_idx = 0
-        mock_alc(function(prompt, opts, idx)
-            call_idx = idx
-            if idx <= 3 then
-                -- Phase 1: proposals
-                return "Proposal " .. idx .. ": The answer is 42."
-            elseif idx <= 6 then
-                -- Phase 2: all vote for proposal 1
-                return "1"
-            else
-                -- Phase 3: synthesis (shouldn't be called if quorum met)
-                return "Synthesized answer"
-            end
-        end)
-
-        local pbft = require("pbft")
-        local ctx = pbft.run({ task = "What is 6 * 7?" })
-
-        expect(ctx.result).to_not.equal(nil)
-        expect(ctx.result.n_agents).to.equal(3)
-        expect(ctx.result.quorum_required).to.equal(1)  -- 2*0+1 = 1
-        expect(ctx.result.quorum_met).to.equal(true)
-        expect(ctx.result.commit_method).to.equal("quorum")
-        expect(ctx.result.bft_valid).to.equal(true)
-    end)
-
-    it("falls back to synthesis when no quorum", function()
-        mock_alc(function(prompt, opts, idx)
-            if idx <= 3 then
-                return "Proposal " .. idx
-            elseif idx <= 6 then
-                -- Each votes for self: no majority
-                local agent = ((idx - 4) % 3) + 1
-                return tostring(agent)
-            else
-                return "Synthesized from all"
-            end
-        end)
-
-        local pbft = require("pbft")
-        local ctx = pbft.run({ task = "Debate topic", n_agents = 3, f = 0 })
-
-        -- With f=0, quorum=1, so any single vote wins.
-        -- All 3 vote differently but quorum=1 means the plurality wins
-        expect(ctx.result.commit_method).to.equal("quorum")
-    end)
-
-    it("validates BFT conditions on start", function()
-        mock_alc(function() return "ok" end)
-        local pbft = require("pbft")
-
-        -- n=3, f=1 requires n >= 3*1+1 = 4 → should error
-        expect(function()
-            pbft.run({ task = "test", n_agents = 3, f = 1 })
-        end).to.fail()
-    end)
-
-    it("works with f=1, n=4", function()
-        mock_alc(function(prompt, opts, idx)
-            if idx <= 4 then
-                return "Proposal " .. idx
-            elseif idx <= 8 then
-                -- 3 out of 4 vote for proposal 1 (quorum = 2*1+1 = 3)
-                if idx <= 7 then return "1" else return "2" end
-            else
-                return "Synthesis"
-            end
-        end)
-
-        local pbft = require("pbft")
-        local ctx = pbft.run({ task = "test", n_agents = 4, f = 1 })
-        expect(ctx.result.quorum_required).to.equal(3)
-        expect(ctx.result.quorum_met).to.equal(true)
-        expect(ctx.result.commit_method).to.equal("quorum")
-    end)
-
-    it("includes proposals in result for traceability", function()
-        mock_alc(function(prompt, opts, idx)
-            if idx <= 3 then return "Answer " .. idx end
-            return "1"
-        end)
-
-        local pbft = require("pbft")
-        local ctx = pbft.run({ task = "test" })
-        expect(#ctx.result.proposals).to.equal(3)
-        expect(ctx.result.proposals[1]).to.equal("Answer 1")
-    end)
-
-    it("uses injected system prompts", function()
-        local captured_systems = {}
-        mock_alc(function(prompt, opts, idx)
-            captured_systems[#captured_systems + 1] = opts.system
-            if idx <= 3 then return "Proposal " .. idx end
-            if idx <= 6 then return "1" end
-            return "Synthesis"
-        end)
-
-        local pbft = require("pbft")
-        pbft.run({
-            task = "test",
-            gen_system = "CUSTOM_GEN",
-            vote_system = "CUSTOM_VOTE",
-        })
-        -- Phase 1: 3 proposals should use gen_system
-        expect(captured_systems[1]).to.equal("CUSTOM_GEN")
-        expect(captured_systems[2]).to.equal("CUSTOM_GEN")
-        expect(captured_systems[3]).to.equal("CUSTOM_GEN")
-        -- Phase 2: 3 votes should use vote_system
-        expect(captured_systems[4]).to.equal("CUSTOM_VOTE")
-        expect(captured_systems[5]).to.equal("CUSTOM_VOTE")
-        expect(captured_systems[6]).to.equal("CUSTOM_VOTE")
-    end)
-end)
-
--- ═══════════════════════════════════════════════════════════════════
--- aco (F5 — Dorigo 1996 + Gutjahr 2000) — Pure engine tests
--- ═══════════════════════════════════════════════════════════════════
 
 describe("aco (pure engine)", function()
     local aco = require("aco")
@@ -188,7 +67,7 @@ describe("aco (pure engine)", function()
             local graph = { nodes = { "A", "B", "C" } }
             local colony = aco.new(graph, { n_ants = 5, seed = 42 })
             local path, score = colony:iterate(function(p)
-                return #p  -- longer paths score higher
+                return #p
             end)
             expect(path).to_not.equal(nil)
             expect(score > 0).to.equal(true)
@@ -200,7 +79,6 @@ describe("aco (pure engine)", function()
             local graph = { nodes = nodes }
             local colony = aco.new(graph, { n_ants = 10, seed = 42 })
 
-            -- Eval: paths that visit specific nodes score higher
             local function eval(path)
                 local score = 0
                 for _, node in ipairs(path) do
@@ -241,7 +119,6 @@ describe("aco (pure engine)", function()
             local graph = { nodes = { "A", "B", "C", "D" } }
             local colony = aco.new(graph, { n_ants = 5, seed = 42 })
             colony:run(function(p) return 1.0 end, { max_iter = 100, stagnation = 3 })
-            -- Should stop well before 100 iterations due to stagnation
             expect(colony.iteration < 100).to.equal(true)
         end)
     end)
@@ -269,9 +146,7 @@ describe("aco (pure engine)", function()
                 },
             }
             local colony = aco.new(graph, { n_ants = 20, beta = 5, seed = 42 })
-            -- With strong beta and high eta on A->B->C, most ants should take that path
             colony:run(function(path)
-                -- Score paths that go A -> B -> C highest
                 if #path == 3 and path[1] == "A" and path[2] == "B" and path[3] == "C" then
                     return 10
                 end
@@ -280,15 +155,10 @@ describe("aco (pure engine)", function()
 
             local best_path, _ = colony:best()
             expect(best_path[1]).to.equal("A")
-            -- With high heuristic on A->B, likely goes through B
             expect(best_path[2]).to.equal("B")
         end)
     end)
 end)
-
--- ═══════════════════════════════════════════════════════════════════
--- aco (F5) — LLM-integrated run(ctx) test
--- ═══════════════════════════════════════════════════════════════════
 
 describe("aco (LLM-integrated)", function()
     lust.after(reset_modules)
@@ -300,7 +170,6 @@ describe("aco (LLM-integrated)", function()
             if prompt:find("Break this task") then
                 return "1. Analyze requirements\n2. Design solution\n3. Implement\n4. Test"
             elseif prompt:find("Rate this approach") then
-                -- Score paths with "Analyze" higher
                 if prompt:find("Analyze") then return "8" else return "5" end
             else
                 return "Final answer based on optimized approach."
@@ -360,11 +229,8 @@ describe("aco (LLM-integrated)", function()
             exec_system = "CUSTOM_EXEC",
         })
 
-        -- First call = decomposition
         expect(captured_systems[1]).to.equal("CUSTOM_DECOMPOSE")
-        -- Last call = execution
         expect(captured_systems[#captured_systems]).to.equal("CUSTOM_EXEC")
-        -- Middle calls = evaluation
         for i = 2, #captured_systems - 1 do
             expect(captured_systems[i]).to.equal("CUSTOM_EVAL")
         end
