@@ -91,3 +91,31 @@ dist:
 # [group('allow-agent')]
 dist-auto:
     agent-block -s scripts/dist.lua -p .
+
+# Audit test coverage across bundled packages. Emits a markdown summary
+# (Untested top-N priority list + coverage stats). Pure Lua, no LLM call.
+# [group('allow-agent')]
+test-audit top="50":
+    lua5.4 tools/test_audit.lua --format=md --top={{top}}
+
+# JSON form of `test-audit` for piping into jq.
+# [group('allow-agent')]
+test-audit-json:
+    lua5.4 tools/test_audit.lua --format=json
+
+# Run a single Lua spec/test file via lua5.4 with `lust` globals injected.
+# Locates mlua-lspec's lust.lua dynamically from the cargo registry so the
+# recipe survives mlua-lspec version bumps. Use `just alc-pkg-test-file
+# <pkg>/spec/<pkg>_spec.lua` or `just alc-pkg-test-file tests/test_X.lua`.
+# [group('allow-agent')]
+alc-pkg-test-file path:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    LUST_DIR=$(ls -d ~/.cargo/registry/src/*/mlua-lspec-*/lua 2>/dev/null | sort -V | tail -n 1)
+    if [ -z "$LUST_DIR" ]; then
+        echo "Error: mlua-lspec/lua not found under ~/.cargo/registry/src/" >&2
+        echo "Run: cargo install mlua-probe-mcp" >&2
+        exit 1
+    fi
+    LUA_PATH="./?.lua;./?/init.lua;$LUST_DIR/?.lua;;" \
+        lua5.4 -e "lust = require('lust'); dofile('{{path}}')"
