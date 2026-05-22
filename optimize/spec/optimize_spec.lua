@@ -1065,3 +1065,139 @@ describe("optimize: auto_card emits Card with two-tier data", function()
         expect(card.scenario.name).to.equal("gsm8k_100")
     end)
 end)
+
+-- ─── Phase C extraction: breed strategy ───
+describe("optimize.search: breed strategy", function()
+    lust.after(reset)
+
+    it("is registered in strategies", function()
+        mock_alc(function() return "mock" end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local s = search.resolve("breed")
+        expect(type(s.init)).to.equal("function")
+        expect(type(s.propose)).to.equal("function")
+        expect(type(s.update)).to.equal("function")
+    end)
+
+    it("init creates population and mutation prompts", function()
+        mock_alc(function() return "mock" end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local state = breed.init(space, nil)
+        expect(#state.population).to.equal(10)
+        expect(#state.mutation_prompts >= 3).to.equal(true)
+        expect(state.hyper_mutation_rate).to.equal(0.15)
+    end)
+
+    it("init seeds from history when available", function()
+        mock_alc(function() return "mock" end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local history = {
+            results = {
+                { params = { x = 3 }, score = 0.8 },
+                { params = { x = 7 }, score = 0.9 },
+            },
+        }
+        local state = breed.init(space, history)
+        expect(#state.population).to.equal(2)
+        expect(state.population[1].score).to.equal(0.9) -- sorted desc
+    end)
+
+    it("propose uses LLM for mutation", function()
+        local llm_called = false
+        mock_alc(function(prompt)
+            if prompt:match("Mutation strategy") then
+                llm_called = true
+                return '{"x": 5}'
+            end
+            return "mock"
+        end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local state = breed.init(space, nil)
+        -- Give population scores for tournament
+        for _, ind in ipairs(state.population) do
+            ind.score = math.random()
+        end
+        local p = breed.propose(state)
+        expect(llm_called).to.equal(true)
+        expect(p.x >= 1 and p.x <= 10).to.equal(true)
+    end)
+
+    it("propose falls back to EA-style on parse failure", function()
+        mock_alc(function() return "not valid json at all" end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local state = breed.init(space, nil)
+        for _, ind in ipairs(state.population) do
+            ind.score = math.random()
+        end
+        -- Should not error even with bad LLM output
+        local p = breed.propose(state)
+        expect(p.x >= 1 and p.x <= 10).to.equal(true)
+    end)
+
+    it("update tracks mutation prompt scores", function()
+        mock_alc(function() return '{"x": 5}' end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local state = breed.init(space, nil)
+        for _, ind in ipairs(state.population) do
+            ind.score = 0.5
+        end
+        -- Propose to set _last_mutation_idx
+        breed.propose(state)
+        -- Update with a score
+        state = breed.update(state, { x = 5 }, 0.9)
+
+        -- At least one mutation prompt should have uses > 0
+        local any_used = false
+        for _, m in ipairs(state.mutation_prompts) do
+            if m.uses > 0 then any_used = true; break end
+        end
+        expect(any_used).to.equal(true)
+    end)
+
+    it("update keeps population bounded", function()
+        mock_alc(function() return '{"x": 5}' end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        local breed = search.resolve("breed")
+
+        local space = { x = { type = "int", min = 1, max = 10 } }
+        local state = breed.init(space, nil)
+        -- Add many individuals
+        for i = 1, 25 do
+            state = breed.update(state, { x = i % 10 + 1 }, math.random())
+        end
+        expect(#state.population <= 20).to.equal(true)
+    end)
+
+    it("resolve includes breed in known strategies", function()
+        mock_alc(function() return "mock" end)
+        package.loaded["optimize.search"] = nil
+        local search = require("optimize.search")
+        -- Should resolve without error
+        for _, name in ipairs({ "ucb", "random", "opro", "ea", "greedy", "breed" }) do
+            local s = search.resolve(name)
+            expect(type(s.init)).to.equal("function")
+        end
+    end)
+end)
