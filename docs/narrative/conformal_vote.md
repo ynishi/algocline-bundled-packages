@@ -3,7 +3,7 @@ name: conformal_vote
 version: 0.1.0
 category: validation
 result_shape: conformal_decided
-description: "Split conformal prediction gate for multi-agent deliberation"
+description: "Split conformal prediction gate for multi-agent deliberation with finite-sample coverage guarantee"
 source: conformal_vote/init.lua
 generated: gen_docs (V0)
 ---
@@ -18,6 +18,7 @@ generated: gen_docs (V0)
 - [Theoretical foundations](#theoretical-foundations)
 - [Entry contract](#entry-contract)
 - [Comparison with related packages](#comparison-with-related-packages)
+- [EXTENSION POINTS](#extension-points)
 - [References](#references)
 - [Parameters](#parameters)
 - [Result](#result)
@@ -66,6 +67,46 @@ See `M.spec` below for the formal machine-readable contract:
 Category: `validation` (alongside `sprt`, `eval_guard`, `inverse_u`).
 The paper's informal "Governance" label describes the role; the
 machine-readable category string follows the existing sibling pkgs.
+
+## EXTENSION POINTS {#extension-points}
+
+REQUIRED:
+  ctx.calibration_samples — array of `{agent_probs, true_label}` from
+    a held-out set drawn i.i.d. with the online test (paper Theorem 2
+    exchangeability requirement). Without this, run() cannot produce
+    a coverage-bounded prediction set.
+  ctx.agents — array of agent specs (system / model / per-agent
+    temperature) for the N parallel verbalized-probability queries.
+    `run()` issues exactly `#agents` LLM calls per invocation.
+  alc.llm — runtime injection. Strategy is Pure Lua; the host MUST
+    provide `alc.llm` at execution time.
+
+(L)-override OPTION (overriding removes paper's coverage guarantee):
+  alpha       — miscoverage rate (default 0.05, paper Table 3 primary).
+                 Pr[Y ∈ C(X)] ≥ 1 - alpha (Theorem 2) is the literal
+                 paper claim only when caller does not override alpha
+                 post-calibration. Re-running calibrate() with a new
+                 alpha is paper-compatible; mutating alpha at run() is
+                 not.
+  weights     — per-agent aggregation weights. Calibrate() pins
+                 these so online runs preserve exchangeability;
+                 overriding weights at run() invalidates the
+                 finite-sample quantile guarantee.
+
+(I) OPTION (industry-standard or sibling-pkg convention defaults):
+  gen_tokens  — per-LLM-call token budget (default 400, matches sc).
+                 Paper Appendix C uses 4096 max_tokens; the pkg default
+                 follows the sibling-pkg convention rather than the
+                 paper's larger budget to keep latency manageable.
+  max_retries — parse-fallback retry count (default 0, matches paper's
+                 no-retry policy).
+  agents[i].system / model / temperature — per-agent overrides for
+    the underlying alc.llm call.
+
+(X) OPTION (no paper or industry-standard provenance):
+  auto_card     — emit a Card on completion (default false).
+  card_pkg      — Card pkg.name override (default "conformal_vote_<task_hash>").
+  scenario_name — explicit scenario name for the emitted Card.
 
 ## References {#references}
 

@@ -19,18 +19,37 @@
 --- | Epistemic | `ground`, `update` |
 --- | Decisional | `recommend` |
 ---
---- DCI-CF 8 stages:
+--- DCI-CF 8 stages (paper §3 canonical numbering):
 ---
---- 1. **Stage 0** — init session
---- 2. **Stage 1** — independent proposals (per-role act(s))
---- 3. **Stage 2** — canonicalize & cluster options
---- 4. **Stages 3-6** (loop up to `Rmax=2`):
----    - Collect challenges / evidence
----    - Admit new hypotheses (cutoff)
----    - Revise & compress options
----    - Score against criteria + convergence test (dominance or no_blocking)
---- 5. **Stage 7** — fallback cascade
---- 6. **Stage 8** — finalize decision packet (5 components completeness)
+--- - **Stage 0** — init session
+--- - **Stage 1** — independent proposals (per-role epistemic act(s))
+--- - **Stage 2** — canonicalize / cluster options
+--- - **Stage 3** — structured challenge and evidence (per paper §3)
+--- - **Stage 4** — revision and option compression (per paper §3)
+--- - **Stage 5** — multi-criteria scoring (per paper §3)
+--- - **Stage 6** — convergence test (dominance / no_blocking, per paper §3)
+--- - **Stage 7** — fallback cascade (outranking → minimax regret →
+---   robust satisficing → Integrator selection, per paper §3 / §E)
+--- - **Stage 8** — finalize decision packet (5-component completeness)
+---
+--- Stages 3–6 loop up to `max_rounds` (default Rmax=2). pkg internal
+--- function names retain the historical `stage3_challenge` /
+--- `stage4_admit` / `stage5_revise` / `stage6_converge` mapping; the
+--- semantics in each loop iteration aggregate Stage 3 (challenge),
+--- Stage 4 (revise / admit), Stage 5 (score), Stage 6 (converge).
+---
+--- ### Stage 7 fallback cascade (paper literal labels)
+---
+--- The cascade order keeps paper-literal labels in narrative but uses
+--- ASCII-safe identifiers in the `FALLBACK_CASCADE_ORDER` constant for
+--- programmatic dispatch. Mapping:
+---
+--- | Paper literal label | pkg identifier (constant)     |
+--- |---------------------|-------------------------------|
+--- | outranking          | `outranking`                  |
+--- | minimax regret      | `minimax`                     |
+--- | robust satisficing  | `satisficing`                 |
+--- | Integrator selection| `integrator_arbitration`      |
 ---
 --- ## Theoretical foundations
 ---
@@ -54,8 +73,9 @@
 ---
 --- ## References
 ---
---- Prakash & Sunil (2026). "From Debate to Deliberation: Structured Collective
---- Reasoning with Typed Epistemic Acts". arXiv:2603.11781.
+--- Prakash, S. (2026). "From Debate to Deliberation: Structured Collective
+--- Reasoning with Typed Epistemic Acts". arXiv:2603.11781. Single author
+--- (Indian School of Business).
 
 local S = require("alc_shapes")
 local T = S.T
@@ -342,9 +362,10 @@ end
 
 -- ─── Stage 1: independent proposals (4 roles × 1 call) ───
 
-local function stage1_propose(task, workspace, gen_tokens)
+local function stage1_propose(task, workspace, gen_tokens, roles)
+    roles = roles or ROLES
     local all_acts = {}
-    for _, role in ipairs(ROLES) do
+    for _, role in ipairs(roles) do
         local persona = role_persona(role)
         local prompt = string.format(
 [[%s
@@ -460,7 +481,8 @@ end
 
 -- ─── Stage 3: collect challenges / evidence ───
 
-local function stage3_challenge(task, workspace, options, gen_tokens)
+local function stage3_challenge(task, workspace, options, gen_tokens, roles)
+    roles = roles or ROLES
     local opts_text = {}
     for _, o in ipairs(options) do
         opts_text[#opts_text + 1] = string.format("- [%d] %s", o.id,
@@ -468,7 +490,7 @@ local function stage3_challenge(task, workspace, options, gen_tokens)
     end
     local options_str = table.concat(opts_text, "\n")
     local acts = {}
-    for _, role in ipairs(ROLES) do
+    for _, role in ipairs(roles) do
         local persona = role_persona(role)
         local prompt = string.format(
 [[%s
@@ -506,7 +528,8 @@ end
 
 -- ─── Stage 4: admit new hypotheses (cutoff) ───
 
-local function stage4_admit(task, workspace, challenges, gen_tokens)
+local function stage4_admit(task, workspace, challenges, gen_tokens, roles)
+    roles = roles or ROLES
     local chal_text = {}
     for i, c in ipairs(challenges) do
         chal_text[#chal_text + 1] = string.format("- [%d] (%s) %s",
@@ -514,7 +537,7 @@ local function stage4_admit(task, workspace, challenges, gen_tokens)
     end
     local joined = table.concat(chal_text, "\n")
     local acts = {}
-    for _, role in ipairs(ROLES) do
+    for _, role in ipairs(roles) do
         local persona = role_persona(role)
         local prompt = string.format(
 [[%s
@@ -547,7 +570,8 @@ end
 -- ─── Stage 5: revise & compress options ───
 
 local function stage5_revise(task, workspace, options, num_finalists,
-                              gen_tokens)
+                              gen_tokens, roles)
+    roles = roles or ROLES
     local opts_text = {}
     for _, o in ipairs(options) do
         opts_text[#opts_text + 1] = string.format("- [%d] %s", o.id,
@@ -559,7 +583,7 @@ local function stage5_revise(task, workspace, options, num_finalists,
     -- consolidates below (1 call per role for transparency; the
     -- revision vote is a single final Integrator call).
     local proposals = {}
-    for _, role in ipairs(ROLES) do
+    for _, role in ipairs(roles) do
         local persona = role_persona(role)
         local prompt = string.format(
 [[%s
@@ -1168,8 +1192,8 @@ function M.run(ctx)
     local total_llm_calls = 0
     local history = {}
 
-    -- Stage 1: 4 × alc.llm
-    local acts1 = stage1_propose(ctx.task, workspace, gen_tokens)
+    -- Stage 1: |roles| × alc.llm
+    local acts1 = stage1_propose(ctx.task, workspace, gen_tokens, roles)
     total_llm_calls = total_llm_calls + #roles
     for _, a in ipairs(acts1) do
         history[#history + 1] = { stage = 1, round = 0, act = a }
@@ -1186,25 +1210,25 @@ function M.run(ctx)
 
     for round = 1, max_rounds do
         rounds_used = round
-        -- Stage 3: 4 × alc.llm
+        -- Stage 3: |roles| × alc.llm
         local challenges = stage3_challenge(ctx.task, workspace, options,
-            gen_tokens)
+            gen_tokens, roles)
         total_llm_calls = total_llm_calls + #roles
         for _, a in ipairs(challenges) do
             history[#history + 1] = { stage = 3, round = round, act = a }
         end
 
-        -- Stage 4: 4 × alc.llm
+        -- Stage 4: |roles| × alc.llm
         local admits = stage4_admit(ctx.task, workspace, challenges,
-            gen_tokens)
+            gen_tokens, roles)
         total_llm_calls = total_llm_calls + #roles
         for _, a in ipairs(admits) do
             history[#history + 1] = { stage = 4, round = round, act = a }
         end
 
-        -- Stage 5: 4 × alc.llm
+        -- Stage 5: |roles| × alc.llm
         options = stage5_revise(ctx.task, workspace, options, num_finalists,
-            gen_tokens)
+            gen_tokens, roles)
         total_llm_calls = total_llm_calls + #roles
 
         -- Stage 6: 1 × alc.llm

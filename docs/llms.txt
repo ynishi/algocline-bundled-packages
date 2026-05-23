@@ -196,7 +196,7 @@
 
 ## validation
 
-- [conformal_vote](narrative/conformal_vote.md): Split conformal prediction gate for multi-agent deliberation
+- [conformal_vote](narrative/conformal_vote.md): Split conformal prediction gate for multi-agent deliberation with finite-sample coverage guarantee
 - [counterfactual_verify](narrative/counterfactual_verify.md): Counterfactual simulation to verify causal faithfulness of a reasoning chain.
 - [cove](narrative/cove.md): Draft-verify-revise — reduces hallucination via independent fact-checking
 - [eval_guard](narrative/eval_guard.md): Multi-agent evaluation safety gates (self-critique / baseline / contamination).

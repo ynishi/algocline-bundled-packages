@@ -151,9 +151,14 @@ local profile_shape = T.shape({
         :describe("correct[m] = ground-truth answer for question m. "
             .. "Length M, must align with samples."),
     validation_accuracy = T.number:is_optional()
-        :describe("a_i ∈ [0,1] used for s_i tie-break (paper §3.1 "
-            .. "Algorithm 1). If nil, computed internally from "
-            .. "samples + correct."),
+        :describe("a_i ∈ [0,1]; caller-precomputed metadata that travels "
+            .. "with the profile through select_subset for later use by "
+            .. "inference_select's s_tie_break='validation_accuracy' "
+            .. "(paper §3.1 Algorithm 1). select_subset itself does NOT "
+            .. "consume this field — its UnionAcc/Contradiction optimization "
+            .. "(paper §3.2) is validation_accuracy-independent. Use "
+            .. "M.compute_validation_accuracy(profile, ...) to derive a_i "
+            .. "from samples + correct when not pre-computed."),
 }, { open = true })
 
 local confidence_input_shape = T.array_of(T.string)
@@ -1000,6 +1005,20 @@ function M.run(profiles, k, opts)
     -- recipes / orch can address the standard "selection step" without
     -- knowing the entry breakdown.
     return M.select_subset(profiles, k, opts)
+end
+
+--- Compute (or echo) validation_accuracy a_i for a profile.
+--- Public alias for callers who want to derive a_i from samples + correct
+--- before passing per-model confidences to inference_select. Returns
+--- profile.validation_accuracy verbatim if set; otherwise computes the
+--- empirical accuracy from samples / correct via the internal helper.
+--- @param profile table     Profile shape (samples / correct / [validation_accuracy])
+--- @param tie_break string|nil  argmax_y tie-break (default lexicographic)
+--- @param partial string|nil    partial_coverage policy (default error)
+--- @param rng function|nil      Optional rng for uniform_random
+--- @return number a_i ∈ [0, 1]
+function M.compute_validation_accuracy(profile, tie_break, partial, rng)
+    return compute_validation_accuracy(profile, tie_break, partial, rng)
 end
 
 -- ─── Test hooks ───

@@ -15,6 +15,7 @@ generated: gen_docs (V0)
 ## Contents
 
 - [Algorithm](#algorithm)
+  - [Stage 7 fallback cascade (paper literal labels)](#stage-7-fallback-cascade-paper-literal-labels)
 - [Theoretical foundations](#theoretical-foundations)
 - [Entry contract](#entry-contract)
 - [Comparison with related packages](#comparison-with-related-packages)
@@ -37,18 +38,37 @@ generated: gen_docs (V0)
 | Epistemic | `ground`, `update` |
 | Decisional | `recommend` |
 
-DCI-CF 8 stages:
+DCI-CF 8 stages (paper §3 canonical numbering):
 
-1. **Stage 0** — init session
-2. **Stage 1** — independent proposals (per-role act(s))
-3. **Stage 2** — canonicalize & cluster options
-4. **Stages 3-6** (loop up to `Rmax=2`):
-   - Collect challenges / evidence
-   - Admit new hypotheses (cutoff)
-   - Revise & compress options
-   - Score against criteria + convergence test (dominance or no_blocking)
-5. **Stage 7** — fallback cascade
-6. **Stage 8** — finalize decision packet (5 components completeness)
+- **Stage 0** — init session
+- **Stage 1** — independent proposals (per-role epistemic act(s))
+- **Stage 2** — canonicalize / cluster options
+- **Stage 3** — structured challenge and evidence (per paper §3)
+- **Stage 4** — revision and option compression (per paper §3)
+- **Stage 5** — multi-criteria scoring (per paper §3)
+- **Stage 6** — convergence test (dominance / no_blocking, per paper §3)
+- **Stage 7** — fallback cascade (outranking → minimax regret →
+  robust satisficing → Integrator selection, per paper §3 / §E)
+- **Stage 8** — finalize decision packet (5-component completeness)
+
+Stages 3–6 loop up to `max_rounds` (default Rmax=2). pkg internal
+function names retain the historical `stage3_challenge` /
+`stage4_admit` / `stage5_revise` / `stage6_converge` mapping; the
+semantics in each loop iteration aggregate Stage 3 (challenge),
+Stage 4 (revise / admit), Stage 5 (score), Stage 6 (converge).
+
+### Stage 7 fallback cascade (paper literal labels) {#stage-7-fallback-cascade-paper-literal-labels}
+
+The cascade order keeps paper-literal labels in narrative but uses
+ASCII-safe identifiers in the `FALLBACK_CASCADE_ORDER` constant for
+programmatic dispatch. Mapping:
+
+| Paper literal label | pkg identifier (constant)     |
+|---------------------|-------------------------------|
+| outranking          | `outranking`                  |
+| minimax regret      | `minimax`                     |
+| robust satisficing  | `satisficing`                 |
+| Integrator selection| `integrator_arbitration`      |
 
 ## Theoretical foundations {#theoretical-foundations}
 
@@ -72,8 +92,9 @@ typed acts, yielding richer trace + guaranteed decision_packet shape.
 
 ## References {#references}
 
-Prakash & Sunil (2026). "From Debate to Deliberation: Structured Collective
-Reasoning with Typed Epistemic Acts". arXiv:2603.11781.
+Prakash, S. (2026). "From Debate to Deliberation: Structured Collective
+Reasoning with Typed Epistemic Acts". arXiv:2603.11781. Single author
+(Indian School of Business).
 
 ## Parameters {#parameters}
 
