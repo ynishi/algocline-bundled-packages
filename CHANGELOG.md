@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-05-23
+
+### Added
+
+- **121st pkg `propose_verify`** — universal 2-call Propose→Verify
+  primitive (Cobbe 2021 §3 verifier-as-judge framing + LATS §3.2
+  generate-then-evaluate framing). Issues exactly 2 `alc.llm` calls
+  (propose → verify) and returns a binary `accepted` verdict with a
+  caller-injected `score_threshold`. Exposes 4 pure helpers
+  (`build_propose_prompt` / `build_verify_prompt` / `parse_verify` /
+  `run`) all LLM-independent and unit-testable. 17/17 spec PASS.
+
+### Fixed
+
+- **paper pkg public-doc layer-separation sweep** — six paper-explicit
+  pkgs (`reconcile` / `moa` / `dmad` / `hegelian` / `conformal_vote` /
+  `propose_verify` per-pkg post-ship fix) carried local-rule lint
+  labels (`(L)` / `(I)` / `(X)` short markers + `## EXTENSION POINTS`
+  ASCII headers) in their public docstrings and `:describe("...")`
+  text. These labels are internal AI provenance trail defined in this
+  repo's `.claude/CLAUDE.md` §3, NOT part of the OSS user contract.
+  Public docs now follow the official format defined in
+  `algocline/docs/pkg-author-conventions.md` (§4.3 two-tier rule +
+  §3.2 `## Caveats` H2 section with subheadings `### Required ctx
+  fields` / `### Knobs that affect the paper's effect guarantee` /
+  `### Optional caller knobs (implementation choices)` / `### Stability
+  tier`). Provenance is written in prose ("per Chen §3 ...",
+  "implementation choice — paper does not specify, ...") rather than
+  abbreviated label markers. In-function `--` comment lines (outside
+  the `---` docstring) remain as the internal AI provenance trail per
+  CLAUDE.md §3 last paragraph. 202/202 spec PASS across the 4 paper
+  pkgs swept in this release; cumulative 219/219 with the prior-commit
+  `propose_verify` / `conformal_vote` sweep.
+- **D1/D2/D3 audit Phase 1** (`dci` / `slm_mux` / `conformal_vote`) —
+  high-priority sweep from issue #1778832121 for paper-citation
+  precision, default-value provenance, and §B.x reference accuracy.
+
+### Verified
+
+- `alc_hub_dist` — 121 generated / 0 failed / lint 0 errors / 0
+  warnings (one additional pkg vs v0.26.0 from `propose_verify`
+  install).
+- All affected pkg specs pass via `mcp__algocline__alc_pkg_test`:
+  `propose_verify` 17/17, `reconcile` 57/57, `moa` 36/36, `dmad`
+  52/52, `hegelian` 57/57, `conformal_vote` 34/34, `dci` / `slm_mux`
+  unchanged from v0.26.0.
+
 ## [0.26.0] - 2026-05-22
 
 ### Added
