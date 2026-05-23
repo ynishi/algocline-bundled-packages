@@ -37,51 +37,77 @@
 --- swarm_frame parse_verdict conventions for aggregation in multi-agent
 --- pipelines, but swarm_frame is not a dependency.
 ---
---- ## ctx fields
+--- ## Entry contract
 ---
---- - `task` (string, required) — the question or task to solve.
----   Fallback chain: ctx.task → ctx.text → ctx.idea → ctx.question.
---- - `score_threshold` (number 0..1, REQUIRED — no default) — minimum
----   verifier score for the verdict to be "accepted". Caller must inject
----   this value. (X — domain-specific; no universal default.)
---- - `proposer_hint` (string, optional) — additional instruction for
----   the proposer (e.g. "answer in one sentence").
---- - `verifier_hint` (string, optional) — additional instruction for
----   the verifier (e.g. "focus on factual accuracy").
+--- - `build_propose_prompt(task, proposer_hint?)` — pure, returns the
+---   proposer prompt string. No LLM call.
+--- - `build_verify_prompt(task, candidate, verifier_hint?)` — pure,
+---   returns the verifier prompt string. No LLM call.
+--- - `parse_verify(text)` — pure, parses verifier LLM output into
+---   `{ accept, score, rationale }`. No LLM call.
+--- - `run(ctx)` — Strategy entry, ctx-threading. Issues exactly 2
+---   `alc.llm` calls (propose → verify) and returns the structured
+---   result.
 ---
---- ## Defaults
+--- ## Caveats
 ---
---- - propose_temperature = 0.7  (I — industry standard for creative
----   generation; OpenAI/Anthropic recommended range for answer drafting)
---- - verify_temperature  = 0.0  (I — industry standard for deterministic
----   judgment; zero-temperature is the de-facto standard for scorers /
----   classifiers)
---- - score_threshold: NO DEFAULT — INJECT or pass as caller arg. (X)
+--- ### Required ctx fields
 ---
---- ## EXTENSION POINTS
+--- - `task` (string) — the question or task to solve. The implementation
+---   falls back through `ctx.task → ctx.text → ctx.idea → ctx.question`
+---   so callers wired to any of the common field names work without
+---   changes.
+--- - `score_threshold` (number, 0..1) — the minimum verifier score for
+---   the verdict to be "accepted". No default is provided because the
+---   acceptance bar is domain-specific: a math problem might need 0.95
+---   while a creative-writing rewrite might want 0.5. Caller must inject
+---   this value.
 ---
---- REQUIRED:
----   ctx.score_threshold — caller MUST supply; no default (X)
+--- ### Optional ctx fields
 ---
---- (I)-override OPTION:
----   propose_temperature — override propose call temperature.
----     Overriding away from 0.7 removes industry-standard creative
----     diversity guarantee.
----   verify_temperature — override verify call temperature.
----     Overriding away from 0.0 makes the verdict non-deterministic.
+--- - `proposer_hint` (string) — extra instruction appended to the
+---   proposer prompt (e.g. "answer in one sentence"). Injects domain
+---   guidance without replacing the base template.
+--- - `verifier_hint` (string) — extra instruction appended to the
+---   verifier prompt (e.g. "focus on factual accuracy"). Same shape as
+---   proposer_hint for the verify call.
+--- - `propose_temperature` (number, default 0.7) — temperature for the
+---   propose call. The default 0.7 is the industry-standard
+---   creative-generation default cited by OpenAI / Anthropic
+---   documentation; overriding away from 0.7 removes that creative-
+---   diversity baseline.
+--- - `verify_temperature` (number, default 0.0) — temperature for the
+---   verify call. The default 0.0 is the industry-standard deterministic
+---   judgment baseline used by scorers and classifiers; overriding above
+---   zero makes the verdict non-deterministic across re-runs.
 ---
---- (I) OPTION:
----   proposer_hint / verifier_hint — inject domain guidance into each
----     prompt without replacing the base template.
+--- ### Why no `score_threshold` default
+---
+--- An accept/reject bar is intrinsically domain-specific (mathematical
+--- correctness vs creative quality vs factual recall each warrant
+--- different cutoffs). Picking a single library-wide default would
+--- silently misclassify cases for most callers; requiring it forces the
+--- caller to make a conscious choice.
+---
+--- ### Why no `swarm_frame` dependency
+---
+--- The verdict string `"DONE path=accepted | rejected"` is compatible
+--- with `swarm_frame.parse_verdict` so callers that aggregate with
+--- swarm_frame can consume it directly, but the pkg itself stays
+--- single-shot to keep the dependency surface minimal.
 ---
 --- ## References
 ---
---- - Cobbe et al. (2021), "Training Verifiers to Solve Math Word
----   Problems", arXiv:2110.14168, §3 — verifier prompt pattern (I)
---- - Zhou et al. (2023), "Language Agent Tree Search Unifies Reasoning,
----   Acting, and Planning in Language Models" (LATS), arXiv:2309.08987,
----   §3.2 — node scoring rationale (I)
---- - ReAct-style propose/verify caller patterns (I)
+--- - Cobbe et al. (2021). "Training Verifiers to Solve Math Word
+---   Problems", arXiv:2110.14168 §3 — verifier prompt pattern (industry-
+---   standard verifier-prompt formulation).
+--- - Zhou et al. (2023). "Language Agent Tree Search Unifies Reasoning,
+---   Acting, and Planning in Language Models" (LATS), arXiv:2309.08987
+---   §3.2 — node-scoring rationale (industry adoption of independent
+---   verifier scoring at planning nodes).
+--- - ReAct-style propose/verify caller patterns — widely-cited tool-use
+---   convention that pairs a candidate generator with an independent
+---   verifier step.
 
 local M = {}
 
@@ -121,8 +147,9 @@ end
 
 --- Build the verifier prompt.
 --- Pure function — no LLM call, no side effects.
---- Verifier prompt pattern follows Cobbe et al. 2021 §3 (I):
----   present the task and candidate, ask for correctness judgment + score.
+--- Verifier prompt pattern follows Cobbe et al. 2021 §3 (industry-
+--- standard verifier-prompt format): present the task and candidate,
+--- ask for correctness judgment + score.
 ---@param task string         The original task
 ---@param candidate string    The proposed candidate answer
 ---@param verifier_hint string|nil  Optional extra instruction for the verifier
@@ -150,7 +177,8 @@ end
 --- Parse verifier output into a structured verdict.
 --- Pure function — no LLM call, no side effects.
 --- Handles malformed output gracefully (returns accept=false, score=0).
---- Citation: Cobbe et al. 2021 §3 verifier prompt pattern (I).
+--- Citation: Cobbe et al. 2021 §3 verifier prompt pattern (industry-
+--- standard ACCEPT/SCORE/RATIONALE shape).
 ---@param text string  Raw verifier LLM output
 ---@return table  { accept: bool, score: number, rationale: string }
 function M.parse_verify(text)

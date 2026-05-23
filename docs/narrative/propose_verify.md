@@ -16,9 +16,12 @@ generated: gen_docs (V0)
 - [Usage](#usage)
 - [Helpers](#helpers)
 - [Narrative](#narrative)
-- [ctx fields](#ctx-fields)
-- [Defaults](#defaults)
-- [EXTENSION POINTS](#extension-points)
+- [Entry contract](#entry-contract)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Optional ctx fields](#optional-ctx-fields)
+  - [Why no `score_threshold` default](#why-no-score-threshold-default)
+  - [Why no `swarm_frame` dependency](#why-no-swarm-frame-dependency)
 - [References](#references)
 
 ## Usage {#usage}
@@ -54,48 +57,74 @@ means for their domain. The verdict string is compatible with
 swarm_frame parse_verdict conventions for aggregation in multi-agent
 pipelines, but swarm_frame is not a dependency.
 
-## ctx fields {#ctx-fields}
+## Entry contract {#entry-contract}
 
-- `task` (string, required) — the question or task to solve.
-  Fallback chain: ctx.task → ctx.text → ctx.idea → ctx.question.
-- `score_threshold` (number 0..1, REQUIRED — no default) — minimum
-  verifier score for the verdict to be "accepted". Caller must inject
-  this value. (X — domain-specific; no universal default.)
-- `proposer_hint` (string, optional) — additional instruction for
-  the proposer (e.g. "answer in one sentence").
-- `verifier_hint` (string, optional) — additional instruction for
-  the verifier (e.g. "focus on factual accuracy").
+- `build_propose_prompt(task, proposer_hint?)` — pure, returns the
+  proposer prompt string. No LLM call.
+- `build_verify_prompt(task, candidate, verifier_hint?)` — pure,
+  returns the verifier prompt string. No LLM call.
+- `parse_verify(text)` — pure, parses verifier LLM output into
+  `{ accept, score, rationale }`. No LLM call.
+- `run(ctx)` — Strategy entry, ctx-threading. Issues exactly 2
+  `alc.llm` calls (propose → verify) and returns the structured
+  result.
 
-## Defaults {#defaults}
+## Caveats {#caveats}
 
-- propose_temperature = 0.7  (I — industry standard for creative
-  generation; OpenAI/Anthropic recommended range for answer drafting)
-- verify_temperature  = 0.0  (I — industry standard for deterministic
-  judgment; zero-temperature is the de-facto standard for scorers /
-  classifiers)
-- score_threshold: NO DEFAULT — INJECT or pass as caller arg. (X)
+### Required ctx fields {#required-ctx-fields}
 
-## EXTENSION POINTS {#extension-points}
+- `task` (string) — the question or task to solve. The implementation
+  falls back through `ctx.task → ctx.text → ctx.idea → ctx.question`
+  so callers wired to any of the common field names work without
+  changes.
+- `score_threshold` (number, 0..1) — the minimum verifier score for
+  the verdict to be "accepted". No default is provided because the
+  acceptance bar is domain-specific: a math problem might need 0.95
+  while a creative-writing rewrite might want 0.5. Caller must inject
+  this value.
 
-REQUIRED:
-  ctx.score_threshold — caller MUST supply; no default (X)
+### Optional ctx fields {#optional-ctx-fields}
 
-(I)-override OPTION:
-  propose_temperature — override propose call temperature.
-    Overriding away from 0.7 removes industry-standard creative
-    diversity guarantee.
-  verify_temperature — override verify call temperature.
-    Overriding away from 0.0 makes the verdict non-deterministic.
+- `proposer_hint` (string) — extra instruction appended to the
+  proposer prompt (e.g. "answer in one sentence"). Injects domain
+  guidance without replacing the base template.
+- `verifier_hint` (string) — extra instruction appended to the
+  verifier prompt (e.g. "focus on factual accuracy"). Same shape as
+  proposer_hint for the verify call.
+- `propose_temperature` (number, default 0.7) — temperature for the
+  propose call. The default 0.7 is the industry-standard
+  creative-generation default cited by OpenAI / Anthropic
+  documentation; overriding away from 0.7 removes that creative-
+  diversity baseline.
+- `verify_temperature` (number, default 0.0) — temperature for the
+  verify call. The default 0.0 is the industry-standard deterministic
+  judgment baseline used by scorers and classifiers; overriding above
+  zero makes the verdict non-deterministic across re-runs.
 
-(I) OPTION:
-  proposer_hint / verifier_hint — inject domain guidance into each
-    prompt without replacing the base template.
+### Why no `score_threshold` default {#why-no-score-threshold-default}
+
+An accept/reject bar is intrinsically domain-specific (mathematical
+correctness vs creative quality vs factual recall each warrant
+different cutoffs). Picking a single library-wide default would
+silently misclassify cases for most callers; requiring it forces the
+caller to make a conscious choice.
+
+### Why no `swarm_frame` dependency {#why-no-swarm-frame-dependency}
+
+The verdict string `"DONE path=accepted | rejected"` is compatible
+with `swarm_frame.parse_verdict` so callers that aggregate with
+swarm_frame can consume it directly, but the pkg itself stays
+single-shot to keep the dependency surface minimal.
 
 ## References {#references}
 
-- Cobbe et al. (2021), "Training Verifiers to Solve Math Word
-  Problems", arXiv:2110.14168, §3 — verifier prompt pattern (I)
-- Zhou et al. (2023), "Language Agent Tree Search Unifies Reasoning,
-  Acting, and Planning in Language Models" (LATS), arXiv:2309.08987,
-  §3.2 — node scoring rationale (I)
-- ReAct-style propose/verify caller patterns (I)
+- Cobbe et al. (2021). "Training Verifiers to Solve Math Word
+  Problems", arXiv:2110.14168 §3 — verifier prompt pattern (industry-
+  standard verifier-prompt formulation).
+- Zhou et al. (2023). "Language Agent Tree Search Unifies Reasoning,
+  Acting, and Planning in Language Models" (LATS), arXiv:2309.08987
+  §3.2 — node-scoring rationale (industry adoption of independent
+  verifier scoring at planning nodes).
+- ReAct-style propose/verify caller patterns — widely-cited tool-use
+  convention that pairs a candidate generator with an independent
+  verifier step.
