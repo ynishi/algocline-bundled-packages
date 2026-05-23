@@ -17,7 +17,12 @@ generated: gen_docs (V0)
   - [Stage name mapping vs paper-literal terms](#stage-name-mapping-vs-paper-literal-terms)
 - [Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters")](#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters)
 - [Entry contract](#entry-contract)
-- [EXTENSION POINTS](#extension-points)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Knobs that affect the paper's effect guarantee](#knobs-that-affect-the-paper-s-effect-guarantee)
+  - [Caller-tunable within the paper range](#caller-tunable-within-the-paper-range)
+  - [Optional caller knobs (implementation choices)](#optional-caller-knobs-implementation-choices)
+  - [Stability tier](#stability-tier)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [History](#history)
 - [Parameters](#parameters)
@@ -62,23 +67,25 @@ labels in two places:
 
 Symbols (T_i / A_i / S_i / τ_0 / τ_a / θ / N) match the paper. The
 choice of "Thesis/Antithesis/Synthesis" as the pkg-facing names is a
-(X) translation decision — the underlying algorithm is paper-literal.
-The paper also denotes antithesis temperature as τ_A (opposition
-temperature); the pkg uses lowercase τ_a / `tau_a` for Lua identifier
-hygiene.
+translation decision (implementation choice) — the underlying
+algorithm is paper-literal. The paper also denotes antithesis
+temperature as τ_A (opposition temperature); the pkg uses lowercase
+τ_a / `tau_a` for Lua identifier hygiene.
 
 **No "rebuttal" stage exists in the paper** (verified against Abdali §3 /
 Algorithm 1 / Appendix A Table 2, 2026-05-15 WebFetch).
 
 ## Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters") {#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters}
 
-| Symbol | Value | Label | Source                                                |
-|--------|-------|-------|-------------------------------------------------------|
-| τ_0    | 0.7   | (L)   | Table 2 "Initial temperature"                         |
-| τ_a    | 0.5   | (L)   | Table 2 "Opposition temperature" (paper symbol τ_A)   |
-| θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 2 |
-| N      | 5     | (L)   | Table 2 "Max iterations" (idea generation value;      |
-|        |       |       | paper also reports N=3 for math reasoning)            |
+| Symbol | Value | Source                                                  |
+|--------|-------|---------------------------------------------------------|
+| τ_0    | 0.7   | Table 2 "Initial temperature"                           |
+| τ_a    | 0.5   | Table 2 "Opposition temperature" (paper symbol τ_A)     |
+| θ      | 0.3   | implementation choice — midpoint of the paper-stated    |
+|        |       | range [0.1, 0.5] from Table 2; specific value is        |
+|        |       | caller's choice within the range                        |
+| N      | 5     | Table 2 "Max iterations" (idea-generation value; paper  |
+|        |       | also reports N=3 for math reasoning)                    |
 
 θ default 0.3 is the midpoint of the paper-stated range [0.1, 0.5]
 (Table 2). 0.3 is NOT itself a literal Table 2 value — only the range is.
@@ -99,39 +106,62 @@ See `M.spec` below for the formal machine-readable contract:
 All four sub-entries are LLM-independent and unit-testable without `alc` mocks.
 `run` is the only LLM-mediated entry.
 
-## EXTENSION POINTS {#extension-points}
+## Caveats {#caveats}
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ REQUIRED                                                             │
-│   ctx.task                  (string)         task to apply dialectic │
-├──────────────────────────────────────────────────────────────────────┤
-│ (L)-override OPTION                                                  │
-│   ctx.tau_0                 (number)         override τ_0 default    │
-│   ctx.tau_a                 (number)         override τ_a default    │
-│   ctx.N                     (number)         override iteration count│
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) caller-tunable within paper range                                │
-│   ctx.theta                 (number ∈ [0.1, 0.5])  decay constant    │
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) infrastructure (paper does not specify)                          │
-│   ctx.gen_tokens            (number)         max tokens per LLM call │
-│   ctx.thesis_prompt         (string template) override thesis prompt │
-│   ctx.antithesis_prompt     (string template) override antithesis    │
-│   ctx.synthesis_prompt      (string template) override synthesis     │
-│   ctx.system_thesis         (string)          system prompt thesis   │
-│   ctx.system_antithesis     (string)          system prompt anti     │
-│   ctx.system_synthesis      (string)          system prompt synth    │
-├──────────────────────────────────────────────────────────────────────┤
-│ Stability tier:                                                      │
-│   stable     : tau_0 / tau_a / theta / N / gen_tokens                │
-│   v2-opt-in  : *_prompt / system_* (template override; format may    │
-│                evolve in future versions)                            │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### Required ctx fields {#required-ctx-fields}
 
-Note: overriding any (L) default invalidates the paper's effect guarantee.
-The pkg accepts the override and proceeds, but the docstring no longer
+- `ctx.task` (string) — the task to apply the dialectic to.
+
+### Knobs that affect the paper's effect guarantee {#knobs-that-affect-the-paper-s-effect-guarantee}
+
+Overriding these moves away from the values Abdali Table 2 reports
+for the main experiment, so the paper's claim no longer transfers
+directly:
+
+- `ctx.tau_0` (number > 0) — overrides τ_0 = 0.7 (Table 2 "Initial
+  temperature").
+- `ctx.tau_a` (number > 0) — overrides τ_a = 0.5 (Table 2
+  "Opposition temperature").
+- `ctx.N` (number ≥ 1) — overrides the iteration count (Table 2
+  "Max iterations").
+
+### Caller-tunable within the paper range {#caller-tunable-within-the-paper-range}
+
+- `ctx.theta` (number ∈ [0.1, 0.5]) — decay constant. Paper Table 2
+  states the range only; specific values within the range are the
+  caller's choice and remain inside the paper's stated bounds.
+  Values outside [0.1, 0.5] are rejected at runtime.
+
+### Optional caller knobs (implementation choices) {#optional-caller-knobs-implementation-choices}
+
+These knobs are implementation choices because the paper does not
+specify concrete values; tuning them does not invalidate the
+paper's claim:
+
+- `ctx.gen_tokens` (number) — max tokens per LLM call.
+- `ctx.thesis_prompt` (string template) — overrides thesis prompt
+  body.
+- `ctx.antithesis_prompt` (string template) — overrides antithesis
+  prompt body.
+- `ctx.synthesis_prompt` (string template) — overrides synthesis
+  prompt body.
+- `ctx.system_thesis` (string) — overrides thesis system prompt.
+- `ctx.system_antithesis` (string) — overrides antithesis system
+  prompt.
+- `ctx.system_synthesis` (string) — overrides synthesis system
+  prompt.
+
+### Stability tier {#stability-tier}
+
+- stable: `tau_0`, `tau_a`, `theta`, `N`, `gen_tokens`.
+- v2-opt-in: `thesis_prompt`, `antithesis_prompt`,
+  `synthesis_prompt`, `system_thesis`, `system_antithesis`,
+  `system_synthesis` (template format may evolve in future
+  versions).
+
+Note: overriding any value drawn directly from Table 2 (τ_0, τ_a,
+N) moves the run outside the paper's reported configuration. The
+pkg accepts the override and proceeds, but the docstring no longer
 claims paper-explicit behaviour for the run.
 
 ## Comparison with related packages {#comparison-with-related-packages}
@@ -163,18 +193,18 @@ the correct paper citation (Abdali 2025) and removes the non-paper
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.N` | number | optional | Max iterations (default: 5, (L) Abdali Table 2) |
-| `ctx.antithesis_prompt` | string | optional | Override antithesis prompt template (X) |
-| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
-| `ctx.synthesis_prompt` | string | optional | Override synthesis prompt template (X) |
-| `ctx.system_antithesis` | string | optional | Override antithesis system prompt (X) |
-| `ctx.system_synthesis` | string | optional | Override synthesis system prompt (X) |
-| `ctx.system_thesis` | string | optional | Override thesis system prompt (X) |
+| `ctx.N` | number | optional | Max iterations (default: 5 per Abdali Table 2 "Max iterations") |
+| `ctx.antithesis_prompt` | string | optional | Override antithesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600; implementation choice — paper does not specify) |
+| `ctx.synthesis_prompt` | string | optional | Override synthesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.system_antithesis` | string | optional | Override antithesis system prompt (implementation choice) |
+| `ctx.system_synthesis` | string | optional | Override synthesis system prompt (implementation choice) |
+| `ctx.system_thesis` | string | optional | Override thesis system prompt (implementation choice) |
 | `ctx.task` | string | **required** | Task or question (required) |
-| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7, (L) Abdali Table 2) |
-| `ctx.tau_a` | number | optional | Antithesis/opposition temperature (default: 0.5, (L) Abdali Table 2) |
-| `ctx.thesis_prompt` | string | optional | Override thesis prompt template (X) |
-| `ctx.theta` | number | optional | Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range) |
+| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7 per Abdali Table 2 "Initial temperature") |
+| `ctx.tau_a` | number | optional | Antithesis/opposition temperature (default: 0.5 per Abdali Table 2 "Opposition temperature") |
+| `ctx.thesis_prompt` | string | optional | Override thesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.theta` | number | optional | Decay constant θ ∈ [0.1, 0.5] (default: 0.3; implementation choice within the paper's stated range from Table 2) |
 
 ## Result {#result}
 

@@ -481,14 +481,14 @@
 ---@field ranking { avg_score: number, path_id: number, rank: number, steps_verified: number }[] @Paths ordered from best to worst by avg_score
 
 ---@class AlcPkgInput_dmad
----@field debate_prompt? string @Override DEBATE template (X)
----@field gen_tokens? number @Max tokens per LLM call (default: 500, (X) infrastructure)
----@field init_prompt? string @Override INIT template (X)
----@field n_agents? number @Number of parallel agents (default: 3, (L) Du repo gen_gsm.py)
----@field n_rounds? number @Number of debate rounds after init (default: 2, (L) Du repo gen_gsm.py)
----@field system_prompt? string @Override system prompt (X)
+---@field debate_prompt? string @Override DEBATE template (implementation choice)
+---@field gen_tokens? number @Max tokens per LLM call (default: 500; implementation choice — paper does not specify)
+---@field init_prompt? string @Override INIT template (implementation choice)
+---@field n_agents? number @Number of parallel agents (default: 3 per Du repo gen_gsm.py agents=3)
+---@field n_rounds? number @Number of debate rounds after init (default: 2 per Du repo gen_gsm.py rounds=2)
+---@field system_prompt? string @Override system prompt (implementation choice)
 ---@field task string @Problem statement (required)
----@field temperature? number @LLM temperature (default: API default, (X) infrastructure; paper does not fix)
+---@field temperature? number @LLM temperature (default: API default; implementation choice — paper does not fix)
 
 ---@class AlcPkgResult_dmad
 ---@field answer string @Final majority-vote answer
@@ -628,18 +628,18 @@
 ---@field total_llm_calls number @Total LLM calls (generation + evaluations)
 
 ---@class AlcPkgInput_hegelian
----@field N? number @Max iterations (default: 5, (L) Abdali Table 2)
----@field antithesis_prompt? string @Override antithesis prompt template (X)
----@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
----@field synthesis_prompt? string @Override synthesis prompt template (X)
----@field system_antithesis? string @Override antithesis system prompt (X)
----@field system_synthesis? string @Override synthesis system prompt (X)
----@field system_thesis? string @Override thesis system prompt (X)
+---@field N? number @Max iterations (default: 5 per Abdali Table 2 "Max iterations")
+---@field antithesis_prompt? string @Override antithesis prompt template (implementation choice — paper specifies role but not wording)
+---@field gen_tokens? number @Max tokens per LLM call (default: 600; implementation choice — paper does not specify)
+---@field synthesis_prompt? string @Override synthesis prompt template (implementation choice — paper specifies role but not wording)
+---@field system_antithesis? string @Override antithesis system prompt (implementation choice)
+---@field system_synthesis? string @Override synthesis system prompt (implementation choice)
+---@field system_thesis? string @Override thesis system prompt (implementation choice)
 ---@field task string @Task or question (required)
----@field tau_0? number @Initial temperature (default: 0.7, (L) Abdali Table 2)
----@field tau_a? number @Antithesis/opposition temperature (default: 0.5, (L) Abdali Table 2)
----@field thesis_prompt? string @Override thesis prompt template (X)
----@field theta? number @Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range)
+---@field tau_0? number @Initial temperature (default: 0.7 per Abdali Table 2 "Initial temperature")
+---@field tau_a? number @Antithesis/opposition temperature (default: 0.5 per Abdali Table 2 "Opposition temperature")
+---@field thesis_prompt? string @Override thesis prompt template (implementation choice — paper specifies role but not wording)
+---@field theta? number @Decay constant θ ∈ [0.1, 0.5] (default: 0.3; implementation choice within the paper's stated range from Table 2)
 
 ---@class AlcPkgResult_hegelian
 ---@field N number @Number of iterations actually executed
@@ -779,16 +779,16 @@
 ---@field total_experts number @Count of experts actually consulted (may be < max_experts due to parsing fallback)
 
 ---@class AlcPkgInput_moa
----@field aggregator_prompt? string @Override AS_PROMPT_TEMPLATE (X)
----@field aggregator_tokens? number @Max tokens per aggregator (default: 2048, (X) infrastructure)
----@field n_layers? number @Number of layers L (default: 3, (L) Wang §3)
+---@field aggregator_prompt? string @Override AS_PROMPT_TEMPLATE; replacing it drops the paper's effect guarantee
+---@field aggregator_tokens? number @Max tokens per aggregator (default: 2048; implementation choice — sized larger than per-proposer to accommodate synthesizing n outputs)
+---@field n_layers? number @Number of layers L (default: 3 per Wang §3 "We use 3 MoA layers")
 ---@field personas? string[] @Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings
----@field proposer_prompt? string @Override proposer prompt (X)
----@field proposer_tokens? number @Max tokens per proposer (default: 512, (X) infrastructure)
+---@field proposer_prompt? string @Override proposer prompt (implementation choice — paper does not specify wording)
+---@field proposer_tokens? number @Max tokens per proposer (default: 512; implementation choice — paper does not specify)
 ---@field proposers? { model?: string, system?: string }[] @Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list
----@field system_prompt? string @Override proposer system prompt (X)
+---@field system_prompt? string @Override proposer system prompt (implementation choice — paper does not specify)
 ---@field task string @Problem statement (required)
----@field temperature? number @LLM temperature (default: 0.7, (X) Wang §3 main config does not state a value)
+---@field temperature? number @LLM temperature (default: 0.7; implementation choice — Wang §3 main config does not state a value, 0.7 is the only numeric value §3 names in the single-proposer ablation row)
 
 ---@class AlcPkgResult_moa
 ---@field answer string @Final aggregator output from layer L
@@ -1113,17 +1113,17 @@
 
 ---@class AlcPkgInput_reconcile
 ---@field agents? { model?: string, system?: string }[] @Diverse-LLM PATH (Chen §3 main config): array of agent specs
----@field confidence_buckets? { lo: number, lo_op?: string, weight: number }[] @Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract.
----@field convincing_count? number @Convincing-sample count (default: 4, (L) Chen §4 footnote)
----@field discussion_prompt? string @Override Phase 2 prompt (X)
----@field gen_tokens? number @Max tokens per LLM call (default: 600, (X) infrastructure)
----@field init_prompt? string @Override Phase 1 prompt (X)
----@field max_rounds? number @Max discussion rounds R (default: 3, (L) Chen §3)
----@field parse_fn? any @Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X)
+---@field confidence_buckets? { lo: number, lo_op?: string, weight: number }[] @Override the §B.5 5-bucket calibration; replacing it drops the paper's weighting guarantee. See M.CONFIDENCE_BUCKETS for the shape contract.
+---@field convincing_count? number @Convincing-sample count (default: 4 per Chen §4 footnote "4 in our experiments")
+---@field discussion_prompt? string @Override Phase 2 prompt (implementation choice — paper specifies elicited information but not exact wording)
+---@field gen_tokens? number @Max tokens per LLM call (default: 600; implementation choice — paper does not specify)
+---@field init_prompt? string @Override Phase 1 prompt (implementation choice — paper specifies elicited information but not exact wording)
+---@field max_rounds? number @Max discussion rounds R (default: 3 per Chen §3 "up to three discussion rounds")
+---@field parse_fn? any @Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (implementation choice)
 ---@field personas? string[] @Single-model rotation PATH (outside Chen §3 main config): persona system prompts
----@field system_prompt? string @Override system prompt (X)
+---@field system_prompt? string @Override system prompt (implementation choice — paper does not fix)
 ---@field task string @Problem statement (required)
----@field temperature? number @LLM temperature (default: API default, (X) Chen §3 does not state a value)
+---@field temperature? number @LLM temperature (default: API default; implementation choice — Chen §3 does not state a value)
 
 ---@class AlcPkgResult_reconcile
 ---@field answer string @Final team answer (normalized form of winning bucket)

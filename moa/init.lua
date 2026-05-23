@@ -27,25 +27,24 @@
 ---
 --- ## Defaults (Wang 2024 §3)
 ---
---- | Symbol     | Value | Label | Source                                          |
---- |------------|-------|-------|-------------------------------------------------|
---- | L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
---- | n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
---- | temp       | 0.7   | (X)   | Wang §3 main config does not state a temperature|
---- |            |       |       | for the layered MoA run. 0.7 is the only        |
---- |            |       |       | numeric value §3 names (single-proposer         |
---- |            |       |       | ablation row); pkg uses 0.7 to anchor the       |
---- |            |       |       | default to that one named value rather than an  |
---- |            |       |       | implementer-chosen number.                      |
---- | max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
---- |            |       |       | provenance: AS_PROMPT requires synthesizing all |
---- |            |       |       | proposer outputs, so a larger budget than       |
---- |            |       |       | per-proposer is required by construction.       |
+--- | Symbol     | Value | Source                                              |
+--- |------------|-------|-----------------------------------------------------|
+--- | L          | 3     | Wang §3 "We use 3 MoA layers"                       |
+--- | n          | 6     | Wang §3 main exp uses 6 open-source proposers       |
+--- | temp       | 0.7   | Wang §3 main config does not state a temperature    |
+--- |            |       | for the layered MoA run. 0.7 is the only numeric    |
+--- |            |       | value §3 names (single-proposer ablation row); pkg  |
+--- |            |       | uses 0.7 to anchor the default to that one named    |
+--- |            |       | value rather than an implementer-chosen number.     |
+--- | max_tokens | 2048  | implementation choice — paper does not specify.     |
+--- |            |       | Provenance: AS_PROMPT requires synthesizing all     |
+--- |            |       | proposer outputs, so a larger budget than           |
+--- |            |       | per-proposer is required by construction.           |
 ---
---- The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — the
---- Lua string literal is identical to Wang 2024 Table 1's English text
---- (punctuation / capitalization / line breaks all match; the only
---- transformation is the Python `{}` placeholder rendered as Lua `%s`).
+--- The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is a Lua string
+--- literal identical to Wang 2024 Table 1's English text (punctuation /
+--- capitalization / line breaks all match; the only transformation is
+--- the Python `{}` placeholder rendered as Lua `%s`).
 ---
 --- ## Proposer models (paper main experiment, Wang 2024 §3)
 ---
@@ -59,11 +58,11 @@
 ---   - Mixtral-8x22B-v0.1
 ---   - dbrx-instruct
 ---
---- These models are (L) for reproducing paper results, but they are NOT
---- hard-coded by this pkg — the caller MUST supply `proposers` (REQUIRED
---- extension point). Hard-coding 6 specific Together AI model IDs would
---- bind the pkg to a specific API tier and exclude OSS / local-model
---- callers.
+--- These models are paper-explicit choices for reproducing Wang 2024
+--- results, but they are NOT hard-coded by this pkg — the caller MUST
+--- supply `proposers` (REQUIRED extension point). Hard-coding 6 specific
+--- Together AI model IDs would bind the pkg to a specific API tier and
+--- exclude OSS / local-model callers.
 ---
 --- ## Entry contract
 ---
@@ -76,47 +75,55 @@
 --- Two pure helpers are LLM-independent and unit-testable. `run` is the
 --- only LLM-mediated entry.
 ---
---- ## EXTENSION POINTS
+--- ## Caveats
 ---
---- ```
---- ┌──────────────────────────────────────────────────────────────────────┐
---- │ REQUIRED                                                             │
---- │   ctx.task                  (string)         problem / user query    │
---- │   ctx.proposers             (array, multi-model PATH; matches Wang  │
---- │       §3 main config) — list of specs, each                          │
---- │       { model = string [, system = string] }; pkg makes one LLM      │
---- │       call per proposer per layer                                    │
---- │     OR                                                               │
---- │   ctx.personas              (array, single-model rotation PATH;     │
---- │       outside Wang §3's multi-model setup) — array of system-prompt  │
---- │       strings; pkg uses a single model and rotates personas per      │
---- │       proposer. Convenient for OSS callers without 6 distinct        │
---- │       models; sacrifices the paper's distinct-model diversity        │
---- │       property.                                                      │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (L)-override OPTION                                                  │
---- │   ctx.n_layers              (number ≥ 1)     override L=3 default    │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (X) infrastructure (paper does not specify or specifies only         │
---- │ ablation)                                                            │
---- │   ctx.temperature           (number)         per-LLM temperature     │
---- │   ctx.proposer_tokens       (number)         max tokens per proposer │
---- │   ctx.aggregator_tokens     (number)         max tokens per aggreg.  │
---- │   ctx.proposer_prompt       (string template) override proposer body │
---- │   ctx.aggregator_prompt     (string template) override AS_PROMPT     │
---- │   ctx.system_prompt         (string)         override proposer sys.  │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ Stability tier:                                                      │
---- │   stable     : n_layers / temperature / proposer_tokens / aggreg_t   │
---- │   v2-opt-in  : proposer_prompt / aggregator_prompt / system_prompt   │
---- │                (template format may evolve in future versions)       │
---- │   experimental : personas (single-model fallback, paper guarantee    │
---- │                  not held)                                           │
---- └──────────────────────────────────────────────────────────────────────┘
---- ```
+--- ### Required ctx fields
 ---
---- Overriding `aggregator_prompt` invalidates the AS_PROMPT_TEMPLATE
---- (L) guarantee. Caller is responsible for keeping ⊕ semantics consistent.
+--- - `ctx.task` (string) — the user query or problem statement.
+--- - One of `ctx.proposers` or `ctx.personas`:
+---   - `ctx.proposers` (array) follows Wang §3's multi-model main
+---     config: each entry is `{ model = string [, system = string] }`.
+---     One LLM call is issued per proposer per layer.
+---   - `ctx.personas` (array of strings) is a single-model rotation
+---     path outside Wang §3's setup; one model is reused while only
+---     the system prompt rotates per proposer. Convenient for OSS
+---     callers without 6 distinct models, but sacrifices the paper's
+---     distinct-model diversity property.
+---
+--- ### Knobs that affect the paper's effect guarantee
+---
+--- Overriding the layered structure or the Aggregate-and-Synthesize
+--- prompt template moves away from Wang §3's main configuration, so the
+--- paper's claim no longer transfers directly:
+---
+--- - `ctx.n_layers` (number ≥ 1) — overrides L = 3 (Wang §3 "We use
+---   3 MoA layers").
+--- - `ctx.aggregator_prompt` (string template) — overrides
+---   `AS_PROMPT_TEMPLATE`; once replaced the caller is responsible for
+---   keeping ⊕ semantics consistent with Wang Table 1.
+---
+--- ### Optional caller knobs (implementation choices)
+---
+--- These knobs are implementation choices because the paper does not
+--- specify them or specifies only an ablation value; tuning them does
+--- not invalidate the paper's claim:
+---
+--- - `ctx.temperature` (number) — per-LLM temperature.
+--- - `ctx.proposer_tokens` (number) — max tokens per proposer.
+--- - `ctx.aggregator_tokens` (number) — max tokens per aggregator.
+--- - `ctx.proposer_prompt` (string template) — overrides the proposer
+---   body wording.
+--- - `ctx.system_prompt` (string) — overrides the proposer system
+---   prompt.
+---
+--- ### Stability tier
+---
+--- - stable: `n_layers`, `temperature`, `proposer_tokens`,
+---   `aggregator_tokens`.
+--- - v2-opt-in: `proposer_prompt`, `aggregator_prompt`, `system_prompt`
+---   (template format may evolve in future versions).
+--- - experimental: `personas` (single-model fallback; paper guarantee
+---   not held).
 ---
 --- ## Comparison with related packages
 ---
@@ -209,15 +216,15 @@ local proposer_input_shape = T.shape({
     task            = T.string:describe("Problem statement (required)"),
     aggregated_prev = T.string:is_optional()
         :describe("Aggregated output from previous layer (omit at layer 1)"),
-    proposer_prompt = T.string:is_optional():describe("Override proposer template (X)"),
-    system_prompt   = T.string:is_optional():describe("Override proposer system prompt (X)"),
+    proposer_prompt = T.string:is_optional():describe("Override proposer template (implementation choice)"),
+    system_prompt   = T.string:is_optional():describe("Override proposer system prompt (implementation choice)"),
 }, { open = true })
 
 local aggregator_input_shape = T.shape({
     proposer_responses = T.array_of(T.string)
         :describe("This layer's n proposer outputs (non-empty)"),
     aggregator_prompt  = T.string:is_optional()
-        :describe("Override AS_PROMPT_TEMPLATE (X — invalidates paper guarantee)"),
+        :describe("Override AS_PROMPT_TEMPLATE; replacing it drops the paper's effect guarantee"),
 }, { open = true })
 
 local run_input_shape = T.shape({
@@ -227,16 +234,16 @@ local run_input_shape = T.shape({
     personas          = T.array_of(T.string):is_optional()
         :describe("Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings"),
     n_layers          = T.number:is_optional()
-        :describe("Number of layers L (default: " .. M._defaults.n_layers .. ", (L) Wang §3)"),
+        :describe("Number of layers L (default: " .. M._defaults.n_layers .. " per Wang §3 \"We use 3 MoA layers\")"),
     temperature       = T.number:is_optional()
-        :describe("LLM temperature (default: " .. M._defaults.temperature .. ", (X) Wang §3 main config does not state a value)"),
+        :describe("LLM temperature (default: " .. M._defaults.temperature .. "; implementation choice — Wang §3 main config does not state a value, 0.7 is the only numeric value §3 names in the single-proposer ablation row)"),
     proposer_tokens   = T.number:is_optional()
-        :describe("Max tokens per proposer (default: " .. M._defaults.proposer_tokens .. ", (X) infrastructure)"),
+        :describe("Max tokens per proposer (default: " .. M._defaults.proposer_tokens .. "; implementation choice — paper does not specify)"),
     aggregator_tokens = T.number:is_optional()
-        :describe("Max tokens per aggregator (default: " .. M._defaults.aggregator_tokens .. ", (X) infrastructure)"),
-    proposer_prompt   = T.string:is_optional():describe("Override proposer prompt (X)"),
-    aggregator_prompt = T.string:is_optional():describe("Override AS_PROMPT_TEMPLATE (X)"),
-    system_prompt     = T.string:is_optional():describe("Override proposer system prompt (X)"),
+        :describe("Max tokens per aggregator (default: " .. M._defaults.aggregator_tokens .. "; implementation choice — sized larger than per-proposer to accommodate synthesizing n outputs)"),
+    proposer_prompt   = T.string:is_optional():describe("Override proposer prompt (implementation choice — paper does not specify wording)"),
+    aggregator_prompt = T.string:is_optional():describe("Override AS_PROMPT_TEMPLATE; replacing it drops the paper's effect guarantee"),
+    system_prompt     = T.string:is_optional():describe("Override proposer system prompt (implementation choice — paper does not specify)"),
 }, { open = true })
 
 local run_result_shape = T.shape({

@@ -48,18 +48,18 @@
 ---
 --- ## Defaults (Chen 2023 §3, §4 footnote)
 ---
---- | Symbol            | Value | Label | Source                                |
---- |-------------------|-------|-------|---------------------------------------|
---- | n (agents)        | 3     | (L)   | §3 main exp uses 3 diverse agents     |
---- | R (max_rounds)    | 3     | (L)   | §3 "up to three discussion rounds"    |
---- | convincing_count  | 4     | (L)   | §4 "we select a small number of       |
---- |                   |       |       | samples (4 in our experiments)"       |
---- | gen_tokens        | 600   | (X)   | Paper does not specify; infrastructure|
---- | temperature       | nil   | (X)   | Paper does not fix; API default used  |
+--- | Symbol            | Value | Source                                            |
+--- |-------------------|-------|---------------------------------------------------|
+--- | n (agents)        | 3     | Chen §3 main exp uses 3 diverse agents            |
+--- | R (max_rounds)    | 3     | Chen §3 "up to three discussion rounds"           |
+--- | convincing_count  | 4     | Chen §4 footnote "4 in our experiments"           |
+--- | gen_tokens        | 600   | implementation choice — paper does not specify    |
+--- | temperature       | nil   | implementation choice — paper does not fix; API   |
+--- |                   |       | default used                                      |
 ---
---- The **5-bucket confidence calibration** is (L) — Lua transcription
---- of repo `utils.py::trans_confidence`; same boundary values, same
---- weights, top-to-bottom first-match evaluation (see
+--- The **5-bucket confidence calibration** is a Lua transcription of
+--- repo `utils.py::trans_confidence` (paper §B.5); same boundary values,
+--- same weights, top-to-bottom first-match evaluation (see
 --- `M.CONFIDENCE_BUCKETS` for the shape contract):
 ---
 ---   p ≤ 0.6        → 0.1
@@ -81,43 +81,60 @@
 --- Four pure helpers are LLM-independent and unit-testable. `run` is the
 --- only LLM-mediated entry.
 ---
---- ## EXTENSION POINTS
+--- ## Caveats
 ---
---- ```
---- ┌──────────────────────────────────────────────────────────────────────┐
---- │ REQUIRED                                                             │
---- │   ctx.task                  (string)         problem / question      │
---- │   ctx.agents                (array, diverse-LLM PATH; matches Chen  │
---- │       §3 main config) — list of specs, each                          │
---- │       { model = string [, system = string] }                         │
---- │     OR                                                               │
---- │   ctx.personas              (array, single-model rotation PATH;     │
---- │       outside Chen §3's diverse-LLM setup) — array of system-prompt  │
---- │       strings; single model + persona rotation. Sacrifices the       │
---- │       paper's distinct-LLM diversity property.                       │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (L)-override OPTION                                                  │
---- │   ctx.max_rounds            (number ≥ 1)     override R=3 default    │
---- │   ctx.convincing_count      (number ≥ 0)     override 4 (L §4 fn)    │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (X) infrastructure (paper does not specify)                          │
---- │   ctx.gen_tokens            (number)         max tokens per LLM call │
---- │   ctx.temperature           (number)         per-LLM temperature     │
---- │   ctx.init_prompt           (string template) override Phase 1 prompt│
---- │   ctx.discussion_prompt     (string template) override Phase 2 prompt│
---- │   ctx.system_prompt         (string)         override system prompt  │
---- │   ctx.parse_fn              (function)       custom response parser  │
---- │   ctx.confidence_buckets    (array of {threshold,weight})            │
---- │                                              override 5-bucket scale │
---- │                                              (X — invalidates §B.5)  │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ Stability tier:                                                      │
---- │   stable     : max_rounds / convincing_count / gen_tokens / temp     │
---- │   v2-opt-in  : *_prompt / system_prompt / parse_fn                   │
---- │   experimental : personas (single-model fallback) /                  │
---- │                  confidence_buckets (paper guarantee not held)       │
---- └──────────────────────────────────────────────────────────────────────┘
---- ```
+--- ### Required ctx fields
+---
+--- - `ctx.task` (string) — the problem or question to solve.
+--- - One of `ctx.agents` or `ctx.personas`:
+---   - `ctx.agents` (array) follows Chen §3's diverse-LLM main config:
+---     each entry is `{ model = string [, system = string] }`.
+---   - `ctx.personas` (array of strings) is a single-model rotation
+---     path outside Chen §3's main setup; the model is fixed and only
+---     the system prompt rotates. This sacrifices the paper's
+---     distinct-LLM diversity property.
+---
+--- ### Knobs that affect the paper's effect guarantee
+---
+--- Overriding any of these moves away from the values Chen §3 / §4
+--- used to demonstrate the consensus benefit, so the paper's claim no
+--- longer transfers directly:
+---
+--- - `ctx.max_rounds` (number ≥ 1) — overrides R = 3 (Chen §3 "up to
+---   three discussion rounds").
+--- - `ctx.convincing_count` (number ≥ 0) — overrides 4 (Chen §4
+---   footnote "4 in our experiments").
+--- - `ctx.confidence_buckets` (array of `{lo, lo_op?, weight}`) —
+---   overrides the §B.5 5-bucket calibration; once replaced the
+---   §B.5 weighting guarantee no longer applies.
+---
+--- ### Optional caller knobs (implementation choices)
+---
+--- These knobs are implementation choices because the paper does not
+--- fix concrete values; tuning them does not invalidate the paper's
+--- claim:
+---
+--- - `ctx.gen_tokens` (number) — max tokens per LLM call.
+--- - `ctx.temperature` (number) — per-LLM temperature.
+--- - `ctx.init_prompt` (string template) — overrides the Phase 1
+---   prompt; paper specifies the *information* to elicit (answer +
+---   explanation + confidence) but not the exact wording.
+--- - `ctx.discussion_prompt` (string template) — overrides the
+---   Phase 2 prompt.
+--- - `ctx.system_prompt` (string) — overrides the default system
+---   prompt.
+--- - `ctx.parse_fn` (function) — custom `(raw) → { answer,
+---   explanation, confidence }` parser.
+---
+--- ### Stability tier
+---
+--- - stable: `max_rounds`, `convincing_count`, `gen_tokens`,
+---   `temperature`.
+--- - v2-opt-in: `init_prompt`, `discussion_prompt`, `system_prompt`,
+---   `parse_fn`.
+--- - experimental: `personas` (single-model fallback);
+---   `confidence_buckets` (replacing the §B.5 calibration drops the
+---   paper's weighting guarantee).
 ---
 --- ## Comparison with related packages
 ---
@@ -256,24 +273,24 @@ local run_input_shape = T.shape({
     personas          = T.array_of(T.string):is_optional()
         :describe("Single-model rotation PATH (outside Chen §3 main config): persona system prompts"),
     max_rounds        = T.number:is_optional()
-        :describe("Max discussion rounds R (default: " .. M._defaults.max_rounds .. ", (L) Chen §3)"),
+        :describe("Max discussion rounds R (default: " .. M._defaults.max_rounds .. " per Chen §3 \"up to three discussion rounds\")"),
     convincing_count  = T.number:is_optional()
-        :describe("Convincing-sample count (default: " .. M._defaults.convincing_count .. ", (L) Chen §4 footnote)"),
+        :describe("Convincing-sample count (default: " .. M._defaults.convincing_count .. " per Chen §4 footnote \"4 in our experiments\")"),
     gen_tokens        = T.number:is_optional()
-        :describe("Max tokens per LLM call (default: " .. M._defaults.gen_tokens .. ", (X) infrastructure)"),
+        :describe("Max tokens per LLM call (default: " .. M._defaults.gen_tokens .. "; implementation choice — paper does not specify)"),
     temperature       = T.number:is_optional()
-        :describe("LLM temperature (default: API default, (X) Chen §3 does not state a value)"),
-    init_prompt       = T.string:is_optional():describe("Override Phase 1 prompt (X)"),
-    discussion_prompt = T.string:is_optional():describe("Override Phase 2 prompt (X)"),
-    system_prompt     = T.string:is_optional():describe("Override system prompt (X)"),
+        :describe("LLM temperature (default: API default; implementation choice — Chen §3 does not state a value)"),
+    init_prompt       = T.string:is_optional():describe("Override Phase 1 prompt (implementation choice — paper specifies elicited information but not exact wording)"),
+    discussion_prompt = T.string:is_optional():describe("Override Phase 2 prompt (implementation choice — paper specifies elicited information but not exact wording)"),
+    system_prompt     = T.string:is_optional():describe("Override system prompt (implementation choice — paper does not fix)"),
     parse_fn          = T.any:is_optional()
-        :describe("Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X)"),
+        :describe("Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (implementation choice)"),
     confidence_buckets = T.array_of(T.shape({
         lo     = T.number,
         lo_op  = T.string:is_optional(),
         weight = T.number,
     }, { open = true })):is_optional()
-        :describe("Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract."),
+        :describe("Override the §B.5 5-bucket calibration; replacing it drops the paper's weighting guarantee. See M.CONFIDENCE_BUCKETS for the shape contract."),
 }, { open = true })
 
 local run_result_shape = T.shape({

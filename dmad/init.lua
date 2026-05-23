@@ -40,24 +40,25 @@
 ---
 --- ## Defaults (Du 2023 repo `gsm/gen_gsm.py`)
 ---
---- | Symbol | Value | Label | Source                                                    |
---- |--------|-------|-------|-----------------------------------------------------------|
---- | N      | 3     | (L)   | `gen_gsm.py` agents=3                                     |
---- | R      | 2     | (L)   | `gen_gsm.py` rounds=2                                     |
---- | temp   | nil   | (X)   | Paper does not fix temperature; repo omits the param so   |
---- |        |       |       | OpenAI API default is used. Pkg leaves nil to mirror this |
---- | tokens | 500   | (X)   | Paper does not specify max_tokens. (X) infrastructure;    |
---- |        |       |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
+--- | Symbol | Value | Source                                                    |
+--- |--------|-------|-----------------------------------------------------------|
+--- | N      | 3     | Du repo `gen_gsm.py` agents=3                             |
+--- | R      | 2     | Du repo `gen_gsm.py` rounds=2                             |
+--- | temp   | nil   | implementation choice — paper does not fix temperature;   |
+--- |        |       | repo omits the param so OpenAI API default is used. Pkg   |
+--- |        |       | leaves nil to mirror this                                 |
+--- | tokens | 500   | implementation choice — paper does not specify max_tokens;|
+--- |        |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
 ---
---- The INIT and DEBATE prompt templates are (L) — Lua transcriptions of
---- the corresponding `gen_gsm.py` string literals. The DEBATE template
---- is built from `prefix + per-agent block (each wraps a response in
+--- The INIT and DEBATE prompt templates are Lua transcriptions of the
+--- corresponding `gen_gsm.py` string literals. The DEBATE template is
+--- built from `prefix + per-agent block (each wraps a response in
 --- ``` triple backticks ```) + suffix`, matching repo `construct_message`
 --- byte-for-byte (modulo Python f-string `{}` ↔ Lua `%s` substitution
 --- and the implicit `\n` semantics). The `\boxed{answer}` sentinel that
 --- `extract_boxed` reads back is preserved. Overriding the templates
---- (X-mode) invalidates the paper's effect guarantee but the pkg
---- accepts the override.
+--- moves away from the repo reference and drops the paper's effect
+--- guarantee, but the pkg accepts the override.
 ---
 --- ## Entry contract
 ---
@@ -72,34 +73,45 @@
 --- The four sub-entries are LLM-independent and unit-testable. `run` is
 --- the only LLM-mediated entry.
 ---
---- ## EXTENSION POINTS
+--- ## Caveats
 ---
---- ```
---- ┌──────────────────────────────────────────────────────────────────────┐
---- │ REQUIRED                                                             │
---- │   ctx.task                  (string)         problem statement       │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (L)-override OPTION                                                  │
---- │   ctx.n_agents              (number ≥ 2)     override N default      │
---- │   ctx.n_rounds              (number ≥ 1)     override R default      │
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ (X) infrastructure (paper does not specify)                          │
---- │   ctx.gen_tokens            (number)         max tokens per LLM call │
---- │   ctx.temperature           (number)         per-LLM temperature     │
---- │   ctx.init_prompt           (string template) override init prompt   │
---- │   ctx.debate_prompt         (string template) override debate prompt │
---- │   ctx.system_prompt         (string)         override system prompt  │
---- │   ctx.extract_fn            (function)       custom answer extractor │
---- │                                              (default: extract_boxed)│
---- ├──────────────────────────────────────────────────────────────────────┤
---- │ Stability tier:                                                      │
---- │   stable     : n_agents / n_rounds / gen_tokens / temperature        │
---- │   v2-opt-in  : *_prompt / system_prompt / extract_fn                 │
---- │                (template/extractor format may evolve)                │
---- └──────────────────────────────────────────────────────────────────────┘
---- ```
+--- ### Required ctx fields
 ---
---- Overriding any (L) default invalidates the paper's effect guarantee.
+--- - `ctx.task` (string) — the problem statement.
+---
+--- ### Knobs that affect the paper's effect guarantee
+---
+--- Overriding these moves away from the values Du repo `gen_gsm.py`
+--- used in the paper's main experiment, so the paper's claim no longer
+--- transfers directly:
+---
+--- - `ctx.n_agents` (number ≥ 2) — overrides N = 3 (Du repo
+---   `gen_gsm.py` agents=3).
+--- - `ctx.n_rounds` (number ≥ 1) — overrides R = 2 (Du repo
+---   `gen_gsm.py` rounds=2).
+---
+--- ### Optional caller knobs (implementation choices)
+---
+--- These knobs are implementation choices because the paper does not
+--- specify concrete values; tuning them does not invalidate the
+--- paper's claim:
+---
+--- - `ctx.gen_tokens` (number) — max tokens per LLM call.
+--- - `ctx.temperature` (number) — per-LLM temperature.
+--- - `ctx.init_prompt` (string template) — overrides the INIT prompt
+---   (Du repo string literal).
+--- - `ctx.debate_prompt` (string template) — overrides the DEBATE
+---   prompt assembled from prefix + per-agent block + suffix.
+--- - `ctx.system_prompt` (string) — overrides the system prompt
+---   (paper repo uses user-role only).
+--- - `ctx.extract_fn` (function) — custom answer extractor; default
+---   is `extract_boxed` reading the `\boxed{...}` sentinel.
+---
+--- ### Stability tier
+---
+--- - stable: `n_agents`, `n_rounds`, `gen_tokens`, `temperature`.
+--- - v2-opt-in: `init_prompt`, `debate_prompt`, `system_prompt`,
+---   `extract_fn` (template / extractor format may evolve).
 ---
 --- ## Comparison with related packages
 ---
@@ -202,18 +214,18 @@ local agent_round_shape = T.shape({
 
 local init_input_shape = T.shape({
     task           = T.string:describe("Problem statement (required)"),
-    init_prompt    = T.string:is_optional():describe("Override INIT template (X)"),
-    system_prompt  = T.string:is_optional():describe("Override system prompt (X)"),
+    init_prompt    = T.string:is_optional():describe("Override INIT template (implementation choice — paper repo string literal is the default)"),
+    system_prompt  = T.string:is_optional():describe("Override system prompt (implementation choice — paper repo uses user-role only)"),
 }, { open = true })
 
 local debate_input_shape = T.shape({
     task                = T.string:describe("Problem statement (required)"),
     other_responses     = T.array_of(T.string):describe("Previous-round responses from the OTHER N-1 agents (required, non-empty)"),
-    debate_prompt       = T.string:is_optional():describe("Override DEBATE template (X)"),
-    debate_prefix       = T.string:is_optional():describe("Override DEBATE prefix when not using full template (X)"),
-    debate_agent_block  = T.string:is_optional():describe("Override per-agent block format when not using full template (X)"),
-    debate_suffix       = T.string:is_optional():describe("Override DEBATE suffix when not using full template (X)"),
-    system_prompt       = T.string:is_optional():describe("Override system prompt (X)"),
+    debate_prompt       = T.string:is_optional():describe("Override DEBATE template (implementation choice — paper repo string literal is the default)"),
+    debate_prefix       = T.string:is_optional():describe("Override DEBATE prefix when not using full template (implementation choice)"),
+    debate_agent_block  = T.string:is_optional():describe("Override per-agent block format when not using full template (implementation choice)"),
+    debate_suffix       = T.string:is_optional():describe("Override DEBATE suffix when not using full template (implementation choice)"),
+    system_prompt       = T.string:is_optional():describe("Override system prompt (implementation choice)"),
 }, { open = true })
 
 local extract_input_shape = T.shape({
@@ -227,16 +239,16 @@ local aggregate_input_shape = T.shape({
 local run_input_shape = T.shape({
     task           = T.string:describe("Problem statement (required)"),
     n_agents       = T.number:is_optional()
-        :describe("Number of parallel agents (default: " .. M._defaults.n_agents .. ", (L) Du repo gen_gsm.py)"),
+        :describe("Number of parallel agents (default: " .. M._defaults.n_agents .. " per Du repo gen_gsm.py agents=3)"),
     n_rounds       = T.number:is_optional()
-        :describe("Number of debate rounds after init (default: " .. M._defaults.n_rounds .. ", (L) Du repo gen_gsm.py)"),
+        :describe("Number of debate rounds after init (default: " .. M._defaults.n_rounds .. " per Du repo gen_gsm.py rounds=2)"),
     gen_tokens     = T.number:is_optional()
-        :describe("Max tokens per LLM call (default: " .. M._defaults.gen_tokens .. ", (X) infrastructure)"),
+        :describe("Max tokens per LLM call (default: " .. M._defaults.gen_tokens .. "; implementation choice — paper does not specify)"),
     temperature    = T.number:is_optional()
-        :describe("LLM temperature (default: API default, (X) infrastructure; paper does not fix)"),
-    init_prompt    = T.string:is_optional():describe("Override INIT template (X)"),
-    debate_prompt  = T.string:is_optional():describe("Override DEBATE template (X)"),
-    system_prompt  = T.string:is_optional():describe("Override system prompt (X)"),
+        :describe("LLM temperature (default: API default; implementation choice — paper does not fix)"),
+    init_prompt    = T.string:is_optional():describe("Override INIT template (implementation choice)"),
+    debate_prompt  = T.string:is_optional():describe("Override DEBATE template (implementation choice)"),
+    system_prompt  = T.string:is_optional():describe("Override system prompt (implementation choice)"),
 }, { open = true })
 
 local run_result_shape = T.shape({
@@ -306,13 +318,14 @@ end
 --- Build the DEBATE prompt for one agent at round r > 0.
 ---
 --- Two construction modes:
---- 1. `debate_prompt` (X) — full custom template with two `%s`
----    placeholders: first = concatenated other-agents block,
----    second = task. Caller pre-formats the agent block as desired.
+--- 1. `debate_prompt` (caller-supplied implementation choice) — full
+---    custom template with two `%s` placeholders: first = concatenated
+---    other-agents block, second = task. Caller pre-formats the agent
+---    block as desired.
 --- 2. Default (no `debate_prompt`) — uses prefix + per-agent block +
 ---    suffix, matching Du repo `construct_message`. Each entry in
 ---    `other_responses` is wrapped via `debate_agent_block` (also
----    overridable as X).
+---    caller-overridable).
 ---@param args table { task, other_responses, debate_prompt?, debate_prefix?, debate_agent_block?, debate_suffix?, system_prompt? }
 ---@return table { prompt, system }
 function M.build_debate_prompt(args)

@@ -2594,7 +2594,11 @@ Returns:
 - [Algorithm (Du 2023 §3)](#algorithm-du-2023-3)
 - [Defaults (Du 2023 repo `gsm/gen_gsm.py`)](#defaults-du-2023-repo-gsm-gen-gsm-py)
 - [Entry contract](#entry-contract)
-- [EXTENSION POINTS](#extension-points)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Knobs that affect the paper's effect guarantee](#knobs-that-affect-the-paper-s-effect-guarantee)
+  - [Optional caller knobs (implementation choices)](#optional-caller-knobs-implementation-choices)
+  - [Stability tier](#stability-tier)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [History](#history)
 - [Parameters](#parameters)
@@ -2640,24 +2644,25 @@ Total LLM calls: N + N·R = N·(R+1). Default 3·(2+1) = 9.
 
 ## Defaults (Du 2023 repo `gsm/gen_gsm.py`) {#defaults-du-2023-repo-gsm-gen-gsm-py}
 
-| Symbol | Value | Label | Source                                                    |
-|--------|-------|-------|-----------------------------------------------------------|
-| N      | 3     | (L)   | `gen_gsm.py` agents=3                                     |
-| R      | 2     | (L)   | `gen_gsm.py` rounds=2                                     |
-| temp   | nil   | (X)   | Paper does not fix temperature; repo omits the param so   |
-|        |       |       | OpenAI API default is used. Pkg leaves nil to mirror this |
-| tokens | 500   | (X)   | Paper does not specify max_tokens. (X) infrastructure;    |
-|        |       |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
+| Symbol | Value | Source                                                    |
+|--------|-------|-----------------------------------------------------------|
+| N      | 3     | Du repo `gen_gsm.py` agents=3                             |
+| R      | 2     | Du repo `gen_gsm.py` rounds=2                             |
+| temp   | nil   | implementation choice — paper does not fix temperature;   |
+|        |       | repo omits the param so OpenAI API default is used. Pkg   |
+|        |       | leaves nil to mirror this                                 |
+| tokens | 500   | implementation choice — paper does not specify max_tokens;|
+|        |       | provenance: prior dmad v0.1.0 baseline (commit 54faaa5)   |
 
-The INIT and DEBATE prompt templates are (L) — Lua transcriptions of
-the corresponding `gen_gsm.py` string literals. The DEBATE template
-is built from `prefix + per-agent block (each wraps a response in
+The INIT and DEBATE prompt templates are Lua transcriptions of the
+corresponding `gen_gsm.py` string literals. The DEBATE template is
+built from `prefix + per-agent block (each wraps a response in
 ``` triple backticks ```) + suffix`, matching repo `construct_message`
 byte-for-byte (modulo Python f-string `{}` ↔ Lua `%s` substitution
 and the implicit `\n` semantics). The `\boxed{answer}` sentinel that
 `extract_boxed` reads back is preserved. Overriding the templates
-(X-mode) invalidates the paper's effect guarantee but the pkg
-accepts the override.
+moves away from the repo reference and drops the paper's effect
+guarantee, but the pkg accepts the override.
 
 ## Entry contract {#entry-contract}
 
@@ -2672,34 +2677,45 @@ See `M.spec` below for the formal machine-readable contract:
 The four sub-entries are LLM-independent and unit-testable. `run` is
 the only LLM-mediated entry.
 
-## EXTENSION POINTS {#extension-points}
+## Caveats {#caveats}
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ REQUIRED                                                             │
-│   ctx.task                  (string)         problem statement       │
-├──────────────────────────────────────────────────────────────────────┤
-│ (L)-override OPTION                                                  │
-│   ctx.n_agents              (number ≥ 2)     override N default      │
-│   ctx.n_rounds              (number ≥ 1)     override R default      │
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) infrastructure (paper does not specify)                          │
-│   ctx.gen_tokens            (number)         max tokens per LLM call │
-│   ctx.temperature           (number)         per-LLM temperature     │
-│   ctx.init_prompt           (string template) override init prompt   │
-│   ctx.debate_prompt         (string template) override debate prompt │
-│   ctx.system_prompt         (string)         override system prompt  │
-│   ctx.extract_fn            (function)       custom answer extractor │
-│                                              (default: extract_boxed)│
-├──────────────────────────────────────────────────────────────────────┤
-│ Stability tier:                                                      │
-│   stable     : n_agents / n_rounds / gen_tokens / temperature        │
-│   v2-opt-in  : *_prompt / system_prompt / extract_fn                 │
-│                (template/extractor format may evolve)                │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### Required ctx fields {#required-ctx-fields}
 
-Overriding any (L) default invalidates the paper's effect guarantee.
+- `ctx.task` (string) — the problem statement.
+
+### Knobs that affect the paper's effect guarantee {#knobs-that-affect-the-paper-s-effect-guarantee}
+
+Overriding these moves away from the values Du repo `gen_gsm.py`
+used in the paper's main experiment, so the paper's claim no longer
+transfers directly:
+
+- `ctx.n_agents` (number ≥ 2) — overrides N = 3 (Du repo
+  `gen_gsm.py` agents=3).
+- `ctx.n_rounds` (number ≥ 1) — overrides R = 2 (Du repo
+  `gen_gsm.py` rounds=2).
+
+### Optional caller knobs (implementation choices) {#optional-caller-knobs-implementation-choices}
+
+These knobs are implementation choices because the paper does not
+specify concrete values; tuning them does not invalidate the
+paper's claim:
+
+- `ctx.gen_tokens` (number) — max tokens per LLM call.
+- `ctx.temperature` (number) — per-LLM temperature.
+- `ctx.init_prompt` (string template) — overrides the INIT prompt
+  (Du repo string literal).
+- `ctx.debate_prompt` (string template) — overrides the DEBATE
+  prompt assembled from prefix + per-agent block + suffix.
+- `ctx.system_prompt` (string) — overrides the system prompt
+  (paper repo uses user-role only).
+- `ctx.extract_fn` (function) — custom answer extractor; default
+  is `extract_boxed` reading the `\boxed{...}` sentinel.
+
+### Stability tier {#stability-tier}
+
+- stable: `n_agents`, `n_rounds`, `gen_tokens`, `temperature`.
+- v2-opt-in: `init_prompt`, `debate_prompt`, `system_prompt`,
+  `extract_fn` (template / extractor format may evolve).
 
 ## Comparison with related packages {#comparison-with-related-packages}
 
@@ -2729,14 +2745,14 @@ paper basis); Hegelian users should switch to `require("hegelian")`.
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.debate_prompt` | string | optional | Override DEBATE template (X) |
-| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 500, (X) infrastructure) |
-| `ctx.init_prompt` | string | optional | Override INIT template (X) |
-| `ctx.n_agents` | number | optional | Number of parallel agents (default: 3, (L) Du repo gen_gsm.py) |
-| `ctx.n_rounds` | number | optional | Number of debate rounds after init (default: 2, (L) Du repo gen_gsm.py) |
-| `ctx.system_prompt` | string | optional | Override system prompt (X) |
+| `ctx.debate_prompt` | string | optional | Override DEBATE template (implementation choice) |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 500; implementation choice — paper does not specify) |
+| `ctx.init_prompt` | string | optional | Override INIT template (implementation choice) |
+| `ctx.n_agents` | number | optional | Number of parallel agents (default: 3 per Du repo gen_gsm.py agents=3) |
+| `ctx.n_rounds` | number | optional | Number of debate rounds after init (default: 2 per Du repo gen_gsm.py rounds=2) |
+| `ctx.system_prompt` | string | optional | Override system prompt (implementation choice) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) infrastructure; paper does not fix) |
+| `ctx.temperature` | number | optional | LLM temperature (default: API default; implementation choice — paper does not fix) |
 
 ## Result {#result}
 
@@ -3509,7 +3525,12 @@ Returns:
   - [Stage name mapping vs paper-literal terms](#stage-name-mapping-vs-paper-literal-terms)
 - [Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters")](#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters)
 - [Entry contract](#entry-contract)
-- [EXTENSION POINTS](#extension-points)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Knobs that affect the paper's effect guarantee](#knobs-that-affect-the-paper-s-effect-guarantee)
+  - [Caller-tunable within the paper range](#caller-tunable-within-the-paper-range)
+  - [Optional caller knobs (implementation choices)](#optional-caller-knobs-implementation-choices)
+  - [Stability tier](#stability-tier)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [History](#history)
 - [Parameters](#parameters)
@@ -3554,23 +3575,25 @@ labels in two places:
 
 Symbols (T_i / A_i / S_i / τ_0 / τ_a / θ / N) match the paper. The
 choice of "Thesis/Antithesis/Synthesis" as the pkg-facing names is a
-(X) translation decision — the underlying algorithm is paper-literal.
-The paper also denotes antithesis temperature as τ_A (opposition
-temperature); the pkg uses lowercase τ_a / `tau_a` for Lua identifier
-hygiene.
+translation decision (implementation choice) — the underlying
+algorithm is paper-literal. The paper also denotes antithesis
+temperature as τ_A (opposition temperature); the pkg uses lowercase
+τ_a / `tau_a` for Lua identifier hygiene.
 
 **No "rebuttal" stage exists in the paper** (verified against Abdali §3 /
 Algorithm 1 / Appendix A Table 2, 2026-05-15 WebFetch).
 
 ## Defaults (Abdali 2025 Appendix A, Table 2: "Experimental hyper-parameters") {#defaults-abdali-2025-appendix-a-table-2-experimental-hyper-parameters}
 
-| Symbol | Value | Label | Source                                                |
-|--------|-------|-------|-------------------------------------------------------|
-| τ_0    | 0.7   | (L)   | Table 2 "Initial temperature"                         |
-| τ_a    | 0.5   | (L)   | Table 2 "Opposition temperature" (paper symbol τ_A)   |
-| θ      | 0.3   | (X)   | within paper-stated (L) range [0.1, 0.5] from Table 2 |
-| N      | 5     | (L)   | Table 2 "Max iterations" (idea generation value;      |
-|        |       |       | paper also reports N=3 for math reasoning)            |
+| Symbol | Value | Source                                                  |
+|--------|-------|---------------------------------------------------------|
+| τ_0    | 0.7   | Table 2 "Initial temperature"                           |
+| τ_a    | 0.5   | Table 2 "Opposition temperature" (paper symbol τ_A)     |
+| θ      | 0.3   | implementation choice — midpoint of the paper-stated    |
+|        |       | range [0.1, 0.5] from Table 2; specific value is        |
+|        |       | caller's choice within the range                        |
+| N      | 5     | Table 2 "Max iterations" (idea-generation value; paper  |
+|        |       | also reports N=3 for math reasoning)                    |
 
 θ default 0.3 is the midpoint of the paper-stated range [0.1, 0.5]
 (Table 2). 0.3 is NOT itself a literal Table 2 value — only the range is.
@@ -3591,39 +3614,62 @@ See `M.spec` below for the formal machine-readable contract:
 All four sub-entries are LLM-independent and unit-testable without `alc` mocks.
 `run` is the only LLM-mediated entry.
 
-## EXTENSION POINTS {#extension-points}
+## Caveats {#caveats}
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ REQUIRED                                                             │
-│   ctx.task                  (string)         task to apply dialectic │
-├──────────────────────────────────────────────────────────────────────┤
-│ (L)-override OPTION                                                  │
-│   ctx.tau_0                 (number)         override τ_0 default    │
-│   ctx.tau_a                 (number)         override τ_a default    │
-│   ctx.N                     (number)         override iteration count│
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) caller-tunable within paper range                                │
-│   ctx.theta                 (number ∈ [0.1, 0.5])  decay constant    │
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) infrastructure (paper does not specify)                          │
-│   ctx.gen_tokens            (number)         max tokens per LLM call │
-│   ctx.thesis_prompt         (string template) override thesis prompt │
-│   ctx.antithesis_prompt     (string template) override antithesis    │
-│   ctx.synthesis_prompt      (string template) override synthesis     │
-│   ctx.system_thesis         (string)          system prompt thesis   │
-│   ctx.system_antithesis     (string)          system prompt anti     │
-│   ctx.system_synthesis      (string)          system prompt synth    │
-├──────────────────────────────────────────────────────────────────────┤
-│ Stability tier:                                                      │
-│   stable     : tau_0 / tau_a / theta / N / gen_tokens                │
-│   v2-opt-in  : *_prompt / system_* (template override; format may    │
-│                evolve in future versions)                            │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### Required ctx fields {#required-ctx-fields}
 
-Note: overriding any (L) default invalidates the paper's effect guarantee.
-The pkg accepts the override and proceeds, but the docstring no longer
+- `ctx.task` (string) — the task to apply the dialectic to.
+
+### Knobs that affect the paper's effect guarantee {#knobs-that-affect-the-paper-s-effect-guarantee}
+
+Overriding these moves away from the values Abdali Table 2 reports
+for the main experiment, so the paper's claim no longer transfers
+directly:
+
+- `ctx.tau_0` (number > 0) — overrides τ_0 = 0.7 (Table 2 "Initial
+  temperature").
+- `ctx.tau_a` (number > 0) — overrides τ_a = 0.5 (Table 2
+  "Opposition temperature").
+- `ctx.N` (number ≥ 1) — overrides the iteration count (Table 2
+  "Max iterations").
+
+### Caller-tunable within the paper range {#caller-tunable-within-the-paper-range}
+
+- `ctx.theta` (number ∈ [0.1, 0.5]) — decay constant. Paper Table 2
+  states the range only; specific values within the range are the
+  caller's choice and remain inside the paper's stated bounds.
+  Values outside [0.1, 0.5] are rejected at runtime.
+
+### Optional caller knobs (implementation choices) {#optional-caller-knobs-implementation-choices}
+
+These knobs are implementation choices because the paper does not
+specify concrete values; tuning them does not invalidate the
+paper's claim:
+
+- `ctx.gen_tokens` (number) — max tokens per LLM call.
+- `ctx.thesis_prompt` (string template) — overrides thesis prompt
+  body.
+- `ctx.antithesis_prompt` (string template) — overrides antithesis
+  prompt body.
+- `ctx.synthesis_prompt` (string template) — overrides synthesis
+  prompt body.
+- `ctx.system_thesis` (string) — overrides thesis system prompt.
+- `ctx.system_antithesis` (string) — overrides antithesis system
+  prompt.
+- `ctx.system_synthesis` (string) — overrides synthesis system
+  prompt.
+
+### Stability tier {#stability-tier}
+
+- stable: `tau_0`, `tau_a`, `theta`, `N`, `gen_tokens`.
+- v2-opt-in: `thesis_prompt`, `antithesis_prompt`,
+  `synthesis_prompt`, `system_thesis`, `system_antithesis`,
+  `system_synthesis` (template format may evolve in future
+  versions).
+
+Note: overriding any value drawn directly from Table 2 (τ_0, τ_a,
+N) moves the run outside the paper's reported configuration. The
+pkg accepts the override and proceeds, but the docstring no longer
 claims paper-explicit behaviour for the run.
 
 ## Comparison with related packages {#comparison-with-related-packages}
@@ -3655,18 +3701,18 @@ the correct paper citation (Abdali 2025) and removes the non-paper
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.N` | number | optional | Max iterations (default: 5, (L) Abdali Table 2) |
-| `ctx.antithesis_prompt` | string | optional | Override antithesis prompt template (X) |
-| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
-| `ctx.synthesis_prompt` | string | optional | Override synthesis prompt template (X) |
-| `ctx.system_antithesis` | string | optional | Override antithesis system prompt (X) |
-| `ctx.system_synthesis` | string | optional | Override synthesis system prompt (X) |
-| `ctx.system_thesis` | string | optional | Override thesis system prompt (X) |
+| `ctx.N` | number | optional | Max iterations (default: 5 per Abdali Table 2 "Max iterations") |
+| `ctx.antithesis_prompt` | string | optional | Override antithesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600; implementation choice — paper does not specify) |
+| `ctx.synthesis_prompt` | string | optional | Override synthesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.system_antithesis` | string | optional | Override antithesis system prompt (implementation choice) |
+| `ctx.system_synthesis` | string | optional | Override synthesis system prompt (implementation choice) |
+| `ctx.system_thesis` | string | optional | Override thesis system prompt (implementation choice) |
 | `ctx.task` | string | **required** | Task or question (required) |
-| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7, (L) Abdali Table 2) |
-| `ctx.tau_a` | number | optional | Antithesis/opposition temperature (default: 0.5, (L) Abdali Table 2) |
-| `ctx.thesis_prompt` | string | optional | Override thesis prompt template (X) |
-| `ctx.theta` | number | optional | Decay constant θ ∈ [0.1, 0.5] (default: 0.3, (X) within paper range) |
+| `ctx.tau_0` | number | optional | Initial temperature (default: 0.7 per Abdali Table 2 "Initial temperature") |
+| `ctx.tau_a` | number | optional | Antithesis/opposition temperature (default: 0.5 per Abdali Table 2 "Opposition temperature") |
+| `ctx.thesis_prompt` | string | optional | Override thesis prompt template (implementation choice — paper specifies role but not wording) |
+| `ctx.theta` | number | optional | Decay constant θ ∈ [0.1, 0.5] (default: 0.3; implementation choice within the paper's stated range from Table 2) |
 
 ## Result {#result}
 
@@ -4468,7 +4514,11 @@ Returns:
 - [Defaults (Wang 2024 §3)](#defaults-wang-2024-3)
 - [Proposer models (paper main experiment, Wang 2024 §3)](#proposer-models-paper-main-experiment-wang-2024-3)
 - [Entry contract](#entry-contract)
-- [EXTENSION POINTS](#extension-points)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Knobs that affect the paper's effect guarantee](#knobs-that-affect-the-paper-s-effect-guarantee)
+  - [Optional caller knobs (implementation choices)](#optional-caller-knobs-implementation-choices)
+  - [Stability tier](#stability-tier)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [Parameters](#parameters)
 - [Result](#result)
@@ -4500,25 +4550,24 @@ cost efficiency. The final layer's aggregator output is the answer.
 
 ## Defaults (Wang 2024 §3) {#defaults-wang-2024-3}
 
-| Symbol     | Value | Label | Source                                          |
-|------------|-------|-------|-------------------------------------------------|
-| L          | 3     | (L)   | Wang §3 "We use 3 MoA layers"                   |
-| n          | 6     | (L)   | Wang §3 main exp uses 6 open-source proposers   |
-| temp       | 0.7   | (X)   | Wang §3 main config does not state a temperature|
-|            |       |       | for the layered MoA run. 0.7 is the only        |
-|            |       |       | numeric value §3 names (single-proposer         |
-|            |       |       | ablation row); pkg uses 0.7 to anchor the       |
-|            |       |       | default to that one named value rather than an  |
-|            |       |       | implementer-chosen number.                      |
-| max_tokens | 2048  | (X)   | Paper does not specify. (X) infrastructure;     |
-|            |       |       | provenance: AS_PROMPT requires synthesizing all |
-|            |       |       | proposer outputs, so a larger budget than       |
-|            |       |       | per-proposer is required by construction.       |
+| Symbol     | Value | Source                                              |
+|------------|-------|-----------------------------------------------------|
+| L          | 3     | Wang §3 "We use 3 MoA layers"                       |
+| n          | 6     | Wang §3 main exp uses 6 open-source proposers       |
+| temp       | 0.7   | Wang §3 main config does not state a temperature    |
+|            |       | for the layered MoA run. 0.7 is the only numeric    |
+|            |       | value §3 names (single-proposer ablation row); pkg  |
+|            |       | uses 0.7 to anchor the default to that one named    |
+|            |       | value rather than an implementer-chosen number.     |
+| max_tokens | 2048  | implementation choice — paper does not specify.     |
+|            |       | Provenance: AS_PROMPT requires synthesizing all     |
+|            |       | proposer outputs, so a larger budget than           |
+|            |       | per-proposer is required by construction.           |
 
-The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is (L) — the
-Lua string literal is identical to Wang 2024 Table 1's English text
-(punctuation / capitalization / line breaks all match; the only
-transformation is the Python `{}` placeholder rendered as Lua `%s`).
+The **AS_PROMPT_TEMPLATE** (Aggregate-and-Synthesize) is a Lua string
+literal identical to Wang 2024 Table 1's English text (punctuation /
+capitalization / line breaks all match; the only transformation is
+the Python `{}` placeholder rendered as Lua `%s`).
 
 ## Proposer models (paper main experiment, Wang 2024 §3) {#proposer-models-paper-main-experiment-wang-2024-3}
 
@@ -4532,11 +4581,11 @@ accessible via Together AI):
   - Mixtral-8x22B-v0.1
   - dbrx-instruct
 
-These models are (L) for reproducing paper results, but they are NOT
-hard-coded by this pkg — the caller MUST supply `proposers` (REQUIRED
-extension point). Hard-coding 6 specific Together AI model IDs would
-bind the pkg to a specific API tier and exclude OSS / local-model
-callers.
+These models are paper-explicit choices for reproducing Wang 2024
+results, but they are NOT hard-coded by this pkg — the caller MUST
+supply `proposers` (REQUIRED extension point). Hard-coding 6 specific
+Together AI model IDs would bind the pkg to a specific API tier and
+exclude OSS / local-model callers.
 
 ## Entry contract {#entry-contract}
 
@@ -4549,47 +4598,55 @@ See `M.spec` below for the formal machine-readable contract:
 Two pure helpers are LLM-independent and unit-testable. `run` is the
 only LLM-mediated entry.
 
-## EXTENSION POINTS {#extension-points}
+## Caveats {#caveats}
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ REQUIRED                                                             │
-│   ctx.task                  (string)         problem / user query    │
-│   ctx.proposers             (array, multi-model PATH; matches Wang  │
-│       §3 main config) — list of specs, each                          │
-│       { model = string [, system = string] }; pkg makes one LLM      │
-│       call per proposer per layer                                    │
-│     OR                                                               │
-│   ctx.personas              (array, single-model rotation PATH;     │
-│       outside Wang §3's multi-model setup) — array of system-prompt  │
-│       strings; pkg uses a single model and rotates personas per      │
-│       proposer. Convenient for OSS callers without 6 distinct        │
-│       models; sacrifices the paper's distinct-model diversity        │
-│       property.                                                      │
-├──────────────────────────────────────────────────────────────────────┤
-│ (L)-override OPTION                                                  │
-│   ctx.n_layers              (number ≥ 1)     override L=3 default    │
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) infrastructure (paper does not specify or specifies only         │
-│ ablation)                                                            │
-│   ctx.temperature           (number)         per-LLM temperature     │
-│   ctx.proposer_tokens       (number)         max tokens per proposer │
-│   ctx.aggregator_tokens     (number)         max tokens per aggreg.  │
-│   ctx.proposer_prompt       (string template) override proposer body │
-│   ctx.aggregator_prompt     (string template) override AS_PROMPT     │
-│   ctx.system_prompt         (string)         override proposer sys.  │
-├──────────────────────────────────────────────────────────────────────┤
-│ Stability tier:                                                      │
-│   stable     : n_layers / temperature / proposer_tokens / aggreg_t   │
-│   v2-opt-in  : proposer_prompt / aggregator_prompt / system_prompt   │
-│                (template format may evolve in future versions)       │
-│   experimental : personas (single-model fallback, paper guarantee    │
-│                  not held)                                           │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### Required ctx fields {#required-ctx-fields}
 
-Overriding `aggregator_prompt` invalidates the AS_PROMPT_TEMPLATE
-(L) guarantee. Caller is responsible for keeping ⊕ semantics consistent.
+- `ctx.task` (string) — the user query or problem statement.
+- One of `ctx.proposers` or `ctx.personas`:
+  - `ctx.proposers` (array) follows Wang §3's multi-model main
+    config: each entry is `{ model = string [, system = string] }`.
+    One LLM call is issued per proposer per layer.
+  - `ctx.personas` (array of strings) is a single-model rotation
+    path outside Wang §3's setup; one model is reused while only
+    the system prompt rotates per proposer. Convenient for OSS
+    callers without 6 distinct models, but sacrifices the paper's
+    distinct-model diversity property.
+
+### Knobs that affect the paper's effect guarantee {#knobs-that-affect-the-paper-s-effect-guarantee}
+
+Overriding the layered structure or the Aggregate-and-Synthesize
+prompt template moves away from Wang §3's main configuration, so the
+paper's claim no longer transfers directly:
+
+- `ctx.n_layers` (number ≥ 1) — overrides L = 3 (Wang §3 "We use
+  3 MoA layers").
+- `ctx.aggregator_prompt` (string template) — overrides
+  `AS_PROMPT_TEMPLATE`; once replaced the caller is responsible for
+  keeping ⊕ semantics consistent with Wang Table 1.
+
+### Optional caller knobs (implementation choices) {#optional-caller-knobs-implementation-choices}
+
+These knobs are implementation choices because the paper does not
+specify them or specifies only an ablation value; tuning them does
+not invalidate the paper's claim:
+
+- `ctx.temperature` (number) — per-LLM temperature.
+- `ctx.proposer_tokens` (number) — max tokens per proposer.
+- `ctx.aggregator_tokens` (number) — max tokens per aggregator.
+- `ctx.proposer_prompt` (string template) — overrides the proposer
+  body wording.
+- `ctx.system_prompt` (string) — overrides the proposer system
+  prompt.
+
+### Stability tier {#stability-tier}
+
+- stable: `n_layers`, `temperature`, `proposer_tokens`,
+  `aggregator_tokens`.
+- v2-opt-in: `proposer_prompt`, `aggregator_prompt`, `system_prompt`
+  (template format may evolve in future versions).
+- experimental: `personas` (single-model fallback; paper guarantee
+  not held).
 
 ## Comparison with related packages {#comparison-with-related-packages}
 
@@ -4611,16 +4668,16 @@ personas and an LLM-as-judge aggregator at each layer.
 
 | key | type | required | description |
 |---|---|---|---|
-| `ctx.aggregator_prompt` | string | optional | Override AS_PROMPT_TEMPLATE (X) |
-| `ctx.aggregator_tokens` | number | optional | Max tokens per aggregator (default: 2048, (X) infrastructure) |
-| `ctx.n_layers` | number | optional | Number of layers L (default: 3, (L) Wang §3) |
+| `ctx.aggregator_prompt` | string | optional | Override AS_PROMPT_TEMPLATE; replacing it drops the paper's effect guarantee |
+| `ctx.aggregator_tokens` | number | optional | Max tokens per aggregator (default: 2048; implementation choice — sized larger than per-proposer to accommodate synthesizing n outputs) |
+| `ctx.n_layers` | number | optional | Number of layers L (default: 3 per Wang §3 "We use 3 MoA layers") |
 | `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Wang §3 main config): array of system-prompt strings |
-| `ctx.proposer_prompt` | string | optional | Override proposer prompt (X) |
-| `ctx.proposer_tokens` | number | optional | Max tokens per proposer (default: 512, (X) infrastructure) |
+| `ctx.proposer_prompt` | string | optional | Override proposer prompt (implementation choice — paper does not specify wording) |
+| `ctx.proposer_tokens` | number | optional | Max tokens per proposer (default: 512; implementation choice — paper does not specify) |
 | `ctx.proposers` | array of shape { model?: string, system?: string } | optional | Multi-model PATH (Wang §3 main config): array of proposer specs; each layer reuses the same list |
-| `ctx.system_prompt` | string | optional | Override proposer system prompt (X) |
+| `ctx.system_prompt` | string | optional | Override proposer system prompt (implementation choice — paper does not specify) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: 0.7, (X) Wang §3 main config does not state a value) |
+| `ctx.temperature` | number | optional | LLM temperature (default: 0.7; implementation choice — Wang §3 main config does not state a value, 0.7 is the only numeric value §3 names in the single-proposer ablation row) |
 
 ## Result {#result}
 
@@ -6588,7 +6645,11 @@ Returns `safe_paneled` shape:
 - [Algorithm (Chen 2023 §3 / Algorithm 1)](#algorithm-chen-2023-3-algorithm-1)
 - [Defaults (Chen 2023 §3, §4 footnote)](#defaults-chen-2023-3-4-footnote)
 - [Entry contract](#entry-contract)
-- [EXTENSION POINTS](#extension-points)
+- [Caveats](#caveats)
+  - [Required ctx fields](#required-ctx-fields)
+  - [Knobs that affect the paper's effect guarantee](#knobs-that-affect-the-paper-s-effect-guarantee)
+  - [Optional caller knobs (implementation choices)](#optional-caller-knobs-implementation-choices)
+  - [Stability tier](#stability-tier)
 - [Comparison with related packages](#comparison-with-related-packages)
 - [Parameters](#parameters)
 - [Result](#result)
@@ -6640,18 +6701,18 @@ When consensus is reached, the loop terminates early.
 
 ## Defaults (Chen 2023 §3, §4 footnote) {#defaults-chen-2023-3-4-footnote}
 
-| Symbol            | Value | Label | Source                                |
-|-------------------|-------|-------|---------------------------------------|
-| n (agents)        | 3     | (L)   | §3 main exp uses 3 diverse agents     |
-| R (max_rounds)    | 3     | (L)   | §3 "up to three discussion rounds"    |
-| convincing_count  | 4     | (L)   | §4 "we select a small number of       |
-|                   |       |       | samples (4 in our experiments)"       |
-| gen_tokens        | 600   | (X)   | Paper does not specify; infrastructure|
-| temperature       | nil   | (X)   | Paper does not fix; API default used  |
+| Symbol            | Value | Source                                            |
+|-------------------|-------|---------------------------------------------------|
+| n (agents)        | 3     | Chen §3 main exp uses 3 diverse agents            |
+| R (max_rounds)    | 3     | Chen §3 "up to three discussion rounds"           |
+| convincing_count  | 4     | Chen §4 footnote "4 in our experiments"           |
+| gen_tokens        | 600   | implementation choice — paper does not specify    |
+| temperature       | nil   | implementation choice — paper does not fix; API   |
+|                   |       | default used                                      |
 
-The **5-bucket confidence calibration** is (L) — Lua transcription
-of repo `utils.py::trans_confidence`; same boundary values, same
-weights, top-to-bottom first-match evaluation (see
+The **5-bucket confidence calibration** is a Lua transcription of
+repo `utils.py::trans_confidence` (paper §B.5); same boundary values,
+same weights, top-to-bottom first-match evaluation (see
 `M.CONFIDENCE_BUCKETS` for the shape contract):
 
   p ≤ 0.6        → 0.1
@@ -6673,43 +6734,60 @@ See `M.spec` below for the formal machine-readable contract:
 Four pure helpers are LLM-independent and unit-testable. `run` is the
 only LLM-mediated entry.
 
-## EXTENSION POINTS {#extension-points}
+## Caveats {#caveats}
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ REQUIRED                                                             │
-│   ctx.task                  (string)         problem / question      │
-│   ctx.agents                (array, diverse-LLM PATH; matches Chen  │
-│       §3 main config) — list of specs, each                          │
-│       { model = string [, system = string] }                         │
-│     OR                                                               │
-│   ctx.personas              (array, single-model rotation PATH;     │
-│       outside Chen §3's diverse-LLM setup) — array of system-prompt  │
-│       strings; single model + persona rotation. Sacrifices the       │
-│       paper's distinct-LLM diversity property.                       │
-├──────────────────────────────────────────────────────────────────────┤
-│ (L)-override OPTION                                                  │
-│   ctx.max_rounds            (number ≥ 1)     override R=3 default    │
-│   ctx.convincing_count      (number ≥ 0)     override 4 (L §4 fn)    │
-├──────────────────────────────────────────────────────────────────────┤
-│ (X) infrastructure (paper does not specify)                          │
-│   ctx.gen_tokens            (number)         max tokens per LLM call │
-│   ctx.temperature           (number)         per-LLM temperature     │
-│   ctx.init_prompt           (string template) override Phase 1 prompt│
-│   ctx.discussion_prompt     (string template) override Phase 2 prompt│
-│   ctx.system_prompt         (string)         override system prompt  │
-│   ctx.parse_fn              (function)       custom response parser  │
-│   ctx.confidence_buckets    (array of {threshold,weight})            │
-│                                              override 5-bucket scale │
-│                                              (X — invalidates §B.5)  │
-├──────────────────────────────────────────────────────────────────────┤
-│ Stability tier:                                                      │
-│   stable     : max_rounds / convincing_count / gen_tokens / temp     │
-│   v2-opt-in  : *_prompt / system_prompt / parse_fn                   │
-│   experimental : personas (single-model fallback) /                  │
-│                  confidence_buckets (paper guarantee not held)       │
-└──────────────────────────────────────────────────────────────────────┘
-```
+### Required ctx fields {#required-ctx-fields}
+
+- `ctx.task` (string) — the problem or question to solve.
+- One of `ctx.agents` or `ctx.personas`:
+  - `ctx.agents` (array) follows Chen §3's diverse-LLM main config:
+    each entry is `{ model = string [, system = string] }`.
+  - `ctx.personas` (array of strings) is a single-model rotation
+    path outside Chen §3's main setup; the model is fixed and only
+    the system prompt rotates. This sacrifices the paper's
+    distinct-LLM diversity property.
+
+### Knobs that affect the paper's effect guarantee {#knobs-that-affect-the-paper-s-effect-guarantee}
+
+Overriding any of these moves away from the values Chen §3 / §4
+used to demonstrate the consensus benefit, so the paper's claim no
+longer transfers directly:
+
+- `ctx.max_rounds` (number ≥ 1) — overrides R = 3 (Chen §3 "up to
+  three discussion rounds").
+- `ctx.convincing_count` (number ≥ 0) — overrides 4 (Chen §4
+  footnote "4 in our experiments").
+- `ctx.confidence_buckets` (array of `{lo, lo_op?, weight}`) —
+  overrides the §B.5 5-bucket calibration; once replaced the
+  §B.5 weighting guarantee no longer applies.
+
+### Optional caller knobs (implementation choices) {#optional-caller-knobs-implementation-choices}
+
+These knobs are implementation choices because the paper does not
+fix concrete values; tuning them does not invalidate the paper's
+claim:
+
+- `ctx.gen_tokens` (number) — max tokens per LLM call.
+- `ctx.temperature` (number) — per-LLM temperature.
+- `ctx.init_prompt` (string template) — overrides the Phase 1
+  prompt; paper specifies the *information* to elicit (answer +
+  explanation + confidence) but not the exact wording.
+- `ctx.discussion_prompt` (string template) — overrides the
+  Phase 2 prompt.
+- `ctx.system_prompt` (string) — overrides the default system
+  prompt.
+- `ctx.parse_fn` (function) — custom `(raw) → { answer,
+  explanation, confidence }` parser.
+
+### Stability tier {#stability-tier}
+
+- stable: `max_rounds`, `convincing_count`, `gen_tokens`,
+  `temperature`.
+- v2-opt-in: `init_prompt`, `discussion_prompt`, `system_prompt`,
+  `parse_fn`.
+- experimental: `personas` (single-model fallback);
+  `confidence_buckets` (replacing the §B.5 calibration drops the
+  paper's weighting guarantee).
 
 ## Comparison with related packages {#comparison-with-related-packages}
 
@@ -6732,17 +6810,17 @@ voting, simpler stop condition.
 | key | type | required | description |
 |---|---|---|---|
 | `ctx.agents` | array of shape { model?: string, system?: string } | optional | Diverse-LLM PATH (Chen §3 main config): array of agent specs |
-| `ctx.confidence_buckets` | array of shape { lo: number, lo_op?: string, weight: number } | optional | Override the §B.5 5-bucket calibration (X — invalidates paper guarantee). See M.CONFIDENCE_BUCKETS for the shape contract. |
-| `ctx.convincing_count` | number | optional | Convincing-sample count (default: 4, (L) Chen §4 footnote) |
-| `ctx.discussion_prompt` | string | optional | Override Phase 2 prompt (X) |
-| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600, (X) infrastructure) |
-| `ctx.init_prompt` | string | optional | Override Phase 1 prompt (X) |
-| `ctx.max_rounds` | number | optional | Max discussion rounds R (default: 3, (L) Chen §3) |
-| `ctx.parse_fn` | any | optional | Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (X) |
+| `ctx.confidence_buckets` | array of shape { lo: number, lo_op?: string, weight: number } | optional | Override the §B.5 5-bucket calibration; replacing it drops the paper's weighting guarantee. See M.CONFIDENCE_BUCKETS for the shape contract. |
+| `ctx.convincing_count` | number | optional | Convincing-sample count (default: 4 per Chen §4 footnote "4 in our experiments") |
+| `ctx.discussion_prompt` | string | optional | Override Phase 2 prompt (implementation choice — paper specifies elicited information but not exact wording) |
+| `ctx.gen_tokens` | number | optional | Max tokens per LLM call (default: 600; implementation choice — paper does not specify) |
+| `ctx.init_prompt` | string | optional | Override Phase 1 prompt (implementation choice — paper specifies elicited information but not exact wording) |
+| `ctx.max_rounds` | number | optional | Max discussion rounds R (default: 3 per Chen §3 "up to three discussion rounds") |
+| `ctx.parse_fn` | any | optional | Custom (answer, explanation, confidence) parser fn(raw) → { answer, explanation, confidence } (implementation choice) |
 | `ctx.personas` | array of string | optional | Single-model rotation PATH (outside Chen §3 main config): persona system prompts |
-| `ctx.system_prompt` | string | optional | Override system prompt (X) |
+| `ctx.system_prompt` | string | optional | Override system prompt (implementation choice — paper does not fix) |
 | `ctx.task` | string | **required** | Problem statement (required) |
-| `ctx.temperature` | number | optional | LLM temperature (default: API default, (X) Chen §3 does not state a value) |
+| `ctx.temperature` | number | optional | LLM temperature (default: API default; implementation choice — Chen §3 does not state a value) |
 
 ## Result {#result}
 
