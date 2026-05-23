@@ -3,3 +3,4 @@
 workspace
 .worktrees
 .env
+.alc-install.lock
