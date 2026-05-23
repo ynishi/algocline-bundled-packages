@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (120)
+## Packages (121)
 
 ### Reasoning
 
@@ -159,6 +159,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[scoring_rule](scoring_rule/)** | Proper Scoring Rules. Brier, logarithmic, spherical scores + Expected Calibration Error (ECE) for evaluating agent prediction quality. Audits whether agent confidence matches actual accuracy. Strictly proper: honest reporting maximizes expected score | Brier (1950), Gneiting & Raftery (JASA 2007), Naeini (AAAI 2015) |
 | **[sprt](sprt/)** | Wald's Sequential Probability Ratio Test primitive. Streaming Bernoulli test with declared α/β error rates; Wald–Wolfowitz optimality (minimal expected N among tests with same error bounds). Substrate for adaptive-stop recipes that need to decide accept_h0 / accept_h1 / continue per observation | Wald (1945), Wald & Wolfowitz (1948) |
 | **[conformal_vote](conformal_vote/)** | Split conformal prediction gate for multi-agent deliberation. Linear opinion pool + finite-sample quantile (⌈(n+1)(1-α)⌉/n) + three-way decision (commit/escalate/anomaly) per Proposition 3. Pr[Y ∈ C(X)] ≥ 1-α (Theorem 2). Calibration pins aggregation weights so online runs preserve exchangeability | Wang et al. (arXiv:2604.07667, 2026) |
+| **[propose_verify](propose_verify/)** | Universal 2-call Propose→Verify primitive. Proposer generates a candidate at creative temperature (0.7), independent verifier scores it at deterministic temperature (0.0) and emits `ACCEPT/SCORE/RATIONALE`. Caller-required `score_threshold` produces `DONE path=accepted | rejected` verdict compatible with swarm_frame aggregation. Three-domain cement (LATS planning / tool calling / speculative decoding) | Cobbe et al. (2021) §3, LATS (Zhou 2023) §3.2 |
 
 ### Orchestration
 

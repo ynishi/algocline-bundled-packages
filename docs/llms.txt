@@ -203,5 +203,6 @@
 - [factscore](narrative/factscore.md): Atomic claim decomposition — per-claim factual verification with scoring
 - [inverse_u](narrative/inverse_u.md): Detect inverse-U accuracy scaling when adding more agents (safety gate).
 - [negation](narrative/negation.md): Adversarial self-test — generate destruction conditions and verify answer survival
+- [propose_verify](narrative/propose_verify.md): 2-call Propose→Verify Strategy: propose a candidate answer then verify it with a scored accept/reject verdict
 - [sprt](narrative/sprt.md): Wald Sequential Probability Ratio Test — anytime 2-hypothesis stopping rule for Bernoulli streams with (α, β) error guarantees and Wald–Wolfowitz optimal E[N]. Complements cs_pruner (multi-ar...
 - [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.

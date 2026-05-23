@@ -37,3 +37,6 @@ LLM amplification engine — Pure Lua strategies executed via \
       "Each bundled package declares `M.spec.entries.run.input` (and often `M.spec.entries.run.result`) using the `alc_shapes.t` combinator DSL. This is the single source of truth for a package's I/O contract — the Parameters table in the narrative is a projection of that DSL, not separate documentation. Do not contradict the narrative's Parameters / result with freshly-derived schemas.",
       "Strategies are invoked through `alc.run(ctx)` where `ctx` is a plain Lua table shaped by the package's `M.spec.entries.run.input`. An `alc.llm(prompt)` call inside a strategy pauses execution and resumes when the host provides the completion via `alc_continue`. Keep wiki pages aligned with this pause/resume execution model.",
   ]
+
+[packages]
+propose_verify = "*"
