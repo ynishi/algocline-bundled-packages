@@ -140,6 +140,7 @@
 ## recipe
 
 - [recipe_deep_panel](narrative/recipe_deep_panel.md): Deep-reasoning diverse panel: N x ab_mcts fan-out + diversity + calibrate.
+- [recipe_evolve_reason](narrative/recipe_evolve_reason.md): Multi-generation evolutionary LLM reasoning. Maintains a population of reasoning paths that compete, mutate, and evolve across generations via civic primitives. Targets hard problems where single-g...
 - [recipe_quick_vote](narrative/recipe_quick_vote.md): Adaptive-stop majority vote. sc-style sampler looped under SPRT gate. Exits as soon as declared (α, β) error rates permit, or truncates with an explicit verdict for consumer escalation. Fills the...
 - [recipe_ranking_funnel](narrative/recipe_ranking_funnel.md): Verified 3-stage ranking funnel — listwise screening, multi-axis scoring, pairwise final rank. -87% calls vs naive pairwise on N=8 (verified). Encodes known failure modes as caveats.
 - [recipe_safe_panel](narrative/recipe_safe_panel.md): Verified safe majority-vote panel — Condorcet-sized, Anti-Jury gated, inverse-U monitored, confidence-calibrated. Composes condorcet + sc + inverse_u + calibrate with known failure mode awareness.

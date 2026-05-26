@@ -135,8 +135,8 @@ local function make_inherit_prompt(parent_reasoning)
 end
 
 local function parse_scores(response)
-    local sa = response:match("Score_A:%s*(%d+)")
-    local sb = response:match("Score_B:%s*(%d+)")
+    local sa = response:match("[Ss]core[_ ]?A[:%s]+(%d+)")
+    local sb = response:match("[Ss]core[_ ]?B[:%s]+(%d+)")
     local a = tonumber(sa) or 5
     local b = tonumber(sb) or 5
     a = math.max(1, math.min(10, a))
@@ -190,8 +190,42 @@ function M.run(ctx)
     local lin  = civic.lineage.new()
     local kchan = civic.knowledge_channel.new()
 
-    local rules = civic.transition_rules.new()
-    -- rules are re-applied each gen with fresh threshold
+    -- mutation_op and knowledge_channel transform are set once (closures
+    -- capture task / gen_tokens which do not change across generations).
+    lin:set_mutation_op(function(parent_payload)
+        local improved = alc.llm(
+            make_mutate_prompt(task, parent_payload.reasoning),
+            {
+                system = "You are improving a previous reasoning attempt. "
+                    .. "Fix errors and strengthen the argument.",
+                max_tokens = gen_tokens,
+            }
+        )
+        total_llm_calls = total_llm_calls + 1
+        return {
+            state = "active",
+            reasoning = improved,
+            answer = improved,
+            insight = parent_payload.insight or "",
+        }
+    end)
+
+    if inherit then
+        kchan:set_transform(function(payload, tctx)
+            local insight_text = alc.llm(
+                make_inherit_prompt(payload.reasoning),
+                {
+                    system = "Extract the key insight concisely.",
+                    max_tokens = 150,
+                }
+            )
+            total_llm_calls = total_llm_calls + 1
+            return {
+                reasoning = payload.reasoning,
+                insight = insight_text,
+            }
+        end)
+    end
 
     -- Gen 0: generate initial reasoning
     for idx = 1, pop_size do
@@ -208,15 +242,24 @@ function M.run(ctx)
 
     local gen_history = {}
 
+    local parse_fail_count = 0
+
     for gen = 1, max_gen do
-        -- Peer evaluation: all pairs
+        -- Peer evaluation: all pairs (A/B position randomized to avoid
+        -- position bias in LLM-as-judge scoring).
         for i = 1, pop_size do
             for j = i + 1, pop_size do
                 local pi = slots:get(i)
                 local pj = slots:get(j)
                 if pi.state == "active" and pj.state == "active" then
+                    local a_idx, b_idx = i, j
+                    local a_reasoning, b_reasoning = pi.reasoning, pj.reasoning
+                    if math.random() < 0.5 then
+                        a_idx, b_idx = j, i
+                        a_reasoning, b_reasoning = pj.reasoning, pi.reasoning
+                    end
                     local resp = alc.llm(
-                        make_eval_prompt(task, pi.reasoning, pj.reasoning),
+                        make_eval_prompt(task, a_reasoning, b_reasoning),
                         {
                             system = "You are a fair, precise evaluator. "
                                 .. "Score each reasoning independently.",
@@ -225,8 +268,11 @@ function M.run(ctx)
                     )
                     total_llm_calls = total_llm_calls + 1
                     local sa, sb = parse_scores(resp)
-                    pool:credit(i, "peer_gen" .. gen, sa)
-                    pool:credit(j, "peer_gen" .. gen, sb)
+                    if not resp:match("[Ss]core[_ ]?A") then
+                        parse_fail_count = parse_fail_count + 1
+                    end
+                    pool:credit(a_idx, "peer_gen" .. gen, sa)
+                    pool:credit(b_idx, "peer_gen" .. gen, sb)
                 end
             end
         end
@@ -274,41 +320,6 @@ function M.run(ctx)
         if gen == max_gen then break end
 
         -- Reproduction: mutate elites to fill eliminated slots
-        lin:set_mutation_op(function(parent_payload)
-            local improved = alc.llm(
-                make_mutate_prompt(task, parent_payload.reasoning),
-                {
-                    system = "You are improving a previous reasoning attempt. "
-                        .. "Fix errors and strengthen the argument.",
-                    max_tokens = gen_tokens,
-                }
-            )
-            total_llm_calls = total_llm_calls + 1
-            return {
-                state = "active",
-                reasoning = improved,
-                answer = improved,
-                insight = parent_payload.insight or "",
-            }
-        end)
-
-        if inherit then
-            kchan:set_transform(function(payload, tctx)
-                local insight_text = alc.llm(
-                    make_inherit_prompt(payload.reasoning),
-                    {
-                        system = "Extract the key insight concisely.",
-                        max_tokens = 150,
-                    }
-                )
-                total_llm_calls = total_llm_calls + 1
-                return {
-                    reasoning = payload.reasoning,
-                    insight = insight_text,
-                }
-            end)
-        end
-
         for _, elim_idx in ipairs(eliminated) do
             local parent_idx = elites[((elim_idx - 1) % #elites) + 1]
             local parent_payload = slots:get(parent_idx)
@@ -356,7 +367,8 @@ function M.run(ctx)
         generations     = max_gen,
         total_llm_calls = total_llm_calls,
         gen_history     = gen_history,
-        lineage_edges   = lin:edges(),
+        lineage_edges     = lin:edges(),
+        parse_fail_count  = parse_fail_count,
     }
 
     return ctx
