@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-26T15:06:52Z",
+  "updated_at": "2026-05-26T15:19:27Z",
   "packages": [
     {
       "name": "ab_mcts",
