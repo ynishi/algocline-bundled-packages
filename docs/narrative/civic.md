@@ -9,13 +9,11 @@ generated: gen_docs (V0)
 
 # civic — civic-frame primitives for swarm simulations
 
-> LogicPkg that aggregates the civic-frame Component library. Each Component is a flat Lua module (no M.meta, no M.shape) that exposes a domain-specific primitive for swarm simulations. civic/init.lua is the single entry point callers use to access all Components.
+> Aggregation hub for the civic-frame component library. Each component is a flat Lua module that exposes a domain-specific primitive for swarm simulations. This file is the single entry point callers use to access all components.
 
 ## Contents
 
 - [Usage](#usage)
-- [Architecture](#architecture)
-- [Shape contract](#shape-contract)
 - [Caveats](#caveats)
 
 ## Usage {#usage}
@@ -46,31 +44,25 @@ local max_signal = bus:aggregate_for(
 bus:reset()  -- clear before next round
 ```
 
-## Architecture {#architecture}
-
-civic follows the ABM LogicPkg + Component pattern:
-- `civic/init.lua` (this file) is the **LogicPkg hub** — it wires Components
-  and owns `M.meta` and the aggregate `M.shape` table.
-- Each `civic/<name>.lua` is a **Component** — a flat module with no `M.meta`
-  and no `M.shape` field. Components expose only their own API surface.
-
-Phase 1 Components: `broadcast_bus`
-Phase 2/3 planned: `slot_table`, `scalar_pool`, `ledger`, `lineage`,
-  `knowledge_channel`, `transition_rules`.
-
-## Shape contract {#shape-contract}
-
-`M.shape.broadcast_entry` documents the entry shape used internally by
-`broadcast_bus`. Callers may reference it for documentation or tooling;
-the bus itself does not enforce it at runtime (payload is opaque).
-
 ## Caveats {#caveats}
 
+**Module structure**: `civic/init.lua` (this file) owns `M.meta` and the
+aggregate `M.shape` table. Each `civic/<name>.lua` is a component module
+with no `M.meta` and no `M.shape`. components expose only their own API.
+
+**Shape descriptors**: `M.shape.broadcast_entry` documents the entry shape
+used internally by `broadcast_bus`. Callers may reference it for documentation
+or tooling; the bus itself does not enforce it at runtime (payload is opaque).
+
+**Planned components**: Phase 1 provides `broadcast_bus`. Phase 2/3 will add
+`slot_table`, `scalar_pool`, `ledger`, `lineage`, `knowledge_channel`,
+`transition_rules`.
+
 **Phase 1 scope**: only `broadcast_bus` is wired. Accessing unimplemented
-Components via `civic.<name>` will raise a require error until Phase 2/3
+components via `civic.<name>` will raise a require error until Phase 2/3
 adds the remaining modules.
 
-**No LLM dependency**: all civic-frame Components in Phase 1 are pure
+**No LLM dependency**: all civic-frame components in Phase 1 are pure
 in-memory data-structure primitives. `alc.llm` is never called. civic may
 be used freely in synchronous, non-LLM orchestration and simulation code.
 
@@ -78,5 +70,5 @@ be used freely in synchronous, non-LLM orchestration and simulation code.
 (`require("civic.broadcast_bus")`) for callers that want to import only
 a subset. The canonical path for most callers is `require("civic")`.
 
-**Feature detection**: unimplemented Phase 2/3 Components can be probed
+**Feature detection**: unimplemented Phase 2/3 components can be probed
 with `pcall(require, "civic.<name>")` without raising.

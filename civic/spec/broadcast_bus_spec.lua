@@ -158,7 +158,7 @@ describe("civic.broadcast_bus — happy path", function()
     end)
 
     it("civic.shape.broadcast_entry is exposed as a table (T.shape descriptor)", function()
-        -- Shape lives on the LogicPkg (civic/init.lua), not on the Component.
+        -- Shape lives on civic/init.lua, not on the component module.
         expect(civic.shape).to.exist()
         expect(civic.shape.broadcast_entry).to.exist()
         expect(type(civic.shape.broadcast_entry)).to.equal("table")
@@ -321,8 +321,8 @@ describe("civic.broadcast_bus — invariant", function()
         expect(count).to.equal(0)
     end)
 
-    it("civic.meta conforms to required fields (LogicPkg)", function()
-        -- civic/init.lua owns M.meta; the Component (broadcast_bus) has none.
+    it("civic.meta conforms to required fields", function()
+        -- civic/init.lua owns M.meta; component modules have none.
         expect(civic.meta.name).to.equal("civic")
         expect(civic.meta.version).to.equal("0.1.0")
         expect(civic.meta.category).to.equal("substrate")

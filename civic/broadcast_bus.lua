@@ -6,9 +6,9 @@
 --- the msgs that pass a domain-specific selector and reduce them via agg_fn.
 --- Opaque payload — the bus imposes no field constraints on msg.
 ---
---- This module is a **Component** of the `civic` LogicPkg. It carries no
---- `M.meta` or `M.shape` field; those live in `civic/init.lua`. Require this
---- module directly only when you need the bus Component in isolation:
+--- This module is a component of the `civic` package. It carries no `M.meta`
+--- or `M.shape` field; those live in `civic/init.lua`. Require this module
+--- directly only when you need the bus in isolation:
 --- `require("civic.broadcast_bus")`. Most callers should use `require("civic")`.
 ---
 --- ## Usage
@@ -87,7 +87,7 @@
 --- not caught by the bus; they propagate directly to the caller.
 ---
 --- **No LLM dependency**: civic.broadcast_bus is a pure in-memory data-structure
---- Component. `alc.llm` is never called. It may be used freely in synchronous,
+--- module. `alc.llm` is never called. It may be used freely in synchronous,
 --- non-LLM orchestration code.
 
 local M = {}
