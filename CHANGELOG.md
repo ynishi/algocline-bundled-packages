@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **122nd pkg `civic`** — civic-frame primitives for swarm simulations
-  (ABM-pattern LogicPkg + Component structure). Phase 1: `broadcast_bus`
-  Component — 1-to-N publish + selector/aggregation bus. Pure in-memory,
-  no LLM dependency, no cross-pkg require. 30/30 spec PASS.
+  (ABM-pattern single pkg + 7 component modules). Components:
+  `broadcast_bus`, `transition_rules`, `slot_table`, `knowledge_channel`,
+  `lineage`, `ledger`, `scalar_pool`. Pure in-memory, no LLM dependency,
+  no cross-pkg require. 166/166 spec PASS.
 
 ## [0.27.0] - 2026-05-23
 
