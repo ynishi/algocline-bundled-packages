@@ -163,5 +163,3 @@ flow.meta
 - `tests/flow/test_integ_swarm_mcts.lua` — fan-out + consensus + commit
 - `tests/flow/test_integ_ensemble_vote.lua` — bare flow.llm × N + pure-compute chain
 - `recipe_deep_panel/` — production Recipe that composes ab_mcts × N + ensemble_div + condorcet + calibrate on top of flow
-- `workspace/tasks/flow-frame/design-full.md` — design record
-- `workspace/tasks/flow-frame/bp-research.md` — Lua / substrate BP research
