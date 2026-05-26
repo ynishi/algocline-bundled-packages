@@ -126,6 +126,21 @@ describe("civic.broadcast_bus — happy path", function()
         expect(r2).to.equal(100)
     end)
 
+    it("same src publishes twice — both entries are stored (append-only)", function()
+        local bus = cbb.new()
+        bus:publish(1, "first")
+        bus:publish(1, "second")
+        expect(#bus._msgs).to.equal(2)
+        local collected = bus:aggregate_for(
+            99,
+            function(src) return src == 1 end,
+            function(msgs) return msgs end
+        )
+        expect(#collected).to.equal(2)
+        expect(collected[1]).to.equal("first")
+        expect(collected[2]).to.equal("second")
+    end)
+
     it("msg payload is opaque — accepts any type (string, number, table, boolean)", function()
         local bus = cbb.new()
         bus:publish(1, "hello")

@@ -114,7 +114,7 @@ end
 ---@return nil
 function Bus:publish(src, msg)
     if type(src) ~= "number" or src < 1 or math.floor(src) ~= src then
-        error("civic_broadcast_bus.publish: src must be positive integer (got " .. tostring(src) .. ")")
+        error("civic.broadcast_bus.publish: src must be positive integer (got " .. tostring(src) .. ")")
     end
     table.insert(self._msgs, { src = src, msg = msg })
 end
@@ -132,13 +132,13 @@ end
 ---@return any
 function Bus:aggregate_for(target, selector_fn, agg_fn)
     if type(target) ~= "number" or target < 1 or math.floor(target) ~= target then
-        error("civic_broadcast_bus.aggregate_for: target must be positive integer (got " .. tostring(target) .. ")")
+        error("civic.broadcast_bus.aggregate_for: target must be positive integer (got " .. tostring(target) .. ")")
     end
     if type(selector_fn) ~= "function" then
-        error("civic_broadcast_bus.aggregate_for: selector_fn must be function (got " .. type(selector_fn) .. ")")
+        error("civic.broadcast_bus.aggregate_for: selector_fn must be function (got " .. type(selector_fn) .. ")")
     end
     if type(agg_fn) ~= "function" then
-        error("civic_broadcast_bus.aggregate_for: agg_fn must be function (got " .. type(agg_fn) .. ")")
+        error("civic.broadcast_bus.aggregate_for: agg_fn must be function (got " .. type(agg_fn) .. ")")
     end
     local picked = {}
     for _, entry in ipairs(self._msgs) do
