@@ -330,6 +330,31 @@ describe("civic.broadcast_bus — invariant", function()
         expect(civic.meta.alc_shapes_compat).to.equal("^0.25")
     end)
 
+    it("aggregate_for target value does not affect result (informational-only param)", function()
+        local bus = cbb.new()
+        bus:publish(1, 10)
+        bus:publish(2, 20)
+
+        local sel_all = function(_) return true end
+        local sum = function(msgs)
+            local s = 0
+            for _, m in ipairs(msgs) do s = s + m end
+            return s
+        end
+
+        local r1 = bus:aggregate_for(1, sel_all, sum)
+        local r2 = bus:aggregate_for(999, sel_all, sum)
+        expect(r1).to.equal(30)
+        expect(r2).to.equal(30)
+    end)
+
+    it("civic.shape.broadcast_entry.fields has src and msg keys", function()
+        local entry = civic.shape.broadcast_entry
+        expect(entry.fields).to.exist()
+        expect(entry.fields.src).to.exist()
+        expect(entry.fields.msg).to.exist()
+    end)
+
     it("civic has no legacy M.VERSION top-level field", function()
         -- W_META_LEGACY_M_VERSION lint guard: civic pkg must not expose M.VERSION
         expect(civic.VERSION).to.equal(nil)

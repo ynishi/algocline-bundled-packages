@@ -64,6 +64,9 @@
 --- **Component independence**: each Component can also be required directly
 --- (`require("civic.broadcast_bus")`) for callers that want to import only
 --- a subset. The canonical path for most callers is `require("civic")`.
+---
+--- **Feature detection**: unimplemented Phase 2/3 Components can be probed
+--- with `pcall(require, "civic.<name>")` without raising.
 
 local M = {}
 

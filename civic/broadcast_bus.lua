@@ -83,6 +83,9 @@
 --- bus scans all entries linearly. For large swarms (P in the thousands),
 --- callers may want to shard or pre-filter at the domain layer.
 ---
+--- **Error propagation**: exceptions raised by `selector_fn` or `agg_fn` are
+--- not caught by the bus; they propagate directly to the caller.
+---
 --- **No LLM dependency**: civic.broadcast_bus is a pure in-memory data-structure
 --- Component. `alc.llm` is never called. It may be used freely in synchronous,
 --- non-LLM orchestration code.
