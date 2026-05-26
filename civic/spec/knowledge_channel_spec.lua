@@ -1,0 +1,170 @@
+--- Tests for civic.knowledge_channel
+
+local describe, it, expect = lust.describe, lust.it, lust.expect
+
+local kc   = require("civic.knowledge_channel")
+local civic = require("civic")
+
+-- ─── Happy path ──────────────────────────────────────────────────────────────
+
+describe("civic.knowledge_channel — happy path", function()
+    it("new() returns an empty channel", function()
+        local ch = kc.new()
+        expect(ch).to.exist()
+        expect(ch:size()).to.equal(0)
+    end)
+
+    it("set_transform registers a function", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        expect(ch:size()).to.equal(0)
+    end)
+
+    it("transfer applies transform and records history", function()
+        local ch = kc.new()
+        ch:set_transform(function(p)
+            return { strategy = p.strategy, wins = p.wins + 1 }
+        end)
+        local out = ch:transfer(1, 2, { strategy = "tft", wins = 3 })
+        expect(out.strategy).to.equal("tft")
+        expect(out.wins).to.equal(4)
+        expect(ch:size()).to.equal(1)
+    end)
+
+    it("history returns correct predecessor/successor pairs", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return { v = p.v } end)
+        ch:transfer(1, 2, { v = 1 })
+        ch:transfer(3, 4, { v = 2 })
+        local h = ch:history()
+        expect(#h).to.equal(2)
+        expect(h[1].predecessor).to.equal(1)
+        expect(h[1].successor).to.equal(2)
+        expect(h[2].predecessor).to.equal(3)
+        expect(h[2].successor).to.equal(4)
+    end)
+
+    it("transfer forwards ctx to transform", function()
+        local ch = kc.new()
+        local captured
+        ch:set_transform(function(p, ctx) captured = ctx; return p end)
+        local my_ctx = { gen = 5 }
+        ch:transfer(1, 2, { x = 1 }, my_ctx)
+        expect(captured).to.equal(my_ctx)
+    end)
+
+    it("transfer works with ctx = nil", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return { v = p.v } end)
+        local out = ch:transfer(1, 2, { v = 42 })
+        expect(out.v).to.equal(42)
+    end)
+
+    it("Channel metatable is exposed", function()
+        expect(kc.Channel).to.exist()
+        expect(kc.Channel.__index).to.exist()
+    end)
+end)
+
+-- ─── Reject ──────────────────────────────────────────────────────────────────
+
+describe("civic.knowledge_channel — reject", function()
+    it("transfer raises when transform not set", function()
+        local ch = kc.new()
+        local ok, err = pcall(function() ch:transfer(1, 2, { x = 1 }) end)
+        expect(ok).to.equal(false)
+        expect(err:find("transform not set")).to.exist()
+    end)
+
+    it("set_transform rejects non-function", function()
+        local ch = kc.new()
+        local ok, err = pcall(function() ch:set_transform("bad") end)
+        expect(ok).to.equal(false)
+        expect(err:find("fn must be function")).to.exist()
+    end)
+
+    it("transfer rejects predecessor = 0", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        local ok, err = pcall(function() ch:transfer(0, 2, { x = 1 }) end)
+        expect(ok).to.equal(false)
+        expect(err:find("predecessor must be positive integer")).to.exist()
+    end)
+
+    it("transfer rejects non-integer successor", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        local ok, err = pcall(function() ch:transfer(1, 2.5, { x = 1 }) end)
+        expect(ok).to.equal(false)
+        expect(err:find("successor must be positive integer")).to.exist()
+    end)
+
+    it("transfer rejects non-table payload", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        local ok, err = pcall(function() ch:transfer(1, 2, "bad") end)
+        expect(ok).to.equal(false)
+        expect(err:find("payload must be table")).to.exist()
+    end)
+
+    it("transfer rejects non-table ctx", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        local ok, err = pcall(function() ch:transfer(1, 2, { x = 1 }, "bad") end)
+        expect(ok).to.equal(false)
+        expect(err:find("ctx must be table or nil")).to.exist()
+    end)
+
+    it("transfer rejects transform returning non-table", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return 42 end)
+        local ok, err = pcall(function() ch:transfer(1, 2, { x = 1 }) end)
+        expect(ok).to.equal(false)
+        expect(err:find("transform must return table")).to.exist()
+    end)
+end)
+
+-- ─── Invariant ───────────────────────────────────────────────────────────────
+
+describe("civic.knowledge_channel — invariant", function()
+    it("history is append-only", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        ch:transfer(1, 2, { x = 1 })
+        ch:transfer(3, 4, { x = 2 })
+        ch:transfer(5, 6, { x = 3 })
+        expect(ch:size()).to.equal(3)
+        local h = ch:history()
+        expect(h[1].predecessor).to.equal(1)
+        expect(h[3].predecessor).to.equal(5)
+    end)
+
+    it("history returns defensive copy (mutation does not affect internal state)", function()
+        local ch = kc.new()
+        ch:set_transform(function(p) return p end)
+        ch:transfer(1, 2, { x = 1 })
+        local h1 = ch:history()
+        h1[1].predecessor = 999
+        local h2 = ch:history()
+        expect(h2[1].predecessor).to.equal(1)
+    end)
+
+    it("new() produces independent instances", function()
+        local c1 = kc.new()
+        local c2 = kc.new()
+        c1:set_transform(function(p) return p end)
+        c1:transfer(1, 2, { x = 1 })
+        expect(c1:size()).to.equal(1)
+        expect(c2:size()).to.equal(0)
+    end)
+
+    it("civic.knowledge_channel is wired from civic/init.lua", function()
+        expect(civic.knowledge_channel).to.exist()
+        expect(civic.knowledge_channel.new).to.exist()
+    end)
+
+    it("civic.shape.transfer_record is exposed", function()
+        expect(civic.shape.transfer_record).to.exist()
+        expect(type(civic.shape.transfer_record)).to.equal("table")
+    end)
+end)

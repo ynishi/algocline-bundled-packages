@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **123rd pkg `recipe_evolve_reason`** — multi-generation evolutionary LLM
+  reasoning recipe. Maintains a population of reasoning paths across
+  generations using civic primitives (slot_table / scalar_pool /
+  transition_rules / lineage / knowledge_channel). Peer evaluation with
+  A/B position-bias mitigation, deterministic elite selection, LLM-driven
+  mutation + knowledge inheritance. 19/19 spec PASS, E2E PASS (7/7 graders,
+  agent-block + claude-haiku-4-5).
+
+- **122nd pkg `civic`** — civic-frame primitives for swarm simulations
+  (ABM-pattern single pkg + 7 component modules). Components:
+  `broadcast_bus`, `transition_rules`, `slot_table`, `knowledge_channel`,
+  `lineage`, `ledger`, `scalar_pool`. Pure in-memory, no LLM dependency,
+  no cross-pkg require. 166/166 spec PASS.
+
 ## [0.27.0] - 2026-05-23
 
 ### Added

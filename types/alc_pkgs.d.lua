@@ -1105,6 +1105,8 @@
 
 ---@alias AlcPkgResult_recipe_deep_panel AlcResultDeepPaneled
 
+---@alias AlcPkgResult_recipe_evolve_reason AlcResultEvolvedReason
+
 ---@alias AlcPkgResult_recipe_quick_vote AlcResultQuickVoted
 
 ---@alias AlcPkgResult_recipe_ranking_funnel AlcResultFunnelRanked
