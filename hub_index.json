@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-23T13:46:33Z",
+  "updated_at": "2026-05-26T09:43:44Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -176,6 +176,18 @@
       "description": "Multi-level routing: escalate from fast to deep only when confidence is low.",
       "category": "routing",
       "docstring": "cascade(Cascade) — multi-level difficulty routing with confidence gating\n\nRoutes problems through escalating complexity levels. Starts with the\ncheapest approach; if confidence is below the threshold, escalates to\na more sophisticated strategy. Minimizes compute for easy problems\nwhile preserving quality for hard ones.\n\n## Usage\n\n```lua\nlocal cascade = require(\"cascade\")\nreturn cascade.run(ctx)\n```\n\n## Algorithm\n\n1. Level 1 (fast) — direct zero-shot answer plus self-assessed\nconfidence.\n2. Level 2 (medium) — chain-of-thought with verification.\n3. Level 3 (deep) — multi-perspective ensemble with ranking.\n\nThe cascade exits as soon as the level's reported confidence reaches\n`threshold`, or after `max_level`.\n\n## References\n\n- Chen, L. et al. (2023). \"FrugalGPT: How to Use Large Language Models\nWhile Reducing Cost and Improving Performance\".\nhttps://arxiv.org/abs/2305.05176\n- Lu, K. et al. (2023). \"Routing to the Expert: Efficient Reward-guided\nEnsemble of Large Language Models\". https://arxiv.org/abs/2311.08692",
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "civic",
+      "version": "0.1.0",
+      "description": "civic-frame primitives — bus / state / channel / policy components for swarm simulations.",
+      "category": "substrate",
+      "docstring": "civic — civic-frame primitives for swarm simulations\n\nLogicPkg that aggregates the civic-frame Component library. Each Component\nis a flat Lua module (no M.meta, no M.shape) that exposes a domain-specific\nprimitive for swarm simulations. civic/init.lua is the single entry point\ncallers use to access all Components.\n\n## Usage\n\n```lua\nlocal civic = require(\"civic\")\n\n-- Create a broadcast bus for a swarm round\nlocal bus = civic.broadcast_bus.new()\n\n-- Producers publish (e.g. every cell in one step)\nbus:publish(1, { signal = 0.9 })\nbus:publish(2, { signal = 0.4 })\n\n-- Consumer aggregates selected signals\nlocal max_signal = bus:aggregate_for(\n99,\nfunction(src) return src == 1 or src == 2 end,\nfunction(msgs)\nlocal best = 0\nfor _, m in ipairs(msgs) do\nif m.signal > best then best = m.signal end\nend\nreturn best\nend\n)\n\nbus:reset()  -- clear before next round\n```\n\n## Architecture\n\ncivic follows the ABM LogicPkg + Component pattern:\n- `civic/init.lua` (this file) is the **LogicPkg hub** — it wires Components\nand owns `M.meta` and the aggregate `M.shape` table.\n- Each `civic/<name>.lua` is a **Component** — a flat module with no `M.meta`\nand no `M.shape` field. Components expose only their own API surface.\n\nPhase 1 Components: `broadcast_bus`\nPhase 2/3 planned: `slot_table`, `scalar_pool`, `ledger`, `lineage`,\n`knowledge_channel`, `transition_rules`.\n\n## Shape contract\n\n`M.shape.broadcast_entry` documents the entry shape used internally by\n`broadcast_bus`. Callers may reference it for documentation or tooling;\nthe bus itself does not enforce it at runtime (payload is opaque).\n\n## Caveats\n\n**Phase 1 scope**: only `broadcast_bus` is wired. Accessing unimplemented\nComponents via `civic.<name>` will raise a require error until Phase 2/3\nadds the remaining modules.\n\n**No LLM dependency**: all civic-frame Components in Phase 1 are pure\nin-memory data-structure primitives. `alc.llm` is never called. civic may\nbe used freely in synchronous, non-LLM orchestration and simulation code.\n\n**Component independence**: each Component can also be required directly\n(`require(\"civic.broadcast_bus\")`) for callers that want to import only\na subset. The canonical path for most callers is `require(\"civic\")`.\n\n**Feature detection**: unimplemented Phase 2/3 Components can be probed\nwith `pcall(require, \"civic.<name>\")` without raising.",
       "source": {
         "type": "unknown"
       },
