@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-05-27
+
+### Added
+
+- **124th pkg `recipe_trace`** — generic LLM call tracer for recipe
+  execution. Wraps `alc.llm` to collect per-call prompt/response/timing
+  without modifying the recipe itself. Entries: `run` (traced execution),
+  `extract` (flat summary), `card_row` (Card samples row builder with
+  prompt truncation), `civic_merge` (civic primitive state merger for
+  slot_table / scalar_pool / lineage / ledger). Examples for all 5
+  recipe_* packages. 17/17 spec PASS, E2E PASS (7/7 graders, 16 traced
+  LLM calls via recipe_quick_vote, agent-block + claude-haiku-4-5).
+
 ## [0.28.0] - 2026-05-27
 
 ### Added
