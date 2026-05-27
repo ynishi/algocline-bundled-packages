@@ -2,6 +2,10 @@
 
 > LLM amplification engine. Pure Lua strategies executed via `alc.run(ctx)`; this index lists every installed strategy package with a one-liner and a link to its full narrative.
 
+## adapter
+
+- [recipe_trace](narrative/recipe_trace.md): Generic LLM call tracer for recipe execution. Wraps alc.llm to collect per-call prompt/response/timing without modifying the recipe itself.
+
 ## adversarial
 
 - [triad](narrative/triad.md): Adversarial 3-role debate — proponent/opponent/judge with multi-round argumentation
