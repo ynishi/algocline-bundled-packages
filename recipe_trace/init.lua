@@ -48,6 +48,8 @@ M.spec = {
     entries = {
         run = {},
         extract = {},
+        card_row = {},
+        civic_merge = {},
     },
 }
 
@@ -159,6 +161,110 @@ function M.extract(result)
         prompts         = prompts,
         responses       = responses,
     }
+end
+
+--- Build a Card samples row from a traced recipe result.
+---
+--- Combines the recipe's own result fields with trace summary into a
+--- flat row suitable for Card JSONL sidecar. The `case` field follows
+--- the evalframe convention (input/expected/name/tags).
+---
+---@param result table   ctx.result from a traced run
+---@param case   table   {input=string, expected=string[], name=string, tags={}}
+---@param opts   table?  {include_prompts=bool, include_responses=bool, max_prompt_len=int}
+---@return table row     Card samples row
+function M.card_row(result, case, opts)
+    opts = opts or {}
+    local include_prompts   = opts.include_prompts ~= false
+    local include_responses = opts.include_responses ~= false
+    local max_prompt_len    = opts.max_prompt_len or 500
+
+    local trace = result.trace or {}
+    local calls = trace.calls or {}
+
+    local call_summaries = {}
+    for i, c in ipairs(calls) do
+        local entry = {
+            seq         = c.seq,
+            duration_ms = c.duration_ms,
+        }
+        if include_prompts then
+            local p = c.prompt or ""
+            entry.prompt = (#p > max_prompt_len)
+                and p:sub(1, max_prompt_len) .. "..."
+                or p
+        end
+        if include_responses then
+            entry.response = c.response
+        end
+        call_summaries[i] = entry
+    end
+
+    return {
+        case = case,
+        response = {
+            text       = tostring(result.answer or ""),
+            model      = "algocline:traced",
+            latency_ms = trace.total_trace_ms or 0,
+        },
+        trace = {
+            total_calls    = trace.total_calls or 0,
+            total_trace_ms = trace.total_trace_ms or 0,
+            completed      = trace.completed or false,
+            calls          = call_summaries,
+        },
+    }
+end
+
+--- Merge civic state snapshots into trace data.
+---
+--- For recipes that use civic primitives (slot_table, scalar_pool,
+--- lineage, etc.), this function attaches civic observable state to
+--- the trace. Call after M.run() completes.
+---
+---@param result table          ctx.result (with .trace from M.run)
+---@param civic_state table     { slots=table?, pool=table?, lineage=table?, ledger=table? }
+---@return table result         same result with .trace.civic merged
+function M.civic_merge(result, civic_state)
+    if not result.trace then
+        return result
+    end
+
+    local civic = {}
+
+    if civic_state.slots then
+        local snapshot = {}
+        local st = civic_state.slots
+        for idx = 1, st:size() do
+            snapshot[idx] = st:get(idx)
+        end
+        civic.slots = snapshot
+    end
+
+    if civic_state.pool then
+        local pool = civic_state.pool
+        local scores = {}
+        for idx = 1, (civic_state.pool_size or 0) do
+            scores[idx] = { idx = idx, total = pool:total(idx) }
+        end
+        civic.scores = scores
+    end
+
+    if civic_state.lineage then
+        civic.lineage_edges = civic_state.lineage:edges()
+    end
+
+    if civic_state.ledger then
+        civic.transactions = civic_state.ledger:transactions()
+        civic.ledger_total = civic_state.ledger:total()
+    end
+
+    if civic_state.gen_history then
+        civic.gen_history = civic_state.gen_history
+    end
+
+    result.trace.civic = civic
+    return result
 end
 
 -- Test hooks
