@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-05-29
+
+### Changed
+- hub_index.json regenerated for algocline v0.41.0. The hub index schema
+  now carries per-package `type` (`runnable` / `library`) and `type_source`
+  fields, derived via VM eval. No package source changes — all 124 packages
+  remain auto-detected (108 runnable, 16 library). `type_source` is `null`
+  for every package, reflecting v0.41.0's removal of explicit `M.meta.type`
+  declaration.
+
 ## [0.29.0] - 2026-05-27
 
 ### Added
