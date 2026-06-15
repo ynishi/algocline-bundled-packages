@@ -466,6 +466,109 @@ Returns:
 
 ---
 
+<!-- ── aot.md ── -->
+
+
+# aot(AoT) — Atom of Thoughts: Markov test-time scaling via DAG contraction
+
+> Decomposes a question into an atomic-state DAG, contracts the independent atoms into the dependent ones to produce a smaller self-contained question, and iterates until depth budget is reached. Each contracted question is answerable from its predecessor alone (Markov property), so the reasoning trace does not need to retain earlier history.
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [References](#references)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local aot = require("aot")
+return aot.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. decompose: ask the LLM to split the question into subquestions
+   with a dependency annotation (DAG `{id, text, depend: [ids]}`).
+2. On the first iteration, set the depth budget D from the longest
+   path through the initial DAG (`get_max_path_length`).
+3. split_indep_dep: separate subquestions with no incoming edges
+   (independent atoms) from those with incoming edges (dependent).
+4. contract: ask the LLM to fold the independent atoms into the
+   dependent ones as known conditions, producing a new self-contained
+   question for the next iteration.
+5. Repeat steps 1-4 until the depth budget is exhausted.
+6. solve: ask the LLM to answer the final contracted question
+   directly. No aggregation across history.
+
+## Caveats {#caveats}
+
+The contraction step depends critically on the quality of the
+**first** DAG decomposition (paper §7 limitation). When the initial
+decomposition fails to capture parallelism / independence the
+contracted question can drift away from the original (Appendix C.1
+"illusions"). The `consistency_check` knob enables an optional
+per-iteration check that asks the LLM whether the contracted
+question still serves the original; paper §4.3 introduces this as a
+refinement outside Algorithm 1, off by default to match the base
+algorithm.
+
+The depth budget D is fixed on the first iteration from
+`GetMaxPathLength(G_0)` (Algorithm 1 line 6) and never recomputed.
+The `max_depth` knob caps D to prevent runaway when an LLM emits a
+long pathological decomposition; setting it to nil reproduces paper
+behaviour.
+
+The paper's "AoT*" variant performs N independent runs and lets the
+LLM pick the best answer (§5). The `final_aggregation_runs` knob
+exposes this; default `1` corresponds to the base algorithm. Set to
+`3` for the AoT* configuration described in the paper.
+
+The decomposition LLM call returns a JSON object that this pkg
+parses via `alc.json_decode` with a regex-based bracket fallback
+(sibling pattern to dci). If the LLM emits an unparseable payload,
+iteration aborts and the current question is solved directly.
+
+## References {#references}
+
+- Teng, F., Yu, Z., Shi, Q., Zhang, J., Wu, C., Luo, Y. (2025).
+  "Atom of Thoughts for Markov LLM Test-Time Scaling". NeurIPS 2025
+  / arXiv:2502.12018. §3.3 Algorithm 1, §4 decomposition / contract,
+  §4.3 consistency_check refinement, §7 limitations.
+  https://arxiv.org/abs/2502.12018
+- Official implementation: https://github.com/qixucen/atom
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.consistency_check` | boolean | optional | Enable the §4.3 optional refinement that verifies contraction quality each iteration (default: false; paper §4.3 introduces this outside Algorithm 1) |
+| `ctx.contract_prompt_template` | string | optional | Override template for the contract phase (default derives from paper Appendix B.3) |
+| `ctx.contract_tokens` | number | optional | Token cap for each contract LLM call (default: 600) |
+| `ctx.decompose_prompt_template` | string | optional | Override template for the decompose phase (default derives from paper Appendix B.2) |
+| `ctx.decompose_tokens` | number | optional | Token cap for each decompose LLM call (default: 800) |
+| `ctx.final_aggregation_runs` | number | optional | Number of independent runs whose answers are pooled by an LLM selector — paper §5 AoT* variant (default: 1 = base algorithm, set to 3 for AoT*) |
+| `ctx.max_depth` | number | optional | Hard cap on the depth budget D (default: nil = paper behaviour, no cap; implementation choice — runaway protection) |
+| `ctx.solve_prompt_template` | string | optional | Override template for the solve phase (default: plain answer prompt) |
+| `ctx.solve_tokens` | number | optional | Token cap for the final solve LLM call (default: 500) |
+| `ctx.task` | string | **required** | Original question to solve |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `depth_used` | number | — | Number of contraction iterations actually executed |
+| `final_answer` | string | — | Direct answer to the final contracted question |
+| `final_question` | string | — | Final contracted question that solve was applied to |
+| `initial_depth_budget` | number | — | Depth D fixed on the first iteration from GetMaxPathLength(G_0), before max_depth cap |
+
+---
+
 <!-- ── bft.md ── -->
 
 
@@ -7464,6 +7567,92 @@ Returns:
 
 ---
 
+<!-- ── s1.md ── -->
+
+
+# s1(s1) — Simple test-time scaling via budget forcing
+
+> Lengthens reasoning by appending a "Wait" continuation cue to the thinking trace, prompting the model to extend its reasoning before producing a final answer. Implements a prompt-level approximation of the paper's decoding-time budget forcing (see Caveats).
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [References](#references)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local s1 = require("s1")
+return s1.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. think_initial: run the first thinking pass on the task.
+2. extend: append the wait_literal cue and call the LLM to continue
+   reasoning. Repeat up to max_extensions rounds.
+3. finalize: append the final_answer_suffix to force answer extraction.
+
+## Caveats {#caveats}
+
+This is a **prompt-level approximation** of the paper's budget forcing,
+not a literal reimplementation. The paper performs decoding-time token
+suppression (refusing to emit the end-of-thinking delimiter) plus
+in-stream "Wait" injection during a single generation pass. The
+algocline `alc.llm` API exposes only prompt-level access (no token
+suppression, no in-stream continuation), so each extension is a fresh
+LLM round trip that takes the accumulated trace as context.
+
+Paper §3 treats "Wait" as plain text (not a special token), and the
+Qwen chat template delimiters are themselves plain string boundaries,
+so the prompt-level approximation preserves the paper's core intent
+— extending the reasoning trace before answering. The trade-off is a
+one round-trip latency per extension and that the LLM may, in its
+continuation, generate a "Final Answer:" early; callers requiring
+literal decoding-time control should drive the underlying provider
+API directly rather than use this pkg.
+
+The original paper also pairs budget forcing with SFT on the s1K
+dataset (Qwen2.5-32B-Instruct base). This pkg only implements the
+inference-time intervention; pairing with a tuned base model is the
+caller's responsibility.
+
+## References {#references}
+
+- Muennighoff, N., Yang, Z., Shi, W., Li, X. L., Fei-Fei, L.,
+  Hajishirzi, H., Zettlemoyer, L., Liang, P., Candès, E., Hashimoto, T.
+  (2025). "s1: Simple test-time scaling". arXiv:2501.19393 §3
+  (Budget Forcing) / §4 (s1K data) / Table 4 (Wait token ablation).
+  https://arxiv.org/abs/2501.19393
+- Official code + data: https://github.com/simplescaling/s1
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.final_answer_suffix` | string | optional | Suffix that forces answer extraction at budget exhaustion (default: "Final Answer:"; paper §3 literal) |
+| `ctx.final_answer_tokens` | number | optional | Token budget for the final answer extraction pass (default: 500; implementation choice) |
+| `ctx.max_extensions` | number | optional | Maximum number of Wait extensions to attempt before forced finalization (default: 4; paper §3 experiments span 2 / 4 / 6, middle value chosen) |
+| `ctx.max_thinking_tokens` | number | optional | Token budget for each thinking pass — initial and each extension (default: 2000; implementation choice — paper does not specify, sized for typical CoT) |
+| `ctx.task` | string | **required** | Question or task to reason about |
+| `ctx.wait_literal` | string | optional | Literal string appended each extension to cue continued reasoning (default: "Wait"; paper §3 / Table 4 ablation winner over "Alternatively" / "Hmm") |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `extensions_used` | number | — | Number of Wait extensions actually executed (0 to max_extensions) |
+| `final_answer` | string | — | Final answer extracted after thinking + extensions + finalize |
+| `trace` | string | — | Full reasoning trace including initial pass and all Wait extensions |
+
+---
+
 <!-- ── s2a.md ── -->
 
 
@@ -8660,6 +8849,106 @@ Returns:
 | `params` | shape { grid_size: number, initial_wealth_range: array of number, max_sugar: number, metabolism_range: array of number, n_agents: number, regrow_rate: number, steps: number, vision_range: array of number } | — |  |
 | `sensitivity` | array of shape { base_value: number, delta: number, factor: number, high_value: number, low_value: number, param: string, score_at_high: number, score_at_low: number } | — |  |
 | `simulation` | shape { gini_mean: number, gini_median: number, gini_p25: number, gini_p75: number, gini_std: number, high_inequality_ci: shape { lower: number, upper: number }, high_inequality_count: number, high_inequality_rate: number, mean_wealth_mean: number, mean_wealth_median: number, mean_wealth_p25: number, mean_wealth_p75: number, mean_wealth_std: number, population_collapsed_ci: shape { lower: number, upper: number }, population_collapsed_count: number, population_collapsed_rate: number, runs: number, survival_rate_mean: number, survival_rate_median: number, survival_rate_p25: number, survival_rate_p75: number, survival_rate_std: number } | — |  |
+
+---
+
+<!-- ── think_prm.md ── -->
+
+
+# think_prm(ThinkPRM) — verifier that thinks before judging each step
+
+> Drives an LLM as a process reward model that emits a verification chain (Let's verify step by step ... step k: <critique> ... \boxed{ correct|incorrect}) and then extracts per-step verdicts plus a solution-level binary verdict. Implements the training-free / zero- shot path described by the paper; the finetuned ThinkPRM force- decode aggregation is out of scope (see Caveats).
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [Caveats](#caveats)
+- [References](#references)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local think_prm = require("think_prm")
+return think_prm.run({
+    problem = "...",
+    solution_steps = { "Step1 ...", "Step2 ...", ... },
+})
+```
+
+## Algorithm {#algorithm}
+
+1. build_prompt: insert {problem} and {solution} (step-indexed)
+   into the verifier prompt template (Figure 14 literal).
+2. Call the verifier LLM n_parallel_cots times (K-CoT scaling, §4)
+   to obtain K independent verification chains.
+3. parse_verdicts: extract `\boxed{correct}` / `\boxed{incorrect}`
+   tokens per step from each verification chain.
+4. aggregate: collapse per-CoT, per-step verdicts to one
+   solution-level score. `any_incorrect` (default) returns false at
+   the first incorrect step in any CoT averaged across CoTs.
+
+## Caveats {#caveats}
+
+Two large caveats apply when using this pkg:
+
+1. **The verifier model matters a lot**. The paper reports that
+   smaller distilled models (e.g. R1-Distill-Qwen-1.5B) emit invalid
+   judgment formats 51%+ of the time and effectively cannot serve as
+   verifiers. The training-free path here only matches paper
+   performance when callers route to a strong reasoning model — the
+   paper baselines use R1-Distill-Qwen-14B or QwQ-32B-Preview.
+   Callers running smaller models should expect high invalid /
+   parse-failure rates.
+
+2. **The canonical ThinkPRM solution score is out of scope**. Paper
+   §E.1 produces a continuous solution score by force-decoding the
+   string "Is the solution correct?" after the verification chain
+   and using `P(yes) / (P(yes) + P(no))` from next-token logits.
+   That requires direct logits access which the `alc.llm` abstraction
+   does not expose; therefore this pkg aggregates using the
+   `\boxed{correct|incorrect}` literals only. The paper's K-CoT
+   parallel scaling is approximated by averaging the per-CoT binary
+   solution verdicts into a continuous score in [0, 1].
+
+The prompt template is taken verbatim from Figure 14 of the paper.
+Callers can override it via `prompt_template` but doing so voids the
+paper's correctness reports.
+
+## References {#references}
+
+- Khalifa, M., Agarwal, R., Logeswaran, L., Kim, J., Peng, H.,
+  Lee, M., Lee, H., Wang, L. (2025). "Process Reward Models That
+  Think (ThinkPRM)". arXiv:2504.16828 §3 (method), §4 (experiments),
+  Figure 14 (verifier prompt template), Appendix A.2 / E.1
+  (aggregation). https://arxiv.org/abs/2504.16828
+- Official code + models: https://github.com/mukhal/thinkprm
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.aggregation` | string | optional | Per-chain aggregation method (default: 'any_incorrect'; matches Figure 14 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode aggregation P(yes)/(P(yes)+P(no)) is out of scope — see Caveats) |
+| `ctx.max_thinking_tokens` | number | optional | Token cap per verifier chain (default: 4096; Khalifa 2025 §4 to avoid overthinking) |
+| `ctx.n_parallel_cots` | number | optional | Number of independent verification chains to sample (default: 1; paper §4 experimental range 1 / 4 / 8 for K-CoT averaging) |
+| `ctx.problem` | string | **required** | Math problem statement |
+| `ctx.prompt_template` | string | optional | Override verifier prompt template (default: paper Figure 14 literal; override voids paper's correctness reports) |
+| `ctx.solution_steps` | array of string | **required** | Solution as an ordered list of step strings (one step per element) |
+| `ctx.temperature` | number | optional | LLM sampling temperature (default: 0.1; Khalifa 2025 §4 default) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `chains` | array of shape { chain: string, correct: boolean, invalid: boolean, verdicts: array of string } | — | Per-chain records for inspection |
+| `correct` | boolean | — | Solution-level majority verdict across K verification chains (score >= 0.5) |
+| `invalid` | boolean | — | True when every verification chain was invalid (no \boxed tokens parsed) |
+| `score` | number | — | Fraction of valid chains that judged the solution correct, in [0, 1] (paper §4 K-CoT averaging approximation; 0 when all chains invalid) |
+| `valid_chains` | number | — | Number of chains whose verdicts parsed successfully |
 
 ---
 

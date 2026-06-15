@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-05-29T14:15:26Z",
+  "updated_at": "2026-06-15T14:16:33Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -98,6 +98,21 @@
       "description": "Pipeline error cascade detection via per-step independent re-derivation.",
       "category": "governance",
       "docstring": "anti_cascade(AntiCascade) — pipeline error cascade amplification detection\n\nDetects when small errors compound through multi-step pipelines by\nindependently re-deriving conclusions from the original input at each\ncheckpoint and comparing with the pipeline's accumulated output. Steps\nwhose drift exceeds the threshold are flagged.\n\n## Usage\n\n```lua\nlocal anti_cascade = require(\"anti_cascade\")\nreturn anti_cascade.run(ctx)\n```\n\n## Algorithm\n\nFor a pipeline of N steps the entry uses ~1 + 2×N LLM calls:\n\n1. For each step, independently re-derive what the step should produce\nfrom the original task in parallel.\n2. Compare the re-derivation against the pipeline's actual output and\ncompute a drift score in [0, 1].\n3. Summarize flagged steps and overall cascade risk.\n\n## Theoretical foundations\n\nGeneralizes the \"Cascade Amplification\" countermeasure from Xie et al.\nThe paper proved that a single atomic error injection can collapse an\nentire multi-agent system, and that independent re-derivation is one\nof the key structural defenses. Also addresses MAST failure modes F3\n(\"error propagation through pipeline\") and F9 (\"accumulated context\ndrift\").\n\n## References\n\n- Xie, ... et al. (2026). \"From Spark to Fire: Diagnosing and\nOvercoming the Fragility of Multi-Agent Systems\". AAMAS 2026.\n- Cemri, ... et al. (2025). MAST failure mode taxonomy (F3, F9).",
+      "tags": null,
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "aot",
+      "version": "0.1.0",
+      "description": "Atom of Thoughts — Markov test-time scaling via DAG decompose + contract.",
+      "category": "reasoning",
+      "docstring": "aot(AoT) — Atom of Thoughts: Markov test-time scaling via DAG contraction\n\nDecomposes a question into an atomic-state DAG, contracts the\nindependent atoms into the dependent ones to produce a smaller\nself-contained question, and iterates until depth budget is reached.\nEach contracted question is answerable from its predecessor alone\n(Markov property), so the reasoning trace does not need to retain\nearlier history.\n\n## Usage\n\n```lua\nlocal aot = require(\"aot\")\nreturn aot.run(ctx)\n```\n\n## Algorithm\n\n1. decompose: ask the LLM to split the question into subquestions\nwith a dependency annotation (DAG `{id, text, depend: [ids]}`).\n2. On the first iteration, set the depth budget D from the longest\npath through the initial DAG (`get_max_path_length`).\n3. split_indep_dep: separate subquestions with no incoming edges\n(independent atoms) from those with incoming edges (dependent).\n4. contract: ask the LLM to fold the independent atoms into the\ndependent ones as known conditions, producing a new self-contained\nquestion for the next iteration.\n5. Repeat steps 1-4 until the depth budget is exhausted.\n6. solve: ask the LLM to answer the final contracted question\ndirectly. No aggregation across history.\n\n## Caveats\n\nThe contraction step depends critically on the quality of the\n**first** DAG decomposition (paper §7 limitation). When the initial\ndecomposition fails to capture parallelism / independence the\ncontracted question can drift away from the original (Appendix C.1\n\"illusions\"). The `consistency_check` knob enables an optional\nper-iteration check that asks the LLM whether the contracted\nquestion still serves the original; paper §4.3 introduces this as a\nrefinement outside Algorithm 1, off by default to match the base\nalgorithm.\n\nThe depth budget D is fixed on the first iteration from\n`GetMaxPathLength(G_0)` (Algorithm 1 line 6) and never recomputed.\nThe `max_depth` knob caps D to prevent runaway when an LLM emits a\nlong pathological decomposition; setting it to nil reproduces paper\nbehaviour.\n\nThe paper's \"AoT*\" variant performs N independent runs and lets the\nLLM pick the best answer (§5). The `final_aggregation_runs` knob\nexposes this; default `1` corresponds to the base algorithm. Set to\n`3` for the AoT* configuration described in the paper.\n\nThe decomposition LLM call returns a JSON object that this pkg\nparses via `alc.json_decode` with a regex-based bracket fallback\n(sibling pattern to dci). If the LLM emits an unparseable payload,\niteration aborts and the current question is solved directly.\n\n## References\n\n- Teng, F., Yu, Z., Shi, Q., Zhang, J., Wu, C., Luo, Y. (2025).\n\"Atom of Thoughts for Markov LLM Test-Time Scaling\". NeurIPS 2025\n/ arXiv:2502.12018. §3.3 Algorithm 1, §4 decomposition / contract,\n§4.3 consistency_check refinement, §7 limitations.\nhttps://arxiv.org/abs/2502.12018\n- Official implementation: https://github.com/qixucen/atom",
       "tags": null,
       "type": "runnable",
       "type_source": null,
@@ -1554,6 +1569,21 @@
       "best_card": null
     },
     {
+      "name": "s1",
+      "version": "0.1.0",
+      "description": "Budget forcing — extends reasoning via 'Wait' continuation cues (prompt-level approximation of s1).",
+      "category": "refinement",
+      "docstring": "s1(s1) — Simple test-time scaling via budget forcing\n\nLengthens reasoning by appending a \"Wait\" continuation cue to the\nthinking trace, prompting the model to extend its reasoning before\nproducing a final answer. Implements a prompt-level approximation of\nthe paper's decoding-time budget forcing (see Caveats).\n\n## Usage\n\n```lua\nlocal s1 = require(\"s1\")\nreturn s1.run(ctx)\n```\n\n## Algorithm\n\n1. think_initial: run the first thinking pass on the task.\n2. extend: append the wait_literal cue and call the LLM to continue\nreasoning. Repeat up to max_extensions rounds.\n3. finalize: append the final_answer_suffix to force answer extraction.\n\n## Caveats\n\nThis is a **prompt-level approximation** of the paper's budget forcing,\nnot a literal reimplementation. The paper performs decoding-time token\nsuppression (refusing to emit the end-of-thinking delimiter) plus\nin-stream \"Wait\" injection during a single generation pass. The\nalgocline `alc.llm` API exposes only prompt-level access (no token\nsuppression, no in-stream continuation), so each extension is a fresh\nLLM round trip that takes the accumulated trace as context.\n\nPaper §3 treats \"Wait\" as plain text (not a special token), and the\nQwen chat template delimiters are themselves plain string boundaries,\nso the prompt-level approximation preserves the paper's core intent\n— extending the reasoning trace before answering. The trade-off is a\none round-trip latency per extension and that the LLM may, in its\ncontinuation, generate a \"Final Answer:\" early; callers requiring\nliteral decoding-time control should drive the underlying provider\nAPI directly rather than use this pkg.\n\nThe original paper also pairs budget forcing with SFT on the s1K\ndataset (Qwen2.5-32B-Instruct base). This pkg only implements the\ninference-time intervention; pairing with a tuned base model is the\ncaller's responsibility.\n\n## References\n\n- Muennighoff, N., Yang, Z., Shi, W., Li, X. L., Fei-Fei, L.,\nHajishirzi, H., Zettlemoyer, L., Liang, P., Candès, E., Hashimoto, T.\n(2025). \"s1: Simple test-time scaling\". arXiv:2501.19393 §3\n(Budget Forcing) / §4 (s1K data) / Table 4 (Wait token ablation).\nhttps://arxiv.org/abs/2501.19393\n- Official code + data: https://github.com/simplescaling/s1",
+      "tags": null,
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "s2a",
       "version": "0.1.0",
       "description": "System 2 Attention — strip irrelevant context before reasoning to reduce distraction and sycophancy",
@@ -1769,6 +1799,21 @@
       "description": "Sugarscape model — agents forage on a sugar landscape, emergent wealth inequality, Pareto-like distributions, and carrying capacity. Based on Epstein & Axtell (1996).",
       "category": "simulation",
       "docstring": "sugarscape_abm(SugarscapeABM) — Sugarscape agent-based model\n\nAgents on a 2D toroidal grid forage for sugar. Each cell has a\nsugar capacity and regrows at a fixed rate. Agents have metabolism\n(sugar consumed per step) and vision (how far they can see). Each\nstep an agent looks in four cardinal directions up to its vision\nrange and moves to the nearest unoccupied cell with the most\nsugar. Agents die when sugar wealth reaches zero. Emergent\nphenomena include wealth inequality (Gini coefficient), Pareto-like\nskewed distributions, carrying capacity, and spatial clustering.\n\n## Usage\n\n```lua\nlocal sugarscape = require(\"sugarscape_abm\")\nreturn sugarscape.run(ctx)\n```\n\n## References\n\n- Epstein, J. M., Axtell, R. (1996). \"Growing Artificial Societies:\nSocial Science from the Bottom Up\". MIT Press.\n\nctx.task?: string Description\nctx.grid_size?: number Side length of square grid (default 25)\nctx.n_agents?: number Initial population (default 100)\nctx.max_sugar?: number Peak sugar capacity per cell (default 4)\nctx.regrow_rate?: number Sugar regrowth per step (default 1)\nctx.metabolism_range?: {number, number} Min/max metabolism (default {1, 4})\nctx.vision_range?: {number, number} Min/max vision (default {1, 6})\nctx.initial_wealth_range?: {number, number} (default {5, 25})\nctx.steps?: number (default 100)\nctx.runs?: number MC runs (default 100)",
+      "tags": null,
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "think_prm",
+      "version": "0.1.0",
+      "description": "ThinkPRM verifier — emits a per-step thinking chain and \\\\boxed{correct|incorrect} verdicts.",
+      "category": "validation",
+      "docstring": "think_prm(ThinkPRM) — verifier that thinks before judging each step\n\nDrives an LLM as a process reward model that emits a verification\nchain (Let's verify step by step ... step k: <critique> ... \\boxed{\ncorrect|incorrect}) and then extracts per-step verdicts plus a\nsolution-level binary verdict. Implements the training-free / zero-\nshot path described by the paper; the finetuned ThinkPRM force-\ndecode aggregation is out of scope (see Caveats).\n\n## Usage\n\n```lua\nlocal think_prm = require(\"think_prm\")\nreturn think_prm.run({\nproblem = \"...\",\nsolution_steps = { \"Step1 ...\", \"Step2 ...\", ... },\n})\n```\n\n## Algorithm\n\n1. build_prompt: insert {problem} and {solution} (step-indexed)\ninto the verifier prompt template (Figure 14 literal).\n2. Call the verifier LLM n_parallel_cots times (K-CoT scaling, §4)\nto obtain K independent verification chains.\n3. parse_verdicts: extract `\\boxed{correct}` / `\\boxed{incorrect}`\ntokens per step from each verification chain.\n4. aggregate: collapse per-CoT, per-step verdicts to one\nsolution-level score. `any_incorrect` (default) returns false at\nthe first incorrect step in any CoT averaged across CoTs.\n\n## Caveats\n\nTwo large caveats apply when using this pkg:\n\n1. **The verifier model matters a lot**. The paper reports that\nsmaller distilled models (e.g. R1-Distill-Qwen-1.5B) emit invalid\njudgment formats 51%+ of the time and effectively cannot serve as\nverifiers. The training-free path here only matches paper\nperformance when callers route to a strong reasoning model — the\npaper baselines use R1-Distill-Qwen-14B or QwQ-32B-Preview.\nCallers running smaller models should expect high invalid /\nparse-failure rates.\n\n2. **The canonical ThinkPRM solution score is out of scope**. Paper\n§E.1 produces a continuous solution score by force-decoding the\nstring \"Is the solution correct?\" after the verification chain\nand using `P(yes) / (P(yes) + P(no))` from next-token logits.\nThat requires direct logits access which the `alc.llm` abstraction\ndoes not expose; therefore this pkg aggregates using the\n`\\boxed{correct|incorrect}` literals only. The paper's K-CoT\nparallel scaling is approximated by averaging the per-CoT binary\nsolution verdicts into a continuous score in [0, 1].\n\nThe prompt template is taken verbatim from Figure 14 of the paper.\nCallers can override it via `prompt_template` but doing so voids the\npaper's correctness reports.\n\n## References\n\n- Khalifa, M., Agarwal, R., Logeswaran, L., Kim, J., Peng, H.,\nLee, M., Lee, H., Wang, L. (2025). \"Process Reward Models That\nThink (ThinkPRM)\". arXiv:2504.16828 §3 (method), §4 (experiments),\nFigure 14 (verifier prompt template), Appendix A.2 / E.1\n(aggregation). https://arxiv.org/abs/2504.16828\n- Official code + models: https://github.com/mukhal/thinkprm",
       "tags": null,
       "type": "runnable",
       "type_source": null,

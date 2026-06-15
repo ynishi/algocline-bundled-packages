@@ -102,6 +102,24 @@
 ---@field step_results { cascade_risk: string, drift_score: number, drift_type: string, flagged: boolean, name: string, raw: string }[] @Per-step drift analysis in pipeline order
 ---@field summary string @LLM-generated cascade analysis summary text
 
+---@class AlcPkgInput_aot
+---@field consistency_check? boolean @Enable the §4.3 optional refinement that verifies contraction quality each iteration (default: false; paper §4.3 introduces this outside Algorithm 1)
+---@field contract_prompt_template? string @Override template for the contract phase (default derives from paper Appendix B.3)
+---@field contract_tokens? number @Token cap for each contract LLM call (default: 600)
+---@field decompose_prompt_template? string @Override template for the decompose phase (default derives from paper Appendix B.2)
+---@field decompose_tokens? number @Token cap for each decompose LLM call (default: 800)
+---@field final_aggregation_runs? number @Number of independent runs whose answers are pooled by an LLM selector — paper §5 AoT* variant (default: 1 = base algorithm, set to 3 for AoT*)
+---@field max_depth? number @Hard cap on the depth budget D (default: nil = paper behaviour, no cap; implementation choice — runaway protection)
+---@field solve_prompt_template? string @Override template for the solve phase (default: plain answer prompt)
+---@field solve_tokens? number @Token cap for the final solve LLM call (default: 500)
+---@field task string @Original question to solve
+
+---@class AlcPkgResult_aot
+---@field depth_used number @Number of contraction iterations actually executed
+---@field final_answer string @Direct answer to the final contracted question
+---@field final_question string @Final contracted question that solve was applied to
+---@field initial_depth_budget number @Depth D fixed on the first iteration from GetMaxPathLength(G_0), before max_depth cap
+
 ---@class AlcPkgInput_bisect
 ---@field gen_tokens? number @Max tokens for chain generation (default: 800)
 ---@field max_repairs? number @Maximum number of bisect→repair cycles (default: 2)
@@ -1252,6 +1270,19 @@
 ---@field resolution_needed boolean @Whether a resolution LLM call was issued
 ---@field verification { a_agrees_b: boolean, a_checks_b: string, b_agrees_a: boolean, b_checks_a: string } @Cross-verification outputs
 
+---@class AlcPkgInput_s1
+---@field final_answer_suffix? string @Suffix that forces answer extraction at budget exhaustion (default: "Final Answer:"; paper §3 literal)
+---@field final_answer_tokens? number @Token budget for the final answer extraction pass (default: 500; implementation choice)
+---@field max_extensions? number @Maximum number of Wait extensions to attempt before forced finalization (default: 4; paper §3 experiments span 2 / 4 / 6, middle value chosen)
+---@field max_thinking_tokens? number @Token budget for each thinking pass — initial and each extension (default: 2000; implementation choice — paper does not specify, sized for typical CoT)
+---@field task string @Question or task to reason about
+---@field wait_literal? string @Literal string appended each extension to cue continued reasoning (default: "Wait"; paper §3 / Table 4 ablation winner over "Alternatively" / "Hmm")
+
+---@class AlcPkgResult_s1
+---@field extensions_used number @Number of Wait extensions actually executed (0 to max_extensions)
+---@field final_answer string @Final answer extracted after thinking + extensions + finalize
+---@field trace string @Full reasoning trace including initial pass and all Wait extensions
+
 ---@class AlcPkgInput_s2a
 ---@field context? string @Full (potentially noisy) context to denoise; empty/absent => task itself is reformulated
 ---@field gen_tokens? number @Max tokens per LLM call (default: 500)
@@ -1387,6 +1418,22 @@
 ---@field params { grid_size: number, initial_wealth_range: number[], max_sugar: number, metabolism_range: number[], n_agents: number, regrow_rate: number, steps: number, vision_range: number[] }
 ---@field sensitivity { base_value: number, delta: number, factor: number, high_value: number, low_value: number, param: string, score_at_high: number, score_at_low: number }[]
 ---@field simulation { gini_mean: number, gini_median: number, gini_p25: number, gini_p75: number, gini_std: number, high_inequality_ci: { lower: number, upper: number }, high_inequality_count: number, high_inequality_rate: number, mean_wealth_mean: number, mean_wealth_median: number, mean_wealth_p25: number, mean_wealth_p75: number, mean_wealth_std: number, population_collapsed_ci: { lower: number, upper: number }, population_collapsed_count: number, population_collapsed_rate: number, runs: number, survival_rate_mean: number, survival_rate_median: number, survival_rate_p25: number, survival_rate_p75: number, survival_rate_std: number }
+
+---@class AlcPkgInput_think_prm
+---@field aggregation? string @Per-chain aggregation method (default: 'any_incorrect'; matches Figure 14 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode aggregation P(yes)/(P(yes)+P(no)) is out of scope — see Caveats)
+---@field max_thinking_tokens? number @Token cap per verifier chain (default: 4096; Khalifa 2025 §4 to avoid overthinking)
+---@field n_parallel_cots? number @Number of independent verification chains to sample (default: 1; paper §4 experimental range 1 / 4 / 8 for K-CoT averaging)
+---@field problem string @Math problem statement
+---@field prompt_template? string @Override verifier prompt template (default: paper Figure 14 literal; override voids paper's correctness reports)
+---@field solution_steps string[] @Solution as an ordered list of step strings (one step per element)
+---@field temperature? number @LLM sampling temperature (default: 0.1; Khalifa 2025 §4 default)
+
+---@class AlcPkgResult_think_prm
+---@field chains { chain: string, correct: boolean, invalid: boolean, verdicts: string[] }[] @Per-chain records for inspection
+---@field correct boolean @Solution-level majority verdict across K verification chains (score >= 0.5)
+---@field invalid boolean @True when every verification chain was invalid (no \boxed tokens parsed)
+---@field score number @Fraction of valid chains that judged the solution correct, in [0, 1] (paper §4 K-CoT averaging approximation; 0 when all chains invalid)
+---@field valid_chains number @Number of chains whose verdicts parsed successfully
 
 ---@class AlcPkgInput_topo_route
 ---@field analysis_tokens? number @Max tokens for the analysis LLM call (default 600)
