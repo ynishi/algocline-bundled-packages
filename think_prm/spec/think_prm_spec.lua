@@ -3,6 +3,14 @@
 --- extraction → solution-level aggregation. Training-free / zero-shot
 --- path only (force-decode logits aggregation is out of scope).
 ---
+--- Covers:
+---   - Figure 14 verbatim template + early-stop variant
+---   - parse_verdicts (case-insensitive, unknown token skip, invalid)
+---   - aggregate (any_incorrect / all_correct)
+---   - verify (single LLM call) + run (K-CoT averaging)
+---   - score_majority_threshold override
+---   - nested dispatch via M.<entry>
+---
 --- Run via:
 ---   just alc-pkg-test-file think_prm/spec/think_prm_spec.lua
 
@@ -37,13 +45,17 @@ local function mock_alc(opts)
     return call_log
 end
 
+-- ============================================================
+-- meta + spec exposure
+-- ============================================================
+
 describe("think_prm.meta", function()
     reset()
     mock_alc()
     local m = require("think_prm")
     it("name / version / category", function()
         expect(m.meta.name).to.equal("think_prm")
-        expect(m.meta.version).to.equal("0.1.0")
+        expect(m.meta.version).to.equal("0.2.0")
         expect(m.meta.category).to.equal("validation")
     end)
 end)
@@ -63,6 +75,10 @@ describe("think_prm.spec", function()
     end)
 end)
 
+-- ============================================================
+-- build_prompt (Figure 14 + early_stop knob)
+-- ============================================================
+
 describe("think_prm.build_prompt", function()
     it("errors when ctx.problem is missing", function()
         reset()
@@ -72,7 +88,7 @@ describe("think_prm.build_prompt", function()
         expect(ok).to.equal(false)
     end)
 
-    it("renders the paper Figure 14 template with step-indexed solution", function()
+    it("default: renders Figure 14 verbatim with step-indexed solution + early-stop line", function()
         reset()
         mock_alc()
         local m = require("think_prm")
@@ -84,8 +100,43 @@ describe("think_prm.build_prompt", function()
         expect(ctx.result.prompt:find("Step 1: first step text", 1, true)).to_not.equal(nil)
         expect(ctx.result.prompt:find("Step 2: second step text", 1, true)).to_not.equal(nil)
         expect(ctx.result.prompt:find("Let's verify step by step", 1, true)).to_not.equal(nil)
+        -- Figure 14 early-stop tail must appear (default)
+        expect(ctx.result.prompt:find("Once you find an incorrect step", 1, true)).to_not.equal(nil)
+    end)
+
+    it("early_stop_on_incorrect=false substitutes the early-stop tail", function()
+        reset()
+        mock_alc()
+        local m = require("think_prm")
+        local ctx = m.build_prompt({
+            problem = "P",
+            solution_steps = { "s1" },
+            early_stop_on_incorrect = false,
+        })
+        -- Figure 14 last line must be absent
+        expect(ctx.result.prompt:find("Once you find an incorrect step", 1, true)).to.equal(nil)
+        -- Replacement instruction must be present
+        expect(ctx.result.prompt:find("Critique every step", 1, true)).to_not.equal(nil)
+    end)
+
+    it("prompt_template override wins over early_stop_on_incorrect", function()
+        reset()
+        mock_alc()
+        local m = require("think_prm")
+        local ctx = m.build_prompt({
+            problem = "P",
+            solution_steps = { "s1" },
+            prompt_template = "CUSTOM_PROMPT for %s with %s",
+            early_stop_on_incorrect = true, -- ignored when template is supplied
+        })
+        expect(ctx.result.prompt:find("CUSTOM_PROMPT for P", 1, true)).to_not.equal(nil)
+        expect(ctx.result.prompt:find("Once you find an incorrect step", 1, true)).to.equal(nil)
     end)
 end)
+
+-- ============================================================
+-- parse_verdicts
+-- ============================================================
 
 describe("think_prm.parse_verdicts", function()
     it("extracts ordered verdicts from a well-formed chain", function()
@@ -142,6 +193,10 @@ Step 3: nope. \boxed{incorrect}
     end)
 end)
 
+-- ============================================================
+-- aggregate
+-- ============================================================
+
 describe("think_prm.aggregate", function()
     it("any_incorrect: any incorrect step → solution incorrect", function()
         reset()
@@ -177,7 +232,6 @@ describe("think_prm.aggregate", function()
         reset()
         mock_alc()
         local m = require("think_prm")
-        -- both 'correct' and 'incorrect' present is still incorrect
         local ctx = m.aggregate({
             verdicts = { "correct", "incorrect" },
             method = "all_correct",
@@ -185,6 +239,10 @@ describe("think_prm.aggregate", function()
         expect(ctx.result.correct).to.equal(false)
     end)
 end)
+
+-- ============================================================
+-- verify
+-- ============================================================
 
 describe("think_prm.verify", function()
     it("errors when ctx.problem is missing", function()
@@ -215,7 +273,11 @@ Step 2: ok. \boxed{correct}
     end)
 end)
 
-describe("think_prm.run", function()
+-- ============================================================
+-- run — K-CoT averaging
+-- ============================================================
+
+describe("think_prm.run — K-CoT averaging", function()
     it("errors when ctx.problem is missing", function()
         reset()
         mock_alc()
@@ -281,7 +343,7 @@ Step 2: \boxed{incorrect}
         expect(ctx.result.correct).to.equal(true)
     end)
 
-    it("all invalid chains → invalid=true, score=0", function()
+    it("all invalid chains → invalid=true, score=0, correct=false", function()
         reset()
         mock_alc({
             responses = { "garbage 1", "garbage 2", "garbage 3" },
@@ -295,6 +357,7 @@ Step 2: \boxed{incorrect}
         expect(ctx.result.invalid).to.equal(true)
         expect(ctx.result.score).to.equal(0)
         expect(ctx.result.valid_chains).to.equal(0)
+        expect(ctx.result.correct).to.equal(false)
     end)
 
     it("mixed valid/invalid: invalid chains excluded from denominator", function()
@@ -311,6 +374,99 @@ Step 2: \boxed{incorrect}
         expect(ctx.result.score).to.equal(1)
         expect(ctx.result.correct).to.equal(true)
         expect(ctx.result.invalid).to.equal(false)
+    end)
+
+    it("score_majority_threshold=0.75 flips a 2/3 score from correct to not correct", function()
+        reset()
+        local good = "Step 1: \\boxed{correct}"
+        local bad = "Step 1: \\boxed{incorrect}"
+        mock_alc({ responses = { good, good, bad } })
+        local m = require("think_prm")
+        local ctx = m.run({
+            problem = "P",
+            solution_steps = { "s1" },
+            n_parallel_cots = 3,
+            score_majority_threshold = 0.75,
+        })
+        -- 2/3 = 0.666... < 0.75
+        expect(ctx.result.score > 0.6 and ctx.result.score < 0.7).to.equal(true)
+        expect(ctx.result.correct).to.equal(false)
+    end)
+end)
+
+-- ============================================================
+-- run — nested dispatch via M.<entry>
+-- ============================================================
+
+describe("think_prm.run — nested dispatch via M.<entry>", function()
+    it("M.run calls through M.verify (K times)", function()
+        reset()
+        mock_alc({ response = "Step 1: \\boxed{correct}" })
+        local m = require("think_prm")
+        local marker = 0
+        local orig = m.verify
+        m.verify = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({
+            problem = "P",
+            solution_steps = { "s1" },
+            n_parallel_cots = 3,
+        })
+        expect(marker).to.equal(3)
+    end)
+
+    it("M.run calls through M.aggregate (K times, one per valid chain)", function()
+        reset()
+        mock_alc({ response = "Step 1: \\boxed{correct}" })
+        local m = require("think_prm")
+        local marker = 0
+        local orig = m.aggregate
+        m.aggregate = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({
+            problem = "P",
+            solution_steps = { "s1" },
+            n_parallel_cots = 3,
+        })
+        expect(marker).to.equal(3)
+    end)
+
+    it("M.verify calls through M.build_prompt", function()
+        reset()
+        mock_alc({ response = "Step 1: \\boxed{correct}" })
+        local m = require("think_prm")
+        local marker = 0
+        local orig = m.build_prompt
+        m.build_prompt = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.verify({
+            problem = "P",
+            solution_steps = { "s1" },
+        })
+        expect(marker).to.equal(1)
+    end)
+
+    it("M.verify calls through M.parse_verdicts", function()
+        reset()
+        mock_alc({ response = "Step 1: \\boxed{correct}" })
+        local m = require("think_prm")
+        local marker = 0
+        local orig = m.parse_verdicts
+        m.parse_verdicts = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.verify({
+            problem = "P",
+            solution_steps = { "s1" },
+        })
+        expect(marker).to.equal(1)
     end)
 end)
 

@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`s1` package — paper §3 strict alignment (v0.1.0 → v0.2.0,
+  breaking `run.input` + `run.result` shape)**. v0.1.0 implemented
+  Muennighoff 2025's budget forcing as an unconditional fixed-N
+  Wait loop. v0.2.0 restores both directions of paper §3:
+  - **Maximum Token Enforcement** added — `max_total_thinking_tokens`
+    (T_max) caller-opt-in knob plus a cumulative trace-length
+    heuristic (`chars_per_token`, default 4 per OpenAI tokenizer
+    guidance). Exceeding T_max triggers early finalize (Wait skip +
+    answer extraction).
+  - **Minimum Token Enforcement** strengthened — `leak_patterns`
+    detection + tail strip + Wait force-append in `extend`, the
+    prompt-level analogue of paper's `</think>` logit suppression.
+    A leaked "Final Answer:" no longer contaminates subsequent
+    extensions.
+  - **Unified system prompt** across the 3 phases (initial / extend
+    / finalize) to text-approximate the paper's single-persona
+    Qwen chat-template invariant; phase distinction is delegated
+    entirely to user-side literal suffixes (`Wait` / `Final Answer:`).
+  - **Nested dispatch** — `M.run` now calls `M.think_initial` /
+    `M.extend` / `M.finalize` through the `M` table so each
+    sub-phase fires its own `S.instrument` shape check
+    (`alc_shapes/README` §Producer usage).
+  - `run.result` adds `exit_reason ∈ {max_extensions, budget}` to
+    surface which stop condition fired. `extensions_used` describe
+    text rewritten to reflect the `[0, max_extensions]` range that
+    `exit_reason` distinguishes.
+
+- **`aot` package — Algorithm 1 strict alignment (v0.1.0 → v0.2.0,
+  breaking `decompose.result` shape)**.
+  - **Nested dispatch** via `M.decompose` / `M.split_indep_dep` /
+    `M.get_max_path_length` / `M.contract` / `M.solve` in `M.run`.
+  - `M.decompose.result.parse_ok` boolean surfaces silent
+    JSON-decode failures (the v0.1.0 empty-list return was
+    indistinguishable from "no subquestions needed").
+  - All magic numbers + system prompts promoted to named constants
+    with prose provenance: `DEFAULT_CONSISTENCY_TOKENS = 16`,
+    `DEFAULT_SELECTOR_TOKENS = 8`,
+    `DEFAULT_CONSISTENCY_YES_TOKEN = "yes"`, 5 phase-specific
+    system prompts, `SELECTOR_PROMPT_FORMAT`.
+  - New `run.input` knobs: `consistency_yes_token` /
+    `consistency_tokens` / `selector_tokens`.
+  - §4.3 `consistency_check` documents that it uses a text-level
+    equivalence proxy (does answering Q_{i+1} imply a correct
+    answer to Q_0?) rather than the paper's literal "synthesized
+    answer / Q_{i+1} result consistency", labeled as an
+    implementation-choice approximation in the describe text.
+
+- **`think_prm` package — paper §4 + Figure 14 strict alignment
+  (v0.1.0 → v0.2.0)**.
+  - **Nested dispatch** — `M.run` calls `M.verify` (× K) and
+    `M.aggregate` (× K); `M.verify` calls `M.build_prompt` and
+    `M.parse_verdicts` internally.
+  - **`DEFAULT_EARLY_STOP_ON_INCORRECT` dead-const resolved** —
+    the value was previously declared but never read.
+    `early_stop_on_incorrect` is now exposed in `run` / `verify` /
+    `build_prompt`. Default `true` preserves the Figure 14 verbatim
+    template; setting `false` substitutes the early-stop tail line
+    with a "critique every step regardless …" instruction, which
+    voids the paper's correctness reports (spelled out as such in
+    the describe text).
+  - **`score_majority_threshold`** knob added (default 0.5,
+    implementation choice — paper does not specify an explicit
+    binarization threshold for the prompt-level K-CoT averaging
+    approximation).
+  - All-invalid handling spelled out: `invalid=true`, `score=0`,
+    `correct=false` simultaneously means "no valid verdict was
+    available"; callers should treat `invalid` as the primary
+    signal and not interpret `correct=false` as a positive
+    incorrect judgment.
+
+- **Provenance moved from short-label markers (`(L)` / `(I)` /
+  `(X)`) to prose in public docstrings and `:describe("...")` text**
+  across `s1` / `aot` / `think_prm`, per this repo's
+  `.claude/CLAUDE.md` §3 (3 判断軸: short labels are an internal AI
+  lint trail and must not be literal-emitted to public projection).
+  Provenance is now written as prose ("Muennighoff 2025 §3 / Table 4
+  ablation winner", "industry-standard per OpenAI tokenizer
+  guidance", "implementation choice — paper does not specify, …").
+  In-function `--` comment lines retain the short tags as the
+  internal AI lint trail per CLAUDE.md §3 last paragraph. Mirrors
+  the v0.27.0 sweep for the previous-batch paper-explicit pkgs
+  (`reconcile` / `moa` / `dmad` / `hegelian` / `conformal_vote` /
+  `propose_verify`).
+
+### Verified
+
+- 3 pkg specs pass via `mcp__lua-debugger__test_launch` —
+  `s1` 30/30, `aot` 30/30, `think_prm` 27/27 (cumulative 87/87).
+  Nested-dispatch monkey-patch tests added per pkg confirm the
+  `M.<entry>` propagation invariant.
+
 ## [0.29.1] - 2026-05-29
 
 ### Changed
@@ -467,15 +560,15 @@ Behaviour is unchanged.
   start). No package implementation (`init.lua` runtime) was touched
   in this sweep — docs / docstring / spec metadata only. Tests
   remain green (existing per-pkg suites pass with no regression).
-  Captured in `workspace/journal.md` 2026-05-08 ~ 2026-05-09 chapter
+  Captured in the internal session journal for 2026-05-08 ~ 2026-05-09
   (pkg-author-conventions full compliance, lint 0/0 完全制覇).
 
 - **`scripts/e2e/review_and_investigate.lua` harness fix (final
   e2e to PASS — 19/19 complete)**: the initial run reported in the
   earlier "End-to-end real-LLM validation" entry left this single
-  e2e FAIL. Root cause was identified by inspecting
-  `workspace/e2e-results/2026-05-08_130610/review_and_investigate.json`
-  turn-by-turn: (1) the prompt passed `code` via `task: %q` to
+  e2e FAIL. Root cause was identified by inspecting the captured
+  per-turn run record for the 2026-05-08 review_and_investigate
+  smoke turn-by-turn: (1) the prompt passed `code` via `task: %q` to
   `alc_advice`, but the package requires `ctx.code` not `ctx.task`,
   forcing the agent to self-correct to `alc_run` on Turn 1 (1
   wasted turn); (2) `max_iterations = 40` was insufficient for
@@ -1350,7 +1443,7 @@ Behaviour is unchanged.
   - **[recipe_safe_panel](recipe_safe_panel/)**: safety-first panel QA. Composes `condorcet` (panel sizing + Anti-Jury), `sc` (self-consistency), `inverse_u` (optional scaling check), `calibrate` (confidence). Auto `M.verified.alc_eval_runs` recorded math_basic pass_rate = 1.0 (7/7) at 8 LLM calls/case under `max_n=3`.
   - **[recipe_ranking_funnel](recipe_ranking_funnel/)**: listwise → pairwise ranking funnel. Composes `listwise_rank` (coarse screening) and `pairwise_rank` (precise finalization). Verified N=8 population ranking: 7 calls vs naive all-pairs 56 (87% savings), top-1 correct.
 - **`M.verified` convention**: recipe packages expose `theoretical_basis` + measured `e2e_runs` / `alc_eval_runs` only — no unverified claims. Populated empirically via agent-block E2E harness.
-- **scripts/e2e/ agent-block harness** (`common.lua` + per-recipe drivers): runs full ReAct loop against real `alc.llm` / `alc_eval`, persists graded results to `workspace/e2e-results/<timestamp>/<name>.json`.
+- **scripts/e2e/ agent-block harness** (`common.lua` + per-recipe drivers): runs full ReAct loop against real `alc.llm` / `alc_eval`, persists graded results to a per-run results directory (timestamped per-recipe JSON).
   - `recipe_safe_panel.lua`: single-case smoke (Capital of Japan)
   - `recipe_ranking_funnel.lua`: single-case smoke (Country population 2026)
   - `recipe_safe_panel_eval.lua`: multi-case `alc_eval` sweep (math_basic, 7 cases) with recipe-level budget caps (`max_n=3`, `scaling_check=false`)

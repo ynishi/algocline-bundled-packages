@@ -2,6 +2,15 @@
 --- arXiv:2502.12018, NeurIPS 2025). DAG decompose → contract → solve
 --- with Markov property (history discard between iterations).
 ---
+--- Covers:
+---   - Algorithm 1 line correspondence (decompose / split / contract /
+---     solve sequence, depth budget fixed on i=0 only)
+---   - parse_ok field surfaces silent decompose failures
+---   - nested dispatch via M.<entry> (monkey-patch marker tests)
+---   - per-knob overrides (consistency_yes_token, consistency_tokens,
+---     selector_tokens, prompt templates)
+---   - AoT* §5 variant (N runs + selector)
+---
 --- Run via:
 ---   just alc-pkg-test-file aot/spec/aot_spec.lua
 
@@ -82,13 +91,17 @@ local function mock_alc(opts)
     return call_log, c
 end
 
+-- ============================================================
+-- meta + spec exposure
+-- ============================================================
+
 describe("aot.meta", function()
     reset()
     mock_alc()
     local m = require("aot")
     it("name / version / category", function()
         expect(m.meta.name).to.equal("aot")
-        expect(m.meta.version).to.equal("0.1.0")
+        expect(m.meta.version).to.equal("0.2.0")
         expect(m.meta.category).to.equal("reasoning")
     end)
 end)
@@ -108,6 +121,10 @@ describe("aot.spec", function()
         end
     end)
 end)
+
+-- ============================================================
+-- split_indep_dep (paper §3.3 lines 8-9)
+-- ============================================================
 
 describe("aot.split_indep_dep", function()
     it("empty list → empty indep + dep", function()
@@ -149,6 +166,10 @@ describe("aot.split_indep_dep", function()
         expect(ctx.result.dep[1].id).to.equal(2)
     end)
 end)
+
+-- ============================================================
+-- get_max_path_length (paper §3.3 line 6; node-count metric)
+-- ============================================================
 
 describe("aot.get_max_path_length", function()
     it("empty list → 0", function()
@@ -202,8 +223,6 @@ describe("aot.get_max_path_length", function()
         reset()
         mock_alc()
         local m = require("aot")
-        -- chain A: 1 → 2 (length 2)
-        -- chain B: 3 → 4 → 5 (length 3)
         local ctx = m.get_max_path_length({
             subquestions = {
                 { id = 1, text = "a", depend = {} },
@@ -217,6 +236,10 @@ describe("aot.get_max_path_length", function()
     end)
 end)
 
+-- ============================================================
+-- decompose (parse_ok contract)
+-- ============================================================
+
 describe("aot.decompose", function()
     it("errors when ctx.question is missing", function()
         reset()
@@ -226,7 +249,7 @@ describe("aot.decompose", function()
         expect(ok).to.equal(false)
     end)
 
-    it("parses well-formed JSON-like decomposition", function()
+    it("parses well-formed JSON-like decomposition, parse_ok=true", function()
         reset()
         mock_alc({
             decompose_responses = {
@@ -238,17 +261,32 @@ describe("aot.decompose", function()
         expect(#ctx.result.subquestions).to.equal(2)
         expect(ctx.result.subquestions[1].id).to.equal(1)
         expect(ctx.result.subquestions[2].depend[1]).to.equal(1)
+        expect(ctx.result.parse_ok).to.equal(true)
     end)
 
-    it("unparseable response → empty subquestions, raw preserved", function()
+    it("unparseable response → empty subquestions, raw preserved, parse_ok=false", function()
         reset()
         mock_alc({ decompose_responses = { "rambling prose with no JSON" } })
         local m = require("aot")
         local ctx = m.decompose({ question = "Q" })
         expect(#ctx.result.subquestions).to.equal(0)
         expect(ctx.result.raw).to.equal("rambling prose with no JSON")
+        expect(ctx.result.parse_ok).to.equal(false)
+    end)
+
+    it("payload without subquestions key → parse_ok=false", function()
+        reset()
+        mock_alc({ decompose_responses = { "{other_key={1,2,3}}" } })
+        local m = require("aot")
+        local ctx = m.decompose({ question = "Q" })
+        expect(#ctx.result.subquestions).to.equal(0)
+        expect(ctx.result.parse_ok).to.equal(false)
     end)
 end)
+
+-- ============================================================
+-- contract / solve
+-- ============================================================
 
 describe("aot.contract", function()
     it("errors when required inputs missing", function()
@@ -259,9 +297,9 @@ describe("aot.contract", function()
         expect(ok).to.equal(false)
     end)
 
-    it("returns contracted_question from LLM", function()
+    it("returns contracted_question from LLM (single call)", function()
         reset()
-        mock_alc({ contract_response = "new_q" })
+        local log, c = mock_alc({ contract_response = "new_q" })
         local m = require("aot")
         local ctx = m.contract({
             question = "Q",
@@ -269,6 +307,7 @@ describe("aot.contract", function()
             dep = { { id = 2, text = "b", depend = { 1 } } },
         })
         expect(ctx.result.contracted_question).to.equal("new_q")
+        expect(c.contract).to.equal(1)
     end)
 end)
 
@@ -290,7 +329,11 @@ describe("aot.solve", function()
     end)
 end)
 
-describe("aot.run", function()
+-- ============================================================
+-- run — Algorithm 1 end-to-end
+-- ============================================================
+
+describe("aot.run — Algorithm 1 basics", function()
     it("errors when ctx.task is missing", function()
         reset()
         mock_alc()
@@ -301,8 +344,6 @@ describe("aot.run", function()
 
     it("default run: D=2 → 2 decompose + 2 contract + 1 solve = 5 calls", function()
         reset()
-        -- Each decompose returns a 2-node DAG with longest path = 2
-        -- (chain 1 → 2). Therefore D = 2 and the loop contracts twice.
         local response = "{subquestions={{id=1,text=[[a]],depend={}},{id=2,text=[[b]],depend={1}}}}"
         local log, c = mock_alc({
             decompose_responses = { response, response },
@@ -338,7 +379,7 @@ describe("aot.run", function()
         expect(ctx.result.initial_depth_budget).to.equal(4)
     end)
 
-    it("unparseable first decompose → solve current question directly (0 iterations)", function()
+    it("unparseable first decompose → parse_ok=false → solve current question directly (0 iterations)", function()
         reset()
         local log, c = mock_alc({ decompose_responses = { "garbage" } })
         local m = require("aot")
@@ -364,6 +405,25 @@ describe("aot.run", function()
         expect(ctx.result.depth_used).to.equal(0)
     end)
 
+    it("consistency_yes_token override propagates ('OK' instead of 'yes')", function()
+        reset()
+        local response = "{subquestions={{id=1,text=[[a]],depend={}},{id=2,text=[[b]],depend={1}}}}"
+        local _, c = mock_alc({
+            decompose_responses = { response, response },
+            consistency_response = "OK to proceed", -- contains 'ok' not 'yes'
+        })
+        local m = require("aot")
+        local ctx = m.run({
+            task = "Q",
+            consistency_check = true,
+            consistency_yes_token = "ok",
+        })
+        -- Should keep iterating because 'ok' matches.
+        expect(c.consistency).to.equal(2) -- one per iteration
+        expect(c.contract).to.equal(2)
+        expect(ctx.result.depth_used).to.equal(2)
+    end)
+
     it("AoT* final_aggregation_runs=3 triggers 3 runs + 1 selector", function()
         reset()
         local response = "{subquestions={{id=1,text=[[a]],depend={}},{id=2,text=[[b]],depend={1}}}}"
@@ -380,6 +440,86 @@ describe("aot.run", function()
         expect(c.solve).to.equal(3) -- one per run
         expect(c.selector).to.equal(1)
         expect(ctx.result.final_answer).to.equal("final_ans")
+    end)
+end)
+
+-- ============================================================
+-- run — nested dispatch via M.<entry>
+-- ============================================================
+
+describe("aot.run — nested dispatch via M.<entry>", function()
+    it("M.run calls through M.decompose (table lookup, not closure)", function()
+        reset()
+        mock_alc()
+        local m = require("aot")
+        local marker = 0
+        local orig = m.decompose
+        m.decompose = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({ task = "Q" })
+        -- default 2-node DAG → D=2 → 2 decompose calls
+        expect(marker).to.equal(2)
+    end)
+
+    it("M.run calls through M.contract (table lookup, not closure)", function()
+        reset()
+        mock_alc()
+        local m = require("aot")
+        local marker = 0
+        local orig = m.contract
+        m.contract = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({ task = "Q" })
+        -- D=2 → 2 contract calls
+        expect(marker).to.equal(2)
+    end)
+
+    it("M.run calls through M.solve (table lookup, not closure)", function()
+        reset()
+        mock_alc()
+        local m = require("aot")
+        local marker = 0
+        local orig = m.solve
+        m.solve = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({ task = "Q" })
+        expect(marker).to.equal(1)
+    end)
+
+    it("M.run calls through M.split_indep_dep (table lookup, not closure)", function()
+        reset()
+        mock_alc()
+        local m = require("aot")
+        local marker = 0
+        local orig = m.split_indep_dep
+        m.split_indep_dep = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({ task = "Q" })
+        -- One split per iteration → D=2 → 2 splits
+        expect(marker).to.equal(2)
+    end)
+
+    it("M.run calls through M.get_max_path_length once (first iteration only)", function()
+        reset()
+        mock_alc()
+        local m = require("aot")
+        local marker = 0
+        local orig = m.get_max_path_length
+        m.get_max_path_length = function(ctx)
+            marker = marker + 1
+            return orig(ctx)
+        end
+        m.run({ task = "Q" })
+        -- Algorithm 1 line 6 fixes D on the first iteration only.
+        expect(marker).to.equal(1)
     end)
 end)
 
