@@ -103,22 +103,25 @@
 ---@field summary string @LLM-generated cascade analysis summary text
 
 ---@class AlcPkgInput_aot
----@field consistency_check? boolean @Enable the §4.3 optional refinement that verifies contraction quality each iteration (default: false; paper §4.3 introduces this outside Algorithm 1)
----@field contract_prompt_template? string @Override template for the contract phase (default derives from paper Appendix B.3)
----@field contract_tokens? number @Token cap for each contract LLM call (default: 600)
----@field decompose_prompt_template? string @Override template for the decompose phase (default derives from paper Appendix B.2)
----@field decompose_tokens? number @Token cap for each decompose LLM call (default: 800)
----@field final_aggregation_runs? number @Number of independent runs whose answers are pooled by an LLM selector — paper §5 AoT* variant (default: 1 = base algorithm, set to 3 for AoT*)
----@field max_depth? number @Hard cap on the depth budget D (default: nil = paper behaviour, no cap; implementation choice — runaway protection)
----@field solve_prompt_template? string @Override template for the solve phase (default: plain answer prompt)
----@field solve_tokens? number @Token cap for the final solve LLM call (default: 500)
----@field task string @Original question to solve
+---@field consistency_check? boolean @Enable §4.3 optional refinement (default: false; paper §4.3 introduces this outside Algorithm 1). The paper §4.3 literal evaluates 'synthesized answer / Q_{i+1} result consistency'; this impl uses a text-level equivalence proxy ('does answering the contracted question imply a correct answer to the original?') as a cheaper prompt-level approximation.
+---@field consistency_tokens? number @Token cap for the consistency_check LLM call (default: 16;— verdict is a single yes/no word)
+---@field consistency_yes_token? string @Plain-text token consistency_check looks for to keep iterating (default: "yes"; implementation choice — lower-cased substring match)
+---@field contract_prompt_template? string @Override template for the contract phase (default captures paper Appendix B.3 intent; implementation choice)
+---@field contract_tokens? number @Token cap for each contract LLM call (default: 600; implementation choice)
+---@field decompose_prompt_template? string @Override template for the decompose phase (default captures paper Appendix B.2 intent; implementation choice)
+---@field decompose_tokens? number @Token cap for each decompose LLM call (default: 800; implementation choice)
+---@field final_aggregation_runs? number @Independent runs whose answers are pooled by an LLM selector (default: 1 = base Algorithm 1; paper §5 AoT* variant uses N=3, set 3 to reproduce)
+---@field max_depth? number @Hard cap on depth budget D (default: nil = paper behaviour, no cap; implementation choice — runaway protection for pathological decompositions)
+---@field selector_tokens? number @Token cap for the AoT* selector LLM call (default: 8;— reply is a single digit)
+---@field solve_prompt_template? string @Override template for the solve phase (default: plain answer prompt; implementation choice)
+---@field solve_tokens? number @Token cap for the final solve LLM call (default: 500; implementation choice)
+---@field task string @Original question to solve (paper §3.3 input Q_0)
 
 ---@class AlcPkgResult_aot
----@field depth_used number @Number of contraction iterations actually executed
----@field final_answer string @Direct answer to the final contracted question
+---@field depth_used number @Number of contraction iterations actually executed. Ranges over [0, depth_budget]; equals depth_budget when the loop completes the full D iterations, < depth_budget when an early termination fires (parse failure / all-independent / consistency rejection).
+---@field final_answer string @Direct answer to the final contracted question (paper §3.3 line 13)
 ---@field final_question string @Final contracted question that solve was applied to
----@field initial_depth_budget number @Depth D fixed on the first iteration from GetMaxPathLength(G_0), before max_depth cap
+---@field initial_depth_budget number @Depth D fixed on the first iteration from GetMaxPathLength(G_0), before max_depth cap (paper §3.3 line 6)
 
 ---@class AlcPkgInput_bisect
 ---@field gen_tokens? number @Max tokens for chain generation (default: 800)
@@ -1271,17 +1274,21 @@
 ---@field verification { a_agrees_b: boolean, a_checks_b: string, b_agrees_a: boolean, b_checks_a: string } @Cross-verification outputs
 
 ---@class AlcPkgInput_s1
----@field final_answer_suffix? string @Suffix that forces answer extraction at budget exhaustion (default: "Final Answer:"; paper §3 literal)
+---@field chars_per_token? number @Heuristic divisor for the prompt-level cumulative-trace token estimate (default: 4; industry standard — OpenAI tokenizer guidance ~4 chars/token for English; CJK-heavy domains should override to ~2)
+---@field final_answer_suffix? string @Suffix that forces answer extraction (default: "Final Answer:"; Muennighoff 2025 §3 literal)
 ---@field final_answer_tokens? number @Token budget for the final answer extraction pass (default: 500; implementation choice)
----@field max_extensions? number @Maximum number of Wait extensions to attempt before forced finalization (default: 4; paper §3 experiments span 2 / 4 / 6, middle value chosen)
----@field max_thinking_tokens? number @Token budget for each thinking pass — initial and each extension (default: 2000; implementation choice — paper does not specify, sized for typical CoT)
+---@field leak_patterns? string[] @Leak-detection literal substrings forwarded to each extend call (default see extend entry; implementation choice)
+---@field max_extensions? number @Maximum number of Wait extensions to attempt before forced finalization (default: 4; implementation choice — Muennighoff 2025 §3 reports K ∈ {2, 4, 6}, 4 chosen as mid-range default. Paper does not prescribe a default.)
+---@field max_thinking_tokens? number @Token budget for each thinking round-trip — initial and each extension (default: 2000; implementation choice)
+---@field max_total_thinking_tokens? number @Cumulative thinking-trace token cap implementing Muennighoff 2025 §3 Maximum Token Enforcement (T_max). When set, exceeding this cap triggers an early finalize (Wait skip + answer extraction). Default: nil (disabled = caller opt-in; implementation choice — paper §3 introduces T_max but does not prescribe a single canonical literal; §5.1 ablations report results around 30,000 thinking tokens as an experimental data point, so this pkg avoids imposing a silent cap). To enable Muennighoff 2025 §3 Maximum Token Enforcement, set explicitly (e.g. max_extensions * max_thinking_tokens, or a value in the §5.1 ablation range around 30,000 tokens).
 ---@field task string @Question or task to reason about
----@field wait_literal? string @Literal string appended each extension to cue continued reasoning (default: "Wait"; paper §3 / Table 4 ablation winner over "Alternatively" / "Hmm")
+---@field wait_literal? string @Literal string appended each extension to cue continued reasoning (default: "Wait"; Muennighoff 2025 §3 / Table 4 ablation winner)
 
 ---@class AlcPkgResult_s1
----@field extensions_used number @Number of Wait extensions actually executed (0 to max_extensions)
+---@field exit_reason "max_extensions"|"budget" @Which stop condition fired: 'max_extensions' when the K loop completed (extensions_used == max_extensions), or 'budget' when Maximum Token Enforcement triggered an early exit (extensions_used < max_extensions).
+---@field extensions_used number @Number of Wait extensions actually executed; ranges over [0, max_extensions]. Equals max_extensions when the loop completes normally; equals the count at which the cumulative T_max budget was reached when max_total_thinking_tokens is set and triggers an early exit. exit_reason distinguishes the two cases.
 ---@field final_answer string @Final answer extracted after thinking + extensions + finalize
----@field trace string @Full reasoning trace including initial pass and all Wait extensions
+---@field trace string @Full reasoning trace including initial pass and all Wait extensions (with leaked tails stripped per leak_patterns)
 
 ---@class AlcPkgInput_s2a
 ---@field context? string @Full (potentially noisy) context to denoise; empty/absent => task itself is reformulated
@@ -1420,18 +1427,20 @@
 ---@field simulation { gini_mean: number, gini_median: number, gini_p25: number, gini_p75: number, gini_std: number, high_inequality_ci: { lower: number, upper: number }, high_inequality_count: number, high_inequality_rate: number, mean_wealth_mean: number, mean_wealth_median: number, mean_wealth_p25: number, mean_wealth_p75: number, mean_wealth_std: number, population_collapsed_ci: { lower: number, upper: number }, population_collapsed_count: number, population_collapsed_rate: number, runs: number, survival_rate_mean: number, survival_rate_median: number, survival_rate_p25: number, survival_rate_p75: number, survival_rate_std: number }
 
 ---@class AlcPkgInput_think_prm
----@field aggregation? string @Per-chain aggregation method (default: 'any_incorrect'; matches Figure 14 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode aggregation P(yes)/(P(yes)+P(no)) is out of scope — see Caveats)
----@field max_thinking_tokens? number @Token cap per verifier chain (default: 4096; Khalifa 2025 §4 to avoid overthinking)
----@field n_parallel_cots? number @Number of independent verification chains to sample (default: 1; paper §4 experimental range 1 / 4 / 8 for K-CoT averaging)
+---@field aggregation? string @Per-chain aggregation method (default: 'any_incorrect'; matches Figure 21 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode P(yes)/(P(yes)+P(no)) is out of scope — see Caveats.)
+---@field early_stop_on_incorrect? boolean @Toggle the Figure 21 early-stop instruction (default: true — Khalifa 2025 Figure 21 literal). Ignored when prompt_template is supplied.
+---@field max_thinking_tokens? number @Token cap per verifier chain (default: 4096; value from the official ThinkPRM repo init example — Khalifa 2025 §4 actually generates up to 8192 tokens, so 4096 is the more conservative implementation default, not a paper-prescribed cap)
+---@field n_parallel_cots? number @Independent verification chains to sample (default: 1; paper §4 K-CoT averaging, experimental range 1 / 4 / 8)
 ---@field problem string @Math problem statement
----@field prompt_template? string @Override verifier prompt template (default: paper Figure 14 literal; override voids paper's correctness reports)
+---@field prompt_template? string @Override verifier prompt template (default: paper Figure 21 verbatim — Khalifa 2025 literal. Override voids paper's correctness reports.)
+---@field score_majority_threshold? number @Threshold used to binarize the K-CoT averaged score into the `correct` field (default: 0.5;— paper does not specify, 0.5 is the natural majority cutoff)
 ---@field solution_steps string[] @Solution as an ordered list of step strings (one step per element)
----@field temperature? number @LLM sampling temperature (default: 0.1; Khalifa 2025 §4 default)
+---@field temperature? number @LLM sampling temperature (default: 0.1; conservative default from the official ThinkPRM repo README — Khalifa 2025 §4 / §E.2 report per-model sampling T=0.4 (Qwen-2.5-14B) / T=0.8 (Llama-3.2-3B-Instruct), so 0.1 is the implementation default, not a paper-prescribed value)
 
 ---@class AlcPkgResult_think_prm
 ---@field chains { chain: string, correct: boolean, invalid: boolean, verdicts: string[] }[] @Per-chain records for inspection
----@field correct boolean @Solution-level majority verdict across K verification chains (score >= 0.5)
----@field invalid boolean @True when every verification chain was invalid (no \boxed tokens parsed)
+---@field correct boolean @Solution-level binary: K-CoT averaged score >= score_majority_threshold (implementation choice — see Caveats for the paper's force-decode alternative).
+---@field invalid boolean @True when every verification chain was invalid (no \boxed tokens parsed). Treat as the primary signal; correct=false alongside invalid=true is not a positive incorrect judgment.
 ---@field score number @Fraction of valid chains that judged the solution correct, in [0, 1] (paper §4 K-CoT averaging approximation; 0 when all chains invalid)
 ---@field valid_chains number @Number of chains whose verdicts parsed successfully
 

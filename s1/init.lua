@@ -16,10 +16,12 @@
 ---    the model emitting `</think>`, then appending the literal
 ---    `wait_literal` and re-invoking the LLM with the accumulated
 ---    trace. When the continuation leaks a final-answer-shaped
----    closing (paper's `</think>` logit mask sets probability 0; the
----    prompt level cannot, so leakage is non-zero), the leaked tail is
----    stripped before the trace accumulates so that the next round
----    still receives a `Wait`-cued non-finalized trace.
+---    closing (paper §3 says "suppress the generation of the
+---    end-of-thinking token delimiter" — the suppression mechanism
+---    is paper-unspecified, and the prompt level cannot guarantee
+---    equivalent suppression, so leakage is non-zero), the leaked
+---    tail is stripped before the trace accumulates so that the
+---    next round still receives a `Wait`-cued non-finalized trace.
 ---
 --- 2. **Maximum Token Enforcement (early exit)** — paper §3 literal:
 ---    "appending the end-of-thinking token delimiter and 'Final
@@ -82,14 +84,18 @@
 ---    continuation of the thinking stream). 500 sized for concise
 ---    answers; override for verbose answers.
 ---  - `max_total_thinking_tokens` = nil (disabled) — paper's
----    Maximum Token Enforcement (T_max) knob. Paper ablates total
----    thinking budget but no canonical default literal is reported in
----    §3, so this pkg deliberately ships T_max as caller opt-in to
----    avoid imposing an arbitrary silent budget cap. When set, the
----    cumulative thinking-trace token estimate exceeding T_max
----    triggers an early finalize (Wait skip + answer extraction). Set
----    explicitly (e.g. `max_extensions * max_thinking_tokens`) for
----    paper-faithful Maximum Token Enforcement behavior.
+---    Maximum Token Enforcement (T_max) knob. Paper §3 introduces
+---    T_max as a budget cap but does not prescribe a single
+---    canonical literal; §5.1 ablations report results around
+---    30,000 thinking tokens as an experimental data point rather
+---    than a normative default. This pkg deliberately ships T_max
+---    as caller opt-in to avoid imposing an arbitrary silent budget
+---    cap. When set, the cumulative thinking-trace token estimate
+---    exceeding T_max triggers an early finalize (Wait skip + answer
+---    extraction). To enable Muennighoff 2025 §3 Maximum Token
+---    Enforcement, set explicitly (e.g. `max_extensions *
+---    max_thinking_tokens`, or a value in the §5.1 ablation range
+---    around 30k).
 ---  - `chars_per_token` = 4 — OpenAI tokenizer rough heuristic
 ---    for English / ASCII text (~4 chars per token, see
 ---    https://platform.openai.com/tokenizer guidance). Used only for
@@ -192,14 +198,16 @@ local DEFAULT_MAX_THINKING_TOKENS = 2000
 local DEFAULT_FINAL_ANSWER_TOKENS = 500
 
 -- (X) Implementation choice — Muennighoff 2025 §3 Maximum Token
--- Enforcement (T_max). nil = disabled = caller opt-in. Paper ablates
--- total thinking budget but no canonical literal default appears in
--- §3, so this pkg ships T_max disabled by default to avoid imposing
--- an arbitrary silent cap. When set, cumulative trace tokens
--- exceeding T_max trigger an early finalize (Wait skip + answer
--- extraction). For paper-faithful Maximum Token Enforcement, callers
--- typically set T_max = max_extensions * max_thinking_tokens or some
--- explicit cumulative cap.
+-- Enforcement (T_max). nil = disabled = caller opt-in. §3 introduces
+-- T_max as a budget cap; §5.1 ablations report results around
+-- 30,000 thinking tokens as an experimental data point rather than
+-- a normative default literal. This pkg ships T_max disabled by
+-- default to avoid imposing an arbitrary silent cap. When set,
+-- cumulative trace tokens exceeding T_max trigger an early finalize
+-- (Wait skip + answer extraction). Callers enabling Muennighoff
+-- 2025 §3 Maximum Token Enforcement typically set T_max =
+-- max_extensions * max_thinking_tokens or a value in the §5.1
+-- ablation range (~30k).
 local DEFAULT_MAX_TOTAL_THINKING_TOKENS = nil
 
 -- (I) Industry-standard rough English tokenization heuristic
@@ -310,7 +318,7 @@ M.spec = {
                     "Token budget for the final answer extraction pass (default: 500; implementation choice)"
                 ),
                 max_total_thinking_tokens = T.number:is_optional():describe(
-                    "Cumulative thinking-trace token cap implementing Muennighoff 2025 §3 Maximum Token Enforcement (T_max). When set, exceeding this cap triggers an early finalize (Wait skip + answer extraction). Default: nil (disabled = caller opt-in; implementation choice — paper ablates total thinking budget but reports no canonical default literal in §3, so this pkg avoids imposing a silent cap). For paper-faithful Maximum Token Enforcement, set explicitly (e.g. max_extensions * max_thinking_tokens)."
+                    "Cumulative thinking-trace token cap implementing Muennighoff 2025 §3 Maximum Token Enforcement (T_max). When set, exceeding this cap triggers an early finalize (Wait skip + answer extraction). Default: nil (disabled = caller opt-in; implementation choice — paper §3 introduces T_max but does not prescribe a single canonical literal; §5.1 ablations report results around 30,000 thinking tokens as an experimental data point, so this pkg avoids imposing a silent cap). To enable Muennighoff 2025 §3 Maximum Token Enforcement, set explicitly (e.g. max_extensions * max_thinking_tokens, or a value in the §5.1 ablation range around 30,000 tokens)."
                 ),
                 chars_per_token = T.number:is_optional():describe(
                     "Heuristic divisor for the prompt-level cumulative-trace token estimate (default: 4; industry standard — OpenAI tokenizer guidance ~4 chars/token for English; CJK-heavy domains should override to ~2)"

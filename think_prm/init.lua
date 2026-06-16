@@ -10,14 +10,14 @@
 --- ## Algorithm
 ---
 --- 1. `build_prompt` — insert `{problem}` and step-indexed `{solution}`
----    into the paper Figure 14 verifier template (verbatim by default;
+---    into the paper Figure 21 verifier template (verbatim by default;
 ---    the `early_stop_on_incorrect=false` knob substitutes the last
 ---    line for an explicit "critique all steps" instruction).
 --- 2. `verify` — invoke the LLM once with the built prompt to obtain a
 ---    verification chain, then `parse_verdicts` extracts the per-step
 ---    `\boxed{correct|incorrect}` tokens.
 --- 3. `aggregate` — collapse per-CoT verdicts to a solution-level
----    binary (`any_incorrect` default; matches Figure 14 early-stop
+---    binary (`any_incorrect` default; matches Figure 21 early-stop
 ---    semantics).
 --- 4. `run` — repeat steps 1-3 `n_parallel_cots` times (paper §4 K-CoT
 ---    scaling) and average the per-CoT binary verdicts into a
@@ -39,18 +39,24 @@
 --- standard heuristics with source links, or implementation-choice
 --- rationale spelled out. No default is implicit.
 ---
----  - `prompt_template` = Figure 14 verbatim — Khalifa 2025
----    Appendix A.2 / Figure 14. Override voids the paper's correctness
+---  - `prompt_template` = Figure 21 verbatim — Khalifa 2025
+---    Appendix A.2 / Figure 21. Override voids the paper's correctness
 ---    reports.
----  - `temperature` = 0.1 — Khalifa 2025 §4 sampling default
----    (also matches the official GitHub config).
----  - `max_thinking_tokens` = 4096 — Khalifa 2025 §4 upper
----    bound to avoid overthinking (paper notes max_length=4096 in the
----    implementation).
+---  - `temperature` = 0.1 — (I) conservative default taken
+---    from the official ThinkPRM repo README basic usage example.
+---    Khalifa 2025 §4 / §E.2 actually report per-model sampling
+---    defaults T=0.4 (Qwen-2.5-14B) / T=0.8 (Llama-3.2-3B-
+---    Instruct); 0.1 is the implementation default, not a
+---    paper-prescribed value.
+---  - `max_thinking_tokens` = 4096 — (I) value taken from the
+---    official ThinkPRM repo init example (`max_length=4096`).
+---    Khalifa 2025 §4 actually generates up to a maximum of 8192
+---    tokens; 4096 is the more conservative implementation default
+---    the pkg inherits, not a paper-prescribed cap.
 ---  - `n_parallel_cots` = 1 — Khalifa 2025 §4 K-CoT averaging.
 ---    Default 1 reproduces the single-chain baseline; experimental
 ---    range 1 / 4 / 8.
----  - `early_stop_on_incorrect` = true — Figure 14 prompt
+---  - `early_stop_on_incorrect` = true — Figure 21 prompt
 ---    literally instructs the verifier to stop at the first incorrect
 ---    step. The paper experiments are with early-stop on; setting
 ---    false substitutes the final prompt line for an explicit
@@ -75,7 +81,7 @@
 ---    `max_thinking_tokens` is per-CoT.
 ---  - `verifier_system_prompt` — Single-line persona
 ---    conditioning ("You are a careful math verifier. Follow the
----    requested output format exactly."). Paper Figure 14 is a
+---    requested output format exactly."). Paper Figure 21 is a
 ---    user-side prompt; the system-prompt wording is impl choice.
 ---    Held constant across all K parallel CoTs.
 ---
@@ -114,7 +120,7 @@
 --- - Khalifa, M., Agarwal, R., Logeswaran, L., Kim, J., Peng, H.,
 ---   Lee, M., Lee, H., Wang, L. (2025). "Process Reward Models That
 ---   Think (ThinkPRM)". arXiv:2504.16828 §3 (method), §4 (experiments
----   / K-CoT scaling), Appendix A.2 / Figure 14 (verifier prompt
+---   / K-CoT scaling), Appendix A.2 / Figure 21 (verifier prompt
 ---   template), Appendix E.1 (aggregation).
 ---   https://arxiv.org/abs/2504.16828
 --- - Official code + models: https://github.com/mukhal/thinkprm
@@ -128,7 +134,7 @@ local M = {}
 M.meta = {
     name = "think_prm",
     version = "0.2.0",
-    description = "ThinkPRM verifier — per-step thinking chain + \\boxed{correct|incorrect} verdicts (Khalifa 2025 §4 / Figure 14, training-free path).",
+    description = "ThinkPRM verifier — per-step thinking chain + \\boxed{correct|incorrect} verdicts (Khalifa 2025 §4 / Figure 21, training-free path).",
     category = "validation",
     alc_shapes_compat = "^0.25",
 }
@@ -138,18 +144,24 @@ M.meta = {
 -- default has an inline tag + rationale; readers should be able to
 -- verify each value against the paper or the cited source.
 
--- (L) Paper Figure 14 sampling default for the verifier (also matches
--- the official GitHub config).
+-- (I) Conservative default taken from the official ThinkPRM repo
+-- README basic usage example. Khalifa 2025 §4 / §E.2 actually report
+-- per-model sampling defaults T=0.4 (Qwen-2.5-14B) / T=0.8
+-- (Llama-3.2-3B-Instruct); 0.1 is the implementation default, not a
+-- paper-prescribed value.
 local DEFAULT_TEMPERATURE = 0.1
 
--- (L) Paper §4 upper bound to avoid overthinking (max_length = 4096).
+-- (I) Value taken from the official ThinkPRM repo init example
+-- (`max_length=4096`). Khalifa 2025 §4 actually generates up to a
+-- maximum of 8192 tokens; 4096 is the more conservative implementation
+-- default the pkg inherits, not a paper-prescribed cap.
 local DEFAULT_MAX_THINKING_TOKENS = 4096
 
 -- (L) Paper §4 K-CoT averaging. K = 1 reproduces the single-chain
 -- behaviour; K = 4 / 8 are the parallel-scaling experimental settings.
 local DEFAULT_N_PARALLEL_COTS = 1
 
--- (L) Paper Figure 14 prompt literally instructs the verifier to stop
+-- (L) Paper Figure 21 prompt literally instructs the verifier to stop
 -- at the first incorrect step. Setting false continues judging all
 -- steps; the paper's reports are with early-stop on.
 local DEFAULT_EARLY_STOP_ON_INCORRECT = true
@@ -166,17 +178,17 @@ local DEFAULT_AGGREGATION = "any_incorrect"
 local DEFAULT_SCORE_MAJORITY_THRESHOLD = 0.5
 
 -- (X) Single-line persona conditioning for the verifier. Paper
--- Figure 14 is a user-side prompt; the system-prompt wording is impl
+-- Figure 21 is a user-side prompt; the system-prompt wording is impl
 -- choice. Held constant across all K parallel CoTs.
 local VERIFIER_SYSTEM_PROMPT =
     "You are a careful math verifier. Follow the requested output format exactly."
 
--- (L) Paper Figure 14 verbatim verifier prompt template body. The
+-- (L) Paper Figure 21 verbatim verifier prompt template body. The
 -- final "Once you find an incorrect step ..." line is split out as a
 -- separate tail so the `early_stop_on_incorrect=false` knob can
 -- substitute an explicit "critique all steps" instruction without
 -- breaking the rest of the literal.
-local FIGURE_14_BODY = [[You are given a math problem and a proposed multiple-step solution (with a step on each line):
+local FIGURE_21_BODY = [[You are given a math problem and a proposed multiple-step solution (with a step on each line):
 
 [Math Problem]
 %s
@@ -196,23 +208,23 @@ Step n: <critique>…The step is \boxed{correct/incorrect}
 
 ]]
 
--- (L) Paper Figure 14 last line (verbatim).
-local FIGURE_14_EARLY_STOP_TAIL =
+-- (L) Paper Figure 21 last line (verbatim).
+local FIGURE_21_EARLY_STOP_TAIL =
     "Once you find an incorrect step, you should stop since you don't need to analyze the remaining steps.\n"
 
--- (X) Substitute for the Figure 14 last line when
+-- (X) Substitute for the Figure 21 last line when
 -- `early_stop_on_incorrect = false`. Explicit instruction to keep
 -- judging all steps. Voids paper alignment (paper reports are with
 -- early-stop on).
 local NO_EARLY_STOP_TAIL =
     "Critique every step regardless of whether earlier steps were judged incorrect.\n"
 
--- (L) Default prompt template: Figure 14 verbatim (body + early-stop
--- tail). Equivalent to FIGURE_14_BODY .. FIGURE_14_EARLY_STOP_TAIL.
-local DEFAULT_PROMPT_TEMPLATE = FIGURE_14_BODY .. FIGURE_14_EARLY_STOP_TAIL
+-- (L) Default prompt template: Figure 21 verbatim (body + early-stop
+-- tail). Equivalent to FIGURE_21_BODY .. FIGURE_21_EARLY_STOP_TAIL.
+local DEFAULT_PROMPT_TEMPLATE = FIGURE_21_BODY .. FIGURE_21_EARLY_STOP_TAIL
 
 -- (X) No-early-stop variant of the prompt template.
-local NO_EARLY_STOP_TEMPLATE = FIGURE_14_BODY .. NO_EARLY_STOP_TAIL
+local NO_EARLY_STOP_TEMPLATE = FIGURE_21_BODY .. NO_EARLY_STOP_TAIL
 
 -- ---- pure helpers ----
 
@@ -231,7 +243,7 @@ end
 
 --- Resolve the prompt template, preferring (in order): a caller-
 --- supplied custom template, the early-stop variant when
---- early_stop_on_incorrect is true (Figure 14 verbatim), the
+--- early_stop_on_incorrect is true (Figure 21 verbatim), the
 --- no-early-stop variant otherwise.
 local function resolve_template(custom_template, early_stop)
     if custom_template ~= nil then return custom_template end
@@ -325,10 +337,10 @@ M.spec = {
                     "Solution as an ordered list of step strings (one step per element)"
                 ),
                 prompt_template = T.string:is_optional():describe(
-                    "Override template (default: paper Figure 14 verbatim — Khalifa 2025 literal. Override voids paper's correctness reports.)"
+                    "Override template (default: paper Figure 21 verbatim — Khalifa 2025 literal. Override voids paper's correctness reports.)"
                 ),
                 early_stop_on_incorrect = T.boolean:is_optional():describe(
-                    "When true (default; Figure 14 literal) the template instructs the verifier to stop at the first incorrect step. When false, substitutes the Figure 14 last line for an explicit 'critique every step' instruction (voids paper alignment). Ignored when prompt_template is supplied."
+                    "When true (default; Figure 21 literal) the template instructs the verifier to stop at the first incorrect step. When false, substitutes the Figure 21 last line for an explicit 'critique every step' instruction (voids paper alignment). Ignored when prompt_template is supplied."
                 ),
             }),
             result = T.shape({
@@ -354,7 +366,7 @@ M.spec = {
                     "Per-step verdicts from one verification chain"
                 ),
                 method = T.string:is_optional():describe(
-                    "'any_incorrect' (default; matches Figure 14 early-stop semantics) or 'all_correct' (rejects on any non-correct token)"
+                    "'any_incorrect' (default; matches Figure 21 early-stop semantics) or 'all_correct' (rejects on any non-correct token)"
                 ),
             }),
             result = T.shape({
@@ -369,16 +381,16 @@ M.spec = {
                     "Solution as an ordered list of step strings"
                 ),
                 prompt_template = T.string:is_optional():describe(
-                    "Override template (default: paper Figure 14 verbatim — Khalifa 2025 literal)"
+                    "Override template (default: paper Figure 21 verbatim — Khalifa 2025 literal)"
                 ),
                 early_stop_on_incorrect = T.boolean:is_optional():describe(
-                    "Toggle the Figure 14 early-stop instruction (default: true — Khalifa 2025 Figure 14 literal). Ignored when prompt_template is supplied."
+                    "Toggle the Figure 21 early-stop instruction (default: true — Khalifa 2025 Figure 21 literal). Ignored when prompt_template is supplied."
                 ),
                 temperature = T.number:is_optional():describe(
-                    "LLM sampling temperature (default: 0.1; Khalifa 2025 §4)"
+                    "LLM sampling temperature (default: 0.1; conservative default from the official ThinkPRM repo README — Khalifa 2025 §4 / §E.2 report per-model sampling T=0.4 (Qwen-2.5-14B) / T=0.8 (Llama-3.2-3B-Instruct), so 0.1 is the implementation default, not a paper-prescribed value)"
                 ),
                 max_thinking_tokens = T.number:is_optional():describe(
-                    "Token cap for the verifier chain (default: 4096; Khalifa 2025 §4 to avoid overthinking)"
+                    "Token cap for the verifier chain (default: 4096; value from the official ThinkPRM repo init example — Khalifa 2025 §4 actually generates up to 8192 tokens, so 4096 is the more conservative implementation default, not a paper-prescribed cap)"
                 ),
             }),
             result = T.shape({
@@ -397,19 +409,19 @@ M.spec = {
                     "Independent verification chains to sample (default: 1; paper §4 K-CoT averaging, experimental range 1 / 4 / 8)"
                 ),
                 prompt_template = T.string:is_optional():describe(
-                    "Override verifier prompt template (default: paper Figure 14 verbatim — Khalifa 2025 literal. Override voids paper's correctness reports.)"
+                    "Override verifier prompt template (default: paper Figure 21 verbatim — Khalifa 2025 literal. Override voids paper's correctness reports.)"
                 ),
                 early_stop_on_incorrect = T.boolean:is_optional():describe(
-                    "Toggle the Figure 14 early-stop instruction (default: true — Khalifa 2025 Figure 14 literal). Ignored when prompt_template is supplied."
+                    "Toggle the Figure 21 early-stop instruction (default: true — Khalifa 2025 Figure 21 literal). Ignored when prompt_template is supplied."
                 ),
                 temperature = T.number:is_optional():describe(
-                    "LLM sampling temperature (default: 0.1; Khalifa 2025 §4 default)"
+                    "LLM sampling temperature (default: 0.1; conservative default from the official ThinkPRM repo README — Khalifa 2025 §4 / §E.2 report per-model sampling T=0.4 (Qwen-2.5-14B) / T=0.8 (Llama-3.2-3B-Instruct), so 0.1 is the implementation default, not a paper-prescribed value)"
                 ),
                 max_thinking_tokens = T.number:is_optional():describe(
-                    "Token cap per verifier chain (default: 4096; Khalifa 2025 §4 to avoid overthinking)"
+                    "Token cap per verifier chain (default: 4096; value from the official ThinkPRM repo init example — Khalifa 2025 §4 actually generates up to 8192 tokens, so 4096 is the more conservative implementation default, not a paper-prescribed cap)"
                 ),
                 aggregation = T.string:is_optional():describe(
-                    "Per-chain aggregation method (default: 'any_incorrect'; matches Figure 14 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode P(yes)/(P(yes)+P(no)) is out of scope — see Caveats.)"
+                    "Per-chain aggregation method (default: 'any_incorrect'; matches Figure 21 early-stop semantics. 'all_correct' requires every step verdict to be correct. The paper's canonical force-decode P(yes)/(P(yes)+P(no)) is out of scope — see Caveats.)"
                 ),
                 score_majority_threshold = T.number:is_optional():describe(
                     "Threshold used to binarize the K-CoT averaged score into the `correct` field (default: 0.5;— paper does not specify, 0.5 is the natural majority cutoff)"

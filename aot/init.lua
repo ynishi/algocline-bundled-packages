@@ -103,9 +103,10 @@
 ---    unifies sys across phases for the single-pass paper Qwen
 ---    persona invariant), AoT's paper *does* separate
 ---    decompose / contract / solve as distinct LLM calls (Algorithm 1
----    lines 4, 10, 13), so per-phase persona conditioning is paper-
----    faithful here. The literal wording is impl choice; callers
----    needing a different persona should fork the call_* helpers.
+---    lines 4, 10, 13), so per-phase persona conditioning here matches
+---    the paper's per-phase LLM call structure. The literal wording is
+---    impl choice; callers needing a different persona should fork the
+---    call_* helpers.
 ---
 --- ## Caveats
 ---
@@ -289,9 +290,9 @@ local SELECTOR_PROMPT_FORMAT =
 
 -- (X) Per-phase system prompts. AoT's paper §3.3 separates decompose
 -- / contract / solve as distinct LLM calls (lines 4, 10, 13), so
--- per-phase persona conditioning is paper-faithful here (contrast
--- with s1 which unifies sys across phases for the paper's single-
--- pass invariant). Literal wording is impl choice.
+-- per-phase persona conditioning here matches the paper's per-phase
+-- LLM call structure (contrast with s1 which unifies sys across phases
+-- for the paper's single-pass invariant). Literal wording is impl choice.
 local DECOMPOSE_SYSTEM_PROMPT =
     "You are a problem decomposer. Output strictly valid JSON; do not add prose around it."
 local CONTRACT_SYSTEM_PROMPT =

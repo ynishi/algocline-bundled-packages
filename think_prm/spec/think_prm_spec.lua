@@ -4,7 +4,7 @@
 --- path only (force-decode logits aggregation is out of scope).
 ---
 --- Covers:
----   - Figure 14 verbatim template + early-stop variant
+---   - Figure 21 verbatim template + early-stop variant
 ---   - parse_verdicts (case-insensitive, unknown token skip, invalid)
 ---   - aggregate (any_incorrect / all_correct)
 ---   - verify (single LLM call) + run (K-CoT averaging)
@@ -76,7 +76,7 @@ describe("think_prm.spec", function()
 end)
 
 -- ============================================================
--- build_prompt (Figure 14 + early_stop knob)
+-- build_prompt (Figure 21 + early_stop knob)
 -- ============================================================
 
 describe("think_prm.build_prompt", function()
@@ -88,7 +88,7 @@ describe("think_prm.build_prompt", function()
         expect(ok).to.equal(false)
     end)
 
-    it("default: renders Figure 14 verbatim with step-indexed solution + early-stop line", function()
+    it("default: renders Figure 21 verbatim with step-indexed solution + early-stop line", function()
         reset()
         mock_alc()
         local m = require("think_prm")
@@ -100,7 +100,7 @@ describe("think_prm.build_prompt", function()
         expect(ctx.result.prompt:find("Step 1: first step text", 1, true)).to_not.equal(nil)
         expect(ctx.result.prompt:find("Step 2: second step text", 1, true)).to_not.equal(nil)
         expect(ctx.result.prompt:find("Let's verify step by step", 1, true)).to_not.equal(nil)
-        -- Figure 14 early-stop tail must appear (default)
+        -- Figure 21 early-stop tail must appear (default)
         expect(ctx.result.prompt:find("Once you find an incorrect step", 1, true)).to_not.equal(nil)
     end)
 
@@ -113,7 +113,7 @@ describe("think_prm.build_prompt", function()
             solution_steps = { "s1" },
             early_stop_on_incorrect = false,
         })
-        -- Figure 14 last line must be absent
+        -- Figure 21 last line must be absent
         expect(ctx.result.prompt:find("Once you find an incorrect step", 1, true)).to.equal(nil)
         -- Replacement instruction must be present
         expect(ctx.result.prompt:find("Critique every step", 1, true)).to_not.equal(nil)

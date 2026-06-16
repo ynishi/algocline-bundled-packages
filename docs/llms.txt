@@ -117,7 +117,7 @@
 
 - [ab_mcts](narrative/ab_mcts.md): Adaptive branching MCTS with Thompson Sampling — wider/deeper per node
 - [analogical](narrative/analogical.md): Analogical prompting — self-generate analogies, extract patterns, apply to original
-- [aot](narrative/aot.md): Atom of Thoughts — Markov test-time scaling via DAG decompose + contract.
+- [aot](narrative/aot.md): Atom of Thoughts — Markov test-time scaling via DAG decompose + contract (Teng 2025 §3.3 Algorithm 1).
 - [bot](narrative/bot.md): Identify problem type, apply thought template, verify (Buffer of Thoughts).
 - [coa](narrative/coa.md): Chain-of-Abstraction — reason with abstract placeholders, then ground via parallel knowledge resolution. Decouples reasoning structure from concrete facts.
 - [contrastive](narrative/contrastive.md): Contrastive CoT: generate correct and wrong chains and learn from the contrast.
@@ -154,7 +154,7 @@
 
 - [reflect](narrative/reflect.md): Self-critique loop — generate, critique, revise until convergence
 - [reflexion](narrative/reflexion.md): Episodic memory self-improvement — learns from failed attempts via verbal reinforcement. Each new attempt references accumulated reflections on past failures. reflect polishes; reflexion learns.
-- [s1](narrative/s1.md): Budget forcing — extends reasoning via 'Wait' continuation cues (prompt-level approximation of s1).
+- [s1](narrative/s1.md): Budget forcing — prompt-level approximation of Muennighoff 2025 §3 (Minimum + Maximum Token Enforcement).
 
 ## routing
 
@@ -214,4 +214,4 @@
 - [propose_verify](narrative/propose_verify.md): 2-call Propose→Verify Strategy: propose a candidate answer then verify it with a scored accept/reject verdict
 - [sprt](narrative/sprt.md): Wald Sequential Probability Ratio Test — anytime 2-hypothesis stopping rule for Bernoulli streams with (α, β) error guarantees and Wald–Wolfowitz optimal E[N]. Complements cs_pruner (multi-ar...
 - [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.
-- [think_prm](narrative/think_prm.md): ThinkPRM verifier — emits a per-step thinking chain and \boxed{correct|incorrect} verdicts.
+- [think_prm](narrative/think_prm.md): ThinkPRM verifier — per-step thinking chain + \boxed{correct|incorrect} verdicts (Khalifa 2025 §4 / Figure 21, training-free path).

@@ -93,12 +93,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`reconcile` / `moa` / `dmad` / `hegelian` / `conformal_vote` /
   `propose_verify`).
 
+- **Critical follow-up to the paper-strict alignment sweep —
+  paper-value misattributions, citation-number drift, and §8
+  literal-vocabulary residue identified by post-commit mathematical
+  review are now fully fixed across `s1` / `aot` / `think_prm`.**
+  - `think_prm` — `temperature = 0.1` and `max_thinking_tokens = 4096`
+    docstrings previously claimed "Khalifa 2025 §4 sampling default" /
+    "Khalifa 2025 §4 upper bound" but these values are the **official
+    ThinkPRM repo** README/init defaults; Khalifa 2025 §4 / §E.2
+    reports per-model sampling T=0.4 (Qwen-2.5-14B) / T=0.8
+    (Llama-3.2-3B-Instruct) and generates up to a maximum of 8192
+    tokens. Both defaults are now labeled as `(I)` conservative repo
+    defaults with prose contrast against the paper's actual values
+    (eliminates §7 violation #4: lib repo CP as "paper-literal").
+  - `think_prm` — Figure citation number drift fix. The verifier
+    prompt template referenced "Figure 14" but in arXiv v5 (current)
+    it is Figure 21 (Appendix A.2). Updated all
+    docstring / describe / comment / local-variable references
+    (`FIGURE_14_BODY` → `FIGURE_21_BODY`,
+    `FIGURE_14_EARLY_STOP_TAIL` → `FIGURE_21_EARLY_STOP_TAIL`) and
+    the spec section headings / test descriptions.
+  - `s1` — §8 default-禁止語 `paper-faithful` literal driven out of
+    the public `:describe` text + docstring + comment trail
+    (3 sites). T_max knob doc clarified to acknowledge the §5.1
+    ablation "around 30,000 thinking tokens" data point that the
+    previous "no canonical literal in §3" framing was implicitly
+    omitting.
+  - `s1` — §3 "`</think>` logit mask sets probability 0"
+    overspecified the paper. §3 literal only says "suppress the
+    generation of the end-of-thinking token delimiter"; the
+    suppression mechanism is paper-unspecified. Docstring rewritten
+    to quote the §3 literal and call the mechanism paper-unspecified.
+  - `aot` — `paper-faithful here` literal driven out (2 sites,
+    docstring + comment trail). Replaced with prose stating that
+    per-phase persona conditioning matches the paper's per-phase
+    distinct-LLM-call structure (Algorithm 1 lines 4 / 10 / 13)
+    without using the §8 short-label.
+
 ### Verified
 
-- 3 pkg specs pass via `mcp__lua-debugger__test_launch` —
-  `s1` 30/30, `aot` 30/30, `think_prm` 27/27 (cumulative 87/87).
+- 3 pkg specs pass via `mcp__algocline__alc_pkg_test` —
+  `s1` 30/30, `aot` 30/30, `think_prm` 27/27 (cumulative 87/87),
+  both before and after the critical follow-up fix application.
   Nested-dispatch monkey-patch tests added per pkg confirm the
   `M.<entry>` propagation invariant.
+- Projection regenerated via `mcp__algocline__alc_hub_dist` after
+  the critical follow-up fix (127 pkg gendoc; 0 lint errors / 0
+  lint warnings under `lint_strict=true`).
+- `grep -rn` confirms zero residual §8 NG literals (`paper-faithful`
+  / `paper-conformant` / `論文準拠` / `論文に忠実` / `neutral default`)
+  and zero residual `Figure 14` / `FIGURE_14_*` identifiers across
+  `s1/`, `aot/`, `think_prm/`.
 
 ## [0.29.1] - 2026-05-29
 
