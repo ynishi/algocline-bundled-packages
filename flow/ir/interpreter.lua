@@ -7,8 +7,8 @@
 --
 -- ## Dispatch injection
 --
--- Agent dispatch is injected via `opts.dispatch(agent_name, input)` so
--- the interpreter stays host-neutral. The default stub returns nil and
+-- Host dispatch is injected via `opts.dispatch(ref, input)` so the
+-- interpreter stays host-neutral. The default stub returns nil and
 -- raises on call, which is spec-friendly: tests provide their own
 -- recorder; production callers inject their own dispatcher.
 --
@@ -124,20 +124,20 @@ end
 --- recorder via `opts.dispatch`, and production callers inject their own
 --- dispatcher.
 ---
----@param agent_name string
+---@param ref string
 ---@param _input any
 ---@return nil
 ---@return string reason
-local function default_dispatch(agent_name, _input)
-    return nil, "default_dispatch: no dispatch configured for " .. agent_name
+local function default_dispatch(ref, _input)
+    return nil, "default_dispatch: no dispatch configured for " .. ref
 end
 
 -- ── Node exec ───────────────────────────────────────────────────────
 
 --- Execute one Node against ctx (in-place mutation).
 ---
---- `step`   evaluates `in_` (if present), calls opts.dispatch, writes
----          the result to ctx[out].
+--- `step`   evaluates `in_` (if present), calls opts.dispatch(ref, in),
+---          writes the result to ctx[out].
 --- `seq`    walks children in order.
 --- `branch` evaluates cond, dispatches to then_ / else_ by truthiness.
 ---
@@ -155,9 +155,9 @@ local function exec_node(node, ctx, opts)
     if kind == "step" then
         local input = nil
         if node.in_ then input = eval_expr(node.in_, ctx) end
-        local result, derr = opts.dispatch(node.agent, input)
+        local result, derr = opts.dispatch(node.ref, input)
         if derr and result == nil then
-            error("exec: step '" .. node.agent .. "': " .. derr, 2)
+            error("exec: step '" .. node.ref .. "': " .. derr, 2)
         end
         write_path(ctx, node.out, result)
     elseif kind == "seq" then
@@ -178,7 +178,7 @@ local function exec_node(node, ctx, opts)
 end
 
 ---@class flow.ir.ExecOpts
----@field dispatch fun(agent: string, input: any): any, string?
+---@field dispatch fun(ref: string, input: any): any, string?
 
 --- Execute a compiled IR.
 ---
@@ -188,7 +188,7 @@ end
 ---
 ---@param compiled flow.ir.Node  IR validated by flow.ir.compile
 ---@param ctx      table         initial ctx (mutated in place)
----@param opts     flow.ir.ExecOpts?  `{ dispatch = fn(agent, input) -> result, err? }`; default raises
+---@param opts     flow.ir.ExecOpts?  `{ dispatch = fn(ref, input) -> result, err? }`; default raises
 ---@return table ctx
 function M.exec(compiled, ctx, opts)
     opts = opts or {}

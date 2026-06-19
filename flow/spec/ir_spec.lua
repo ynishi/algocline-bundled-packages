@@ -31,8 +31,8 @@ local function path(at) return { op = "path", at = at } end
 local function lit(v)   return { op = "lit",  value = v } end
 local function eq(l, r) return { op = "eq",   lhs = l, rhs = r } end
 
-local function step(agent, out, in_)
-    return { kind = "step", agent = agent, out = out, in_ = in_ }
+local function step(ref, out, in_)
+    return { kind = "step", ref = ref, out = out, in_ = in_ }
 end
 local function seq(...)
     return { kind = "seq", children = { ... } }
@@ -41,13 +41,13 @@ local function branch(cond, t, e)
     return { kind = "branch", cond = cond, then_ = t, else_ = e }
 end
 
--- recording dispatcher: returns { agent = N } where N = ordinal call index
+-- recording dispatcher: returns { ref = N } where N = ordinal call index
 local function make_recorder()
     local log, n = {}, 0
-    return function(agent, input)
+    return function(ref, input)
         n = n + 1
-        log[#log + 1] = { agent = agent, input = input, n = n }
-        return { agent = agent, n = n }
+        log[#log + 1] = { ref = ref, input = input, n = n }
+        return { ref = ref, n = n }
     end, log
 end
 
@@ -106,7 +106,7 @@ describe("flow.ir.exec", function()
         local compiled = compile(step("a", "ctx.x"))
         local disp, log = make_recorder()
         local ctx = exec(compiled, {}, { dispatch = disp })
-        expect(ctx.x.agent).to.equal("a")
+        expect(ctx.x.ref).to.equal("a")
         expect(#log).to.equal(1)
     end)
 
@@ -117,8 +117,8 @@ describe("flow.ir.exec", function()
         ))
         local disp, log = make_recorder()
         local ctx = exec(compiled, {}, { dispatch = disp })
-        expect(log[1].agent).to.equal("a")
-        expect(log[2].agent).to.equal("b")
+        expect(log[1].ref).to.equal("a")
+        expect(log[2].ref).to.equal("b")
         expect(ctx.x.n).to.equal(1)
         expect(ctx.y.n).to.equal(2)
     end)
@@ -131,7 +131,7 @@ describe("flow.ir.exec", function()
         ))
         local disp, log = make_recorder()
         local ctx = exec(compiled, { status = "ok" }, { dispatch = disp })
-        expect(log[1].agent).to.equal("a")
+        expect(log[1].ref).to.equal("a")
         expect(ctx.done).to.exist()
         expect(ctx.retry).to.equal(nil)
     end)
@@ -140,11 +140,11 @@ describe("flow.ir.exec", function()
         local compiled = compile(seq(
             step("a", "ctx.x"),
             step("b", "ctx.y"),
-            -- the recorder stub writes { agent = ..., n = ... } so the
-            -- branch reads ctx.y.agent to verify a real path read can
+            -- the recorder stub writes { ref = ..., n = ... } so the
+            -- branch reads ctx.y.ref to verify a real path read can
             -- drive the decision.
             branch(
-                eq(path("$.ctx.y.agent"), lit("b")),
+                eq(path("$.ctx.y.ref"), lit("b")),
                 step("c", "ctx.done"),
                 step("d", "ctx.retry")
             )
@@ -152,7 +152,7 @@ describe("flow.ir.exec", function()
         local disp, log = make_recorder()
         local ctx = exec(compiled, {}, { dispatch = disp })
         expect(#log).to.equal(3)
-        expect(log[3].agent).to.equal("c")
+        expect(log[3].ref).to.equal("c")
         expect(ctx.done).to.exist()
         expect(ctx.retry).to.equal(nil)
     end)

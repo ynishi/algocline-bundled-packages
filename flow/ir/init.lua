@@ -40,8 +40,10 @@ M.compile = compile_mod.compile
 --- Execute a compiled IR against an initial ctx.
 ---
 --- See flow.ir.interpreter §Dispatch injection / §Path resolution for
---- the runtime contract. `opts.dispatch` is required for any IR that
---- contains a `step` node; the default stub raises.
+--- the runtime contract. `opts.dispatch(ref, input)` is required for
+--- any IR that contains a `step` node; the default stub raises. The
+--- interpreter is host-neutral — `ref` is an opaque string the host
+--- alone interprets.
 ---
 ---@type fun(compiled: flow.ir.Node, ctx: table, opts: flow.ir.ExecOpts?): table
 M.exec    = interp.exec

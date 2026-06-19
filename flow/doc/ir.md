@@ -11,8 +11,8 @@ local ir   = flow.ir
 local compiled = ir.compile({
     kind = "seq",
     children = {
-        { kind = "step", agent = "a", out = "ctx.x" },
-        { kind = "step", agent = "b", out = "ctx.y" },
+        { kind = "step", ref = "a", out = "ctx.x" },
+        { kind = "step", ref = "b", out = "ctx.y" },
         {
             kind  = "branch",
             cond  = {
@@ -20,16 +20,16 @@ local compiled = ir.compile({
                 lhs = { op = "path", at = "$.ctx.y.status" },
                 rhs = { op = "lit",  value = "ok" },
             },
-            then_ = { kind = "step", agent = "c", out = "ctx.done" },
-            else_ = { kind = "step", agent = "d", out = "ctx.retry" },
+            then_ = { kind = "step", ref = "c", out = "ctx.done" },
+            else_ = { kind = "step", ref = "d", out = "ctx.retry" },
         },
     },
 })
 assert(compiled, "compile failed")
 
 local ctx = ir.exec(compiled, {}, {
-    dispatch = function(agent, _input)
-        return { agent = agent, status = "ok" }  -- host wires its own dispatcher
+    dispatch = function(ref, _input)
+        return { ref = ref, status = "ok" }  -- host wires its own dispatcher
     end,
 })
 ```
@@ -46,8 +46,10 @@ The Def layer is a plain Lua table:
   fail at compile, not at exec. `T.discriminated` with
   `open = false` (belt-and-suspenders, `alc_shapes.t §C4`) makes
   unknown tags a compile error.
-- **Host neutral** — the interpreter knows nothing about agents. It
-  only walks Nodes / Exprs and calls `opts.dispatch(agent, input)`.
+- **Host neutral** — the interpreter knows nothing about what `step.ref`
+  refers to. It walks Nodes / Exprs and calls `opts.dispatch(ref,
+  input)`; everything host-specific (agents, LLM calls, functions,
+  external services) lives behind that dispatch.
 
 ## Def → Compile → Exec
 
@@ -65,7 +67,7 @@ The Def layer is a plain Lua table:
                        ▼
                 ┌─────────────┐
                 │   exec()    │  walks Nodes, evaluates Exprs,
-                │             │  calls opts.dispatch(agent, input)
+                │             │  calls opts.dispatch(ref, input)
                 └─────────────┘
                        │
                        ▼
@@ -78,15 +80,19 @@ the same table on success; no separate transformation step.
 
 ## Surface (MVP)
 
-| Layer | Kinds |
-|---|---|
-| Node | `step` / `seq` / `branch` |
-| Expr | `path` / `lit` / `eq` |
+| Layer | Kinds | Purity |
+|---|---|---|
+| Effect Node (L4) | `step` | host call via `opts.dispatch` |
+| Control Node (L3) | `seq` / `branch` | pure structured control |
+| Expr (L3) | `path` / `lit` / `eq` | pure value |
+
+The interpreter treats `step` as the **only** host-escape Node; every
+other Node and every Expr is host-neutral.
 
 ### Node shapes
 
 ```lua
-{ kind = "step",   agent = "<name>", in_ = <Expr>?, out = "ctx.<path>" }
+{ kind = "step",   ref = "<handler>", in_ = <Expr>?, out = "ctx.<path>" }
 { kind = "seq",    children = { <Node>, ... } }
 { kind = "branch", cond = <Expr>, then_ = <Node>, else_ = <Node> }
 ```
@@ -113,7 +119,7 @@ local ir = require("flow").ir
 
 ir.compile(def)                  -- flow.ir.Node → flow.ir.Node | nil, reason
 ir.exec(compiled, ctx, opts)     -- mutates + returns ctx
-                                 -- opts.dispatch(agent, input) -> result, err?
+                                 -- opts.dispatch(ref, input) -> result, err?
 
 ir.Node                          -- alc_shapes discriminated schema (Schema-as-Data)
 ir.Expr                          -- alc_shapes discriminated schema (Schema-as-Data)

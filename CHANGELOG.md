@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow.ir` — host-neutrality cleanup (v0.3.0-beta, breaking
+  `step` Node field rename)**. `step.agent` field renamed to
+  `step.ref`; the field is an opaque handler reference passed to
+  `opts.dispatch(ref, input)` — what the host does with it
+  (Agent call / LLM invocation / function dispatch / external
+  service) is the host's concern, not the IR's. The IR is a
+  host-neutral substrate; carrying "agent" in the field name was a
+  domain-leak. `flow/doc/ir.md` reframes the surface as L3 control +
+  L4 effect: `step` is the only effect Node (host escape via
+  dispatch), every other Node and Expr is pure structured control or
+  pure value. Docstring + spec helper + example all updated to use
+  `ref` consistently. Breaking only within the pre-1.0 beta surface
+  (`flow` v0.3.0-beta).
+
 - **`s1` package — paper §3 strict alignment (v0.1.0 → v0.2.0,
   breaking `run.input` + `run.result` shape)**. v0.1.0 implemented
   Muennighoff 2025's budget forcing as an unconditional fixed-N

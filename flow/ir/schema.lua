@@ -2,7 +2,9 @@
 -- Node + Expr schema (Schema-as-Data).
 --
 -- MVP surface: 3 Node kinds (step / seq / branch) + 3 Expr ops
--- (path / lit / eq).
+-- (path / lit / eq). `step` is the host-escape effect Node (calls
+-- opts.dispatch); the remaining Node kinds and all Expr ops are
+-- host-neutral (pure structured control + pure value computation).
 --
 -- ## Why discriminated + open=false
 --
@@ -11,8 +13,8 @@
 -- suspenders fail-loud (C4 in alc_shapes/t.lua). Typos in `kind` /
 -- `op` are caught at compile (`flow.ir.compile`) rather than silently
 -- passing through at exec. `open = false` rejects unknown top-level
--- fields so e.g. `{ kind = "step", agnet = "x", ... }` (typo in
--- `agent`) fails loud instead of leaking through.
+-- fields so e.g. `{ kind = "step", rf = "x", ... }` (typo in `ref`)
+-- fails loud instead of leaking through.
 --
 -- ## Why T.table for children (not T.ref recursion)
 --
@@ -27,7 +29,7 @@
 -- The IR shape declared here is the public Schema-as-Data SoT for
 -- `flow.ir`. Consumers MAY rawget on these fields:
 --
---   step.kind / step.agent / step.in_ / step.out
+--   step.kind / step.ref / step.in_ / step.out
 --   seq.kind / seq.children
 --   branch.kind / branch.cond / branch.then_ / branch.else_
 --   Expr.path.op / Expr.path.at
@@ -85,7 +87,7 @@ M.EXPR_OPS = { path = true, lit = true, eq = true }
 
 ---@class flow.ir.Node.step
 ---@field kind   "step"
----@field agent  string  agent name, looked up via opts.dispatch
+---@field ref    string  opaque handler reference passed to opts.dispatch
 ---@field in_    flow.ir.Expr|nil  input Expr; nil → dispatch receives nil
 ---@field out    string  ctx write path; must start with "ctx."
 
@@ -107,10 +109,10 @@ M.EXPR_OPS = { path = true, lit = true, eq = true }
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `kind`
 M.Node = T.discriminated("kind", {
     step = T.shape({
-        kind  = T.one_of({ "step" }),
-        agent = T.string:describe("agent name, registry lookup key"),
-        in_   = T.table:is_optional():describe("input Expr (walked)"),
-        out   = T.string:describe("ctx write path, must start with 'ctx.'"),
+        kind = T.one_of({ "step" }),
+        ref  = T.string:describe("opaque handler reference, passed to opts.dispatch"),
+        in_  = T.table:is_optional():describe("input Expr (walked)"),
+        out  = T.string:describe("ctx write path, must start with 'ctx.'"),
     }, { open = false }),
     seq = T.shape({
         kind     = T.one_of({ "seq" }),

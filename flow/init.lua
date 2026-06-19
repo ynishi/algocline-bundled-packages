@@ -5,9 +5,10 @@
 ---   ReqToken  — a random nonce bound to a state, echoed by downstream
 ---               pkg results and verified on return.
 ---   IR        — Schema-as-Data Node + Expr IR with Def → Compile → Exec
----               (see `flow.ir`, `flow/doc/ir.md`). Minimum-primitive
+---               (see `flow.ir`, `flow/doc/ir.md`). Host-neutral
 ---               substrate for authoring pipelines as a single Lua
----               table; host neutral (dispatch is injected).
+---               table; effects enter only through the `step` Node
+---               which calls an injected `opts.dispatch(ref, input)`.
 ---
 --- flow is a substrate, not an orchestrator. It does not provide M.run.
 --- The driver loop stays in user code (Recipe). This preserves the
