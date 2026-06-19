@@ -43,6 +43,15 @@ end
 local function branch(cond, t, e)
     return { kind = "branch", cond = cond, then_ = t, else_ = e }
 end
+local function letx(at, value)
+    return { kind = "let", at = at, value = value }
+end
+local function loopx(cond, body, max, counter)
+    return { kind = "loop", cond = cond, body = body, max = max, counter = counter }
+end
+local function callx(flow_name, args, out)
+    return { kind = "call", flow = flow_name, args = args, out = out }
+end
 
 -- recording dispatcher: returns { ref = N } where N = ordinal call index
 local function make_recorder()
@@ -80,7 +89,7 @@ describe("flow.ir.compile", function()
     end)
 
     it("rejects an unknown Node kind", function()
-        local ok, reason = compile({ kind = "loop", body = step("a", "ctx.x") })
+        local ok, reason = compile({ kind = "no_such_kind", body = step("a", "ctx.x") })
         expect(ok).to.equal(nil)
         expect(reason:find("unknown Node kind")).to.exist()
     end)
@@ -127,6 +136,35 @@ describe("flow.ir.compile", function()
             step("b", "ctx.retry")
         ))
         expect(ok).to.exist()
+    end)
+
+    it("rejects let.at without 'ctx.' prefix", function()
+        local ok, reason = compile(letx("flag", lit(true)))
+        expect(ok).to.equal(nil)
+        expect(reason:find("ctx%.")).to.exist()
+    end)
+
+    it("rejects loop without `max`", function()
+        local ok, reason = compile(loopx(lit(true), letx("ctx.x", lit(1)), nil, "ctx.i"))
+        expect(ok).to.equal(nil)
+        expect(reason:find("max")).to.exist()
+    end)
+
+    it("rejects nested loop sharing counter path", function()
+        local inner = loopx(lit(true), letx("ctx.x", lit(1)), 3, "ctx.i")
+        local outer = loopx(lit(true), inner, 3, "ctx.i")
+        local ok, reason = compile(outer)
+        expect(ok).to.equal(nil)
+        expect(reason:find("nested loop reuses counter")).to.exist()
+    end)
+
+    it("rejects call.flow not in eager registry", function()
+        local ok, reason = compile(
+            callx("missing", {}, "ctx.out"),
+            { flows = { other = true } }
+        )
+        expect(ok).to.equal(nil)
+        expect(reason:find("not in opts.flows registry")).to.exist()
     end)
 end)
 
@@ -246,6 +284,86 @@ describe("flow.ir.exec", function()
         expect(ctx.num_lt).to.exist()
         expect(ctx.str_lt).to.exist()
         expect(ctx.bad_ge).to.exist()
+    end)
+
+    it("`let` binds a literal Expr to ctx", function()
+        local compiled = compile(letx("ctx.greeting", lit("hi")))
+        local ctx = exec(compiled, {})
+        expect(ctx.greeting).to.equal("hi")
+    end)
+
+    it("`let` binds a computed Expr (eq → boolean)", function()
+        local compiled = compile(letx("ctx.match", eq(lit(3), lit(3))))
+        local ctx = exec(compiled, {})
+        expect(ctx.match).to.equal(true)
+    end)
+
+    it("`loop` runs zero times when cond is false on first check", function()
+        local compiled = compile(loopx(
+            lit(false),
+            letx("ctx.touched", lit(true)),
+            5,
+            "ctx.i"
+        ))
+        local ctx = exec(compiled, {})
+        expect(ctx.i).to.equal(0)
+        expect(ctx.touched).to.equal(nil)
+    end)
+
+    it("`loop` increments counter and exits when cond goes false", function()
+        local compiled = compile(loopx(
+            lt(path("$.ctx.i"), lit(3)),
+            letx("ctx.touched", path("$.ctx.i")),
+            5,
+            "ctx.i"
+        ))
+        local ctx = exec(compiled, {})
+        expect(ctx.i).to.equal(3)
+        expect(ctx.touched).to.equal(3)
+    end)
+
+    it("`loop.max` guards an always-truthy cond", function()
+        local compiled = compile(loopx(
+            lit(true),
+            letx("ctx.touched", path("$.ctx.i")),
+            4,
+            "ctx.i"
+        ))
+        local ctx = exec(compiled, {})
+        expect(ctx.i).to.equal(4)
+        expect(ctx.touched).to.equal(4)
+    end)
+
+    it("`call` invokes a sub-flow and merges sub-ctx under out", function()
+        local sub_flow = compile(seq(
+            letx("ctx.echo", path("$.ctx.x")),
+            step("a", "ctx.result")
+        ))
+        local main = compile(callx("sub", { x = lit(42) }, "ctx.out"))
+        local disp, log = make_recorder()
+        local ctx = exec(main, {}, { dispatch = disp, flows = { sub = sub_flow } })
+        expect(ctx.out.echo).to.equal(42)
+        expect(ctx.out.result.ref).to.equal("a")
+        expect(ctx.out.x).to.equal(42)
+        expect(#log).to.equal(1)
+    end)
+
+    it("`call` raises on unknown flow at exec time (lazy mode)", function()
+        local main = compile(callx("missing", {}, "ctx.out"))
+        local ok, ex_err = pcall(function()
+            exec(main, {}, { flows = {} })
+        end)
+        expect(ok).to.equal(false)
+        expect(tostring(ex_err):find("not registered")).to.exist()
+    end)
+
+    it("`call` enforces max_call_depth on recursion", function()
+        local rec = compile(callx("rec", {}, "ctx.r"))
+        local ok, ex_err = pcall(function()
+            exec(rec, {}, { flows = { rec = rec }, max_call_depth = 3 })
+        end)
+        expect(ok).to.equal(false)
+        expect(tostring(ex_err):find("max_call_depth")).to.exist()
     end)
 
     it("runs a multi-stage IR (seq → seq → branch on a prior step's output)", function()

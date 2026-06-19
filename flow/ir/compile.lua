@@ -95,11 +95,21 @@ local function check_expr(expr, path)
 end
 
 --- Recursively validate a Node.
----@param node flow.ir.Node
----@param path string  IR location for error messages
+---
+--- `walk_state` carries state threaded through the recursive descent:
+---   - `active_counters` : Set<string>  loop.counter paths currently in
+---     enclosing scope; nested loop reusing the same path is a compile
+---     error.
+---   - `known_flows`     : Set<string>?  call.flow eager registry; when
+---     provided, unknown flows are a compile error (lazy when nil).
+---
+---@param node       flow.ir.Node
+---@param path       string  IR location for error messages
+---@param walk_state table?  threaded walk state (see above)
 ---@return boolean|nil ok   true on success, nil on failure
 ---@return string?    reason  set when ok is nil
-local function check_node(node, path)
+local function check_node(node, path, walk_state)
+    walk_state = walk_state or { active_counters = {}, known_flows = nil }
     if type(node) ~= "table" then
         return err(path, "expected Node table, got " .. type(node))
     end
@@ -121,20 +131,67 @@ local function check_node(node, path)
     elseif kind == "seq" then
         for i, child in ipairs(node.children) do
             local sub
-            sub, reason = check_node(child, string.format("%s.children[%d]", path, i))
+            sub, reason = check_node(child, string.format("%s.children[%d]", path, i), walk_state)
             if not sub then return nil, reason end
         end
     elseif kind == "branch" then
         local sub
         sub, reason = check_expr(node.cond, path .. ".cond")
         if not sub then return nil, reason end
-        sub, reason = check_node(node.then_, path .. ".then_")
+        sub, reason = check_node(node.then_, path .. ".then_", walk_state)
         if not sub then return nil, reason end
-        sub, reason = check_node(node.else_, path .. ".else_")
+        sub, reason = check_node(node.else_, path .. ".else_", walk_state)
         if not sub then return nil, reason end
+    elseif kind == "let" then
+        if node.at:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
+            return err(path, "let.at must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        local sub
+        sub, reason = check_expr(node.value, path .. ".value")
+        if not sub then return nil, reason end
+    elseif kind == "loop" then
+        if type(node.max) ~= "number" or node.max < 1 or node.max ~= math.floor(node.max) then
+            return err(path, "loop.max must be an integer >= 1, got " .. tostring(node.max))
+        end
+        if node.counter:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
+            return err(path, "loop.counter must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if walk_state.active_counters[node.counter] then
+            return err(path,
+                "loop.counter: nested loop reuses counter path '" .. node.counter .. "'")
+        end
+        local sub
+        sub, reason = check_expr(node.cond, path .. ".cond")
+        if not sub then return nil, reason end
+        -- augment active_counters for body walk (clone to avoid mutating caller's state)
+        local body_state = { active_counters = {}, known_flows = walk_state.known_flows }
+        for k, v in pairs(walk_state.active_counters) do body_state.active_counters[k] = v end
+        body_state.active_counters[node.counter] = true
+        sub, reason = check_node(node.body, path .. ".body", body_state)
+        if not sub then return nil, reason end
+    elseif kind == "call" then
+        if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
+            return err(path, "call.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if node.flow == "" then
+            return err(path, "call.flow: required non-empty string")
+        end
+        if walk_state.known_flows and not walk_state.known_flows[node.flow] then
+            return err(path, "call.flow: '" .. node.flow .. "' not in opts.flows registry")
+        end
+        for k, sub_expr in pairs(node.args) do
+            local sub
+            sub, reason = check_expr(sub_expr, path .. ".args." .. tostring(k))
+            if not sub then return nil, reason end
+        end
     end
     return true
 end
+
+---@class flow.ir.CompileOpts
+---@field flows table<string, any>?  if provided, every `call.flow` name
+---   not present as a key is a compile error (eager registry check).
+---   Default (nil) defers `call.flow` resolution to exec.
 
 --- Compile a Lua-table IR.
 ---
@@ -144,10 +201,16 @@ end
 --- nil + reason are returned. Reasons are JSONPath-ish (`$.cond.lhs: …`).
 ---
 ---@param ir flow.ir.Node  the root Node (Def)
+---@param opts flow.ir.CompileOpts?  optional eager-validation knobs
 ---@return flow.ir.Node|nil compiled
 ---@return string? reason  set when compiled is nil
-function M.compile(ir)
-    local ok, reason = check_node(ir, "$")
+function M.compile(ir, opts)
+    opts = opts or {}
+    local walk_state = {
+        active_counters = {},
+        known_flows = opts.flows,
+    }
+    local ok, reason = check_node(ir, "$", walk_state)
     if not ok then return nil, reason end
     return ir
 end

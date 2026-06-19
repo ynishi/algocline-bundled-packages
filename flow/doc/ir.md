@@ -83,7 +83,7 @@ the same table on success; no separate transformation step.
 | Layer | Kinds | Purity |
 |---|---|---|
 | Effect Node (L4) | `step` | host call via `opts.dispatch` |
-| Control Node (L3) | `seq` / `branch` | pure structured control |
+| Control Node (L3) | `seq` / `branch` / `let` / `loop` / `call` | pure structured control |
 | Expr (L3) | `path` / `lit` / `eq` / `and` / `not` / `lt` | pure value |
 
 The interpreter treats `step` as the **only** host-escape Node; every
@@ -95,7 +95,23 @@ other Node and every Expr is host-neutral.
 { kind = "step",   ref = "<handler>", in_ = <Expr>?, out = "ctx.<path>" }
 { kind = "seq",    children = { <Node>, ... } }
 { kind = "branch", cond = <Expr>, then_ = <Node>, else_ = <Node> }
+{ kind = "let",    at = "ctx.<path>", value = <Expr> }
+{ kind = "loop",   cond = <Expr>, body = <Node>,
+                   max = <int>=1>, counter = "ctx.<path>" }
+{ kind = "call",   flow = "<name>", args = { <k> = <Expr>, ... },
+                   out = "ctx.<path>" }
 ```
+
+`let` is pure — `value` is evaluated and bound to `ctx[at]` without
+any host call. `loop` is while-style: `cond` is evaluated before each
+iteration; `counter` is written as 0 before the loop and incremented
+to N after the Nth iteration; `max` is a hard upper bound (compile
+rejects `max < 1`). Nested loops sharing the same `counter` path are
+a compile error. `call` invokes a registered sub-IR (`opts.flows[flow]`)
+with a fresh sub-ctx built from `args`, then writes the entire sub-ctx
+to `ctx[out]`. Recursion is bounded by `opts.max_call_depth` (default
+64). `compile(ir, { flows = {...} })` enables eager validation of
+`call.flow` names; otherwise resolution is deferred to exec.
 
 ### Expr shapes
 

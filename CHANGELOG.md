@@ -23,6 +23,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ref` consistently. Breaking only within the pre-1.0 beta surface
   (`flow` v0.3.0-beta).
 
+- **`flow.ir` — L3 Node surface completion (v0.3.0-beta)**. Three
+  pure-control Node kinds added:
+  - `let { at, value }` — pure value bind to ctx. The first Node
+    that writes to ctx without going through a host call. Removes
+    the need to use `step` for setting derived state.
+  - `loop { cond, body, max, counter }` — while-style bounded
+    iteration. `cond` is evaluated before each iteration; `counter`
+    is written as 0 before the loop and incremented to N after the
+    Nth iteration; `max` is a hard upper bound (compile rejects
+    `max < 1`). Nested loops sharing the same `counter` path are a
+    compile error.
+  - `call { flow, args, out }` — sub-IR invocation. The registry is
+    injected via `opts.flows = { name = <compiled IR>, ... }`,
+    mirroring the dispatch injection pattern. A fresh sub-ctx is
+    built by evaluating each `args[k]` against the caller's ctx;
+    the sub-flow executes against that sub-ctx; the entire sub-ctx
+    is then written under `out`. Recursion is bounded by
+    `opts.max_call_depth` (default 64).
+  `compile(ir, { flows = {...} })` now accepts an eager-registry opt
+  for `call.flow` name validation; lazy resolution is the default.
+  L3 Node surface is now 5 control kinds + 1 effect Node (`step`):
+  `seq / branch / let / loop / call / step`, matching the §F target.
+
 - **`flow.ir` — L3 Expr surface completion (v0.3.0-beta)**. Three
   pure-value Expr ops added:
   - `and { args = { <Expr>, ... } }` — short-circuit conjunction;

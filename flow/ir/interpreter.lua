@@ -153,6 +153,17 @@ end
 ---          writes the result to ctx[out].
 --- `seq`    walks children in order.
 --- `branch` evaluates cond, dispatches to then_ / else_ by truthiness.
+--- `let`    evaluates `value` against ctx and binds the result to ctx[at]
+---          (pure value bind; no host call).
+--- `loop`   while-loop with hard `max` cap; writes 0 to `counter` before
+---          entering, then increments and writes before each iteration.
+---          `cond` is evaluated before each iteration; on exit the
+---          counter retains the count of completed iterations.
+--- `call`   looks up `opts.flows[flow]`, builds a fresh sub-ctx by
+---          evaluating each `args[k]` against the caller's ctx, executes
+---          the sub-flow against sub-ctx, then writes the full sub-ctx
+---          to caller's ctx[out]. Recursion is bounded by
+---          `opts.max_call_depth` (default 64).
 ---
 --- Errors raise (`error(... , 2)`) rather than returning nil-reason; the
 --- caller (`M.exec`) treats Node exec as transactional from the caller's
@@ -184,6 +195,32 @@ local function exec_node(node, ctx, opts)
         else
             exec_node(node.else_, ctx, opts)
         end
+    elseif kind == "let" then
+        write_path(ctx, node.at, eval_expr(node.value, ctx))
+    elseif kind == "loop" then
+        write_path(ctx, node.counter, 0)
+        local n = 0
+        while n < node.max and eval_expr(node.cond, ctx) do
+            n = n + 1
+            write_path(ctx, node.counter, n)
+            exec_node(node.body, ctx, opts)
+        end
+    elseif kind == "call" then
+        if opts._call_depth >= opts.max_call_depth then
+            error("exec: call: max_call_depth (" .. opts.max_call_depth .. ") exceeded", 2)
+        end
+        local sub_flow = (opts.flows or {})[node.flow]
+        if sub_flow == nil then
+            error("exec: call: flow '" .. node.flow .. "' not registered in opts.flows", 2)
+        end
+        local sub_ctx = {}
+        for k, expr in pairs(node.args) do
+            sub_ctx[k] = eval_expr(expr, ctx)
+        end
+        opts._call_depth = opts._call_depth + 1
+        exec_node(sub_flow, sub_ctx, opts)
+        opts._call_depth = opts._call_depth - 1
+        write_path(ctx, node.out, sub_ctx)
     else
         error("exec: unknown kind " .. tostring(kind), 2)
     end
@@ -191,7 +228,9 @@ local function exec_node(node, ctx, opts)
 end
 
 ---@class flow.ir.ExecOpts
----@field dispatch fun(ref: string, input: any): any, string?
+---@field dispatch       fun(ref: string, input: any): any, string?
+---@field flows          table<string, flow.ir.Node>?  registry for `call.flow`
+---@field max_call_depth integer?  recursion cap for `call` (default 64)
 
 --- Execute a compiled IR.
 ---
@@ -199,13 +238,19 @@ end
 --- `local ctx = flow.ir.exec(ir, {}, { dispatch = ... })`).
 --- Errors raise via `error()` — callers wanting recovery should pcall.
 ---
+--- `opts.flows` must include every name referenced by a `call` Node in
+--- the IR (compile can validate eagerly via `compile.opts.flows`).
+--- `opts.max_call_depth` caps `call` recursion at 64 by default.
+---
 ---@param compiled flow.ir.Node  IR validated by flow.ir.compile
 ---@param ctx      table         initial ctx (mutated in place)
----@param opts     flow.ir.ExecOpts?  `{ dispatch = fn(ref, input) -> result, err? }`; default raises
+---@param opts     flow.ir.ExecOpts?
 ---@return table ctx
 function M.exec(compiled, ctx, opts)
     opts = opts or {}
     opts.dispatch = opts.dispatch or default_dispatch
+    opts.max_call_depth = opts.max_call_depth or 64
+    opts._call_depth = 0
     return exec_node(compiled, ctx, opts)
 end
 

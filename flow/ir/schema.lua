@@ -133,10 +133,31 @@ M.EXPR_OPS = {
 ---@field then_  flow.ir.Node
 ---@field else_  flow.ir.Node
 
+---@class flow.ir.Node.let
+---@field kind   "let"
+---@field at     string        ctx write path; must start with "ctx."
+---@field value  flow.ir.Expr  Expr evaluated and bound to ctx[at]
+
+---@class flow.ir.Node.loop
+---@field kind     "loop"
+---@field cond     flow.ir.Expr  while-loop condition (eval'd before each iter)
+---@field body     flow.ir.Node  body executed per iteration
+---@field max      integer       hard upper bound on iteration count (>= 1)
+---@field counter  string        ctx write path for iteration index ("ctx.*")
+
+---@class flow.ir.Node.call
+---@field kind  "call"
+---@field flow  string                          registry key looked up via opts.flows
+---@field args  table<string, flow.ir.Expr>    mapped into sub-flow ctx
+---@field out   string                          ctx write path for sub-ctx ("ctx.*")
+
 ---@alias flow.ir.Node
 ---| flow.ir.Node.step
 ---| flow.ir.Node.seq
 ---| flow.ir.Node.branch
+---| flow.ir.Node.let
+---| flow.ir.Node.loop
+---| flow.ir.Node.call
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `kind`
 M.Node = T.discriminated("kind", {
@@ -156,9 +177,30 @@ M.Node = T.discriminated("kind", {
         then_ = T.table:describe("nested Node (walked)"),
         else_ = T.table:describe("nested Node (walked)"),
     }, { open = false }),
+    ["let"] = T.shape({
+        kind  = T.one_of({ "let" }),
+        at    = T.string:describe("ctx write path, must start with 'ctx.'"),
+        value = T.table:describe("nested Expr (walked)"),
+    }, { open = false }),
+    loop = T.shape({
+        kind    = T.one_of({ "loop" }),
+        cond    = T.table:describe("nested Expr (walked, evaluated before each iter)"),
+        body    = T.table:describe("nested Node (walked)"),
+        max     = T.number:describe("hard iteration cap, integer >= 1"),
+        counter = T.string:describe("ctx write path for iteration index, 'ctx.*'"),
+    }, { open = false }),
+    call = T.shape({
+        kind = T.one_of({ "call" }),
+        flow = T.string:describe("registry key looked up via opts.flows"),
+        args = T.table:describe("{ key = Expr, ... } mapped into sub-flow ctx"),
+        out  = T.string:describe("ctx write path for sub-flow ctx, 'ctx.*'"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Node kinds (membership test).
-M.NODE_KINDS = { step = true, seq = true, branch = true }
+M.NODE_KINDS = {
+    step = true, seq = true, branch = true,
+    ["let"] = true, loop = true, call = true,
+}
 
 return M
