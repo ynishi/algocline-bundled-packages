@@ -58,10 +58,26 @@ local M = {}
 ---@field lhs  flow.ir.Expr  nested Expr (walked by compile)
 ---@field rhs  flow.ir.Expr  nested Expr (walked by compile)
 
+---@class flow.ir.Expr.and
+---@field op    "and"
+---@field args  flow.ir.Expr[]  nested Exprs (walked, length >= 2)
+
+---@class flow.ir.Expr.not
+---@field op   "not"
+---@field arg  flow.ir.Expr  nested Expr (walked)
+
+---@class flow.ir.Expr.lt
+---@field op   "lt"
+---@field lhs  flow.ir.Expr  nested Expr (walked); numeric or string
+---@field rhs  flow.ir.Expr  nested Expr (walked); same type as lhs
+
 ---@alias flow.ir.Expr
 ---| flow.ir.Expr.path
 ---| flow.ir.Expr.lit
 ---| flow.ir.Expr.eq
+---| flow.ir.Expr.and
+---| flow.ir.Expr.not
+---| flow.ir.Expr.lt
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `op`
 M.Expr = T.discriminated("op", {
@@ -78,10 +94,26 @@ M.Expr = T.discriminated("op", {
         lhs = T.table:describe("nested Expr (walked by compile)"),
         rhs = T.table:describe("nested Expr (walked by compile)"),
     }, { open = false }),
+    ["and"] = T.shape({
+        op   = T.one_of({ "and" }),
+        args = T.array_of(T.table):describe("nested Exprs (walked, length >= 2)"),
+    }, { open = false }),
+    ["not"] = T.shape({
+        op  = T.one_of({ "not" }),
+        arg = T.table:describe("nested Expr (walked)"),
+    }, { open = false }),
+    lt = T.shape({
+        op  = T.one_of({ "lt" }),
+        lhs = T.table:describe("nested Expr (walked); numeric or string"),
+        rhs = T.table:describe("nested Expr (walked); same type as lhs"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Expr ops (membership test).
-M.EXPR_OPS = { path = true, lit = true, eq = true }
+M.EXPR_OPS = {
+    path = true, lit = true, eq = true,
+    ["and"] = true, ["not"] = true, lt = true,
+}
 
 -- ── Node (kind-tagged) ──────────────────────────────────────────────
 

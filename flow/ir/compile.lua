@@ -70,6 +70,26 @@ local function check_expr(expr, path)
         if not sub then return nil, reason end
         sub, reason = check_expr(expr.rhs, path .. ".rhs")
         if not sub then return nil, reason end
+    elseif op == "and" then
+        if type(expr.args) ~= "table" or #expr.args < 2 then
+            local got = type(expr.args) == "table" and #expr.args or 0
+            return err(path, "Expr.and: requires >= 2 args, got " .. got)
+        end
+        for i, sub_expr in ipairs(expr.args) do
+            local sub_ok
+            sub_ok, reason = check_expr(sub_expr, string.format("%s.args[%d]", path, i))
+            if not sub_ok then return nil, reason end
+        end
+    elseif op == "not" then
+        local sub
+        sub, reason = check_expr(expr.arg, path .. ".arg")
+        if not sub then return nil, reason end
+    elseif op == "lt" then
+        local sub
+        sub, reason = check_expr(expr.lhs, path .. ".lhs")
+        if not sub then return nil, reason end
+        sub, reason = check_expr(expr.rhs, path .. ".rhs")
+        if not sub then return nil, reason end
     end
     return true
 end

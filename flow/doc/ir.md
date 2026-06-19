@@ -78,13 +78,13 @@ Compile is a separate stage so the IR can be inspected and rejected
 before any side effect runs. The Def *is* the IR — `compile` returns
 the same table on success; no separate transformation step.
 
-## Surface (MVP)
+## Surface
 
 | Layer | Kinds | Purity |
 |---|---|---|
 | Effect Node (L4) | `step` | host call via `opts.dispatch` |
 | Control Node (L3) | `seq` / `branch` | pure structured control |
-| Expr (L3) | `path` / `lit` / `eq` | pure value |
+| Expr (L3) | `path` / `lit` / `eq` / `and` / `not` / `lt` | pure value |
 
 The interpreter treats `step` as the **only** host-escape Node; every
 other Node and every Expr is host-neutral.
@@ -103,7 +103,14 @@ other Node and every Expr is host-neutral.
 { op = "path", at = "$.ctx.<path>" }   -- read ctx
 { op = "lit",  value = <any> }         -- literal
 { op = "eq",   lhs = <Expr>, rhs = <Expr> }
+{ op = "and",  args = { <Expr>, <Expr>, ... } }  -- length >= 2, short-circuit
+{ op = "not",  arg = <Expr> }                    -- truthiness inversion
+{ op = "lt",   lhs = <Expr>, rhs = <Expr> }      -- numeric or lexicographic
 ```
+
+`and` / `not` / `lt` all return Lua booleans. `or` is derivable via
+De Morgan (`not(and(not(a), not(b)))`); kept out of the budget. `eq`
+follows Lua `==` semantics (reference equality on tables).
 
 ### State model
 

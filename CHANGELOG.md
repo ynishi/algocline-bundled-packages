@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ref` consistently. Breaking only within the pre-1.0 beta surface
   (`flow` v0.3.0-beta).
 
+- **`flow.ir` — L3 Expr surface completion (v0.3.0-beta)**. Three
+  pure-value Expr ops added:
+  - `and { args = { <Expr>, ... } }` — short-circuit conjunction;
+    requires `>= 2` args (compile rejects otherwise); returns Lua
+    boolean (predictability over Lua's last-truthy semantics).
+  - `not { arg = <Expr> }` — truthiness inversion; returns Lua
+    boolean.
+  - `lt { lhs, rhs }` — Lua `<` semantics; numeric for numbers,
+    lexicographic for strings; raises on unordered types.
+  `or` stays out of the budget (derivable via De Morgan
+  `not(and(not, not))`). L3 Expr surface is now 6 ops
+  (`path / lit / eq / and / not / lt`).
+
 - **`s1` package — paper §3 strict alignment (v0.1.0 → v0.2.0,
   breaking `run.input` + `run.result` shape)**. v0.1.0 implemented
   Muennighoff 2025's budget forcing as an unconditional fixed-N

@@ -30,6 +30,9 @@ local exec    = ir.exec
 local function path(at) return { op = "path", at = at } end
 local function lit(v)   return { op = "lit",  value = v } end
 local function eq(l, r) return { op = "eq",   lhs = l, rhs = r } end
+local function andx(...) return { op = "and", args = { ... } } end
+local function notx(e) return { op = "not",  arg = e } end
+local function lt(l, r) return { op = "lt",   lhs = l, rhs = r } end
 
 local function step(ref, out, in_)
     return { kind = "step", ref = ref, out = out, in_ = in_ }
@@ -97,6 +100,34 @@ describe("flow.ir.compile", function()
         expect(ok).to.equal(nil)
         expect(reason:find("ctx%.")).to.exist()
     end)
+
+    it("accepts an `and` Expr with >= 2 args", function()
+        local ok = compile(branch(
+            andx(eq(lit(1), lit(1)), eq(lit(2), lit(2))),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        expect(ok).to.exist()
+    end)
+
+    it("rejects an `and` Expr with < 2 args", function()
+        local ok, reason = compile(branch(
+            andx(eq(lit(1), lit(1))),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        expect(ok).to.equal(nil)
+        expect(reason:find("requires >= 2 args")).to.exist()
+    end)
+
+    it("accepts `not` and `lt` Exprs (nested in branch.cond)", function()
+        local ok = compile(branch(
+            notx(lt(lit(1), lit(2))),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        expect(ok).to.exist()
+    end)
 end)
 
 -- ── interpreter ─────────────────────────────────────────────────────
@@ -134,6 +165,87 @@ describe("flow.ir.exec", function()
         expect(log[1].ref).to.equal("a")
         expect(ctx.done).to.exist()
         expect(ctx.retry).to.equal(nil)
+    end)
+
+    it("`and` evaluates short-circuit; first falsy returns false", function()
+        local compiled = compile(branch(
+            andx(
+                eq(path("$.ctx.flag"), lit("ok")),
+                eq(path("$.ctx.flag"), lit("ok"))
+            ),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        local disp, log = make_recorder()
+        -- ctx.flag is missing -> path returns nil -> eq returns false
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("b")
+        expect(ctx.retry).to.exist()
+        expect(ctx.done).to.equal(nil)
+    end)
+
+    it("`and` with 3 truthy args runs the then branch", function()
+        local compiled = compile(branch(
+            andx(lit(1), lit("x"), lit(true)),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("a")
+        expect(ctx.done).to.exist()
+        expect(ctx.retry).to.equal(nil)
+    end)
+
+    it("`not` inverts truthiness (nil -> true, truthy -> false)", function()
+        local compiled = compile(seq(
+            branch(
+                notx(path("$.ctx.absent")),
+                step("a", "ctx.t1"),
+                step("b", "ctx.f1")
+            ),
+            branch(
+                notx(lit(true)),
+                step("c", "ctx.t2"),
+                step("d", "ctx.f2")
+            )
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("a")
+        expect(log[2].ref).to.equal("d")
+        expect(ctx.t1).to.exist()
+        expect(ctx.f1).to.equal(nil)
+        expect(ctx.t2).to.equal(nil)
+        expect(ctx.f2).to.exist()
+    end)
+
+    it("`lt` compares numbers and strings (lexicographic)", function()
+        local compiled = compile(seq(
+            branch(
+                lt(lit(3), lit(5)),
+                step("a", "ctx.num_lt"),
+                step("b", "ctx.num_ge")
+            ),
+            branch(
+                lt(lit("a"), lit("b")),
+                step("c", "ctx.str_lt"),
+                step("d", "ctx.str_ge")
+            ),
+            branch(
+                lt(lit(5), lit(3)),
+                step("e", "ctx.bad_lt"),
+                step("f", "ctx.bad_ge")
+            )
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("a")
+        expect(log[2].ref).to.equal("c")
+        expect(log[3].ref).to.equal("f")
+        expect(ctx.num_lt).to.exist()
+        expect(ctx.str_lt).to.exist()
+        expect(ctx.bad_ge).to.exist()
     end)
 
     it("runs a multi-stage IR (seq → seq → branch on a prior step's output)", function()

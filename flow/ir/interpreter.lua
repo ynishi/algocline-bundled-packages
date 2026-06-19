@@ -97,6 +97,10 @@ end
 --- `path` returns the value at the JSONPath-ish ref (or nil).
 --- `lit` returns the literal value as-is.
 --- `eq` returns boolean (Lua `==` semantics; nil == nil is true).
+--- `and` returns boolean (short-circuit; true iff every arg is truthy).
+--- `not` returns boolean (truthiness inversion).
+--- `lt` returns boolean (Lua `<` semantics; numeric for numbers,
+---     lexicographic for strings, raises on mixed/unordered types).
 ---
 ---@param expr flow.ir.Expr
 ---@param ctx  table
@@ -111,6 +115,15 @@ local function eval_expr(expr, ctx)
         return v
     elseif op == "eq" then
         return eval_expr(expr.lhs, ctx) == eval_expr(expr.rhs, ctx)
+    elseif op == "and" then
+        for _, sub in ipairs(expr.args) do
+            if not eval_expr(sub, ctx) then return false end
+        end
+        return true
+    elseif op == "not" then
+        return not eval_expr(expr.arg, ctx)
+    elseif op == "lt" then
+        return eval_expr(expr.lhs, ctx) < eval_expr(expr.rhs, ctx)
     end
     error("eval_expr: unknown op " .. tostring(op), 2)
 end
