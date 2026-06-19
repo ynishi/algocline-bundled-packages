@@ -1,9 +1,13 @@
 --- flow — Light Frame substrate for composing algo-based pkg
 ---
---- Provides two primitives:
+--- Provides three primitives:
 ---   FlowState — a plain table persisted via alc.state (KV primitive).
 ---   ReqToken  — a random nonce bound to a state, echoed by downstream
 ---               pkg results and verified on return.
+---   IR        — Schema-as-Data Node + Expr IR with Def → Compile → Exec
+---               (see `flow.ir`, `flow/doc/ir.md`). Minimum-primitive
+---               substrate for authoring pipelines as a single Lua
+---               table; host neutral (dispatch is injected).
 ---
 --- flow is a substrate, not an orchestrator. It does not provide M.run.
 --- The driver loop stays in user code (Recipe). This preserves the
@@ -33,19 +37,19 @@
 local state = require("flow.state")
 local token = require("flow.token")
 local llm   = require("flow.llm")
+local ir    = require("flow.ir")
 
 local M = {}
 
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.2.0",
-    description = "Flow Frame — FlowState + ReqToken substrate for composing "
-        .. "algo-based pkg (ab_mcts / cascade / coevolve / ...). "
-        .. "Light Frame: driver loop stays in user code. v0.2 adds "
-        .. "session-spanning bound APIs (wrap_bound / verify_bound / "
-        .. "llm_bound) that persist verify-side state across alc.llm "
-        .. "yield boundaries.",
+    version     = "0.3.0-beta",
+    description = "Flow Frame — FlowState + ReqToken + IR substrate for "
+        .. "composing algo-based pkg (ab_mcts / cascade / coevolve / "
+        .. "...). Light Frame: driver loop stays in user code. v0.3 "
+        .. "adds `flow.ir` — Schema-as-Data Node + Expr IR with "
+        .. "Def→Compile→Exec.",
     category    = "substrate",
     alc_shapes_compat = "^0.25",
 }
@@ -65,5 +69,10 @@ M.token_verify_bound = token.verify_bound
 
 M.llm                = llm.llm
 M.llm_bound          = llm.llm_bound
+
+-- IR sub-module (Schema-as-Data Node + Expr; Def → Compile → Exec).
+-- Exposed as a nested namespace because the surface (compile / exec /
+-- Node / Expr) is cohesive and benefits from a single qualifier.
+M.ir                 = ir
 
 return M

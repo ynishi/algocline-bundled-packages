@@ -1,6 +1,8 @@
 # flow — Light Frame for composing algo-based pkg
 
-Two primitives (FlowState + ReqToken) over `alc.state`, nothing more.
+Three primitives (FlowState + ReqToken + IR) over `alc.state` /
+`alc_shapes`, nothing more. See [`ir.md`](./ir.md) for the IR
+sub-module (Schema-as-Data Def → Compile → Exec).
 `flow` is a **substrate**, not an orchestrator: it does not provide `M.run`,
 and the driver loop stays in user code (Functional Core / Imperative Shell).
 

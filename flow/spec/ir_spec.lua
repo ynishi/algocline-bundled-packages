@@ -1,0 +1,159 @@
+--- Tests for flow.ir (Flow IR Def + interpreter).
+---
+--- MVP coverage:
+---   - schema validation (6 cases: 3 reject + 3 accept)
+---   - interpreter execution (4 cases: step/seq/branch/multi-stage)
+
+local describe, it, expect = lust.describe, lust.it, lust.expect
+
+-- See flow/spec/flow_spec.lua for the rationale of deriving REPO from
+-- package.path rather than os.getenv("PWD") — same constraint applies
+-- under mlua-probe-mcp.
+local function repo_root_from_package_path()
+    for entry in package.path:gmatch("[^;]+") do
+        local prefix = entry:match("^(.-)/%?%.lua$")
+        if prefix and prefix ~= "" and prefix:sub(1, 1) == "/" then
+            return prefix
+        end
+    end
+    return "."
+end
+local REPO = repo_root_from_package_path()
+package.path = REPO .. "/?.lua;" .. REPO .. "/?/init.lua;" .. package.path
+
+local ir      = require("flow.ir")
+local compile = ir.compile
+local exec    = ir.exec
+
+-- ── helpers ─────────────────────────────────────────────────────────
+
+local function path(at) return { op = "path", at = at } end
+local function lit(v)   return { op = "lit",  value = v } end
+local function eq(l, r) return { op = "eq",   lhs = l, rhs = r } end
+
+local function step(agent, out, in_)
+    return { kind = "step", agent = agent, out = out, in_ = in_ }
+end
+local function seq(...)
+    return { kind = "seq", children = { ... } }
+end
+local function branch(cond, t, e)
+    return { kind = "branch", cond = cond, then_ = t, else_ = e }
+end
+
+-- recording dispatcher: returns { agent = N } where N = ordinal call index
+local function make_recorder()
+    local log, n = {}, 0
+    return function(agent, input)
+        n = n + 1
+        log[#log + 1] = { agent = agent, input = input, n = n }
+        return { agent = agent, n = n }
+    end, log
+end
+
+-- ── compile / schema ────────────────────────────────────────────────
+
+describe("flow.ir.compile", function()
+    it("accepts a minimal step", function()
+        local ok = compile(step("a", "ctx.x"))
+        expect(ok).to.exist()
+    end)
+
+    it("accepts a seq of steps", function()
+        local ok = compile(seq(
+            step("a", "ctx.x"),
+            step("b", "ctx.y")
+        ))
+        expect(ok).to.exist()
+    end)
+
+    it("accepts a branch with an eq cond", function()
+        local ok = compile(branch(
+            eq(path("$.ctx.status"), lit("ok")),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        expect(ok).to.exist()
+    end)
+
+    it("rejects an unknown Node kind", function()
+        local ok, reason = compile({ kind = "loop", body = step("a", "ctx.x") })
+        expect(ok).to.equal(nil)
+        expect(reason:find("unknown Node kind")).to.exist()
+    end)
+
+    it("rejects an unknown Expr op (nested under branch.cond)", function()
+        local ok, reason = compile(branch(
+            { op = "not_yet_supported", arg = lit(true) },
+            step("a", "ctx.a"),
+            step("b", "ctx.b")
+        ))
+        expect(ok).to.equal(nil)
+        expect(reason:find("unknown Expr op")).to.exist()
+    end)
+
+    it("rejects step.out without the 'ctx.' prefix", function()
+        local ok, reason = compile(step("a", "missing_prefix"))
+        expect(ok).to.equal(nil)
+        expect(reason:find("ctx%.")).to.exist()
+    end)
+end)
+
+-- ── interpreter ─────────────────────────────────────────────────────
+
+describe("flow.ir.exec", function()
+    it("runs a single step and writes the out path", function()
+        local compiled = compile(step("a", "ctx.x"))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(ctx.x.agent).to.equal("a")
+        expect(#log).to.equal(1)
+    end)
+
+    it("runs a seq in order", function()
+        local compiled = compile(seq(
+            step("a", "ctx.x"),
+            step("b", "ctx.y")
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].agent).to.equal("a")
+        expect(log[2].agent).to.equal("b")
+        expect(ctx.x.n).to.equal(1)
+        expect(ctx.y.n).to.equal(2)
+    end)
+
+    it("branches on eq(path, lit)", function()
+        local compiled = compile(branch(
+            eq(path("$.ctx.status"), lit("ok")),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, { status = "ok" }, { dispatch = disp })
+        expect(log[1].agent).to.equal("a")
+        expect(ctx.done).to.exist()
+        expect(ctx.retry).to.equal(nil)
+    end)
+
+    it("runs a multi-stage IR (seq → seq → branch on a prior step's output)", function()
+        local compiled = compile(seq(
+            step("a", "ctx.x"),
+            step("b", "ctx.y"),
+            -- the recorder stub writes { agent = ..., n = ... } so the
+            -- branch reads ctx.y.agent to verify a real path read can
+            -- drive the decision.
+            branch(
+                eq(path("$.ctx.y.agent"), lit("b")),
+                step("c", "ctx.done"),
+                step("d", "ctx.retry")
+            )
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(#log).to.equal(3)
+        expect(log[3].agent).to.equal("c")
+        expect(ctx.done).to.exist()
+        expect(ctx.retry).to.equal(nil)
+    end)
+end)
