@@ -888,9 +888,9 @@ describe("flow: meta", function()
         end
     end)
 
-    it("meta.version is 0.3.0-beta (flow.ir sub-module added)", function()
+    it("meta.version is 0.3.0 (flow.ir Step 2 surface complete)", function()
         mock_alc_state()
         local flow = require("flow")
-        expect(flow.meta.version).to.equal("0.3.0-beta")
+        expect(flow.meta.version).to.equal("0.3.0")
     end)
 end)

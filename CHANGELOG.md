@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`flow.ir` — host-neutrality cleanup (v0.3.0-beta, breaking
+- **`flow` v0.2.0 → v0.3.0 — Step 2 surface stabilization**. Pre-1.0
+  beta surface (v0.3.0-beta) is now frozen as v0.3.0. The `flow.ir`
+  sub-module ships its complete L3 surface (6 Node + 6 Expr) plus 1
+  L4 effect Node (`step`). Subsequent v0.3.x releases will be
+  backwards-compatible within the v0.3 minor; the four `flow.ir`
+  entries below detail the surface that v0.3.0 freezes.
+
+- **`flow.ir` — host-neutrality cleanup (v0.3.0, breaking
   `step` Node field rename)**. `step.agent` field renamed to
   `step.ref`; the field is an opaque handler reference passed to
   `opts.dispatch(ref, input)` — what the host does with it
@@ -24,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`flow` v0.3.0-beta).
 
 - **`flow.ir` — fanout Node + ergonomics + cross-primitive smoke
-  (v0.3.0-beta)**. Final piece of the Step 2 surface:
+  (v0.3.0)**. Final piece of the Step 2 surface:
   - `fanout { items, bind, body, join, out }` — parallel-shaped Node
     with serial fallback. `items` must evaluate to a Lua array; the
     body runs per item against a branch-local ctx (shallow copy of
@@ -51,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exercises the full surface (6 Node + 6 Expr + step) in a single
   IR.
 
-- **`flow.ir` — L3 Node surface completion (v0.3.0-beta)**. Three
+- **`flow.ir` — L3 Node surface completion (v0.3.0)**. Three
   pure-control Node kinds added:
   - `let { at, value }` — pure value bind to ctx. The first Node
     that writes to ctx without going through a host call. Removes
@@ -74,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   L3 Node surface is now 5 control kinds + 1 effect Node (`step`):
   `seq / branch / let / loop / call / step`, matching the §F target.
 
-- **`flow.ir` — L3 Expr surface completion (v0.3.0-beta)**. Three
+- **`flow.ir` — L3 Expr surface completion (v0.3.0)**. Three
   pure-value Expr ops added:
   - `and { args = { <Expr>, ... } }` — short-circuit conjunction;
     requires `>= 2` args (compile rejects otherwise); returns Lua
