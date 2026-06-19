@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.3.0 → v0.3.1 — `or` / `len` Expr ops added,
+  docstring leak cleanup**.
+  - `or { args = { <Expr>, ... } }` — short-circuit disjunction;
+    requires `>= 2` args; returns Lua boolean (true on first
+    truthy, false if every arg is non-truthy).
+  - `len { arg = <Expr> }` — Lua `#`: works on strings (byte
+    length) and sequence-style arrays; raises on values without a
+    length op. Useful for `loop` cond / `fanout.items` size
+    checks without going through a host call.
+  - `flow/init.lua` module docstring trimmed: removed pre-existing
+    internal design-note references (publish-checker surfaced them
+    as a leak risk; cleared before any public-publish path).
+  L3 Expr surface is now 8 ops (`path / lit / eq / and / or /
+  not / lt / len`).
+
 - **`flow` v0.2.0 → v0.3.0 — Step 2 surface stabilization**. Pre-1.0
   beta surface (v0.3.0-beta) is now frozen as v0.3.0. The `flow.ir`
   sub-module ships its complete L3 surface (6 Node + 6 Expr) plus 1

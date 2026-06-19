@@ -101,6 +101,10 @@ end
 --- `not` returns boolean (truthiness inversion).
 --- `lt` returns boolean (Lua `<` semantics; numeric for numbers,
 ---     lexicographic for strings, raises on mixed/unordered types).
+--- `or` returns boolean (short-circuit; true on first truthy arg,
+---     false if every arg is non-truthy).
+--- `len` returns integer (Lua `#` semantics; works on strings and
+---     sequence-style arrays; raises on values without a length op).
 ---
 ---@param expr flow.ir.Expr
 ---@param ctx  table
@@ -124,6 +128,13 @@ local function eval_expr(expr, ctx)
         return not eval_expr(expr.arg, ctx)
     elseif op == "lt" then
         return eval_expr(expr.lhs, ctx) < eval_expr(expr.rhs, ctx)
+    elseif op == "or" then
+        for _, sub in ipairs(expr.args) do
+            if eval_expr(sub, ctx) then return true end
+        end
+        return false
+    elseif op == "len" then
+        return #eval_expr(expr.arg, ctx)
     end
     error("eval_expr: unknown op " .. tostring(op), 2)
 end

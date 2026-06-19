@@ -33,6 +33,8 @@ local function eq(l, r) return { op = "eq",   lhs = l, rhs = r } end
 local function andx(...) return { op = "and", args = { ... } } end
 local function notx(e) return { op = "not",  arg = e } end
 local function lt(l, r) return { op = "lt",   lhs = l, rhs = r } end
+local function orx(...) return { op = "or",  args = { ... } } end
+local function lenx(e) return { op = "len",  arg = e } end
 
 local function step(ref, out, in_)
     return { kind = "step", ref = ref, out = out, in_ = in_ }
@@ -209,6 +211,25 @@ describe("flow.ir.compile", function()
             cond = lit(true),
             then_ = step("a", "ctx.done"),
         })
+        expect(ok).to.exist()
+    end)
+
+    it("rejects an `or` Expr with < 2 args", function()
+        local ok, reason = compile(branch(
+            orx(lit(true)),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        expect(ok).to.equal(nil)
+        expect(reason:find("requires >= 2 args")).to.exist()
+    end)
+
+    it("accepts `or` and `len` Exprs (nested in branch.cond)", function()
+        local ok = compile(branch(
+            orx(eq(lenx(lit("abc")), lit(3)), eq(lit(1), lit(2))),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
         expect(ok).to.exist()
     end)
 end)
@@ -523,6 +544,40 @@ describe("flow.ir.exec", function()
         expect(log[1].ref).to.equal("ran")
         expect(ctx.x).to.equal(nil)
         expect(ctx.y).to.exist()
+    end)
+
+    it("`or` returns true on first truthy; short-circuits", function()
+        local compiled = compile(branch(
+            orx(eq(lit(1), lit(2)), eq(lit(3), lit(3))),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("a")
+        expect(ctx.done).to.exist()
+    end)
+
+    it("`or` returns false when every arg is falsy", function()
+        local compiled = compile(branch(
+            orx(lit(false), lit(nil)),
+            step("a", "ctx.done"),
+            step("b", "ctx.retry")
+        ))
+        local disp, log = make_recorder()
+        local ctx = exec(compiled, {}, { dispatch = disp })
+        expect(log[1].ref).to.equal("b")
+        expect(ctx.retry).to.exist()
+    end)
+
+    it("`len` returns string length and array length", function()
+        local compiled = compile(seq(
+            letx("ctx.s_len", lenx(lit("hello"))),
+            letx("ctx.a_len", lenx(lit({ 10, 20, 30, 40 })))
+        ))
+        local ctx = exec(compiled, {})
+        expect(ctx.s_len).to.equal(5)
+        expect(ctx.a_len).to.equal(4)
     end)
 
     it("`flow.ir.default_dispatch` is exposed and raises for unknown refs", function()

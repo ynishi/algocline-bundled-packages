@@ -16,11 +16,6 @@
 --- bundled algo pkg (ab_mcts, cascade, coevolve, ...) composable
 --- without an Agent boundary abstraction.
 ---
---- Design references:
----   - workspace/tasks/flow-frame/design-full.md
----   - workspace/tasks/flow-frame/design-refine.md
----   - workspace/tasks/flow-frame/bp-research.md
----
 --- Usage (minimal):
 ---   local flow = require("flow")
 ---
@@ -45,12 +40,12 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.3.0",
+    version     = "0.3.1",
     description = "Flow Frame — FlowState + ReqToken + IR substrate for "
         .. "composing algo-based pkg (ab_mcts / cascade / coevolve / "
         .. "...). Light Frame: driver loop stays in user code. v0.3 "
         .. "adds `flow.ir` — Schema-as-Data Node + Expr IR with "
-        .. "Def→Compile→Exec; L3 surface complete (6 Node + 6 Expr "
+        .. "Def→Compile→Exec; L3 surface complete (6 Node + 8 Expr "
         .. "+ 1 L4 effect).",
     category    = "substrate",
     alc_shapes_compat = "^0.25",
