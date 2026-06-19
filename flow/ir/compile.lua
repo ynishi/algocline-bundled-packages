@@ -100,8 +100,13 @@ end
 ---   - `active_counters` : Set<string>  loop.counter paths currently in
 ---     enclosing scope; nested loop reusing the same path is a compile
 ---     error.
+---   - `active_binds`    : Set<string>  fanout.bind paths currently in
+---     enclosing scope; nested fanout reusing the same path is a
+---     compile error.
 ---   - `known_flows`     : Set<string>?  call.flow eager registry; when
 ---     provided, unknown flows are a compile error (lazy when nil).
+---   - `known_refs`      : Set<string>?  step.ref eager registry; when
+---     provided, unknown refs are a compile error (lazy when nil).
 ---
 ---@param node       flow.ir.Node
 ---@param path       string  IR location for error messages
@@ -109,7 +114,10 @@ end
 ---@return boolean|nil ok   true on success, nil on failure
 ---@return string?    reason  set when ok is nil
 local function check_node(node, path, walk_state)
-    walk_state = walk_state or { active_counters = {}, known_flows = nil }
+    walk_state = walk_state or {
+        active_counters = {}, active_binds = {},
+        known_flows = nil, known_refs = nil,
+    }
     if type(node) ~= "table" then
         return err(path, "expected Node table, got " .. type(node))
     end
@@ -122,6 +130,9 @@ local function check_node(node, path, walk_state)
     if kind == "step" then
         if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
             return err(path, "step.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if walk_state.known_refs and not walk_state.known_refs[node.ref] then
+            return err(path, "step.ref: '" .. node.ref .. "' not in opts.refs registry")
         end
         if node.in_ ~= nil then
             local sub
@@ -140,8 +151,10 @@ local function check_node(node, path, walk_state)
         if not sub then return nil, reason end
         sub, reason = check_node(node.then_, path .. ".then_", walk_state)
         if not sub then return nil, reason end
-        sub, reason = check_node(node.else_, path .. ".else_", walk_state)
-        if not sub then return nil, reason end
+        if node.else_ ~= nil then
+            sub, reason = check_node(node.else_, path .. ".else_", walk_state)
+            if not sub then return nil, reason end
+        end
     elseif kind == "let" then
         if node.at:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
             return err(path, "let.at must start with '" .. CTX_WRITE_PREFIX .. "'")
@@ -164,7 +177,12 @@ local function check_node(node, path, walk_state)
         sub, reason = check_expr(node.cond, path .. ".cond")
         if not sub then return nil, reason end
         -- augment active_counters for body walk (clone to avoid mutating caller's state)
-        local body_state = { active_counters = {}, known_flows = walk_state.known_flows }
+        local body_state = {
+            active_counters = {},
+            active_binds = walk_state.active_binds,
+            known_flows = walk_state.known_flows,
+            known_refs = walk_state.known_refs,
+        }
         for k, v in pairs(walk_state.active_counters) do body_state.active_counters[k] = v end
         body_state.active_counters[node.counter] = true
         sub, reason = check_node(node.body, path .. ".body", body_state)
@@ -184,6 +202,30 @@ local function check_node(node, path, walk_state)
             sub, reason = check_expr(sub_expr, path .. ".args." .. tostring(k))
             if not sub then return nil, reason end
         end
+    elseif kind == "fanout" then
+        if node.bind:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
+            return err(path, "fanout.bind must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
+            return err(path, "fanout.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if walk_state.active_binds[node.bind] then
+            return err(path,
+                "fanout.bind: nested fanout reuses bind path '" .. node.bind .. "'")
+        end
+        local sub
+        sub, reason = check_expr(node.items, path .. ".items")
+        if not sub then return nil, reason end
+        local body_state = {
+            active_counters = walk_state.active_counters,
+            active_binds = {},
+            known_flows = walk_state.known_flows,
+            known_refs = walk_state.known_refs,
+        }
+        for k, v in pairs(walk_state.active_binds) do body_state.active_binds[k] = v end
+        body_state.active_binds[node.bind] = true
+        sub, reason = check_node(node.body, path .. ".body", body_state)
+        if not sub then return nil, reason end
     end
     return true
 end
@@ -192,6 +234,9 @@ end
 ---@field flows table<string, any>?  if provided, every `call.flow` name
 ---   not present as a key is a compile error (eager registry check).
 ---   Default (nil) defers `call.flow` resolution to exec.
+---@field refs  table<string, any>?  if provided, every `step.ref` name
+---   not present as a key is a compile error (eager registry check).
+---   Default (nil) defers resolution to exec/dispatch.
 
 --- Compile a Lua-table IR.
 ---
@@ -208,7 +253,9 @@ function M.compile(ir, opts)
     opts = opts or {}
     local walk_state = {
         active_counters = {},
+        active_binds = {},
         known_flows = opts.flows,
+        known_refs = opts.refs,
     }
     local ok, reason = check_node(ir, "$", walk_state)
     if not ok then return nil, reason end

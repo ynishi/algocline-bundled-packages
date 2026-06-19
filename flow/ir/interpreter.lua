@@ -164,6 +164,23 @@ end
 ---          the sub-flow against sub-ctx, then writes the full sub-ctx
 ---          to caller's ctx[out]. Recursion is bounded by
 ---          `opts.max_call_depth` (default 64).
+--- `fanout` evaluates `items` to an array, runs `body` per item against
+---          a branch-local ctx (shallow copy of caller's ctx + `bind`
+---          written to the item), and writes the joined result to
+---          ctx[out]. `join` ∈ {"all", "any"}:
+---            `all` — every branch runs; out is an array of per-branch
+---                    final ctx tables.
+---            `any` — branches run in order; first non-raising branch's
+---                    final ctx is out; all-fail raises; empty items
+---                    yields out = {}.
+---          The MVP interpreter is serial; `opts.scheduler` is a
+---          reserved forward-compat slot for a future concurrent
+---          scheduler (no-op when nil).
+---          Note: in `any`, the identity of the winning branch is
+---          iteration-order-dependent under the serial fallback; a
+---          concurrent scheduler may select differently. Flows should
+---          not depend on which branch wins — only on the sub-ctx
+---          contents.
 ---
 --- Errors raise (`error(... , 2)`) rather than returning nil-reason; the
 --- caller (`M.exec`) treats Node exec as transactional from the caller's
@@ -192,7 +209,7 @@ local function exec_node(node, ctx, opts)
         local cond_val = eval_expr(node.cond, ctx)
         if cond_val then
             exec_node(node.then_, ctx, opts)
-        else
+        elseif node.else_ ~= nil then
             exec_node(node.else_, ctx, opts)
         end
     elseif kind == "let" then
@@ -221,6 +238,43 @@ local function exec_node(node, ctx, opts)
         exec_node(sub_flow, sub_ctx, opts)
         opts._call_depth = opts._call_depth - 1
         write_path(ctx, node.out, sub_ctx)
+    elseif kind == "fanout" then
+        local items = eval_expr(node.items, ctx)
+        if type(items) ~= "table" then
+            error("exec: fanout.items: expected array, got " .. type(items), 2)
+        end
+        if node.join == "all" then
+            local results = {}
+            for i, item in ipairs(items) do
+                local branch_ctx = {}
+                for k, v in pairs(ctx) do branch_ctx[k] = v end
+                write_path(branch_ctx, node.bind, item)
+                exec_node(node.body, branch_ctx, opts)
+                results[i] = branch_ctx
+            end
+            write_path(ctx, node.out, results)
+        else
+            -- join == "any": first non-raising branch wins; empty items → {}
+            local winner, last_err
+            for _, item in ipairs(items) do
+                local branch_ctx = {}
+                for k, v in pairs(ctx) do branch_ctx[k] = v end
+                write_path(branch_ctx, node.bind, item)
+                local ok, ex_err = pcall(exec_node, node.body, branch_ctx, opts)
+                if ok then
+                    winner = branch_ctx
+                    last_err = nil
+                    break
+                else
+                    last_err = ex_err
+                end
+            end
+            if last_err then
+                error("exec: fanout(any): all branches failed; last error: "
+                    .. tostring(last_err), 2)
+            end
+            write_path(ctx, node.out, winner or {})
+        end
     else
         error("exec: unknown kind " .. tostring(kind), 2)
     end
@@ -231,6 +285,9 @@ end
 ---@field dispatch       fun(ref: string, input: any): any, string?
 ---@field flows          table<string, flow.ir.Node>?  registry for `call.flow`
 ---@field max_call_depth integer?  recursion cap for `call` (default 64)
+---@field scheduler      any?  reserved forward-compat slot for concurrent
+---                           fanout schedulers; the MVP interpreter is
+---                           serial and ignores this field.
 
 --- Execute a compiled IR.
 ---
@@ -253,6 +310,17 @@ function M.exec(compiled, ctx, opts)
     opts._call_depth = 0
     return exec_node(compiled, ctx, opts)
 end
+
+--- Public default dispatch helper.
+---
+--- Exposed so callers (test harnesses, host wrappers) can compose with
+--- it, e.g. fall back to it for unknown refs:
+---
+---   opts.dispatch = function(ref, input)
+---       if my_dispatcher[ref] then return my_dispatcher[ref](input) end
+---       return flow.ir.default_dispatch(ref, input)  -- raise on unknown
+---   end
+M.default_dispatch = default_dispatch
 
 -- Exported for spec; not part of the public API contract.
 M._eval_expr  = eval_expr

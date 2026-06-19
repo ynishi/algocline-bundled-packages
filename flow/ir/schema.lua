@@ -131,7 +131,7 @@ M.EXPR_OPS = {
 ---@field kind   "branch"
 ---@field cond   flow.ir.Expr  truthiness of this Expr selects then_/else_
 ---@field then_  flow.ir.Node
----@field else_  flow.ir.Node
+---@field else_  flow.ir.Node|nil  omit for no-op on falsy cond
 
 ---@class flow.ir.Node.let
 ---@field kind   "let"
@@ -151,6 +151,14 @@ M.EXPR_OPS = {
 ---@field args  table<string, flow.ir.Expr>    mapped into sub-flow ctx
 ---@field out   string                          ctx write path for sub-ctx ("ctx.*")
 
+---@class flow.ir.Node.fanout
+---@field kind   "fanout"
+---@field items  flow.ir.Expr  Expr evaluating to a Lua array
+---@field bind   string        per-branch ctx write path for the item ("ctx.*")
+---@field body   flow.ir.Node  executed per item against branch-local ctx
+---@field join   "all"|"any"   join mode (see §fanout semantics)
+---@field out    string        joined result write path ("ctx.*")
+
 ---@alias flow.ir.Node
 ---| flow.ir.Node.step
 ---| flow.ir.Node.seq
@@ -158,6 +166,7 @@ M.EXPR_OPS = {
 ---| flow.ir.Node.let
 ---| flow.ir.Node.loop
 ---| flow.ir.Node.call
+---| flow.ir.Node.fanout
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `kind`
 M.Node = T.discriminated("kind", {
@@ -175,7 +184,7 @@ M.Node = T.discriminated("kind", {
         kind  = T.one_of({ "branch" }),
         cond  = T.table:describe("nested Expr (walked)"),
         then_ = T.table:describe("nested Node (walked)"),
-        else_ = T.table:describe("nested Node (walked)"),
+        else_ = T.table:is_optional():describe("nested Node (walked); omit for no-op"),
     }, { open = false }),
     ["let"] = T.shape({
         kind  = T.one_of({ "let" }),
@@ -195,12 +204,22 @@ M.Node = T.discriminated("kind", {
         args = T.table:describe("{ key = Expr, ... } mapped into sub-flow ctx"),
         out  = T.string:describe("ctx write path for sub-flow ctx, 'ctx.*'"),
     }, { open = false }),
+    fanout = T.shape({
+        kind  = T.one_of({ "fanout" }),
+        items = T.table:describe("nested Expr (walked); must eval to a Lua array"),
+        bind  = T.string:describe("per-branch ctx write path for the item, 'ctx.*'"),
+        body  = T.table:describe("nested Node (walked, runs per item)"),
+        join  = T.one_of({ "all", "any" }):describe(
+            "join semantics: 'all' collects every branch ctx, "
+            .. "'any' returns the first non-raising branch's ctx"),
+        out   = T.string:describe("joined result write path, 'ctx.*'"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Node kinds (membership test).
 M.NODE_KINDS = {
     step = true, seq = true, branch = true,
-    ["let"] = true, loop = true, call = true,
+    ["let"] = true, loop = true, call = true, fanout = true,
 }
 
 return M

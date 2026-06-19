@@ -48,4 +48,10 @@ M.compile = compile_mod.compile
 ---@type fun(compiled: flow.ir.Node, ctx: table, opts: flow.ir.ExecOpts?): table
 M.exec    = interp.exec
 
+--- Public default dispatch helper — returns (nil, reason); raises when
+--- invoked by exec without a caller-supplied dispatch. Exposed so host
+--- wrappers can fall through to it for unknown refs.
+---@type fun(ref: string, input: any): nil, string
+M.default_dispatch = interp.default_dispatch
+
 return M

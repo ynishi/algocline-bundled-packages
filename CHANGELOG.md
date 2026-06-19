@@ -23,6 +23,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ref` consistently. Breaking only within the pre-1.0 beta surface
   (`flow` v0.3.0-beta).
 
+- **`flow.ir` — fanout Node + ergonomics + cross-primitive smoke
+  (v0.3.0-beta)**. Final piece of the Step 2 surface:
+  - `fanout { items, bind, body, join, out }` — parallel-shaped Node
+    with serial fallback. `items` must evaluate to a Lua array; the
+    body runs per item against a branch-local ctx (shallow copy of
+    caller ctx + `bind` written to the item). `join ∈ {"all", "any"}`:
+    `all` writes an array of per-branch final ctx tables to `out`;
+    `any` writes the first non-raising branch's ctx (empty `items`
+    → `out = {}`; all-fail re-raises). Nested fanout sharing the
+    same `bind` path is a compile error (analogue of `loop.counter`
+    collision). `race` is intentionally out of scope.
+  - `opts.scheduler` is reserved on `exec` as a forward-compat slot
+    for a future concurrent scheduler; the MVP interpreter is
+    serial and ignores it. Note that `join = "any"` is
+    iteration-order-dependent in serial fallback — flows should not
+    depend on *which* branch wins, only on the sub-ctx contents.
+  - `branch.else_` is now optional (omit for a no-op on falsy cond).
+  - `compile.opts.refs = { name = ... }` enables eager `step.ref`
+    validation at compile, paired with the existing `opts.flows`
+    for `call.flow`. Default behavior (no `opts`) is unchanged.
+  - `flow.ir.default_dispatch` is now publicly exposed so host
+    wrappers can fall through to it for unknown refs.
+
+  L3 Node surface is complete: `seq / branch / let / loop / call /
+  fanout` (5 control + 1 L4 effect `step`). Cross-primitive smoke
+  exercises the full surface (6 Node + 6 Expr + step) in a single
+  IR.
+
 - **`flow.ir` — L3 Node surface completion (v0.3.0-beta)**. Three
   pure-control Node kinds added:
   - `let { at, value }` — pure value bind to ctx. The first Node
