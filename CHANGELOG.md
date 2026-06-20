@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.6.0 → v0.7.0 — Step 3 §3.4: path syntax extended with
+  RFC 9535 JSONPath bracket integer-index selector**.
+  - `Expr.path.at` field shape is **unchanged** (still a string);
+    the value's internal syntax now accepts `[N]` segments alongside
+    the existing `.name` segments. Same applies to all write-side
+    paths (`step.out` / `let.at` / `loop.counter` / `call.out` /
+    `fanout.bind` / `fanout.out`).
+  - Read semantics: positive `[N]` is 1-based; negative `[-N]` counts
+    from the tail (`[-1]` = last). Out-of-range index (positive or
+    negative) yields nil (consistent with `.foo` missing-key
+    semantics).
+  - Write semantics: positive `[N]` is supported and auto-creates
+    intermediate tables; negative `[-N]` on write **raises** ("no
+    well-defined semantics when the array does not yet exist").
+  - Out of scope (deferred to needs-driven follow-ups): wildcard
+    `[*]`, slice `[1:5]`, filter `[?(@.x == 1)]`, quoted name
+    selectors `["foo bar"]`.
+  - New internal module `flow/ir/path.lua` (parser shared by compile
+    and interpreter). Interpreter `read_path` / `write_path` and
+    compile path validators now both go through this single parser,
+    so compile-time syntax errors (`[abc]`, `[]`, `[0]`, unterminated
+    `[`) surface at compile rather than exec.
+  - New spec `flow/spec/ir_path_bracket_spec.lua` (24 cases): parser
+    coverage (name / index / negative / chained / write-style / 5
+    error pathways), read semantics (positive / negative /
+    out-of-range / nested), write semantics (positive auto-create /
+    nested / negative reject), compile-time syntax validation (Expr.
+    path.at + step.out accept + reject), and end-to-end compile +
+    exec for read + write paths.
+
 - **`flow` v0.5.0 → v0.6.0 — Step 3 §3.B: fanout `join` enum completed
   to the canonical Promise / futures combinator 4-set**.
   - Enum extended additively: `"all" | "any"` → `"all" | "any" |

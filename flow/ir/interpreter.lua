@@ -12,10 +12,13 @@
 -- raises on call, which is spec-friendly: tests provide their own
 -- recorder; production callers inject their own dispatcher.
 --
--- ## Path resolution (MVP)
+-- ## Path resolution
 --
---   read:  "$.ctx.foo.bar"  → ctx.foo.bar (table walk, missing key → nil)
---   write: "ctx.foo.bar"    → ctx.foo.bar (intermediate tables auto-created)
+--   read:  "$.ctx.foo.bar"      → ctx.foo.bar (table walk, missing key → nil)
+--   read:  "$.ctx.items[2]"     → ctx.items[2] (1-based; [-1] = last)
+--   write: "ctx.foo.bar"        → ctx.foo.bar (intermediate tables auto-created)
+--   write: "ctx.items[3]"       → ctx.items[3] (intermediate tables auto-created;
+--                                negative index is NOT supported on write)
 --
 -- Reads are absolute and rooted at ctx (the "$" sigil is required, only
 -- the `$.ctx.*` sub-tree is exposed). Writes are relative to ctx and
@@ -23,45 +26,60 @@
 -- intermediates on reads return nil (silent missing-key); writes through
 -- a non-table intermediate are *replaced* with a fresh table.
 --
+-- Bracket selectors (`[N]`) follow RFC 9535's integer index subset:
+-- 1-based, negatives count from the tail on READ (-1 = last). Negative
+-- indexes on WRITE raise (no well-defined semantics when the array does
+-- not yet exist). Wildcards / slices / filter expressions are out of
+-- scope. See `flow.ir.path` for the parser.
+--
 -- ## Surface
 --
--- 3 Node kinds × 3 Expr ops only. The schema discriminated +
--- `open = false` guard ensures unknown kind / op never reaches here.
+-- 7 Node kinds × 8 Expr ops. The schema discriminated + `open = false`
+-- guard ensures unknown kind / op never reaches here.
+
+local path_mod = require("flow.ir.path")
 
 local M = {}
 
 -- ── path utils ──────────────────────────────────────────────────────
 
---- Split a dotted path into its segments (no escaping in MVP).
----@param s string
----@return string[]  segments (1-based, dense)
-local function split_dots(s)
-    local out, idx = {}, 1
-    for part in string.gmatch(s, "[^%.]+") do
-        out[idx], idx = part, idx + 1
-    end
-    return out
-end
-
 --- Resolve a `$.ctx.*` read path against the ctx table.
 ---
 --- Walks the segments after `$.ctx`. A non-table intermediate yields
 --- nil (missing-key semantics), which lets `eq(path, lit)` test for
---- presence as `eq(path, lit(nil))`.
+--- presence as `eq(path, lit(nil))`. Negative integer segments index
+--- from the array tail (`[-1]` = last element); out-of-range negatives
+--- yield nil rather than raising.
 ---
 ---@param ctx table
----@param at  string  e.g. "$.ctx.verdict"
+---@param at  string  e.g. "$.ctx.verdict" or "$.ctx.items[2]"
 ---@return any|nil value
 ---@return string? err  set only on malformed path
 local function read_path(ctx, at)
-    local parts = split_dots(at)
+    local parts, parse_err = path_mod.parse(at)
+    if not parts then
+        return nil, "read_path: " .. tostring(parse_err) .. ": " .. at
+    end
     if parts[1] ~= "$" or parts[2] ~= "ctx" then
         return nil, "read_path: only $.ctx.* supported, got " .. at
     end
     local cur = ctx
     for i = 3, #parts do
         if type(cur) ~= "table" then return nil end
-        cur = cur[parts[i]]
+        local seg = parts[i]
+        if type(seg) == "number" then
+            local n = seg
+            if n < 0 then
+                -- RFC 9535: negative index counts from the end. Use Lua's
+                -- `#cur` as the length; out-of-range negative → nil.
+                local len = #cur
+                if -n > len then return nil end
+                n = len + 1 + n
+            end
+            cur = cur[n]
+        else
+            cur = cur[seg]
+        end
     end
     return cur
 end
@@ -73,21 +91,37 @@ end
 --- are expected to keep ctx well-typed; this is a deliberate choice
 --- over a silent failure path.
 ---
+--- Integer index segments (`[N]`) are supported on write and use the
+--- integer key directly (so `ctx.items[3] = v` does `ctx.items[3] = v`
+--- with intermediate `ctx.items` auto-created as a fresh table when
+--- absent). Negative indexes on WRITE raise — "write to the tail of an
+--- array that might not exist yet" has no well-defined semantics.
+---
 ---@param ctx   table
----@param at    string  e.g. "ctx.foo.bar"
+---@param at    string  e.g. "ctx.foo.bar" or "ctx.items[3]"
 ---@param value any
 local function write_path(ctx, at, value)
-    local parts = split_dots(at)
+    local parts, parse_err = path_mod.parse(at)
+    if not parts then
+        error("write_path: " .. tostring(parse_err) .. ": " .. at, 2)
+    end
     if parts[1] ~= "ctx" then
         error("write_path: only ctx.* supported, got " .. at, 2)
     end
     local cur = ctx
     for i = 2, #parts - 1 do
         local k = parts[i]
+        if type(k) == "number" and k < 0 then
+            error("write_path: negative index not supported on write: " .. at, 2)
+        end
         if type(cur[k]) ~= "table" then cur[k] = {} end
         cur = cur[k]
     end
-    cur[parts[#parts]] = value
+    local last = parts[#parts]
+    if type(last) == "number" and last < 0 then
+        error("write_path: negative index not supported on write: " .. at, 2)
+    end
+    cur[last] = value
 end
 
 -- ── Expr eval ───────────────────────────────────────────────────────

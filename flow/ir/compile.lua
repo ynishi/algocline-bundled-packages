@@ -35,9 +35,10 @@
 -- This mirrors lshape / alc_shapes.check error formatting and makes
 -- the failing node easy to locate in a Lua source dump.
 
-local S      = require("alc_shapes")
-local schema = require("flow.ir.schema")
-local walk   = require("flow.ir.walk")
+local S         = require("alc_shapes")
+local schema    = require("flow.ir.schema")
+local walk      = require("flow.ir.walk")
+local path_mod  = require("flow.ir.path")
 
 local M = {}
 
@@ -55,6 +56,19 @@ end
 
 local function has_ctx_write_prefix(s)
     return s:sub(1, #CTX_WRITE_PREFIX) == CTX_WRITE_PREFIX
+end
+
+--- Validate path syntax via `flow.ir.path.parse` and surface parse
+--- errors at compile time (rather than letting them fall through to
+--- the interpreter). The prefix string check above gates the root,
+--- and this checks the bracket / name segment shape that follows.
+---@param at string
+---@return true|nil ok
+---@return string?  reason
+local function validate_path_syntax(at)
+    local _, reason = path_mod.parse(at)
+    if reason then return nil, reason end
+    return true
 end
 
 -- ── Expr validation ─────────────────────────────────────────────────
@@ -95,6 +109,10 @@ local EXPR_LOCAL_CHECK = {
     path = function(expr, path)
         if expr.at:sub(1, #PATH_READ_PREFIX) ~= PATH_READ_PREFIX then
             return err(path, "Expr.path.at must start with '" .. PATH_READ_PREFIX .. "'")
+        end
+        local ok, reason = validate_path_syntax(expr.at)
+        if not ok then
+            return err(path, "Expr.path.at: " .. reason)
         end
         return true
     end,
@@ -150,11 +168,13 @@ local NODE_LOCAL_CHECK = {
         if not has_ctx_write_prefix(node.out) then
             return err(path, "step.out must start with '" .. CTX_WRITE_PREFIX .. "'")
         end
+        local ok, reason = validate_path_syntax(node.out)
+        if not ok then return err(path, "step.out: " .. reason) end
         if state.known_refs and not state.known_refs[node.ref] then
             return err(path, "step.ref: '" .. node.ref .. "' not in opts.refs registry")
         end
         if node.in_ ~= nil then
-            local ok, reason = check_expr(node.in_, path .. ".in_")
+            ok, reason = check_expr(node.in_, path .. ".in_")
             if not ok then return nil, reason end
         end
         return true
@@ -171,7 +191,9 @@ local NODE_LOCAL_CHECK = {
         if not has_ctx_write_prefix(node.at) then
             return err(path, "let.at must start with '" .. CTX_WRITE_PREFIX .. "'")
         end
-        local ok, reason = check_expr(node.value, path .. ".value")
+        local ok, reason = validate_path_syntax(node.at)
+        if not ok then return err(path, "let.at: " .. reason) end
+        ok, reason = check_expr(node.value, path .. ".value")
         if not ok then return nil, reason end
         return true
     end,
@@ -182,11 +204,13 @@ local NODE_LOCAL_CHECK = {
         if not has_ctx_write_prefix(node.counter) then
             return err(path, "loop.counter must start with '" .. CTX_WRITE_PREFIX .. "'")
         end
+        local ok, reason = validate_path_syntax(node.counter)
+        if not ok then return err(path, "loop.counter: " .. reason) end
         if state.active_counters[node.counter] then
             return err(path,
                 "loop.counter: nested loop reuses counter path '" .. node.counter .. "'")
         end
-        local ok, reason = check_expr(node.cond, path .. ".cond")
+        ok, reason = check_expr(node.cond, path .. ".cond")
         if not ok then return nil, reason end
         local body_state = {
             active_counters = copy_set(state.active_counters),
@@ -201,6 +225,8 @@ local NODE_LOCAL_CHECK = {
         if not has_ctx_write_prefix(node.out) then
             return err(path, "call.out must start with '" .. CTX_WRITE_PREFIX .. "'")
         end
+        local ok_p, reason_p = validate_path_syntax(node.out)
+        if not ok_p then return err(path, "call.out: " .. reason_p) end
         if node.flow == "" then
             return err(path, "call.flow: required non-empty string")
         end
@@ -220,6 +246,10 @@ local NODE_LOCAL_CHECK = {
         if not has_ctx_write_prefix(node.out) then
             return err(path, "fanout.out must start with '" .. CTX_WRITE_PREFIX .. "'")
         end
+        local ok_p, reason_p = validate_path_syntax(node.bind)
+        if not ok_p then return err(path, "fanout.bind: " .. reason_p) end
+        ok_p, reason_p = validate_path_syntax(node.out)
+        if not ok_p then return err(path, "fanout.out: " .. reason_p) end
         if state.active_binds[node.bind] then
             return err(path,
                 "fanout.bind: nested fanout reuses bind path '" .. node.bind .. "'")

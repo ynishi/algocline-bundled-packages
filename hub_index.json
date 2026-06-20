@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-06-20T05:44:00Z",
+  "updated_at": "2026-06-20T05:53:05Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -724,8 +724,8 @@
     },
     {
       "name": "flow",
-      "version": "0.6.0",
-      "description": "Flow Frame — FlowState + ReqToken + IR substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.3 adds `flow.ir` — Schema-as-Data Node + Expr IR with Def→Compile→Exec; L3 surface complete (6 Node + 8 Expr + 1 L4 effect). v0.4 publishes the Constructor API + Introspect API (walk / type_of / children_of / refs_of) so engine integrators consume the Node tree via a frozen visitor contract. v0.5 adds Persistence API (to_json / from_json) with a 2-step injection seam (opts.alc + _G.alc) — host-neutral, caller supplies the JSON impl; round-trip property pinned across all 7 Node + 8 Expr. v0.6 completes the fanout join enum to the canonical Promise / futures combinator set (all / any / race / all_settled) with serial-fallback interpreter semantics; concurrent execution is engine territory (swarm-frame).",
+      "version": "0.7.0",
+      "description": "Flow Frame — FlowState + ReqToken + IR substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.3 adds `flow.ir` — Schema-as-Data Node + Expr IR with Def→Compile→Exec; L3 surface complete (6 Node + 8 Expr + 1 L4 effect). v0.4 publishes the Constructor API + Introspect API (walk / type_of / children_of / refs_of) so engine integrators consume the Node tree via a frozen visitor contract. v0.5 adds Persistence API (to_json / from_json) with a 2-step injection seam (opts.alc + _G.alc) — host-neutral, caller supplies the JSON impl; round-trip property pinned across all 7 Node + 8 Expr. v0.6 completes the fanout join enum to the canonical Promise / futures combinator set (all / any / race / all_settled) with serial-fallback interpreter semantics; concurrent execution is engine territory (swarm-frame). v0.7 extends path syntax with RFC 9535 JSONPath bracket integer index selector (`$.ctx.items[3]`, `[-1]` for tail on read) — additive, `at` field shape unchanged.",
       "category": "substrate",
       "docstring": "flow — Light Frame substrate for composing algo-based pkg\n\nProvides three primitives:\nFlowState — a plain table persisted via alc.state (KV primitive).\nReqToken  — a random nonce bound to a state, echoed by downstream\npkg results and verified on return.\nIR        — Schema-as-Data Node + Expr IR with Def → Compile → Exec\n(see `flow.ir`, `flow/doc/ir.md`). Host-neutral\nsubstrate for authoring pipelines as a single Lua\ntable; effects enter only through the `step` Node\nwhich calls an injected `opts.dispatch(ref, input)`.\n\nflow is a substrate, not an orchestrator. It does not provide M.run.\nThe driver loop stays in user code (Recipe). This preserves the\n\"mechanism, not policy\" discipline of a Light Frame and keeps\nbundled algo pkg (ab_mcts, cascade, coevolve, ...) composable\nwithout an Agent boundary abstraction.\n\nUsage (minimal):\nlocal flow = require(\"flow\")\n\nlocal st   = flow.state_new({ key_prefix = \"my_run\", id = \"abc\", resume = true })\nlocal tok  = flow.token_issue(st)\n\nif not flow.state_get(st, \"gate_ok\") then\nlocal req = flow.token_wrap(tok, { slot = \"gate\", payload = { q = \"...\" } })\nlocal out = some_pkg.run(req.payload)\nassert(flow.token_verify(tok, out, req), \"token/slot mismatch\")\nflow.state_set(st, \"gate_ok\", true)\nflow.state_save(st)\nend",
       "tags": null,

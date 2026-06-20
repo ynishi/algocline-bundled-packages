@@ -40,7 +40,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.6.0",
+    version     = "0.7.0",
     description = "Flow Frame — FlowState + ReqToken + IR substrate for "
         .. "composing algo-based pkg (ab_mcts / cascade / coevolve / "
         .. "...). Light Frame: driver loop stays in user code. v0.3 "
@@ -56,7 +56,10 @@ M.meta = {
         .. "v0.6 completes the fanout join enum to the canonical "
         .. "Promise / futures combinator set (all / any / race / "
         .. "all_settled) with serial-fallback interpreter semantics; "
-        .. "concurrent execution is engine territory (swarm-frame).",
+        .. "concurrent execution is engine territory (swarm-frame). "
+        .. "v0.7 extends path syntax with RFC 9535 JSONPath bracket "
+        .. "integer index selector (`$.ctx.items[3]`, `[-1]` for tail "
+        .. "on read) — additive, `at` field shape unchanged.",
     category    = "substrate",
     alc_shapes_compat = "^0.25",
 }
