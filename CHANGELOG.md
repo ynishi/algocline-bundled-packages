@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.4.0 → v0.5.0 — Step 3 §3.2a / §3.2b: Persistence API
+  (host-neutral) + round-trip property pinned across the full Node +
+  Expr surface**.
+  - **Persistence API (§3.2a, additive)**: `flow.ir.to_json(node, opts?)`
+    and `flow.ir.from_json(json_str, opts?)` serialize / deserialize a
+    Node tree via a caller-injected JSON impl. flow.ir does NOT bundle
+    a JSON encoder — host-neutral discipline. Resolution is 2-step:
+    (1) `opts.alc.json_encode / json_decode` explicit injection
+    (test seam; lets standalone runners use pure_json or any other
+    impl), (2) `_G.alc` fall-through (production default, algocline
+    runtime supplies it). Failure contract is canonicalized: missing
+    `alc.json_encode` / `alc.json_decode` raises with a clear "set
+    _G.alc or pass opts.alc" message; decoder raises and nil-returning
+    decoders are both normalized into a single `flow.ir.from_json:
+    decode failed:` `error()`, so Lua JSON ecosystem fragmentation
+    (cjson throws / dkjson returns `nil,err` / rxi throws) does not
+    leak into the caller. Static-tree only — execution state /
+    dispatch / closures are not persisted.
+  - **Round-trip property spec (§3.2b)**: new
+    `flow/spec/ir_roundtrip_spec.lua` (22 cases) asserts
+    `from_json(to_json(node)) == node` (deep equal) across all 7 Node
+    kinds and all 8 Expr ops, plus a compound tree case that also
+    re-verifies through `flow.ir.compile` after the round-trip. The
+    JSON impl used by the spec is a small spec-local rxi-style
+    encoder/decoder injected via `opts.alc` (so the spec runs under
+    mlua-probe without depending on `_G.alc`).
+
 - **`flow` v0.3.1 → v0.4.0 — Step 3 §3.0 / §3.1 / §3.A:
   Constructor API + Introspect API public, compile refactored to
   per-kind registry over a shared walk primitive**.

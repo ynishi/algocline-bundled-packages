@@ -40,7 +40,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.4.0",
+    version     = "0.5.0",
     description = "Flow Frame — FlowState + ReqToken + IR substrate for "
         .. "composing algo-based pkg (ab_mcts / cascade / coevolve / "
         .. "...). Light Frame: driver loop stays in user code. v0.3 "
@@ -49,7 +49,10 @@ M.meta = {
         .. "+ 1 L4 effect). v0.4 publishes the Constructor API + "
         .. "Introspect API (walk / type_of / children_of / refs_of) "
         .. "so engine integrators consume the Node tree via a frozen "
-        .. "visitor contract.",
+        .. "visitor contract. v0.5 adds Persistence API (to_json / "
+        .. "from_json) with a 2-step injection seam (opts.alc + "
+        .. "_G.alc) — host-neutral, caller supplies the JSON impl; "
+        .. "round-trip property pinned across all 7 Node + 8 Expr.",
     category    = "substrate",
     alc_shapes_compat = "^0.25",
 }

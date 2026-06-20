@@ -23,6 +23,11 @@
 --   M.children_of(node)      : direct child Nodes with accessor keys
 --   M.refs_of(node_or_expr)  : every `path.at` reachable from a subtree
 --
+-- Persistence (§3.2a; host-neutral, caller-injected JSON impl):
+--   M.to_json(node, opts?)   : encode via opts.alc.json_encode / _G.alc
+--   M.from_json(str, opts?)  : decode via opts.alc.json_decode / _G.alc
+--   JSON impl is NOT bundled — flow.ir is interpreter-host-neutral.
+--
 -- Constructor API (thin sugar over raw table SoT):
 --   Expr (8 ops, hybrid args):
 --     M.path(at) / M.lit(value)
@@ -159,6 +164,79 @@ M.children_of = walk_mod.children_of
 ---
 ---@type fun(node_or_expr: flow.ir.Node|flow.ir.Expr): string[]
 M.refs_of = walk_mod.refs_of
+
+-- ── Persistence API (§3.2a) ─────────────────────────────────────────
+--
+-- Node tree ↔ JSON via a caller-injected `alc.json_encode` /
+-- `alc.json_decode` pair. flow.ir does NOT bundle a JSON impl
+-- (host-neutral discipline). 2-step injection seam:
+--
+--   (1) opts.alc explicit injection (test seam; lets standalone
+--       runners pass in pure_json or any other impl)
+--   (2) `_G.alc` fall-through (production default; algocline runtime
+--       provides alc.json_encode / json_decode)
+--
+-- Failure contract (canonicalized; impl-difference NOT exposed):
+--   - alc / alc.json_encode missing       -> error("...required...")
+--   - alc / alc.json_decode missing       -> error("...required...")
+--   - encode raises                       -> propagated as error()
+--   - decode raises OR returns nil+err    -> error("...decode failed:...")
+--
+-- Static-tree only: execution state / opts.dispatch / closures are
+-- not persisted. JSON impls differ on array-vs-object detection,
+-- sparse arrays, nil handling, etc. — those concerns are the
+-- caller's (injected impl's) responsibility, not flow.ir's.
+
+local function resolve_alc(opts, kind, fn_name)
+    local alc = opts and opts.alc or _G.alc
+    if not alc or not alc[fn_name] then
+        error(string.format(
+            "flow.ir.%s_json: alc.%s required (set _G.alc or pass opts.alc)",
+            kind, fn_name), 3)
+    end
+    return alc[fn_name]
+end
+
+--- Serialize a (possibly compiled) Node tree to a JSON string.
+---
+--- Returns the encoded JSON string. Raises on missing encoder or on
+--- encoder failure. Caller is responsible for ensuring the injected
+--- `alc.json_encode` handles the table layout (e.g. empty `seq.children`
+--- arrays may be encoded as `[]` or `{}` depending on impl — this is
+--- caller's choice, not flow.ir's).
+---
+---@param node flow.ir.Node
+---@param opts { alc: { json_encode: fun(any): string, json_decode: fun(string): any }? }?
+---@return string json
+function M.to_json(node, opts)
+    local encode = resolve_alc(opts, "to", "json_encode")
+    return encode(node)
+end
+
+--- Deserialize a JSON string into a Node tree (raw table form).
+---
+--- The returned value is the raw table the injected `alc.json_decode`
+--- produces; it is NOT re-validated by `flow.ir.compile`. Run
+--- `flow.ir.compile(node)` if structural guarantees are needed.
+---
+--- Errors are normalized: decoders that throw and decoders that return
+--- `(nil, err)` are both surfaced as a single `error()` whose message
+--- starts with "flow.ir.from_json: decode failed:".
+---
+---@param json_str string
+---@param opts { alc: { json_encode: fun(any): string, json_decode: fun(string): any }? }?
+---@return flow.ir.Node node
+function M.from_json(json_str, opts)
+    local decode = resolve_alc(opts, "from", "json_decode")
+    local ok, decoded_or_err = pcall(decode, json_str)
+    if not ok then
+        error("flow.ir.from_json: decode failed: " .. tostring(decoded_or_err), 2)
+    end
+    if decoded_or_err == nil then
+        error("flow.ir.from_json: decode failed: decoder returned nil", 2)
+    end
+    return decoded_or_err
+end
 
 -- ── Constructor API — Expr ──────────────────────────────────────────
 --

@@ -888,9 +888,9 @@ describe("flow: meta", function()
         end
     end)
 
-    it("meta.version is 0.4.0 (Constructor + Introspect API public)", function()
+    it("meta.version is 0.5.0 (Persistence API + round-trip property)", function()
         mock_alc_state()
         local flow = require("flow")
-        expect(flow.meta.version).to.equal("0.4.0")
+        expect(flow.meta.version).to.equal("0.5.0")
     end)
 end)
