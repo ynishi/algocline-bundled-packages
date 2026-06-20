@@ -1134,6 +1134,20 @@
 
 ---@alias AlcPkgResult_recipe_safe_panel AlcResultSafePaneled
 
+---@class AlcPkgInput_recipe_swarm_gate
+---@field approaches? string[] @Caller-supplied approach hints (default: {"top-down", "bottom-up", "analogical"})
+---@field budget? number @ab_mcts expansion iterations per branch (default: 8)
+---@field max_depth? number @ab_mcts tree depth per branch (default: 3)
+---@field resume? boolean @Resume from prior flow state if present (default: false)
+---@field task string @Problem statement
+---@field task_id string @Stable identity used as the flow state key suffix
+
+---@class AlcPkgResult_recipe_swarm_gate
+---@field branches? table<string, { answer: string, approach: string, best_score: number, tree_stats: any }> @Per-branch ab_mcts result, keyed by branch_N
+---@field picked? string @Consensus gate final_output (the "pick=branch_N" verdict text)
+---@field stage? string @On failure, the gate that rejected ("root_gate" / "consensus_gate" / "commit_gate")
+---@field status string @"done" / "failed"
+
 ---@class AlcPkgInput_reconcile
 ---@field agents? { model?: string, system?: string }[] @Diverse-LLM PATH (Chen §3 main config): array of agent specs
 ---@field confidence_buckets? { lo: number, lo_op?: string, weight: number }[] @Override the §B.5 5-bucket calibration; replacing it drops the paper's weighting guarantee. See M.CONFIDENCE_BUCKETS for the shape contract.
