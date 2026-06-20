@@ -1,22 +1,29 @@
 ---@module 'flow.ir.compile'
 -- Def → IR validation (Compile stage of Def→Compile→Exec).
 --
--- Two passes:
---   1. shallow alc_shapes check at the root (catches typos in kind/op
---      tag and the top-level field set).
---   2. recursive walk that re-checks every nested Node / Expr. The
---      schema declares children as T.table (not T.ref) because MVP
---      avoids registry-resolved recursion; the walk here is the second
---      validation half.
+-- Single recursive walk per node: alc_shapes shallow check (catches
+-- kind/op typos and the top-level field set) + a per-kind validator
+-- that enforces local invariants (path prefixes, registry membership,
+-- nested-counter / nested-bind rules) and descends into structural
+-- children via `flow.ir.walk.children_of`. The same child-enumeration
+-- function backs the public §3.A introspect surface, so compile and
+-- introspect cannot drift on what counts as a child.
 --
 -- ## Static guarantees after compile
 --
 --   - every kind is in NODE_KINDS, every op is in EXPR_OPS
---   - step.out starts with "ctx."
+--   - step.out / let.at / loop.counter / call.out / fanout.bind /
+--     fanout.out start with "ctx."
 --   - Expr.path.at starts with "$.ctx." (other roots reserved)
 --   - step.in_, if present, is a valid Expr (recursively)
---   - seq.children are all valid Nodes (recursively)
---   - branch.{cond, then_, else_} are all valid (recursively)
+--   - seq.children / branch.then_/else_ / loop.body / fanout.body
+--     are all valid Nodes (recursively)
+--   - branch.cond / loop.cond / let.value / call.args[*] / fanout.items
+--     are all valid Exprs (recursively)
+--   - nested loop sharing the same `counter` path is rejected
+--   - nested fanout sharing the same `bind` path is rejected
+--   - when opts.flows is provided, every `call.flow` must be a key
+--   - when opts.refs is provided, every `step.ref` must be a key
 --
 -- compile() returns the same IR table on success (Def *is* the IR — no
 -- separate transformation), or (nil, reason) on failure.
@@ -30,6 +37,7 @@
 
 local S      = require("alc_shapes")
 local schema = require("flow.ir.schema")
+local walk   = require("flow.ir.walk")
 
 local M = {}
 
@@ -45,12 +53,56 @@ local function err(path, msg)
     return nil, string.format("compile: at %s: %s", path, msg)
 end
 
---- Recursively validate an Expr.
----@param expr flow.ir.Expr
----@param path string  IR location for error messages
----@return boolean|nil ok   true on success, nil on failure
----@return string?    reason  set when ok is nil
-local function check_expr(expr, path)
+local function has_ctx_write_prefix(s)
+    return s:sub(1, #CTX_WRITE_PREFIX) == CTX_WRITE_PREFIX
+end
+
+-- ── Expr validation ─────────────────────────────────────────────────
+--
+-- Per-op validators receive (expr, path). They run AFTER the shared
+-- alc_shapes shallow check + op membership check and AFTER any nested
+-- Expr children have themselves been validated. Validators MUST NOT
+-- recurse — recursion is centralized in `check_expr` via
+-- `walk.expr_children_of`.
+
+local check_expr   -- forward decl
+
+--- Validate Expr children listed by `walk.expr_children_of` and verify
+--- that variadic-arg op kinds have at least 2 entries.
+---@param expr  flow.ir.Expr
+---@param path  string
+---@return boolean|nil ok
+---@return string?    reason
+local function descend_expr(expr, path)
+    -- variadic min-2 check (and / or)
+    if expr.op == "and" or expr.op == "or" then
+        if type(expr.args) ~= "table" or #expr.args < 2 then
+            local got = type(expr.args) == "table" and #expr.args or 0
+            return err(path, "Expr." .. expr.op .. ": requires >= 2 args, got " .. got)
+        end
+    end
+    for _, entry in ipairs(walk.expr_children_of(expr)) do
+        local sub_path = path .. "." .. entry.key
+        if entry.idx ~= nil then sub_path = string.format("%s[%d]", sub_path, entry.idx) end
+        local ok, reason = check_expr(entry.child, sub_path)
+        if not ok then return nil, reason end
+    end
+    return true
+end
+
+---@type table<string, fun(expr: flow.ir.Expr, path: string): boolean|nil, string?>
+local EXPR_LOCAL_CHECK = {
+    path = function(expr, path)
+        if expr.at:sub(1, #PATH_READ_PREFIX) ~= PATH_READ_PREFIX then
+            return err(path, "Expr.path.at must start with '" .. PATH_READ_PREFIX .. "'")
+        end
+        return true
+    end,
+    -- lit / eq / and / or / not / lt / len: no local invariant beyond
+    -- shape + recursive children.
+}
+
+check_expr = function(expr, path)
     if type(expr) ~= "table" then
         return err(path, "expected Expr table, got " .. type(expr))
     end
@@ -60,75 +112,133 @@ local function check_expr(expr, path)
     end
     local ok, reason = S.check(expr, schema.Expr)
     if not ok then return err(path, reason) end
-    if op == "path" then
-        if expr.at:sub(1, #PATH_READ_PREFIX) ~= PATH_READ_PREFIX then
-            return err(path, "Expr.path.at must start with '" .. PATH_READ_PREFIX .. "'")
-        end
-    elseif op == "eq" then
-        local sub
-        sub, reason = check_expr(expr.lhs, path .. ".lhs")
-        if not sub then return nil, reason end
-        sub, reason = check_expr(expr.rhs, path .. ".rhs")
-        if not sub then return nil, reason end
-    elseif op == "and" then
-        if type(expr.args) ~= "table" or #expr.args < 2 then
-            local got = type(expr.args) == "table" and #expr.args or 0
-            return err(path, "Expr.and: requires >= 2 args, got " .. got)
-        end
-        for i, sub_expr in ipairs(expr.args) do
-            local sub_ok
-            sub_ok, reason = check_expr(sub_expr, string.format("%s.args[%d]", path, i))
-            if not sub_ok then return nil, reason end
-        end
-    elseif op == "not" then
-        local sub
-        sub, reason = check_expr(expr.arg, path .. ".arg")
-        if not sub then return nil, reason end
-    elseif op == "lt" then
-        local sub
-        sub, reason = check_expr(expr.lhs, path .. ".lhs")
-        if not sub then return nil, reason end
-        sub, reason = check_expr(expr.rhs, path .. ".rhs")
-        if not sub then return nil, reason end
-    elseif op == "or" then
-        if type(expr.args) ~= "table" or #expr.args < 2 then
-            local got = type(expr.args) == "table" and #expr.args or 0
-            return err(path, "Expr.or: requires >= 2 args, got " .. got)
-        end
-        for i, sub_expr in ipairs(expr.args) do
-            local sub_ok
-            sub_ok, reason = check_expr(sub_expr, string.format("%s.args[%d]", path, i))
-            if not sub_ok then return nil, reason end
-        end
-    elseif op == "len" then
-        local sub
-        sub, reason = check_expr(expr.arg, path .. ".arg")
-        if not sub then return nil, reason end
+    local local_check = EXPR_LOCAL_CHECK[op]
+    if local_check then
+        ok, reason = local_check(expr, path)
+        if not ok then return nil, reason end
     end
-    return true
+    return descend_expr(expr, path)
 end
 
---- Recursively validate a Node.
----
---- `walk_state` carries state threaded through the recursive descent:
----   - `active_counters` : Set<string>  loop.counter paths currently in
----     enclosing scope; nested loop reusing the same path is a compile
----     error.
----   - `active_binds`    : Set<string>  fanout.bind paths currently in
----     enclosing scope; nested fanout reusing the same path is a
----     compile error.
----   - `known_flows`     : Set<string>?  call.flow eager registry; when
----     provided, unknown flows are a compile error (lazy when nil).
----   - `known_refs`      : Set<string>?  step.ref eager registry; when
----     provided, unknown refs are a compile error (lazy when nil).
----
----@param node       flow.ir.Node
----@param path       string  IR location for error messages
----@param walk_state table?  threaded walk state (see above)
----@return boolean|nil ok   true on success, nil on failure
----@return string?    reason  set when ok is nil
-local function check_node(node, path, walk_state)
-    walk_state = walk_state or {
+-- ── Node validation ─────────────────────────────────────────────────
+--
+-- Walk state threaded per subtree:
+--   active_counters : Set<string>  loop.counter paths in enclosing scope
+--   active_binds    : Set<string>  fanout.bind paths in enclosing scope
+--   known_flows     : Set<string>? eager call.flow registry (nil → lazy)
+--   known_refs      : Set<string>? eager step.ref registry (nil → lazy)
+--
+-- Per-kind validators run AFTER the alc_shapes shallow check and AFTER
+-- their Expr fields have been independently validated. They return
+-- either (true) on success or (nil, reason) on failure. They DO NOT
+-- recurse into structural child Nodes — that descent is centralized in
+-- `check_node` via `walk.children_of`. The single exception is `loop`
+-- / `fanout`, which need to extend the walk_state before descending;
+-- they return a possibly-modified `body_state` as the 3rd return value.
+
+local check_node   -- forward decl
+
+local function copy_set(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    return out
+end
+
+---@type table<string, fun(node: flow.ir.Node, path: string, state: table): boolean|nil, string?, table?>
+local NODE_LOCAL_CHECK = {
+    step = function(node, path, state)
+        if not has_ctx_write_prefix(node.out) then
+            return err(path, "step.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if state.known_refs and not state.known_refs[node.ref] then
+            return err(path, "step.ref: '" .. node.ref .. "' not in opts.refs registry")
+        end
+        if node.in_ ~= nil then
+            local ok, reason = check_expr(node.in_, path .. ".in_")
+            if not ok then return nil, reason end
+        end
+        return true
+    end,
+    seq = function(_node, _path, _state)
+        return true  -- children validated by check_node descent
+    end,
+    branch = function(node, path, _state)
+        local ok, reason = check_expr(node.cond, path .. ".cond")
+        if not ok then return nil, reason end
+        return true
+    end,
+    ["let"] = function(node, path, _state)
+        if not has_ctx_write_prefix(node.at) then
+            return err(path, "let.at must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        local ok, reason = check_expr(node.value, path .. ".value")
+        if not ok then return nil, reason end
+        return true
+    end,
+    loop = function(node, path, state)
+        if type(node.max) ~= "number" or node.max < 1 or node.max ~= math.floor(node.max) then
+            return err(path, "loop.max must be an integer >= 1, got " .. tostring(node.max))
+        end
+        if not has_ctx_write_prefix(node.counter) then
+            return err(path, "loop.counter must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if state.active_counters[node.counter] then
+            return err(path,
+                "loop.counter: nested loop reuses counter path '" .. node.counter .. "'")
+        end
+        local ok, reason = check_expr(node.cond, path .. ".cond")
+        if not ok then return nil, reason end
+        local body_state = {
+            active_counters = copy_set(state.active_counters),
+            active_binds    = state.active_binds,
+            known_flows     = state.known_flows,
+            known_refs      = state.known_refs,
+        }
+        body_state.active_counters[node.counter] = true
+        return true, nil, body_state
+    end,
+    call = function(node, path, state)
+        if not has_ctx_write_prefix(node.out) then
+            return err(path, "call.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if node.flow == "" then
+            return err(path, "call.flow: required non-empty string")
+        end
+        if state.known_flows and not state.known_flows[node.flow] then
+            return err(path, "call.flow: '" .. node.flow .. "' not in opts.flows registry")
+        end
+        for k, sub_expr in pairs(node.args) do
+            local ok, reason = check_expr(sub_expr, path .. ".args." .. tostring(k))
+            if not ok then return nil, reason end
+        end
+        return true
+    end,
+    fanout = function(node, path, state)
+        if not has_ctx_write_prefix(node.bind) then
+            return err(path, "fanout.bind must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if not has_ctx_write_prefix(node.out) then
+            return err(path, "fanout.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        if state.active_binds[node.bind] then
+            return err(path,
+                "fanout.bind: nested fanout reuses bind path '" .. node.bind .. "'")
+        end
+        local ok, reason = check_expr(node.items, path .. ".items")
+        if not ok then return nil, reason end
+        local body_state = {
+            active_counters = state.active_counters,
+            active_binds    = copy_set(state.active_binds),
+            known_flows     = state.known_flows,
+            known_refs      = state.known_refs,
+        }
+        body_state.active_binds[node.bind] = true
+        return true, nil, body_state
+    end,
+}
+
+check_node = function(node, path, state)
+    state = state or {
         active_counters = {}, active_binds = {},
         known_flows = nil, known_refs = nil,
     }
@@ -141,105 +251,16 @@ local function check_node(node, path, walk_state)
     end
     local ok, reason = S.check(node, schema.Node)
     if not ok then return err(path, reason) end
-    if kind == "step" then
-        if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "step.out must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        if walk_state.known_refs and not walk_state.known_refs[node.ref] then
-            return err(path, "step.ref: '" .. node.ref .. "' not in opts.refs registry")
-        end
-        if node.in_ ~= nil then
-            local sub
-            sub, reason = check_expr(node.in_, path .. ".in_")
-            if not sub then return nil, reason end
-        end
-    elseif kind == "seq" then
-        for i, child in ipairs(node.children) do
-            local sub
-            sub, reason = check_node(child, string.format("%s.children[%d]", path, i), walk_state)
-            if not sub then return nil, reason end
-        end
-    elseif kind == "branch" then
-        local sub
-        sub, reason = check_expr(node.cond, path .. ".cond")
-        if not sub then return nil, reason end
-        sub, reason = check_node(node.then_, path .. ".then_", walk_state)
-        if not sub then return nil, reason end
-        if node.else_ ~= nil then
-            sub, reason = check_node(node.else_, path .. ".else_", walk_state)
-            if not sub then return nil, reason end
-        end
-    elseif kind == "let" then
-        if node.at:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "let.at must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        local sub
-        sub, reason = check_expr(node.value, path .. ".value")
-        if not sub then return nil, reason end
-    elseif kind == "loop" then
-        if type(node.max) ~= "number" or node.max < 1 or node.max ~= math.floor(node.max) then
-            return err(path, "loop.max must be an integer >= 1, got " .. tostring(node.max))
-        end
-        if node.counter:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "loop.counter must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        if walk_state.active_counters[node.counter] then
-            return err(path,
-                "loop.counter: nested loop reuses counter path '" .. node.counter .. "'")
-        end
-        local sub
-        sub, reason = check_expr(node.cond, path .. ".cond")
-        if not sub then return nil, reason end
-        -- augment active_counters for body walk (clone to avoid mutating caller's state)
-        local body_state = {
-            active_counters = {},
-            active_binds = walk_state.active_binds,
-            known_flows = walk_state.known_flows,
-            known_refs = walk_state.known_refs,
-        }
-        for k, v in pairs(walk_state.active_counters) do body_state.active_counters[k] = v end
-        body_state.active_counters[node.counter] = true
-        sub, reason = check_node(node.body, path .. ".body", body_state)
-        if not sub then return nil, reason end
-    elseif kind == "call" then
-        if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "call.out must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        if node.flow == "" then
-            return err(path, "call.flow: required non-empty string")
-        end
-        if walk_state.known_flows and not walk_state.known_flows[node.flow] then
-            return err(path, "call.flow: '" .. node.flow .. "' not in opts.flows registry")
-        end
-        for k, sub_expr in pairs(node.args) do
-            local sub
-            sub, reason = check_expr(sub_expr, path .. ".args." .. tostring(k))
-            if not sub then return nil, reason end
-        end
-    elseif kind == "fanout" then
-        if node.bind:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "fanout.bind must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        if node.out:sub(1, #CTX_WRITE_PREFIX) ~= CTX_WRITE_PREFIX then
-            return err(path, "fanout.out must start with '" .. CTX_WRITE_PREFIX .. "'")
-        end
-        if walk_state.active_binds[node.bind] then
-            return err(path,
-                "fanout.bind: nested fanout reuses bind path '" .. node.bind .. "'")
-        end
-        local sub
-        sub, reason = check_expr(node.items, path .. ".items")
-        if not sub then return nil, reason end
-        local body_state = {
-            active_counters = walk_state.active_counters,
-            active_binds = {},
-            known_flows = walk_state.known_flows,
-            known_refs = walk_state.known_refs,
-        }
-        for k, v in pairs(walk_state.active_binds) do body_state.active_binds[k] = v end
-        body_state.active_binds[node.bind] = true
-        sub, reason = check_node(node.body, path .. ".body", body_state)
-        if not sub then return nil, reason end
+    local local_check = NODE_LOCAL_CHECK[kind]
+    local body_state
+    ok, reason, body_state = local_check(node, path, state)
+    if not ok then return nil, reason end
+    local child_state = body_state or state
+    for _, entry in ipairs(walk.children_of(node)) do
+        local sub_path = path .. "." .. entry.key
+        if entry.idx ~= nil then sub_path = string.format("%s[%d]", sub_path, entry.idx) end
+        local sub_ok, sub_reason = check_node(entry.child, sub_path, child_state)
+        if not sub_ok then return nil, sub_reason end
     end
     return true
 end
@@ -267,9 +288,9 @@ function M.compile(ir, opts)
     opts = opts or {}
     local walk_state = {
         active_counters = {},
-        active_binds = {},
-        known_flows = opts.flows,
-        known_refs = opts.refs,
+        active_binds    = {},
+        known_flows     = opts.flows,
+        known_refs      = opts.refs,
     }
     local ok, reason = check_node(ir, "$", walk_state)
     if not ok then return nil, reason end
