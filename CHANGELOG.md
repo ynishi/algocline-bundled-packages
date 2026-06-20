@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.3.1 → v0.4.0 — Step 3 §3.0 / §3.1 / §3.A:
+  Constructor API + Introspect API public, compile refactored to
+  per-kind registry over a shared walk primitive**.
+  - **Constructor API (additive, raw-table SoT preserved)**:
+    `flow.ir` now publishes thin wrappers over the raw IR tables so
+    external callers stop re-inventing spec-local helpers.
+    Expr 8 ops: `path / lit` (positional), `eq / lt` (positional 2),
+    `["and"] / ["or"]` (variadic, bracket for reserved word),
+    `["not"] / len` (positional 1).
+    Node 7 kinds: `step / branch / loop / call / fanout` (table-arg),
+    `["let"]` (bracket-table-arg), `seq` (variadic children).
+    `step` input field stays `in_` (underscore suffix) for backwards
+    compatibility with the v0.3.1 schema / interpreter; bracket
+    `["in"]` would have broken the v0.3.1 surface.
+  - **Introspect API (§3.A) — engine-integrator contract**:
+    `flow.ir.walk(node, visitor)` walks the Node tree depth-first
+    pre-order with a frozen visitor signature
+    `visitor(node, ctx) -> nil | "skip" | "stop"` where
+    `ctx = { depth, parent, path }`. `flow.ir.type_of(node)`,
+    `flow.ir.children_of(node)`, and `flow.ir.refs_of(node_or_expr)`
+    complete the read-only introspect surface. The signature is
+    pinned literally in the public docstring so future extension is
+    a SemVer-major break (callers will start writing visitors as
+    soon as it ships).
+  - **compile.lua internal refactor (§3.1)**: per-kind validator
+    registry tables (`NODE_LOCAL_CHECK` / `EXPR_LOCAL_CHECK`)
+    replace the long if/elseif dispatch. Recursive descent goes
+    through `flow.ir.walk.children_of` / `expr_children_of` — the
+    same child-enumeration functions back both compile's walk and
+    the public `walk` / `refs_of`, so compile and introspect cannot
+    drift on what counts as a child. The stale "two passes"
+    docstring is corrected (compile already ran one shallow check
+    per node).
+  - flow/ir/init.lua docstring rewritten to reflect the full Step 2
+    + Step 3 surface (7 Node + 8 Expr + Constructor + Introspect)
+    and the raw-table-SoT contract.
+  - New internal module `flow/ir/walk.lua`. New spec files
+    `flow/spec/ir_constructor_spec.lua` (16 cases) and
+    `flow/spec/ir_introspect_spec.lua` (15 cases). All 45 existing
+    `ir_spec` tests still pass.
+  - 3.B (fanout `race` / `all_settled` join enum) and 3.4
+    (JSONPath bracket selector in `path.at`) are carry — needs
+    driven, not in v0.4.0.
+
 - **`flow` v0.3.0 → v0.3.1 — `or` / `len` Expr ops added,
   docstring leak cleanup**.
   - `or { args = { <Expr>, ... } }` — short-circuit disjunction;

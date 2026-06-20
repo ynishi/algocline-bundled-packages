@@ -195,7 +195,7 @@
 ## substrate
 
 - [civic](narrative/civic.md): civic-frame primitives — bus / state / channel / policy components for swarm simulations.
-- [flow](narrative/flow.md): Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.2 adds session-spanning bound APIs (...
+- [flow](narrative/flow.md): Flow Frame — FlowState + ReqToken + IR substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.3 adds `flow.ir` — Schema-as-...
 
 ## synthesis
 

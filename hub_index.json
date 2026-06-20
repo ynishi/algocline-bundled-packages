@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-06-16T01:19:49Z",
+  "updated_at": "2026-06-20T05:17:47Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -724,10 +724,10 @@
     },
     {
       "name": "flow",
-      "version": "0.2.0",
-      "description": "Flow Frame — FlowState + ReqToken substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.2 adds session-spanning bound APIs (wrap_bound / verify_bound / llm_bound) that persist verify-side state across alc.llm yield boundaries.",
+      "version": "0.4.0",
+      "description": "Flow Frame — FlowState + ReqToken + IR substrate for composing algo-based pkg (ab_mcts / cascade / coevolve / ...). Light Frame: driver loop stays in user code. v0.3 adds `flow.ir` — Schema-as-Data Node + Expr IR with Def→Compile→Exec; L3 surface complete (6 Node + 8 Expr + 1 L4 effect). v0.4 publishes the Constructor API + Introspect API (walk / type_of / children_of / refs_of) so engine integrators consume the Node tree via a frozen visitor contract.",
       "category": "substrate",
-      "docstring": "flow — Light Frame substrate for composing algo-based pkg\n\nProvides two primitives:\nFlowState — a plain table persisted via alc.state (KV primitive).\nReqToken  — a random nonce bound to a state, echoed by downstream\npkg results and verified on return.\n\nflow is a substrate, not an orchestrator. It does not provide M.run.\nThe driver loop stays in user code (Recipe). This preserves the\n\"mechanism, not policy\" discipline of a Light Frame and keeps\nbundled algo pkg (ab_mcts, cascade, coevolve, ...) composable\nwithout an Agent boundary abstraction.\n\nDesign references:\n- workspace/tasks/flow-frame/design-full.md\n- workspace/tasks/flow-frame/design-refine.md\n- workspace/tasks/flow-frame/bp-research.md\n\nUsage (minimal):\nlocal flow = require(\"flow\")\n\nlocal st   = flow.state_new({ key_prefix = \"my_run\", id = \"abc\", resume = true })\nlocal tok  = flow.token_issue(st)\n\nif not flow.state_get(st, \"gate_ok\") then\nlocal req = flow.token_wrap(tok, { slot = \"gate\", payload = { q = \"...\" } })\nlocal out = some_pkg.run(req.payload)\nassert(flow.token_verify(tok, out, req), \"token/slot mismatch\")\nflow.state_set(st, \"gate_ok\", true)\nflow.state_save(st)\nend",
+      "docstring": "flow — Light Frame substrate for composing algo-based pkg\n\nProvides three primitives:\nFlowState — a plain table persisted via alc.state (KV primitive).\nReqToken  — a random nonce bound to a state, echoed by downstream\npkg results and verified on return.\nIR        — Schema-as-Data Node + Expr IR with Def → Compile → Exec\n(see `flow.ir`, `flow/doc/ir.md`). Host-neutral\nsubstrate for authoring pipelines as a single Lua\ntable; effects enter only through the `step` Node\nwhich calls an injected `opts.dispatch(ref, input)`.\n\nflow is a substrate, not an orchestrator. It does not provide M.run.\nThe driver loop stays in user code (Recipe). This preserves the\n\"mechanism, not policy\" discipline of a Light Frame and keeps\nbundled algo pkg (ab_mcts, cascade, coevolve, ...) composable\nwithout an Agent boundary abstraction.\n\nUsage (minimal):\nlocal flow = require(\"flow\")\n\nlocal st   = flow.state_new({ key_prefix = \"my_run\", id = \"abc\", resume = true })\nlocal tok  = flow.token_issue(st)\n\nif not flow.state_get(st, \"gate_ok\") then\nlocal req = flow.token_wrap(tok, { slot = \"gate\", payload = { q = \"...\" } })\nlocal out = some_pkg.run(req.payload)\nassert(flow.token_verify(tok, out, req), \"token/slot mismatch\")\nflow.state_set(st, \"gate_ok\", true)\nflow.state_save(st)\nend",
       "tags": null,
       "type": "library",
       "type_source": null,

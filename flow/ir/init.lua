@@ -17,6 +17,12 @@
 --   M.exec(compiled, ctx, opts)
 --   M.default_dispatch       : public stub (raises "no dispatch configured")
 --
+-- Introspect (§3.A; consumer-facing contract for engine integrators):
+--   M.walk(node, visitor)    : depth-first pre-order over the Node tree
+--   M.type_of(node)          : "step" / "seq" / "branch" / ... (node.kind)
+--   M.children_of(node)      : direct child Nodes with accessor keys
+--   M.refs_of(node_or_expr)  : every `path.at` reachable from a subtree
+--
 -- Constructor API (thin sugar over raw table SoT):
 --   Expr (8 ops, hybrid args):
 --     M.path(at) / M.lit(value)
@@ -60,6 +66,7 @@
 local schema      = require("flow.ir.schema")
 local compile_mod = require("flow.ir.compile")
 local interp      = require("flow.ir.interpreter")
+local walk_mod    = require("flow.ir.walk")
 
 local M = {}
 
@@ -94,6 +101,64 @@ M.exec    = interp.exec
 --- wrappers can fall through to it for unknown refs.
 ---@type fun(ref: string, input: any): nil, string
 M.default_dispatch = interp.default_dispatch
+
+-- ── Introspect API (§3.A) ───────────────────────────────────────────
+--
+-- Read-only walk + type query over a Node tree. The visitor signature
+-- is the **public contract** and is intentionally frozen — extending
+-- it later would be a SemVer-major break. Lock literal:
+--
+--   visitor(node, ctx) -> nil | "skip" | "stop"
+--     node : current Node (read-only; mutate is undefined behavior)
+--     ctx  : { depth = integer, parent = Node|nil, path = {string|int, ...} }
+--       depth  — root is 0; child of root is 1, etc.
+--       parent — direct parent Node (nil at root)
+--       path   — accessor list from root to current node
+--                (e.g. {"children", 2, "then_"})
+--     returns:
+--       nil    — continue (default)
+--       "skip" — do not descend into this node's children
+--       "stop" — abort the entire walk
+--
+-- Walks are Node-tree only — Expr sub-trees of e.g. `branch.cond` are
+-- not visited by `walk`. To collect references inside Exprs use
+-- `refs_of`.
+
+--- Depth-first pre-order walk over a Node tree.
+---
+--- Visits the root first, then descends in `children_of` order.
+--- Returns "stop" if the visitor aborted, otherwise nil.
+---
+---@type fun(node: flow.ir.Node, visitor: fun(node: flow.ir.Node, ctx: { depth: integer, parent: flow.ir.Node?, path: (string|integer)[] }): nil|"skip"|"stop"): nil|"stop"
+M.walk = walk_mod.walk
+
+--- Return the kind of a Node (`"step"` / `"seq"` / `"branch"` / etc.).
+--- Equivalent to `node.kind` — provided for symmetry with `refs_of` /
+--- `children_of` and to let consumers depend on the function rather
+--- than on the raw-table layout.
+---@type fun(node: flow.ir.Node): string
+M.type_of = walk_mod.type_of
+
+--- Enumerate direct child Nodes of a Node with their accessor keys.
+---
+--- Returns a list of `{ child = Node, key = string|integer, idx = integer? }`
+--- entries. For `seq.children[i]`, `key = "children"` and `idx = i`.
+--- For named accessors (`then_` / `else_` / `body`), only `key` is set.
+--- Returns `{}` for leaf Nodes (`step` / `let` / `call`, which have no
+--- structural sub-Nodes).
+---
+---@type fun(node: flow.ir.Node): { child: flow.ir.Node, key: string|integer, idx: integer? }[]
+M.children_of = walk_mod.children_of
+
+--- Collect every `path.at` string reachable from a Node or Expr.
+---
+--- Walks the Node tree and every Expr sub-tree, returning the `at` of
+--- every `path` Expr in traversal order. Duplicates are preserved
+--- (callers dedupe if needed). Returns `{}` for subtrees that contain
+--- no `path` Exprs.
+---
+---@type fun(node_or_expr: flow.ir.Node|flow.ir.Expr): string[]
+M.refs_of = walk_mod.refs_of
 
 -- ── Constructor API — Expr ──────────────────────────────────────────
 --
