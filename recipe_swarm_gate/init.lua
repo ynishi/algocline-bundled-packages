@@ -189,7 +189,8 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: root_gate token mismatch")
         end
-        if out.status ~= "completed" then
+        local out_r = out.result or out
+        if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "root_gate")
             flow.state_save(state)
             return { status = "failed", stage = "root_gate" }
@@ -215,11 +216,12 @@ function M.run(ctx)
             if not flow.token_verify(token, out, req) then
                 error("recipe_swarm_gate: branch " .. bkey .. " token mismatch")
             end
+            local out_r = out.result or out
             branches[bkey] = {
                 approach   = approach,
-                answer     = out.answer,
-                best_score = out.best_score,
-                tree_stats = out.tree_stats,
+                answer     = out_r.answer,
+                best_score = out_r.best_score,
+                tree_stats = out_r.tree_stats,
             }
             flow.state_set(state, "branches", branches)
             flow.state_save(state)
@@ -252,12 +254,13 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: consensus_gate token mismatch")
         end
-        if out.status ~= "completed" then
+        local out_r = out.result or out
+        if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "consensus_gate")
             flow.state_save(state)
             return { status = "failed", stage = "consensus_gate", branches = branches }
         end
-        flow.state_set(state, "consensus", out.final_output)
+        flow.state_set(state, "consensus", out_r.final_output)
         flow.state_save(state)
     end
 
@@ -280,7 +283,8 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: commit_gate token mismatch")
         end
-        if out.status ~= "completed" then
+        local out_r = out.result or out
+        if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "commit_gate")
             flow.state_save(state)
             return {

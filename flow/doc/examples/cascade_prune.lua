@@ -57,11 +57,12 @@ function M.run(ctx)
             local out = cascade.run(req.payload)
             assert(flow.token_verify(token, out, req),
                 "cascade_prune: " .. pkey .. " token mismatch")
+            local out_r = out.result or out
             scores[pkey] = {
                 perspective = persp,
-                answer      = out.answer,
-                confidence  = out.confidence,
-                level_used  = out.level_used,
+                answer      = out_r.answer,
+                confidence  = out_r.confidence,
+                level_used  = out_r.level_used,
             }
             flow.state_set(state, "scores", scores)
             flow.state_save(state)
@@ -91,12 +92,13 @@ function M.run(ctx)
         local out = gatephase.run(req.payload)
         assert(flow.token_verify(token, out, req),
             "cascade_prune: final_pick token mismatch")
-        if out.status ~= "completed" then
+        local out_r = out.result or out
+        if out_r.status ~= "completed" then
             flow.state_set(state, "stage", "final_pick")
             flow.state_save(state)
             return { status = "failed", stage = "final_pick", scores = scores }
         end
-        flow.state_set(state, "picked", out.final_output)
+        flow.state_set(state, "picked", out_r.final_output)
         flow.state_save(state)
     end
 

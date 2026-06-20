@@ -62,12 +62,13 @@ function M.run(ctx)
             local out = coevolve.run(req.payload)
             assert(flow.token_verify(token, out, req),
                 "coevolve_adaptive: " .. rkey .. " token mismatch (cross-round leak?)")
+            local out_r = out.result or out
             history[rkey] = {
-                answer         = out.answer,
-                total_problems = out.total_problems,
-                total_correct  = out.total_correct,
-                total_partial  = out.total_partial,
-                total_wrong    = out.total_wrong,
+                answer         = out_r.answer,
+                total_problems = out_r.total_problems,
+                total_correct  = out_r.total_correct,
+                total_partial  = out_r.total_partial,
+                total_wrong    = out_r.total_wrong,
             }
             flow.state_set(state, "history", history)
             flow.state_set(state, "round",   r + 1)

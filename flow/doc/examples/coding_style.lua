@@ -55,12 +55,13 @@ function M.run(ctx)
             local out = gatephase.run(req.payload)
             assert(flow.token_verify(token, out, req),
                 "coding_style: " .. step.name .. " token mismatch")
-            if out.status ~= "completed" then
+            local out_r = out.result or out
+            if out_r.status ~= "completed" then
                 flow.state_set(state, "failed_at", step.name)
                 flow.state_save(state)
                 return { status = "failed", stage = step.name, results = results }
             end
-            results[step.name] = out.final_output
+            results[step.name] = out_r.final_output
             flow.state_set(state, "results",            results)
             flow.state_set(state, "done_" .. step.name, true)
             flow.state_save(state)
