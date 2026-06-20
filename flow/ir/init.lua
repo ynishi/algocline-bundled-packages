@@ -288,6 +288,30 @@ M["not"] = function(arg) return { op = "not", arg = arg } end
 ---@return flow.ir.Expr.len
 function M.len(arg) return { op = "len", arg = arg } end
 
+--- `concat` Expr: string concatenation (length >= 2). Variadic. Every
+--- arg must eval to a string at runtime — no implicit `tostring`
+--- coercion. Use `M.lit("...")` for literal string segments.
+---@param ... flow.ir.Expr
+---@return flow.ir.Expr.concat
+function M.concat(...) return { op = "concat", args = { ... } } end
+
+--- `add` Expr: numeric addition over two nested Exprs. Both sides must
+--- eval to numbers at runtime (no string-number coercion). Use
+--- `M.concat` for string joining.
+---@param lhs flow.ir.Expr
+---@param rhs flow.ir.Expr
+---@return flow.ir.Expr.add
+function M.add(lhs, rhs) return { op = "add", lhs = lhs, rhs = rhs } end
+
+--- `get` Expr: dynamic table read `from[key]`. `from` must eval to a
+--- table; `key` must eval to a string or number. Complements `path`
+--- (which is a compile-time fixed JSONPath) for runtime-computed keys.
+--- Missing keys return nil (Lua `t[k]` semantics).
+---@param from flow.ir.Expr
+---@param key  flow.ir.Expr
+---@return flow.ir.Expr.get
+function M.get(from, key) return { op = "get", from = from, key = key } end
+
 -- ── Constructor API — Node ──────────────────────────────────────────
 --
 -- Node constructors take a single spec table (named args). `seq` is
@@ -382,6 +406,38 @@ function M.fanout(spec)
         body  = spec.body,
         join  = spec.join,
         out   = spec.out,
+    }
+end
+
+--- `wrap_step` Node: ReqToken-bracketed dispatch as a single AST atom.
+---
+--- Evaluates `slot` (Expr → non-empty string), issues+wraps a ReqToken
+--- around the payload (`in_` if present), calls `opts.dispatch(ref,
+--- wrapped_payload)`, then verifies the result echo. On verify success
+--- the raw result is written to `ctx[out]`. On verify mismatch the
+--- `on_mismatch` Node (if provided) runs against ctx (with the failing
+--- result already written to `ctx[out]` so the fallback can inspect it);
+--- when `on_mismatch` is omitted, exec raises a slot-tagged error.
+---
+--- `bound = true` switches issue / wrap / verify to the session-spanning
+--- variants (`flow.token_wrap_bound` / `verify_bound`), persisting the
+--- verify-side req under `state.data._flow_req_<slot>`. Bound mode
+--- requires `opts.state` (FlowState) to be passed to `flow.ir.exec`.
+---
+--- The pkg-side contract is unchanged from §11.2 / `flow/token.lua`:
+--- handlers MAY echo `_flow_token` / `_flow_slot` in their result;
+--- verify is fail-open when echo is absent.
+---@param spec { slot: flow.ir.Expr, ref: string, in_: flow.ir.Expr?, out: string, bound: boolean?, on_mismatch: flow.ir.Node? }
+---@return flow.ir.Node.wrap_step
+function M.wrap_step(spec)
+    return {
+        kind        = "wrap_step",
+        slot        = spec.slot,
+        ref         = spec.ref,
+        in_         = spec.in_,
+        out         = spec.out,
+        bound       = spec.bound,
+        on_mismatch = spec.on_mismatch,
     }
 end
 

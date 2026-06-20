@@ -61,8 +61,14 @@ function M.children_of(node)
         out[#out + 1] = { child = node.body, key = "body" }
     elseif kind == "fanout" then
         out[#out + 1] = { child = node.body, key = "body" }
+    elseif kind == "wrap_step" then
+        if node.on_mismatch ~= nil then
+            out[#out + 1] = { child = node.on_mismatch, key = "on_mismatch" }
+        end
     end
     -- step / let / call have no direct child Nodes (only Exprs/args).
+    -- wrap_step's only structural child is the optional on_mismatch Node;
+    -- slot / in_ are Exprs, not structural children.
     return out
 end
 
@@ -85,6 +91,16 @@ function M.expr_children_of(expr)
         end
     elseif op == "not" or op == "len" then
         out[#out + 1] = { child = expr.arg, key = "arg" }
+    elseif op == "concat" then
+        for i, ch in ipairs(expr.args) do
+            out[#out + 1] = { child = ch, key = "args", idx = i }
+        end
+    elseif op == "add" then
+        out[#out + 1] = { child = expr.lhs, key = "lhs" }
+        out[#out + 1] = { child = expr.rhs, key = "rhs" }
+    elseif op == "get" then
+        out[#out + 1] = { child = expr.from, key = "from" }
+        out[#out + 1] = { child = expr.key, key = "key" }
     end
     -- path / lit are leaves.
     return out
@@ -179,6 +195,9 @@ function M.refs_of(node_or_expr)
             for _, e in pairs(n.args) do collect_expr(e) end
         elseif k == "fanout" then
             collect_expr(n.items)
+        elseif k == "wrap_step" then
+            collect_expr(n.slot)
+            if n.in_ ~= nil then collect_expr(n.in_) end
         end
         for _, entry in ipairs(M.children_of(n)) do
             collect_node(entry.child)

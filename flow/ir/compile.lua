@@ -88,8 +88,8 @@ local check_expr   -- forward decl
 ---@return boolean|nil ok
 ---@return string?    reason
 local function descend_expr(expr, path)
-    -- variadic min-2 check (and / or)
-    if expr.op == "and" or expr.op == "or" then
+    -- variadic min-2 check (and / or / concat)
+    if expr.op == "and" or expr.op == "or" or expr.op == "concat" then
         if type(expr.args) ~= "table" or #expr.args < 2 then
             local got = type(expr.args) == "table" and #expr.args or 0
             return err(path, "Expr." .. expr.op .. ": requires >= 2 args, got " .. got)
@@ -116,8 +116,9 @@ local EXPR_LOCAL_CHECK = {
         end
         return true
     end,
-    -- lit / eq / and / or / not / lt / len: no local invariant beyond
-    -- shape + recursive children.
+    -- lit / eq / and / or / not / lt / len / add / get: no local invariant
+    -- beyond shape + recursive children. (concat min-2 is checked in
+    -- descend_expr alongside and/or.)
 }
 
 check_expr = function(expr, path)
@@ -238,6 +239,26 @@ local NODE_LOCAL_CHECK = {
             if not ok then return nil, reason end
         end
         return true
+    end,
+    wrap_step = function(node, path, state)
+        if not has_ctx_write_prefix(node.out) then
+            return err(path, "wrap_step.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        local ok, reason = validate_path_syntax(node.out)
+        if not ok then return err(path, "wrap_step.out: " .. reason) end
+        if state.known_refs and not state.known_refs[node.ref] then
+            return err(path, "wrap_step.ref: '" .. node.ref .. "' not in opts.refs registry")
+        end
+        if node.ref == "" then
+            return err(path, "wrap_step.ref: required non-empty string")
+        end
+        ok, reason = check_expr(node.slot, path .. ".slot")
+        if not ok then return nil, reason end
+        if node.in_ ~= nil then
+            ok, reason = check_expr(node.in_, path .. ".in_")
+            if not ok then return nil, reason end
+        end
+        return true  -- on_mismatch (if present) walked via children_of
     end,
     fanout = function(node, path, state)
         if not has_ctx_write_prefix(node.bind) then

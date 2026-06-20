@@ -38,8 +38,13 @@
 -- guard ensures unknown kind / op never reaches here.
 
 local path_mod = require("flow.ir.path")
+local token_mod = require("flow.token")
+local state_mod = require("flow.state")
+local util_mod  = require("flow.util")
 
 local M = {}
+
+local TOKEN_HEX_BYTES = 32
 
 -- ── path utils ──────────────────────────────────────────────────────
 
@@ -169,6 +174,39 @@ local function eval_expr(expr, ctx)
         return false
     elseif op == "len" then
         return #eval_expr(expr.arg, ctx)
+    elseif op == "concat" then
+        local parts = {}
+        for i, sub in ipairs(expr.args) do
+            local v = eval_expr(sub, ctx)
+            if type(v) ~= "string" then
+                error(
+                    "eval_expr: concat arg[" .. i .. "] must be a string, got "
+                        .. type(v) .. " (no implicit tostring coercion)", 2)
+            end
+            parts[i] = v
+        end
+        return table.concat(parts)
+    elseif op == "add" then
+        local lhs = eval_expr(expr.lhs, ctx)
+        local rhs = eval_expr(expr.rhs, ctx)
+        if type(lhs) ~= "number" then
+            error("eval_expr: add.lhs must be a number, got " .. type(lhs), 2)
+        end
+        if type(rhs) ~= "number" then
+            error("eval_expr: add.rhs must be a number, got " .. type(rhs), 2)
+        end
+        return lhs + rhs
+    elseif op == "get" then
+        local from = eval_expr(expr.from, ctx)
+        if type(from) ~= "table" then
+            error("eval_expr: get.from must be a table, got " .. type(from), 2)
+        end
+        local key = eval_expr(expr.key, ctx)
+        local kt = type(key)
+        if kt ~= "string" and kt ~= "number" then
+            error("eval_expr: get.key must be a string or number, got " .. kt, 2)
+        end
+        return from[key]
     end
     error("eval_expr: unknown op " .. tostring(op), 2)
 end
@@ -368,6 +406,72 @@ local function exec_node(node, ctx, opts)
             end
             write_path(ctx, node.out, results)
         end
+    elseif kind == "wrap_step" then
+        -- Evaluate slot Expr to a non-empty string.
+        local slot = eval_expr(node.slot, ctx)
+        if type(slot) ~= "string" or slot == "" then
+            error("exec: wrap_step.slot must eval to a non-empty string, got "
+                .. type(slot), 2)
+        end
+        -- Evaluate input payload (or nil).
+        local input = nil
+        if node.in_ then input = eval_expr(node.in_, ctx) end
+        if input ~= nil and type(input) ~= "table" then
+            error("exec: wrap_step '" .. slot .. "': in_ must eval to a table or nil, "
+                .. "got " .. type(input), 2)
+        end
+
+        -- Issue + wrap. Bound variant requires opts.state.
+        local req
+        if node.bound then
+            local st = opts.state
+            if type(st) ~= "table" then
+                error("exec: wrap_step '" .. slot .. "': bound=true requires "
+                    .. "opts.state (FlowState) to be provided", 2)
+            end
+            req = token_mod.wrap_bound(st, { slot = slot, payload = input })
+        else
+            local tok
+            if opts.state then
+                tok = token_mod.issue(opts.state)
+            else
+                -- Stateless variant: synthesize an ephemeral token. The
+                -- echo contract still works (dispatch sees _flow_token /
+                -- _flow_slot in the payload), and verify checks equality
+                -- against req._expect_token.
+                tok = { value = util_mod.random_hex(TOKEN_HEX_BYTES) }
+            end
+            req = token_mod.wrap(tok, { slot = slot, payload = input })
+        end
+
+        -- Dispatch.
+        local result, derr = opts.dispatch(node.ref, req.payload)
+        if derr and result == nil then
+            error("exec: wrap_step '" .. slot .. "' (ref '" .. node.ref .. "'): "
+                .. derr, 2)
+        end
+
+        -- Verify (fail-open on missing echo).
+        local ok
+        if node.bound then
+            ok = token_mod.verify_bound(opts.state, slot, result)
+        else
+            ok = token_mod.verify(nil, result, req)
+        end
+
+        if not ok then
+            if node.on_mismatch ~= nil then
+                -- Surface verify result for the fallback Node before
+                -- handing control off.
+                write_path(ctx, node.out, result)
+                exec_node(node.on_mismatch, ctx, opts)
+            else
+                error("exec: wrap_step '" .. slot .. "': token/slot mismatch "
+                    .. "(set on_mismatch to handle, or check pkg echo contract)", 2)
+            end
+        else
+            write_path(ctx, node.out, result)
+        end
     else
         error("exec: unknown kind " .. tostring(kind), 2)
     end
@@ -378,6 +482,9 @@ end
 ---@field dispatch       fun(ref: string, input: any): any, string?
 ---@field flows          table<string, flow.ir.Node>?  registry for `call.flow`
 ---@field max_call_depth integer?  recursion cap for `call` (default 64)
+---@field state          table?  optional FlowState. When present, `wrap_step`
+---                              issues / persists tokens via this state. Required
+---                              when any `wrap_step` Node has `bound = true`.
 ---@field scheduler      any?  reserved forward-compat slot for concurrent
 ---                           fanout schedulers; the MVP interpreter is
 ---                           serial and ignores this field.

@@ -79,6 +79,21 @@ local M = {}
 ---@field op   "len"
 ---@field arg  flow.ir.Expr  nested Expr (walked); must eval to string or array
 
+---@class flow.ir.Expr.concat
+---@field op    "concat"
+---@field args  flow.ir.Expr[]  nested Exprs (walked, length >= 2); each must
+---  eval to a string at runtime (no implicit tostring coercion)
+
+---@class flow.ir.Expr.add
+---@field op   "add"
+---@field lhs  flow.ir.Expr  nested Expr (walked); must eval to a number
+---@field rhs  flow.ir.Expr  nested Expr (walked); must eval to a number
+
+---@class flow.ir.Expr.get
+---@field op    "get"
+---@field from  flow.ir.Expr  nested Expr (walked); must eval to a table
+---@field key   flow.ir.Expr  nested Expr (walked); must eval to a string or number
+
 ---@alias flow.ir.Expr
 ---| flow.ir.Expr.path
 ---| flow.ir.Expr.lit
@@ -88,6 +103,9 @@ local M = {}
 ---| flow.ir.Expr.lt
 ---| flow.ir.Expr.or
 ---| flow.ir.Expr.len
+---| flow.ir.Expr.concat
+---| flow.ir.Expr.add
+---| flow.ir.Expr.get
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `op`
 M.Expr = T.discriminated("op", {
@@ -125,6 +143,22 @@ M.Expr = T.discriminated("op", {
         op  = T.one_of({ "len" }),
         arg = T.table:describe("nested Expr (walked); must eval to string or array"),
     }, { open = false }),
+    concat = T.shape({
+        op   = T.one_of({ "concat" }),
+        args = T.array_of(T.table):describe(
+            "nested Exprs (walked, length >= 2); each must eval to a string at "
+            .. "runtime (exec raises on non-string; no implicit tostring coercion)"),
+    }, { open = false }),
+    add = T.shape({
+        op  = T.one_of({ "add" }),
+        lhs = T.table:describe("nested Expr (walked); must eval to a number"),
+        rhs = T.table:describe("nested Expr (walked); must eval to a number"),
+    }, { open = false }),
+    get = T.shape({
+        op   = T.one_of({ "get" }),
+        from = T.table:describe("nested Expr (walked); must eval to a table"),
+        key  = T.table:describe("nested Expr (walked); must eval to a string or number"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Expr ops (membership test).
@@ -132,6 +166,7 @@ M.EXPR_OPS = {
     path = true, lit = true, eq = true,
     ["and"] = true, ["not"] = true, lt = true,
     ["or"] = true, len = true,
+    concat = true, add = true, get = true,
 }
 
 -- ── Node (kind-tagged) ──────────────────────────────────────────────
@@ -178,6 +213,18 @@ M.EXPR_OPS = {
 ---@field join   "all"|"any"|"race"|"all_settled"  join mode (see §fanout semantics)
 ---@field out    string        joined result write path ("ctx.*")
 
+---@class flow.ir.Node.wrap_step
+---@field kind         "wrap_step"
+---@field slot         flow.ir.Expr  Expr evaluating to a non-empty string;
+---  used as the ReqToken slot label (and, when bound, as the persistence key).
+---@field ref          string        opaque handler reference, passed to opts.dispatch
+---@field in_          flow.ir.Expr|nil  input Expr; nil → dispatch receives nil
+---@field out          string        ctx write path; must start with "ctx."
+---@field bound        boolean|nil   when true, persist req under state.data._flow_req_<slot>
+---  and auto-delete on verify success (session-spanning). Default false (in-memory cycle).
+---@field on_mismatch  flow.ir.Node|nil  Node executed when verify returns false
+---  (instead of raising). When nil, exec raises with a slot-tagged message.
+
 ---@alias flow.ir.Node
 ---| flow.ir.Node.step
 ---| flow.ir.Node.seq
@@ -186,6 +233,7 @@ M.EXPR_OPS = {
 ---| flow.ir.Node.loop
 ---| flow.ir.Node.call
 ---| flow.ir.Node.fanout
+---| flow.ir.Node.wrap_step
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `kind`
 M.Node = T.discriminated("kind", {
@@ -239,12 +287,29 @@ M.Node = T.discriminated("kind", {
             .. "(Promise.allSettled / join_all)"),
         out   = T.string:describe("joined result write path, 'ctx.*'"),
     }, { open = false }),
+    wrap_step = T.shape({
+        kind        = T.one_of({ "wrap_step" }),
+        slot        = T.table:describe(
+            "nested Expr (walked); must eval to a non-empty string at runtime. "
+            .. "Used as the ReqToken slot label and (when bound) as the "
+            .. "state.data._flow_req_<slot> persistence key."),
+        ref         = T.string:describe("opaque handler reference, passed to opts.dispatch"),
+        in_         = T.table:is_optional():describe("input Expr (walked)"),
+        out         = T.string:describe("ctx write path, must start with 'ctx.'"),
+        bound       = T.boolean:is_optional():describe(
+            "when true, persist req under state.data._flow_req_<slot> "
+            .. "(survives session restart); default false (in-memory cycle)"),
+        on_mismatch = T.table:is_optional():describe(
+            "nested Node (walked); executed when verify returns false. "
+            .. "When omitted, exec raises with a slot-tagged mismatch message."),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Node kinds (membership test).
 M.NODE_KINDS = {
     step = true, seq = true, branch = true,
     ["let"] = true, loop = true, call = true, fanout = true,
+    wrap_step = true,
 }
 
 return M
