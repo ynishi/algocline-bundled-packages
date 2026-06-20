@@ -61,18 +61,7 @@ common.run({
     graders = {
         common.grader_agent_ok(),
         common.grader_max_tokens(200000),
-        {
-            name = "status_done",
-            check = function(result)
-                if not result.ok then return false, "agent failed" end
-                local c = (result.content or ""):gsub("[%*`_~\"]", ""):lower()
-                if c:find("status%s*[:=]%s*done", 1, false) then return true, nil end
-                if c:find("status%s*[:=]%s*regen", 1, false) then
-                    return false, "status=regen_required (anti_jury or zero diversity)"
-                end
-                return false, "status=done not surfaced"
-            end,
-        },
+        common.grader_status_done(),
         {
             name = "aggregated_present",
             check = function(result)

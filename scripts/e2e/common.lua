@@ -295,4 +295,57 @@ function M.grader_agent_ok()
     }
 end
 
+--- Strip common markdown noise (asterisk / backtick / underscore /
+--- tilde / quote) and lowercase, so grader substring matches survive
+--- agent decorations like `**Status:** \`"done"\``.
+---
+--- Char class must stay in sync with the agent's typical markdown
+--- emit. Update here only; 5 graders (recipe_swarm_gate + 4 examples)
+--- consume via M.grader_status_done so adding a new noise character
+--- needs only one edit.
+---@param s string|nil
+---@return string
+function M.strip_md(s)
+    return (s or ""):gsub("[%*`_~\"]", ""):lower()
+end
+
+--- Create a status_done grader. PASS when stripped content contains
+--- `status: done` (or `status = done`). FAIL with specific reason
+--- when an explicit negative signal (`status: failed` or
+--- `status: regen_required`) appears; otherwise FAIL with
+--- "status: done not surfaced".
+---
+--- `opts.regen_as_fail` (default true): treat `regen_required` as a
+--- distinct fail reason instead of just "not surfaced". ensemble_vote
+--- uses this because anti_jury short-circuits to regen_required.
+---
+--- Scope: E2E harness only (agent.run() ReAct loop graders). If
+--- alc_eval scenarios or bundled pkgs start consuming the same shape,
+--- lift `strip_md` to a shared util (e.g. evalframe/ or flow/util)
+--- and keep `grader_status_done` here — consumer split keeps E2E and
+--- scenario grading layers from coupling.
+---@param opts? { regen_as_fail?: boolean }
+function M.grader_status_done(opts)
+    opts = opts or {}
+    local regen_as_fail = opts.regen_as_fail
+    if regen_as_fail == nil then regen_as_fail = true end
+    return {
+        name = "status_done",
+        check = function(result)
+            if not result.ok then return false, "agent failed" end
+            local c = M.strip_md(result.content)
+            if c:find("status%s*[:=]%s*done", 1, false) then
+                return true, nil
+            end
+            if c:find("status%s*[:=]%s*failed", 1, false) then
+                return false, "status reported as failed"
+            end
+            if regen_as_fail and c:find("status%s*[:=]%s*regen", 1, false) then
+                return false, "status=regen_required (anti_jury or zero diversity)"
+            end
+            return false, "status: done not surfaced"
+        end,
+    }
+end
+
 return M

@@ -1,5 +1,7 @@
 ---@module 'flow.util'
--- Internal utilities for the flow Frame (not part of public API).
+-- Utilities for the flow Frame. Most entries are internal (random_hex /
+-- parse_tag / shallow_copy / deep_equal); `unwrap_result` is part of the
+-- public boundary surface re-exported as `flow.unwrap_result`.
 
 local M = {}
 
@@ -70,6 +72,43 @@ function M.shallow_copy(t)
     for k, v in pairs(t) do
         out[k] = v
     end
+    return out
+end
+
+--- Unwrap a bundled pkg return value to its business result.
+---
+--- Bundled pkg authored against the `ctx` convention return the call
+--- site's `ctx` with the business result tucked under `ctx.result`
+--- (see ab_mcts/init.lua:404, orch_gatephase/init.lua:287,
+--- cascade/init.lua:347, coevolve/init.lua:422 etc.). Some pkg or
+--- mock harnesses still return the result fields at top level — both
+--- shapes need to be tolerated at every pkg boundary inside a Recipe
+--- / Example.
+---
+--- Equivalent to the inline idiom `local r = out.result or out`
+--- previously copied across recipe_swarm_gate (4 boundaries) and the
+--- 4 flow/doc/examples (4 boundaries). Consolidating here means a
+--- future shape unification (e.g. enforcing ctx-only return) only has
+--- to be migrated in one place.
+---
+--- The fallback is intentionally permissive: when `out` is nil the
+--- helper returns nil so that downstream `nil.<field>` errors surface
+--- the same way as if the inline idiom had been used. When `out` is a
+--- non-table primitive it is returned as-is for the same reason.
+---
+--- Boundary regression discipline: spec mocks SHOULD return the
+--- production `{ result = {...} }` shape so that an accidental shape
+--- drift (e.g. 2026-06-21 commit 42629df where mocks returned flat
+--- top-level fields and a real LLM run insta-failed at root_gate)
+--- cannot pass the spec while breaking real E2E. This helper is the
+--- defense-in-depth layer; mocks matching production shape are the
+--- primary defense.
+---@generic T
+---@param out T|{result: T}|nil
+---@return T|nil
+function M.unwrap_result(out)
+    if type(out) ~= "table" then return out end
+    if out.result ~= nil then return out.result end
     return out
 end
 

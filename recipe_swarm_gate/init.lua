@@ -189,7 +189,7 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: root_gate token mismatch")
         end
-        local out_r = out.result or out
+        local out_r = flow.unwrap_result(out)
         if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "root_gate")
             flow.state_save(state)
@@ -216,7 +216,7 @@ function M.run(ctx)
             if not flow.token_verify(token, out, req) then
                 error("recipe_swarm_gate: branch " .. bkey .. " token mismatch")
             end
-            local out_r = out.result or out
+            local out_r = flow.unwrap_result(out)
             branches[bkey] = {
                 approach   = approach,
                 answer     = out_r.answer,
@@ -254,7 +254,7 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: consensus_gate token mismatch")
         end
-        local out_r = out.result or out
+        local out_r = flow.unwrap_result(out)
         if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "consensus_gate")
             flow.state_save(state)
@@ -283,7 +283,7 @@ function M.run(ctx)
         if not flow.token_verify(token, out, req) then
             error("recipe_swarm_gate: commit_gate token mismatch")
         end
-        local out_r = out.result or out
+        local out_r = flow.unwrap_result(out)
         if out_r.status ~= "completed" then
             flow.state_set(state, "failed_at", "commit_gate")
             flow.state_save(state)

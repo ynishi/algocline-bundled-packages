@@ -72,18 +72,7 @@ common.run({
         common.grader_agent_ok(),
         common.grader_max_tokens(600000),
         common.grader_max_turns(35),
-        {
-            name = "status_done",
-            check = function(result)
-                if not result.ok then return false, "agent failed" end
-                local c = (result.content or ""):gsub("[%*`_~\"]", ""):lower()
-                if c:find("status%s*[:=]%s*done", 1, false) then return true, nil end
-                if c:find("status%s*[:=]%s*failed", 1, false) then
-                    return false, "status reported as failed"
-                end
-                return false, "status=done not surfaced"
-            end,
-        },
+        common.grader_status_done(),
         {
             name = "step_design_done",
             check = function(result)

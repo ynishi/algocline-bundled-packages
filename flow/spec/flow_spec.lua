@@ -210,6 +210,46 @@ describe("flow.util: shallow_copy", function()
 end)
 
 -- ---------------------------------------------------------------------
+-- flow.util.unwrap_result
+-- ---------------------------------------------------------------------
+describe("flow.util: unwrap_result", function()
+    it("unwraps ctx-shaped return ({result = X}) to X", function()
+        local util = require("flow.util")
+        local inner = { status = "completed", answer = 42 }
+        local out = { result = inner }
+        expect(util.unwrap_result(out)).to.equal(inner)
+        -- field access shape matches production ctx
+        expect(util.unwrap_result(out).status).to.equal("completed")
+        expect(util.unwrap_result(out).answer).to.equal(42)
+    end)
+
+    it("passes through flat top-level shape (no .result)", function()
+        local util = require("flow.util")
+        local flat = { status = "completed", answer = 42 }
+        expect(util.unwrap_result(flat)).to.equal(flat)
+        expect(util.unwrap_result(flat).status).to.equal("completed")
+    end)
+
+    it("returns nil for nil input", function()
+        local util = require("flow.util")
+        expect(util.unwrap_result(nil)).to.equal(nil)
+    end)
+
+    it("returns primitives unchanged", function()
+        local util = require("flow.util")
+        expect(util.unwrap_result(42)).to.equal(42)
+        expect(util.unwrap_result("s")).to.equal("s")
+        expect(util.unwrap_result(false)).to.equal(false)
+    end)
+
+    it("re-exports as flow.unwrap_result on the top-level module", function()
+        local flow = require("flow")
+        expect(type(flow.unwrap_result)).to.equal("function")
+        expect(flow.unwrap_result({ result = { ok = true } }).ok).to.equal(true)
+    end)
+end)
+
+-- ---------------------------------------------------------------------
 -- flow.state
 -- ---------------------------------------------------------------------
 describe("flow.state: basics", function()
@@ -883,6 +923,7 @@ describe("flow: meta", function()
             "token_issue", "token_wrap", "token_verify",
             "token_wrap_bound", "token_verify_bound",
             "llm", "llm_bound",
+            "unwrap_result",
         }) do
             expect(type(flow[name])).to.equal("function")
         end

@@ -2,6 +2,17 @@
 --- coevolve_adaptive,coding_style}.lua — mock alc.llm + patched pkg
 --- runs; walks each example end-to-end and confirms ReqToken slot
 --- isolation across rounds / perspectives / phases.
+---
+--- Mock shape contract: bundled pkgs (cascade / coevolve /
+--- orch_gatephase) return `ctx` with the business result tucked under
+--- `ctx.result = {...}` (see cascade/init.lua:347, coevolve/init.lua:422,
+--- orch_gatephase/init.lua:287). Mocks here mirror that production
+--- shape so a boundary regression (e.g. 2026-06-21 commit 42629df, where
+--- an example accessed top-level fields on a ctx-wrapped return → first
+--- real LLM run failed while spec mocks were green) cannot pass the
+--- spec while breaking real E2E. The `flow.unwrap_result(out)` call
+--- in the example sources (see flow/util.lua) is kept as
+--- defense-in-depth for non-ctx pkg returns.
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
@@ -60,7 +71,7 @@ describe("flow/doc/examples/cascade_prune", function()
         local cascade   = require("cascade")
         local gatephase = require("orch_gatephase")
         cascade.run = function(input)
-            return {
+            return { result = {
                 answer     = "ans for " .. input.task:sub(1, 16),
                 confidence = 0.9,
                 level_used = 1,
@@ -68,16 +79,16 @@ describe("flow/doc/examples/cascade_prune", function()
                 threshold  = input.threshold,
                 escalated  = false,
                 history    = {},
-            }
+            } }
         end
         gatephase.run = function(_)
-            return {
+            return { result = {
                 status = "completed", task_type = "feature",
                 skipped_phases = {},
                 phases = { { name = "pick", output = "pick=persp_2", gate_passed = true, attempts = 1 } },
                 final_output = "pick=persp_2",
                 total_llm_calls = 1,
-            }
+            } }
         end
         local ex = require("examples.cascade_prune")
         local r = ex.run({ task = "x", task_id = "cp_1" })
@@ -143,7 +154,7 @@ describe("flow/doc/examples/coevolve_adaptive", function()
         coevolve.run = function(input)
             -- The recipe embeds _flow_slot in payload (via flow.token_wrap).
             seen_slots[#seen_slots + 1] = input._flow_slot
-            return {
+            return { result = {
                 answer        = "ans_" .. input._flow_slot,
                 round_stats   = {},
                 total_problems = 3,
@@ -151,7 +162,7 @@ describe("flow/doc/examples/coevolve_adaptive", function()
                 total_partial  = 0,
                 total_wrong    = 1,
                 all_results    = {},
-            }
+            } }
         end
         local ex = require("examples.coevolve_adaptive")
         local r = ex.run({ task = "domain X", task_id = "ce_1", rounds = 3 })
@@ -175,13 +186,13 @@ describe("flow/doc/examples/coding_style", function()
         local gatephase = require("orch_gatephase")
         gatephase.run = function(input)
             local pn = input.phases[1].name
-            return {
+            return { result = {
                 status = "completed", task_type = "feature",
                 skipped_phases = {},
                 phases = { { name = pn, output = "OUT_" .. pn, gate_passed = true, attempts = 1 } },
                 final_output = "OUT_" .. pn,
                 total_llm_calls = 1,
-            }
+            } }
         end
         local ex = require("examples.coding_style")
         local r = ex.run({
@@ -205,9 +216,9 @@ describe("flow/doc/examples/coding_style", function()
         gatephase.run = function(input)
             local pn = input.phases[1].name
             if pn == "design" then
-                return { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "OK", gate_passed = true, attempts = 1 } }, final_output = "OK", total_llm_calls = 1 }
+                return { result = { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "OK", gate_passed = true, attempts = 1 } }, final_output = "OK", total_llm_calls = 1 } }
             end
-            return { status = "failed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "NO", gate_passed = false, attempts = 3 } }, final_output = "NO", total_llm_calls = 3 }
+            return { result = { status = "failed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "NO", gate_passed = false, attempts = 3 } }, final_output = "NO", total_llm_calls = 3 } }
         end
         local ex = require("examples.coding_style")
         local r = ex.run({

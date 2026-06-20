@@ -34,6 +34,7 @@ local state = require("flow.state")
 local token = require("flow.token")
 local llm   = require("flow.llm")
 local ir    = require("flow.ir")
+local util  = require("flow.util")
 
 local M = {}
 
@@ -79,6 +80,12 @@ M.token_verify_bound = token.verify_bound
 
 M.llm                = llm.llm
 M.llm_bound          = llm.llm_bound
+
+-- Result-shape boundary helper: bundled pkg return `ctx` with
+-- `ctx.result = {...}`. Recipe / Example unwrap at every pkg
+-- boundary; centralized so a future shape unification migrates in
+-- one place. See flow/util.lua for the full rationale.
+M.unwrap_result      = util.unwrap_result
 
 -- IR sub-module (Schema-as-Data Node + Expr; Def → Compile → Exec).
 -- Exposed as a nested namespace because the surface (compile / exec /

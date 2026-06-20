@@ -6,6 +6,17 @@
 ---   * root_fail   — root_gate emits NO, recipe returns {status="failed", stage="root_gate"}.
 ---   * consensus_fail — consensus gate emits free-form (gate regex fails), recipe returns failed.
 ---   * resume — second invocation skips already-completed slots.
+---
+--- Mock shape contract: ab_mcts.run / orch_gatephase.run return `ctx` with
+--- the business result tucked under `ctx.result = {...}` (see
+--- ab_mcts/init.lua:404 and orch_gatephase/init.lua:287). The spec
+--- mocks below mirror that production shape so a boundary regression
+--- like 2026-06-21 commit 42629df (recipe accessed top-level fields on
+--- a ctx-wrapped return → root_gate insta-fail on first real LLM run)
+--- cannot pass the spec while breaking real E2E. The
+--- `flow.unwrap_result(out)` call in recipe_swarm_gate/init.lua (see
+--- flow/util.lua) is kept as defense-in-depth for pkgs that may
+--- legitimately return flat shapes in the future.
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
@@ -88,7 +99,7 @@ describe("recipe_swarm_gate", function()
         reset()
         local _h = mock_env({
             ab_mcts = function(input, i)
-                return {
+                return { result = {
                     answer     = "answer_" .. tostring(i),
                     best_path  = { "step1", "step2" },
                     best_score = 0.7 + 0.05 * i,
@@ -97,7 +108,7 @@ describe("recipe_swarm_gate", function()
                         wider_decisions = 3, deeper_decisions = 4,
                         max_depth = input.max_depth, branching_ratio = 0.4,
                     },
-                }
+                } }
             end,
             gatephase = function(input, _)
                 local pn = phase_name(input)
@@ -109,14 +120,14 @@ describe("recipe_swarm_gate", function()
                 else  -- commit
                     out = "COMMIT"
                 end
-                return {
+                return { result = {
                     status         = "completed",
                     task_type      = "feature",
                     skipped_phases = {},
                     phases         = { { name = pn, output = out, gate_passed = true, attempts = 1 } },
                     final_output   = out,
                     total_llm_calls = 1,
-                }
+                } }
             end,
         })
 
@@ -141,14 +152,14 @@ describe("recipe_swarm_gate", function()
         mock_env({
             ab_mcts = function() error("ab_mcts must not be called on root_fail") end,
             gatephase = function(input, _)
-                return {
+                return { result = {
                     status         = "failed",
                     task_type      = "feature",
                     skipped_phases = {},
                     phases         = { { name = phase_name(input), output = "NO", gate_passed = false, attempts = 3 } },
                     final_output   = "NO",
                     total_llm_calls = 3,
-                }
+                } }
             end,
         })
         local recipe = require("recipe_swarm_gate")
@@ -161,20 +172,20 @@ describe("recipe_swarm_gate", function()
         reset()
         mock_env({
             ab_mcts = function(input, i)
-                return {
+                return { result = {
                     answer     = "a" .. i,
                     best_path  = {},
                     best_score = 0.5,
                     tree_stats = { total_nodes = 1, budget = input.budget, wider_decisions = 0, deeper_decisions = 0, max_depth = input.max_depth, branching_ratio = 0 },
-                }
+                } }
             end,
             gatephase = function(input, _)
                 local pn = phase_name(input)
                 if pn == "root" then
-                    return { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "OK", gate_passed = true, attempts = 1 } }, final_output = "OK", total_llm_calls = 1 }
+                    return { result = { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "OK", gate_passed = true, attempts = 1 } }, final_output = "OK", total_llm_calls = 1 } }
                 end
                 -- consensus: gate fails
-                return { status = "failed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "I cannot decide", gate_passed = false, attempts = 3 } }, final_output = "I cannot decide", total_llm_calls = 3 }
+                return { result = { status = "failed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = "I cannot decide", gate_passed = false, attempts = 3 } }, final_output = "I cannot decide", total_llm_calls = 3 } }
             end,
         })
         local recipe = require("recipe_swarm_gate")
@@ -189,17 +200,17 @@ describe("recipe_swarm_gate", function()
         reset()
         local h = mock_env({
             ab_mcts = function(input, i)
-                return {
+                return { result = {
                     answer     = "ans_" .. i,
                     best_path  = {},
                     best_score = 0.8,
                     tree_stats = { total_nodes = 1, budget = input.budget, wider_decisions = 0, deeper_decisions = 0, max_depth = input.max_depth, branching_ratio = 0 },
-                }
+                } }
             end,
             gatephase = function(input, _)
                 local pn = phase_name(input)
                 local out = pn == "root" and "OK" or (pn == "consensus" and "pick=branch_1" or "COMMIT")
-                return { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = out, gate_passed = true, attempts = 1 } }, final_output = out, total_llm_calls = 1 }
+                return { result = { status = "completed", task_type = "feature", skipped_phases = {}, phases = { { name = pn, output = out, gate_passed = true, attempts = 1 } }, final_output = out, total_llm_calls = 1 } }
             end,
         })
 

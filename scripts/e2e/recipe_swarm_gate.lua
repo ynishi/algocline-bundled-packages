@@ -93,27 +93,7 @@ common.run({
         common.grader_agent_ok(),
         common.grader_max_tokens(1500000),
         common.grader_max_turns(75),
-        {
-            name = "status_done",
-            check = function(result)
-                if not result.ok then return false, "agent failed" end
-                -- Strip common markdown noise so the agent's
-                -- "**Status:** `done`" formatting still matches.
-                local c = (result.content or "")
-                    :gsub("[%*`_~\"]", "")
-                    :lower()
-                if c:find("status%s*[:=]%s*done", 1, false) then
-                    return true, nil
-                end
-                -- Negative signal only when status is explicitly failed
-                -- (avoid the literal word "failed" appearing in
-                -- caveats / Notes sections).
-                if c:find("status%s*[:=]%s*failed", 1, false) then
-                    return false, "status reported as failed"
-                end
-                return false, "status: done not surfaced"
-            end,
-        },
+        common.grader_status_done(),
         {
             name = "picked_branch",
             check = function(result)
