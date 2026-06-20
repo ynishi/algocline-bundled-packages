@@ -319,6 +319,26 @@ end
 --- distinct fail reason instead of just "not surfaced". ensemble_vote
 --- uses this because anti_jury short-circuits to regen_required.
 ---
+--- Caveats — this grader is intentionally brittle, scoped to E2E
+--- smoke runs over the agent.run() ReAct loop:
+---   * substring match on stripped content can false-positive on
+---     "previous status: done was reverted" style natural-language
+---     prose, and can false-negative on "the status came out as done"
+---     when the agent paraphrases instead of emitting the literal
+---     `status: done` token. Empirically the recipe pkgs return the
+---     literal token in their `result.status` field and the agent
+---     surfaces it verbatim, so the match holds for the recipes the
+---     E2E harness exercises today.
+---   * the strip char class is the only DRY point — adding a new
+---     markdown noise character (e.g. agent starts wrapping in `<>`)
+---     requires one edit in `strip_md` above and all 5 graders pick it up.
+---   * NOT suitable for promotion to a non-E2E layer. alc_eval
+---     scenarios or bundled pkg unit tests should assert on structured
+---     return shapes (`result.status == "done"`) directly, not on a
+---     ReAct text grep. Lifting this helper outside scripts/e2e/ would
+---     leak the brittle prose-grep contract into layers that have
+---     access to the typed result.
+---
 --- Scope: E2E harness only (agent.run() ReAct loop graders). If
 --- alc_eval scenarios or bundled pkgs start consuming the same shape,
 --- lift `strip_md` to a shared util (e.g. evalframe/ or flow/util)

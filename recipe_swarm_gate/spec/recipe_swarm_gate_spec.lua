@@ -17,6 +17,14 @@
 --- `flow.unwrap_result(out)` call in recipe_swarm_gate/init.lua (see
 --- flow/util.lua) is kept as defense-in-depth for pkgs that may
 --- legitimately return flat shapes in the future.
+---
+--- Token verify coverage: the mocks below intentionally do NOT echo
+--- `_flow_token` / `_flow_slot`, so every `flow.token_verify` call in
+--- the recipe hits the fail-open path. The happy-path spec passing is
+--- itself the regression check that pass-through still works; the
+--- positive / negative echo cases live in `flow/spec/flow_spec.lua`
+--- (see "passes fail-open when result has no echo fields" / "fails on
+--- token mismatch" at flow_spec.lua:476-505) and are not duplicated here.
 
 local describe, it, expect = lust.describe, lust.it, lust.expect
 
