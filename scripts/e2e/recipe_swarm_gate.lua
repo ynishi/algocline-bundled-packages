@@ -100,7 +100,7 @@ common.run({
                 -- Strip common markdown noise so the agent's
                 -- "**Status:** `done`" formatting still matches.
                 local c = (result.content or "")
-                    :gsub("[%*`_~]", "")
+                    :gsub("[%*`_~\"]", "")
                     :lower()
                 if c:find("status%s*[:=]%s*done", 1, false) then
                     return true, nil
