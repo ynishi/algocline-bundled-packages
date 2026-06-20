@@ -178,20 +178,32 @@ end
 --- `fanout` evaluates `items` to an array, runs `body` per item against
 ---          a branch-local ctx (shallow copy of caller's ctx + `bind`
 ---          written to the item), and writes the joined result to
----          ctx[out]. `join` ∈ {"all", "any"}:
+---          ctx[out]. `join` ∈ {"all", "any", "race", "all_settled"}:
 ---            `all` — every branch runs; out is an array of per-branch
----                    final ctx tables.
+---                    final ctx tables (Promise.all / try_join_all).
 ---            `any` — branches run in order; first non-raising branch's
 ---                    final ctx is out; all-fail raises; empty items
+---                    yields out = {} (Promise.any / select_ok).
+---            `race` — first branch to settle wins, success OR raise:
+---                    runs items in order until one completes; serial
+---                    fallback always settles item[1] first, so out is
+---                    item[1]'s ctx on success or item[1]'s error is
+---                    re-raised on failure (Promise.race /
+---                    select_all-first). Empty items yields out = {}.
+---            `all_settled` — every branch runs, NEVER raises; out is
+---                    an array of per-item records:
+---                      { status = "fulfilled", value  = <branch ctx> }
+---                      { status = "rejected",  reason = <error string> }
+---                    (Promise.allSettled / join_all). Empty items
 ---                    yields out = {}.
 ---          The MVP interpreter is serial; `opts.scheduler` is a
 ---          reserved forward-compat slot for a future concurrent
 ---          scheduler (no-op when nil).
----          Note: in `any`, the identity of the winning branch is
----          iteration-order-dependent under the serial fallback; a
----          concurrent scheduler may select differently. Flows should
----          not depend on which branch wins — only on the sub-ctx
----          contents.
+---          Note: in `any` / `race`, the identity of the winning
+---          branch is iteration-order-dependent under the serial
+---          fallback; a concurrent scheduler may select differently.
+---          Flows should not depend on which branch wins — only on
+---          the sub-ctx contents.
 ---
 --- Errors raise (`error(... , 2)`) rather than returning nil-reason; the
 --- caller (`M.exec`) treats Node exec as transactional from the caller's
@@ -264,8 +276,8 @@ local function exec_node(node, ctx, opts)
                 results[i] = branch_ctx
             end
             write_path(ctx, node.out, results)
-        else
-            -- join == "any": first non-raising branch wins; empty items → {}
+        elseif node.join == "any" then
+            -- first non-raising branch wins; empty items → {}; all-fail raises
             local winner, last_err
             for _, item in ipairs(items) do
                 local branch_ctx = {}
@@ -285,6 +297,42 @@ local function exec_node(node, ctx, opts)
                     .. tostring(last_err), 2)
             end
             write_path(ctx, node.out, winner or {})
+        elseif node.join == "race" then
+            -- first branch to settle wins (success OR raise). In the serial
+            -- fallback the first item always settles first; out is item[1]'s
+            -- branch ctx on success, item[1]'s error is re-raised on
+            -- failure. Empty items yields out = {}.
+            if #items == 0 then
+                write_path(ctx, node.out, {})
+            else
+                local first_item = items[1]
+                local branch_ctx = {}
+                for k, v in pairs(ctx) do branch_ctx[k] = v end
+                write_path(branch_ctx, node.bind, first_item)
+                local ok, ex_err = pcall(exec_node, node.body, branch_ctx, opts)
+                if not ok then
+                    error("exec: fanout(race): first settled branch failed: "
+                        .. tostring(ex_err), 2)
+                end
+                write_path(ctx, node.out, branch_ctx)
+            end
+        else
+            -- join == "all_settled": every branch runs; failures are caught
+            -- and recorded as { status="rejected", reason=<msg> } records;
+            -- successful branches yield { status="fulfilled", value=<ctx> }.
+            local results = {}
+            for i, item in ipairs(items) do
+                local branch_ctx = {}
+                for k, v in pairs(ctx) do branch_ctx[k] = v end
+                write_path(branch_ctx, node.bind, item)
+                local ok, ex_err = pcall(exec_node, node.body, branch_ctx, opts)
+                if ok then
+                    results[i] = { status = "fulfilled", value = branch_ctx }
+                else
+                    results[i] = { status = "rejected", reason = tostring(ex_err) }
+                end
+            end
+            write_path(ctx, node.out, results)
         end
     else
         error("exec: unknown kind " .. tostring(kind), 2)

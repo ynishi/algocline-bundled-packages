@@ -888,9 +888,9 @@ describe("flow: meta", function()
         end
     end)
 
-    it("meta.version is 0.5.0 (Persistence API + round-trip property)", function()
+    it("meta.version is 0.6.0 (fanout race / all_settled join enum)", function()
         mock_alc_state()
         local flow = require("flow")
-        expect(flow.meta.version).to.equal("0.5.0")
+        expect(flow.meta.version).to.equal("0.6.0")
     end)
 end)

@@ -175,7 +175,7 @@ M.EXPR_OPS = {
 ---@field items  flow.ir.Expr  Expr evaluating to a Lua array
 ---@field bind   string        per-branch ctx write path for the item ("ctx.*")
 ---@field body   flow.ir.Node  executed per item against branch-local ctx
----@field join   "all"|"any"   join mode (see §fanout semantics)
+---@field join   "all"|"any"|"race"|"all_settled"  join mode (see §fanout semantics)
 ---@field out    string        joined result write path ("ctx.*")
 
 ---@alias flow.ir.Node
@@ -228,9 +228,15 @@ M.Node = T.discriminated("kind", {
         items = T.table:describe("nested Expr (walked); must eval to a Lua array"),
         bind  = T.string:describe("per-branch ctx write path for the item, 'ctx.*'"),
         body  = T.table:describe("nested Node (walked, runs per item)"),
-        join  = T.one_of({ "all", "any" }):describe(
-            "join semantics: 'all' collects every branch ctx, "
-            .. "'any' returns the first non-raising branch's ctx"),
+        join  = T.one_of({ "all", "any", "race", "all_settled" }):describe(
+            "join semantics (Promise / futures combinators): "
+            .. "'all' collects every branch ctx (Promise.all / try_join_all); "
+            .. "'any' returns the first non-raising branch's ctx (Promise.any / select_ok); "
+            .. "'race' returns the first branch to settle, success OR raise "
+            .. "(Promise.race / select_all first); "
+            .. "'all_settled' runs every branch and writes "
+            .. "{status='fulfilled'|'rejected', value=ctx|reason=msg} per item "
+            .. "(Promise.allSettled / join_all)"),
         out   = T.string:describe("joined result write path, 'ctx.*'"),
     }, { open = false }),
 })

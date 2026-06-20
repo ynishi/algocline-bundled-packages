@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.5.0 → v0.6.0 — Step 3 §3.B: fanout `join` enum completed
+  to the canonical Promise / futures combinator 4-set**.
+  - Enum extended additively: `"all" | "any"` → `"all" | "any" |
+    "race" | "all_settled"`. The 2 new values match the枯れた
+    Promise / futures canon (Promise.allSettled / Promise.race /
+    futures::join_all / futures::select_all-first), bringing flow.ir
+    from 2/4 to 4/4 of the canonical combinator set.
+  - Schema docstring now documents the 4-way semantics with
+    Promise.\* / futures::\* parity in a single table.
+  - Interpreter serial-fallback semantics:
+    - `race`        — first branch to settle wins (success OR raise);
+                      empty items → `out = {}`; in serial fallback
+                      item[1] always settles first, so out is
+                      item[1]'s branch ctx, or item[1]'s error is
+                      re-raised as `fanout(race): first settled branch
+                      failed: <reason>`.
+    - `all_settled` — every branch runs and NEVER raises; out is an
+                      array of per-item records of shape
+                      `{ status = "fulfilled", value = <branch ctx> }`
+                      or `{ status = "rejected", reason = <msg> }`;
+                      empty items → `out = {}`.
+  - Concurrent execution stays engine territory (swarm-frame); flow.ir
+    only holds the join mode as data + a serial-fallback interpreter.
+  - New spec `flow/spec/ir_fanout_race_spec.lua` (11 cases):
+    schema accept (race / all_settled) + reject (unknown), race
+    success / failure / empty-items semantics, all_settled
+    fulfilled / mixed (fulfilled + rejected) / empty-items semantics,
+    and a literal `"join":"race"` / `"join":"all_settled"` JSON
+    round-trip via the Persistence API.
+  - 3.4 (JSONPath bracket selector in `path.at`) remains carry per
+    Step 3 plan §7 — needs-driven.
+
 - **`flow` v0.4.0 → v0.5.0 — Step 3 §3.2a / §3.2b: Persistence API
   (host-neutral) + round-trip property pinned across the full Node +
   Expr surface**.
