@@ -240,6 +240,98 @@ local NODE_LOCAL_CHECK = {
         end
         return true
     end,
+    switch = function(node, path, _state)
+        local ok, reason = check_expr(node.on, path .. ".on")
+        if not ok then return nil, reason end
+        if type(node.cases) ~= "table" or #node.cases < 1 then
+            return err(path, "switch.cases: requires >= 1 case")
+        end
+        for i, c in ipairs(node.cases) do
+            if type(c) ~= "table" then
+                return err(path, string.format("switch.cases[%d]: expected table", i))
+            end
+            if type(c.match) ~= "table" or type(c.body) ~= "table" then
+                return err(path, string.format(
+                    "switch.cases[%d]: requires { match=Expr, body=Node } table", i))
+            end
+            local cok, creason = check_expr(c.match, string.format("%s.cases[%d].match", path, i))
+            if not cok then return nil, creason end
+        end
+        return true  -- case bodies + else_ walked via children_of
+    end,
+    ["try"] = function(node, path, _state)
+        if node.err_at ~= nil then
+            if not has_ctx_write_prefix(node.err_at) then
+                return err(path, "try.err_at must start with '" .. CTX_WRITE_PREFIX .. "'")
+            end
+            local ok, reason = validate_path_syntax(node.err_at)
+            if not ok then return err(path, "try.err_at: " .. reason) end
+        end
+        return true  -- body + catch walked via children_of
+    end,
+    return_early = function(node, path, _state)
+        if node.out ~= nil then
+            if not has_ctx_write_prefix(node.out) then
+                return err(path, "return_early.out must start with '" .. CTX_WRITE_PREFIX .. "'")
+            end
+            local ok, reason = validate_path_syntax(node.out)
+            if not ok then return err(path, "return_early.out: " .. reason) end
+        end
+        if (node.value ~= nil) ~= (node.out ~= nil) then
+            return err(path, "return_early: out and value must be both present or both absent")
+        end
+        if node.value ~= nil then
+            local ok, reason = check_expr(node.value, path .. ".value")
+            if not ok then return nil, reason end
+        end
+        return true
+    end,
+    map = function(node, path, _state)
+        for _, field in ipairs({ "bind", "collect", "out" }) do
+            if not has_ctx_write_prefix(node[field]) then
+                return err(path, "map." .. field .. " must start with '" .. CTX_WRITE_PREFIX .. "'")
+            end
+            local ok, reason = validate_path_syntax(node[field])
+            if not ok then return err(path, "map." .. field .. ": " .. reason) end
+        end
+        local ok, reason = check_expr(node.in_, path .. ".in_")
+        if not ok then return nil, reason end
+        return true
+    end,
+    reduce = function(node, path, _state)
+        for _, field in ipairs({ "acc", "bind", "out" }) do
+            if not has_ctx_write_prefix(node[field]) then
+                return err(path, "reduce." .. field .. " must start with '" .. CTX_WRITE_PREFIX .. "'")
+            end
+            local ok, reason = validate_path_syntax(node[field])
+            if not ok then return err(path, "reduce." .. field .. ": " .. reason) end
+        end
+        local ok, reason = check_expr(node.in_, path .. ".in_")
+        if not ok then return nil, reason end
+        ok, reason = check_expr(node.init, path .. ".init")
+        if not ok then return nil, reason end
+        return true
+    end,
+    ["fail"] = function(node, path, _state)
+        local ok, reason = check_expr(node.message, path .. ".message")
+        if not ok then return nil, reason end
+        return true
+    end,
+    ["assert"] = function(node, path, _state)
+        local ok, reason = check_expr(node.cond, path .. ".cond")
+        if not ok then return nil, reason end
+        ok, reason = check_expr(node.message, path .. ".message")
+        if not ok then return nil, reason end
+        return true
+    end,
+    once = function(node, path, _state)
+        if not has_ctx_write_prefix(node.flag) then
+            return err(path, "once.flag must start with '" .. CTX_WRITE_PREFIX .. "'")
+        end
+        local ok, reason = validate_path_syntax(node.flag)
+        if not ok then return err(path, "once.flag: " .. reason) end
+        return true  -- body validated by check_node descent
+    end,
     wrap_step = function(node, path, state)
         if not has_ctx_write_prefix(node.out) then
             return err(path, "wrap_step.out must start with '" .. CTX_WRITE_PREFIX .. "'")

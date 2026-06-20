@@ -65,7 +65,22 @@ function M.children_of(node)
         if node.on_mismatch ~= nil then
             out[#out + 1] = { child = node.on_mismatch, key = "on_mismatch" }
         end
+    elseif kind == "once" then
+        out[#out + 1] = { child = node.body, key = "body" }
+    elseif kind == "map" or kind == "reduce" then
+        out[#out + 1] = { child = node.body, key = "body" }
+    elseif kind == "switch" then
+        for i, c in ipairs(node.cases) do
+            out[#out + 1] = { child = c.body, key = "cases", idx = i }
+        end
+        if node.else_ ~= nil then
+            out[#out + 1] = { child = node.else_, key = "else_" }
+        end
+    elseif kind == "try" then
+        out[#out + 1] = { child = node.body,  key = "body" }
+        out[#out + 1] = { child = node.catch, key = "catch" }
     end
+    -- return_early is a leaf Node (only optional Expr `value`).
     -- step / let / call have no direct child Nodes (only Exprs/args).
     -- wrap_step's only structural child is the optional on_mismatch Node;
     -- slot / in_ are Exprs, not structural children.
@@ -82,27 +97,38 @@ end
 function M.expr_children_of(expr)
     local out = {}
     local op = expr.op
-    if op == "eq" or op == "lt" then
+    if op == "eq" or op == "lt"
+        or op == "add" or op == "sub" or op == "mul" or op == "div" or op == "mod"
+        or op == "gt" or op == "gte" or op == "lte" or op == "ne" then
         out[#out + 1] = { child = expr.lhs, key = "lhs" }
         out[#out + 1] = { child = expr.rhs, key = "rhs" }
     elseif op == "and" or op == "or" then
         for i, ch in ipairs(expr.args) do
             out[#out + 1] = { child = ch, key = "args", idx = i }
         end
-    elseif op == "not" or op == "len" then
+    elseif op == "not" or op == "len" or op == "exists" then
         out[#out + 1] = { child = expr.arg, key = "arg" }
     elseif op == "concat" then
         for i, ch in ipairs(expr.args) do
             out[#out + 1] = { child = ch, key = "args", idx = i }
         end
-    elseif op == "add" then
-        out[#out + 1] = { child = expr.lhs, key = "lhs" }
-        out[#out + 1] = { child = expr.rhs, key = "rhs" }
     elseif op == "get" then
         out[#out + 1] = { child = expr.from, key = "from" }
         out[#out + 1] = { child = expr.key, key = "key" }
+    elseif op == "format" then
+        out[#out + 1] = { child = expr.fmt, key = "fmt" }
+        for i, ch in ipairs(expr.args) do
+            out[#out + 1] = { child = ch, key = "args", idx = i }
+        end
+    elseif op == "filter" then
+        out[#out + 1] = { child = expr.from, key = "from" }
+        out[#out + 1] = { child = expr.pred, key = "pred" }
+    elseif op == "fold" then
+        out[#out + 1] = { child = expr.from, key = "from" }
+        out[#out + 1] = { child = expr.init, key = "init" }
+        out[#out + 1] = { child = expr.fn,   key = "fn" }
     end
-    -- path / lit are leaves.
+    -- path / lit / var are leaves.
     return out
 end
 
@@ -198,6 +224,21 @@ function M.refs_of(node_or_expr)
         elseif k == "wrap_step" then
             collect_expr(n.slot)
             if n.in_ ~= nil then collect_expr(n.in_) end
+        elseif k == "fail" then
+            collect_expr(n.message)
+        elseif k == "assert" then
+            collect_expr(n.cond)
+            collect_expr(n.message)
+        elseif k == "map" then
+            collect_expr(n.in_)
+        elseif k == "reduce" then
+            collect_expr(n.in_)
+            collect_expr(n.init)
+        elseif k == "switch" then
+            collect_expr(n.on)
+            for _, c in ipairs(n.cases) do collect_expr(c.match) end
+        elseif k == "return_early" then
+            if n.value ~= nil then collect_expr(n.value) end
         end
         for _, entry in ipairs(M.children_of(n)) do
             collect_node(entry.child)

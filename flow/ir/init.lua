@@ -312,6 +312,66 @@ function M.add(lhs, rhs) return { op = "add", lhs = lhs, rhs = rhs } end
 ---@return flow.ir.Expr.get
 function M.get(from, key) return { op = "get", from = from, key = key } end
 
+--- `sub` Expr: numeric subtraction (lhs - rhs). Both sides must eval to numbers.
+function M.sub(lhs, rhs) return { op = "sub", lhs = lhs, rhs = rhs } end
+
+--- `mul` Expr: numeric multiplication.
+function M.mul(lhs, rhs) return { op = "mul", lhs = lhs, rhs = rhs } end
+
+--- `div` Expr: numeric division. Raises on division by zero.
+function M.div(lhs, rhs) return { op = "div", lhs = lhs, rhs = rhs } end
+
+--- `mod` Expr: numeric modulo. Raises on modulo by zero.
+function M.mod(lhs, rhs) return { op = "mod", lhs = lhs, rhs = rhs } end
+
+--- `gt` / `gte` / `lte` / `ne` Exprs: comparison sugar over Lua operators.
+function M.gt(lhs, rhs)  return { op = "gt",  lhs = lhs, rhs = rhs } end
+function M.gte(lhs, rhs) return { op = "gte", lhs = lhs, rhs = rhs } end
+function M.lte(lhs, rhs) return { op = "lte", lhs = lhs, rhs = rhs } end
+function M.ne(lhs, rhs)  return { op = "ne",  lhs = lhs, rhs = rhs } end
+
+--- `exists` Expr: truthy iff `arg` evaluates to a non-nil value. Equivalent
+--- to `not(eq(arg, lit(nil)))` but expresses the intent directly.
+function M.exists(arg) return { op = "exists", arg = arg } end
+
+--- `format` Expr: `string.format(fmt, args...)`. `fmt` must eval to a string;
+--- `args` evaluate to the positional substitutions in order.
+---@param fmt flow.ir.Expr
+---@param ... flow.ir.Expr
+function M.format(fmt, ...) return { op = "format", fmt = fmt, args = { ... } } end
+
+--- `var` Expr: read a named binding from the enclosing filter / fold env.
+--- Raises at eval time when no binding env is active.
+---@param name string
+---@return flow.ir.Expr.var
+M["var"] = function(name) return { op = "var", name = name } end
+
+--- `filter` Expr: keep elements of `from` (array) for which `pred` is truthy,
+--- with each element bound to `var` while evaluating pred.
+---@param from flow.ir.Expr
+---@param var  string
+---@param pred flow.ir.Expr
+---@return flow.ir.Expr.filter
+function M.filter(from, var, pred)
+    return { op = "filter", from = from, var = var, pred = pred }
+end
+
+--- `fold` Expr: left-fold over `from` (array). `init` seeds the accumulator;
+--- per iter `fn` is evaluated with `acc_var` bound to the running acc and
+--- `item_var` bound to the current element; its result becomes the next acc.
+---@param spec { from: flow.ir.Expr, init: flow.ir.Expr, acc_var: string, item_var: string, fn: flow.ir.Expr }
+---@return flow.ir.Expr.fold
+function M.fold(spec)
+    return {
+        op       = "fold",
+        from     = spec.from,
+        init     = spec.init,
+        acc_var  = spec.acc_var,
+        item_var = spec.item_var,
+        fn       = spec.fn,
+    }
+end
+
 -- ── Constructor API — Node ──────────────────────────────────────────
 --
 -- Node constructors take a single spec table (named args). `seq` is
@@ -439,6 +499,99 @@ function M.wrap_step(spec)
         bound       = spec.bound,
         on_mismatch = spec.on_mismatch,
     }
+end
+
+--- `switch` Node: n-way branch on `on`. `cases` is an ordered list of
+--- `{ match = Expr, body = Node }` entries; the first whose `match`
+--- evaluates to a value equal (Lua `==`) to `on` wins. `else_` runs when
+--- no case matches (optional).
+---@param spec { on: flow.ir.Expr, cases: { match: flow.ir.Expr, body: flow.ir.Node }[], else_: flow.ir.Node? }
+---@return flow.ir.Node.switch
+function M.switch(spec)
+    return {
+        kind  = "switch",
+        on    = spec.on,
+        cases = spec.cases,
+        else_ = spec.else_,
+    }
+end
+
+--- `try` Node: runs `body` under pcall; on a non-sentinel raise, optionally
+--- writes the error message to `ctx[err_at]` and runs `catch`. Does NOT
+--- swallow `return_early` — that sentinel unwinds to the enclosing
+--- `flow.ir.exec` frame.
+---@param spec { body: flow.ir.Node, catch: flow.ir.Node, err_at: string? }
+---@return flow.ir.Node.try
+M["try"] = function(spec)
+    return { kind = "try", body = spec.body, catch = spec.catch, err_at = spec.err_at }
+end
+
+--- `return_early` Node: optionally writes `value` (Expr) to `ctx[out]`,
+--- then unwinds to the enclosing `flow.ir.exec` frame. `try` does NOT
+--- catch this sentinel.
+---@param spec { out: string?, value: flow.ir.Expr? }
+---@return flow.ir.Node.return_early
+function M.return_early(spec)
+    spec = spec or {}
+    return { kind = "return_early", out = spec.out, value = spec.value }
+end
+
+--- `map` Node: iterate over an array, run `body` per item against the shared
+--- ctx (with the item bound to `bind`), and collect the value at `collect`
+--- (a "$." + ctx path) into `out` as the i-th element.
+---@param spec { in_: flow.ir.Expr, bind: string, body: flow.ir.Node, collect: string, out: string }
+---@return flow.ir.Node.map
+function M.map(spec)
+    return {
+        kind    = "map",
+        in_     = spec.in_,
+        bind    = spec.bind,
+        body    = spec.body,
+        collect = spec.collect,
+        out     = spec.out,
+    }
+end
+
+--- `reduce` Node: iterate over an array, threading an accumulator at ctx[acc]
+--- through each body run (body is expected to update ctx[acc]). The initial
+--- acc value is `init` (Expr). Final acc is written to `out`.
+---@param spec { in_: flow.ir.Expr, init: flow.ir.Expr, acc: string, bind: string, body: flow.ir.Node, out: string }
+---@return flow.ir.Node.reduce
+function M.reduce(spec)
+    return {
+        kind = "reduce",
+        in_  = spec.in_,
+        init = spec.init,
+        acc  = spec.acc,
+        bind = spec.bind,
+        body = spec.body,
+        out  = spec.out,
+    }
+end
+
+--- `fail` Node: unconditionally raises. `message` is an Expr that must
+--- eval to a string.
+---@param spec { message: flow.ir.Expr }
+---@return flow.ir.Node.fail
+M["fail"] = function(spec)
+    return { kind = "fail", message = spec.message }
+end
+
+--- `assert` Node: raises with `message` (Expr → string) iff `cond` (Expr)
+--- evaluates to a falsy value. Otherwise no-op.
+---@param spec { cond: flow.ir.Expr, message: flow.ir.Expr }
+---@return flow.ir.Node.assert
+M["assert"] = function(spec)
+    return { kind = "assert", cond = spec.cond, message = spec.message }
+end
+
+--- `once` Node: resume-guarded body. `flag` is a ctx write path; the body
+--- runs iff `$.<flag>` is currently falsy, then `flag` is set to `true`.
+--- Combine with FlowState (load → exec → save) for cross-session resume.
+---@param spec { flag: string, body: flow.ir.Node }
+---@return flow.ir.Node.once
+function M.once(spec)
+    return { kind = "once", flag = spec.flag, body = spec.body }
 end
 
 return M

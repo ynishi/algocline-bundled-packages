@@ -89,6 +89,73 @@ local M = {}
 ---@field lhs  flow.ir.Expr  nested Expr (walked); must eval to a number
 ---@field rhs  flow.ir.Expr  nested Expr (walked); must eval to a number
 
+---@class flow.ir.Expr.var
+---@field op    "var"
+---@field name  string  reads from the binding env established by filter/fold
+
+---@class flow.ir.Expr.filter
+---@field op    "filter"
+---@field from  flow.ir.Expr  must eval to a Lua array
+---@field var   string        name bound to the current item while evaluating pred
+---@field pred  flow.ir.Expr  truthy → keep element
+
+---@class flow.ir.Expr.fold
+---@field op        "fold"
+---@field from      flow.ir.Expr  must eval to a Lua array
+---@field init      flow.ir.Expr  initial accumulator
+---@field acc_var   string        name bound to the running acc inside fn
+---@field item_var  string        name bound to the current item inside fn
+---@field fn        flow.ir.Expr  Expr returning the new acc (becomes next iter's acc_var)
+
+---@class flow.ir.Expr.sub
+---@field op   "sub"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.mul
+---@field op   "mul"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.div
+---@field op   "div"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr  raises on division by zero
+
+---@class flow.ir.Expr.mod
+---@field op   "mod"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr  raises on modulo by zero
+
+---@class flow.ir.Expr.gt
+---@field op   "gt"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.gte
+---@field op   "gte"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.lte
+---@field op   "lte"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.ne
+---@field op   "ne"
+---@field lhs  flow.ir.Expr
+---@field rhs  flow.ir.Expr
+
+---@class flow.ir.Expr.exists
+---@field op    "exists"
+---@field arg   flow.ir.Expr  truthy iff arg evaluates to a non-nil value
+
+---@class flow.ir.Expr.format
+---@field op    "format"
+---@field fmt   flow.ir.Expr  Expr → string (string.format format string)
+---@field args  flow.ir.Expr[]  positional args (any Lua values accepted by string.format)
+
 ---@class flow.ir.Expr.get
 ---@field op    "get"
 ---@field from  flow.ir.Expr  nested Expr (walked); must eval to a table
@@ -105,7 +172,20 @@ local M = {}
 ---| flow.ir.Expr.len
 ---| flow.ir.Expr.concat
 ---| flow.ir.Expr.add
+---| flow.ir.Expr.sub
+---| flow.ir.Expr.mul
+---| flow.ir.Expr.div
+---| flow.ir.Expr.mod
+---| flow.ir.Expr.gt
+---| flow.ir.Expr.gte
+---| flow.ir.Expr.lte
+---| flow.ir.Expr.ne
+---| flow.ir.Expr.exists
+---| flow.ir.Expr.format
 ---| flow.ir.Expr.get
+---| flow.ir.Expr.var
+---| flow.ir.Expr.filter
+---| flow.ir.Expr.fold
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `op`
 M.Expr = T.discriminated("op", {
@@ -159,6 +239,70 @@ M.Expr = T.discriminated("op", {
         from = T.table:describe("nested Expr (walked); must eval to a table"),
         key  = T.table:describe("nested Expr (walked); must eval to a string or number"),
     }, { open = false }),
+    sub = T.shape({
+        op  = T.one_of({ "sub" }),
+        lhs = T.table:describe("nested Expr; must eval to a number"),
+        rhs = T.table:describe("nested Expr; must eval to a number"),
+    }, { open = false }),
+    mul = T.shape({
+        op  = T.one_of({ "mul" }),
+        lhs = T.table:describe("nested Expr; must eval to a number"),
+        rhs = T.table:describe("nested Expr; must eval to a number"),
+    }, { open = false }),
+    div = T.shape({
+        op  = T.one_of({ "div" }),
+        lhs = T.table:describe("nested Expr; must eval to a number"),
+        rhs = T.table:describe("nested Expr; must eval to a non-zero number"),
+    }, { open = false }),
+    mod = T.shape({
+        op  = T.one_of({ "mod" }),
+        lhs = T.table:describe("nested Expr; must eval to a number"),
+        rhs = T.table:describe("nested Expr; must eval to a non-zero number"),
+    }, { open = false }),
+    gt = T.shape({
+        op  = T.one_of({ "gt" }),
+        lhs = T.table, rhs = T.table,
+    }, { open = false }),
+    gte = T.shape({
+        op  = T.one_of({ "gte" }),
+        lhs = T.table, rhs = T.table,
+    }, { open = false }),
+    lte = T.shape({
+        op  = T.one_of({ "lte" }),
+        lhs = T.table, rhs = T.table,
+    }, { open = false }),
+    ne = T.shape({
+        op  = T.one_of({ "ne" }),
+        lhs = T.table, rhs = T.table,
+    }, { open = false }),
+    exists = T.shape({
+        op  = T.one_of({ "exists" }),
+        arg = T.table:describe("nested Expr; truthy iff result is non-nil"),
+    }, { open = false }),
+    format = T.shape({
+        op   = T.one_of({ "format" }),
+        fmt  = T.table:describe("nested Expr; must eval to a string (string.format fmt)"),
+        args = T.array_of(T.table):describe("nested Exprs (walked); positional args"),
+    }, { open = false }),
+    ["var"] = T.shape({
+        op   = T.one_of({ "var" }),
+        name = T.string:describe("binding name resolved from the enclosing filter/fold env"),
+    }, { open = false }),
+    filter = T.shape({
+        op   = T.one_of({ "filter" }),
+        from = T.table:describe("nested Expr; must eval to a Lua array"),
+        var  = T.string:describe("binding name for the current item inside pred"),
+        pred = T.table:describe("nested Expr (walked under var binding); truthy keeps element"),
+    }, { open = false }),
+    fold = T.shape({
+        op       = T.one_of({ "fold" }),
+        from     = T.table:describe("nested Expr; must eval to a Lua array"),
+        init     = T.table:describe("nested Expr; initial accumulator"),
+        acc_var  = T.string:describe("binding name for the running acc inside fn"),
+        item_var = T.string:describe("binding name for the current item inside fn"),
+        fn       = T.table:describe(
+            "nested Expr (walked under acc_var + item_var bindings); returns next acc"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Expr ops (membership test).
@@ -167,6 +311,10 @@ M.EXPR_OPS = {
     ["and"] = true, ["not"] = true, lt = true,
     ["or"] = true, len = true,
     concat = true, add = true, get = true,
+    sub = true, mul = true, div = true, mod = true,
+    gt = true, gte = true, lte = true, ne = true,
+    exists = true, format = true,
+    ["var"] = true, filter = true, fold = true,
 }
 
 -- ── Node (kind-tagged) ──────────────────────────────────────────────
@@ -213,6 +361,63 @@ M.EXPR_OPS = {
 ---@field join   "all"|"any"|"race"|"all_settled"  join mode (see §fanout semantics)
 ---@field out    string        joined result write path ("ctx.*")
 
+---@class flow.ir.Node.SwitchCase
+---@field match  flow.ir.Expr  value compared (Lua `==`) against on
+---@field body   flow.ir.Node  executed when match equals on
+
+---@class flow.ir.Node.switch
+---@field kind   "switch"
+---@field on     flow.ir.Expr               value compared per case
+---@field cases  flow.ir.Node.SwitchCase[]  evaluated in order, first match wins
+---@field else_  flow.ir.Node|nil           default body when no case matches
+
+---@class flow.ir.Node.try
+---@field kind    "try"
+---@field body    flow.ir.Node    executed under pcall
+---@field catch   flow.ir.Node    executed when body raises (non-sentinel error)
+---@field err_at  string|nil      optional ctx write path ("ctx.*") for the error message
+
+---@class flow.ir.Node.return_early
+---@field kind   "return_early"
+---@field out    string|nil       optional ctx write path for the value
+---@field value  flow.ir.Expr|nil optional Expr; written to ctx[out] before unwind
+
+---@class flow.ir.Node.map
+---@field kind     "map"
+---@field in_      flow.ir.Expr  must eval to a Lua array
+---@field bind     string        ctx write path for current item ("ctx.*")
+---@field body     flow.ir.Node  runs per item against the shared ctx
+---@field collect  string        ctx read sub-path under "$." prefix; the value
+---  at this path after each body run is collected as the i-th element of out
+---@field out      string        ctx write path for the collected array ("ctx.*")
+
+---@class flow.ir.Node.reduce
+---@field kind   "reduce"
+---@field in_    flow.ir.Expr  must eval to a Lua array
+---@field init   flow.ir.Expr  initial accumulator value
+---@field acc    string        ctx write path used as accumulator ("ctx.*"); body
+---  reads this to obtain the running acc and writes it to update.
+---@field bind   string        ctx write path for current item ("ctx.*")
+---@field body   flow.ir.Node  runs per item; expected to update ctx[acc]
+---@field out    string        ctx write path for the final acc ("ctx.*")
+
+---@class flow.ir.Node.fail
+---@field kind     "fail"
+---@field message  flow.ir.Expr  Expr evaluated to a string; raised as error
+
+---@class flow.ir.Node.assert
+---@field kind     "assert"
+---@field cond     flow.ir.Expr  truthy → no-op; falsy → raises with message
+---@field message  flow.ir.Expr  Expr evaluated to a string when cond is falsy
+
+---@class flow.ir.Node.once
+---@field kind  "once"
+---@field flag  string        ctx write path; must start with "ctx.". Read as
+---  `$.<flag>` before body; on truthy, body is skipped. After body completes,
+---  `flag` is set to `true`. Use this as a resume guard so the body runs at
+---  most once across re-entries (caller persists ctx via FlowState).
+---@field body  flow.ir.Node
+
 ---@class flow.ir.Node.wrap_step
 ---@field kind         "wrap_step"
 ---@field slot         flow.ir.Expr  Expr evaluating to a non-empty string;
@@ -234,6 +439,14 @@ M.EXPR_OPS = {
 ---| flow.ir.Node.call
 ---| flow.ir.Node.fanout
 ---| flow.ir.Node.wrap_step
+---| flow.ir.Node.once
+---| flow.ir.Node.fail
+---| flow.ir.Node.assert
+---| flow.ir.Node.map
+---| flow.ir.Node.reduce
+---| flow.ir.Node.switch
+---| flow.ir.Node.try
+---| flow.ir.Node.return_early
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `kind`
 M.Node = T.discriminated("kind", {
@@ -287,6 +500,59 @@ M.Node = T.discriminated("kind", {
             .. "(Promise.allSettled / join_all)"),
         out   = T.string:describe("joined result write path, 'ctx.*'"),
     }, { open = false }),
+    once = T.shape({
+        kind = T.one_of({ "once" }),
+        flag = T.string:describe(
+            "ctx write path, must start with 'ctx.'; truthy value skips body, "
+            .. "otherwise body runs and flag is set to true"),
+        body = T.table:describe("nested Node (walked); executed at most once per ctx"),
+    }, { open = false }),
+    ["fail"] = T.shape({
+        kind    = T.one_of({ "fail" }),
+        message = T.table:describe("nested Expr (walked); must eval to a string"),
+    }, { open = false }),
+    ["assert"] = T.shape({
+        kind    = T.one_of({ "assert" }),
+        cond    = T.table:describe("nested Expr (walked); falsy → raise"),
+        message = T.table:describe("nested Expr (walked); must eval to a string"),
+    }, { open = false }),
+    map = T.shape({
+        kind    = T.one_of({ "map" }),
+        in_     = T.table:describe("nested Expr (walked); must eval to a Lua array"),
+        bind    = T.string:describe("ctx write path for current item, 'ctx.*'"),
+        body    = T.table:describe("nested Node (walked); runs per item, shared ctx"),
+        collect = T.string:describe(
+            "ctx write path read back after each body run, 'ctx.*'; "
+            .. "the value at this path becomes the i-th element of out"),
+        out     = T.string:describe("ctx write path for the collected array, 'ctx.*'"),
+    }, { open = false }),
+    reduce = T.shape({
+        kind = T.one_of({ "reduce" }),
+        in_  = T.table:describe("nested Expr (walked); must eval to a Lua array"),
+        init = T.table:describe("nested Expr (walked); initial accumulator value"),
+        acc  = T.string:describe("ctx write path used as accumulator, 'ctx.*'"),
+        bind = T.string:describe("ctx write path for current item, 'ctx.*'"),
+        body = T.table:describe("nested Node (walked); runs per item, updates ctx[acc]"),
+        out  = T.string:describe("ctx write path for the final acc, 'ctx.*'"),
+    }, { open = false }),
+    switch = T.shape({
+        kind  = T.one_of({ "switch" }),
+        on    = T.table:describe("nested Expr (walked); compared against each case"),
+        cases = T.array_of(T.table):describe(
+            "list of { match = Expr, body = Node }; evaluated in order, first match wins"),
+        else_ = T.table:is_optional():describe("nested Node; default when no case matches"),
+    }, { open = false }),
+    ["try"] = T.shape({
+        kind   = T.one_of({ "try" }),
+        body   = T.table:describe("nested Node (walked); executed under pcall"),
+        catch  = T.table:describe("nested Node (walked); runs on non-sentinel raise"),
+        err_at = T.string:is_optional():describe("ctx write path for caught error message"),
+    }, { open = false }),
+    return_early = T.shape({
+        kind  = T.one_of({ "return_early" }),
+        out   = T.string:is_optional():describe("ctx write path for the value, 'ctx.*'"),
+        value = T.table:is_optional():describe("nested Expr; written to ctx[out] before unwind"),
+    }, { open = false }),
     wrap_step = T.shape({
         kind        = T.one_of({ "wrap_step" }),
         slot        = T.table:describe(
@@ -309,7 +575,10 @@ M.Node = T.discriminated("kind", {
 M.NODE_KINDS = {
     step = true, seq = true, branch = true,
     ["let"] = true, loop = true, call = true, fanout = true,
-    wrap_step = true,
+    wrap_step = true, once = true,
+    ["fail"] = true, ["assert"] = true,
+    map = true, reduce = true,
+    switch = true, ["try"] = true, return_early = true,
 }
 
 return M

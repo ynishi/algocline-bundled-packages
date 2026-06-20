@@ -46,6 +46,15 @@ local M = {}
 
 local TOKEN_HEX_BYTES = 32
 
+--- Sentinel raised by `return_early` to unwind to the nearest `M.exec`
+--- frame without being absorbed by `try`. Detected by identity (table key).
+local RETURN_EARLY_SENTINEL = {}
+M._RETURN_EARLY_SENTINEL = RETURN_EARLY_SENTINEL
+
+local function is_return_early(err)
+    return type(err) == "table" and err[RETURN_EARLY_SENTINEL] == true
+end
+
 -- ── path utils ──────────────────────────────────────────────────────
 
 --- Resolve a `$.ctx.*` read path against the ctx table.
@@ -148,7 +157,7 @@ end
 ---@param expr flow.ir.Expr
 ---@param ctx  table
 ---@return any
-local function eval_expr(expr, ctx)
+local function eval_expr(expr, ctx, env)
     local op = expr.op
     if op == "lit" then
         return expr.value
@@ -156,28 +165,33 @@ local function eval_expr(expr, ctx)
         local v, err = read_path(ctx, expr.at)
         if err then error(err, 2) end
         return v
+    elseif op == "var" then
+        if env == nil then
+            error("eval_expr: var '" .. expr.name .. "' has no enclosing binding env", 2)
+        end
+        return env[expr.name]
     elseif op == "eq" then
-        return eval_expr(expr.lhs, ctx) == eval_expr(expr.rhs, ctx)
+        return eval_expr(expr.lhs, ctx, env) == eval_expr(expr.rhs, ctx, env)
     elseif op == "and" then
         for _, sub in ipairs(expr.args) do
-            if not eval_expr(sub, ctx) then return false end
+            if not eval_expr(sub, ctx, env) then return false end
         end
         return true
     elseif op == "not" then
-        return not eval_expr(expr.arg, ctx)
+        return not eval_expr(expr.arg, ctx, env)
     elseif op == "lt" then
-        return eval_expr(expr.lhs, ctx) < eval_expr(expr.rhs, ctx)
+        return eval_expr(expr.lhs, ctx, env) < eval_expr(expr.rhs, ctx, env)
     elseif op == "or" then
         for _, sub in ipairs(expr.args) do
-            if eval_expr(sub, ctx) then return true end
+            if eval_expr(sub, ctx, env) then return true end
         end
         return false
     elseif op == "len" then
-        return #eval_expr(expr.arg, ctx)
+        return #eval_expr(expr.arg, ctx, env)
     elseif op == "concat" then
         local parts = {}
         for i, sub in ipairs(expr.args) do
-            local v = eval_expr(sub, ctx)
+            local v = eval_expr(sub, ctx, env)
             if type(v) ~= "string" then
                 error(
                     "eval_expr: concat arg[" .. i .. "] must be a string, got "
@@ -187,8 +201,8 @@ local function eval_expr(expr, ctx)
         end
         return table.concat(parts)
     elseif op == "add" then
-        local lhs = eval_expr(expr.lhs, ctx)
-        local rhs = eval_expr(expr.rhs, ctx)
+        local lhs = eval_expr(expr.lhs, ctx, env)
+        local rhs = eval_expr(expr.rhs, ctx, env)
         if type(lhs) ~= "number" then
             error("eval_expr: add.lhs must be a number, got " .. type(lhs), 2)
         end
@@ -197,16 +211,81 @@ local function eval_expr(expr, ctx)
         end
         return lhs + rhs
     elseif op == "get" then
-        local from = eval_expr(expr.from, ctx)
+        local from = eval_expr(expr.from, ctx, env)
         if type(from) ~= "table" then
             error("eval_expr: get.from must be a table, got " .. type(from), 2)
         end
-        local key = eval_expr(expr.key, ctx)
+        local key = eval_expr(expr.key, ctx, env)
         local kt = type(key)
         if kt ~= "string" and kt ~= "number" then
             error("eval_expr: get.key must be a string or number, got " .. kt, 2)
         end
         return from[key]
+    elseif op == "sub" or op == "mul" or op == "div" or op == "mod" then
+        local lhs = eval_expr(expr.lhs, ctx, env)
+        local rhs = eval_expr(expr.rhs, ctx, env)
+        if type(lhs) ~= "number" then
+            error("eval_expr: " .. op .. ".lhs must be a number, got " .. type(lhs), 2)
+        end
+        if type(rhs) ~= "number" then
+            error("eval_expr: " .. op .. ".rhs must be a number, got " .. type(rhs), 2)
+        end
+        if (op == "div" or op == "mod") and rhs == 0 then
+            error("eval_expr: " .. op .. ".rhs must be non-zero", 2)
+        end
+        if op == "sub" then return lhs - rhs
+        elseif op == "mul" then return lhs * rhs
+        elseif op == "div" then return lhs / rhs
+        else return lhs % rhs end
+    elseif op == "gt" then
+        return eval_expr(expr.lhs, ctx, env) > eval_expr(expr.rhs, ctx, env)
+    elseif op == "gte" then
+        return eval_expr(expr.lhs, ctx, env) >= eval_expr(expr.rhs, ctx, env)
+    elseif op == "lte" then
+        return eval_expr(expr.lhs, ctx, env) <= eval_expr(expr.rhs, ctx, env)
+    elseif op == "ne" then
+        return eval_expr(expr.lhs, ctx, env) ~= eval_expr(expr.rhs, ctx, env)
+    elseif op == "exists" then
+        return eval_expr(expr.arg, ctx, env) ~= nil
+    elseif op == "format" then
+        local fmt = eval_expr(expr.fmt, ctx, env)
+        if type(fmt) ~= "string" then
+            error("eval_expr: format.fmt must be a string, got " .. type(fmt), 2)
+        end
+        local args = {}
+        for i, sub in ipairs(expr.args) do
+            args[i] = eval_expr(sub, ctx, env)
+        end
+        return string.format(fmt, table.unpack(args))
+    elseif op == "filter" then
+        local from = eval_expr(expr.from, ctx, env)
+        if type(from) ~= "table" then
+            error("eval_expr: filter.from must be an array, got " .. type(from), 2)
+        end
+        local results = {}
+        local inner_env = {}
+        if env then for k, v in pairs(env) do inner_env[k] = v end end
+        for _, item in ipairs(from) do
+            inner_env[expr.var] = item
+            if eval_expr(expr.pred, ctx, inner_env) then
+                results[#results + 1] = item
+            end
+        end
+        return results
+    elseif op == "fold" then
+        local from = eval_expr(expr.from, ctx, env)
+        if type(from) ~= "table" then
+            error("eval_expr: fold.from must be an array, got " .. type(from), 2)
+        end
+        local acc = eval_expr(expr.init, ctx, env)
+        local inner_env = {}
+        if env then for k, v in pairs(env) do inner_env[k] = v end end
+        for _, item in ipairs(from) do
+            inner_env[expr.acc_var]  = acc
+            inner_env[expr.item_var] = item
+            acc = eval_expr(expr.fn, ctx, inner_env)
+        end
+        return acc
     end
     error("eval_expr: unknown op " .. tostring(op), 2)
 end
@@ -406,6 +485,88 @@ local function exec_node(node, ctx, opts)
             end
             write_path(ctx, node.out, results)
         end
+    elseif kind == "switch" then
+        local on_val = eval_expr(node.on, ctx)
+        local matched = false
+        for _, c in ipairs(node.cases) do
+            if eval_expr(c.match, ctx) == on_val then
+                exec_node(c.body, ctx, opts)
+                matched = true
+                break
+            end
+        end
+        if not matched and node.else_ ~= nil then
+            exec_node(node.else_, ctx, opts)
+        end
+    elseif kind == "try" then
+        local ok, ex_err = pcall(exec_node, node.body, ctx, opts)
+        if not ok then
+            -- Don't swallow return_early — it must unwind to M.exec.
+            if is_return_early(ex_err) then error(ex_err, 0) end
+            if node.err_at ~= nil then
+                write_path(ctx, node.err_at, tostring(ex_err))
+            end
+            exec_node(node.catch, ctx, opts)
+        end
+    elseif kind == "return_early" then
+        if node.value ~= nil then
+            write_path(ctx, node.out, eval_expr(node.value, ctx))
+        end
+        error({ [RETURN_EARLY_SENTINEL] = true }, 0)
+    elseif kind == "map" then
+        local items = eval_expr(node.in_, ctx)
+        if type(items) ~= "table" then
+            error("exec: map.in_: expected array, got " .. type(items), 2)
+        end
+        local results = {}
+        for i, item in ipairs(items) do
+            write_path(ctx, node.bind, item)
+            exec_node(node.body, ctx, opts)
+            local v, perr = read_path(ctx, "$." .. node.collect)
+            if perr then error(perr, 2) end
+            results[i] = v
+        end
+        write_path(ctx, node.out, results)
+    elseif kind == "reduce" then
+        local items = eval_expr(node.in_, ctx)
+        if type(items) ~= "table" then
+            error("exec: reduce.in_: expected array, got " .. type(items), 2)
+        end
+        write_path(ctx, node.acc, eval_expr(node.init, ctx))
+        for _, item in ipairs(items) do
+            write_path(ctx, node.bind, item)
+            exec_node(node.body, ctx, opts)
+        end
+        local v, perr = read_path(ctx, "$." .. node.acc)
+        if perr then error(perr, 2) end
+        write_path(ctx, node.out, v)
+    elseif kind == "fail" then
+        local msg = eval_expr(node.message, ctx)
+        if type(msg) ~= "string" then
+            error("exec: fail.message must eval to a string, got " .. type(msg), 2)
+        end
+        error("exec: fail: " .. msg, 2)
+    elseif kind == "assert" then
+        local cond = eval_expr(node.cond, ctx)
+        if not cond then
+            local msg = eval_expr(node.message, ctx)
+            if type(msg) ~= "string" then
+                error("exec: assert.message must eval to a string, got " .. type(msg), 2)
+            end
+            error("exec: assert: " .. msg, 2)
+        end
+    elseif kind == "once" then
+        -- Resume guard: read ctx at $.<node.flag>. If truthy, skip body;
+        -- otherwise run body and set flag = true on completion. Persistence
+        -- across sessions is the caller's responsibility (e.g. by holding
+        -- the flag under a FlowState data subtree and saving after exec).
+        local read_at = "$." .. node.flag
+        local cur, perr = read_path(ctx, read_at)
+        if perr then error(perr, 2) end
+        if not cur then
+            exec_node(node.body, ctx, opts)
+            write_path(ctx, node.flag, true)
+        end
     elseif kind == "wrap_step" then
         -- Evaluate slot Expr to a non-empty string.
         local slot = eval_expr(node.slot, ctx)
@@ -508,7 +669,12 @@ function M.exec(compiled, ctx, opts)
     opts.dispatch = opts.dispatch or default_dispatch
     opts.max_call_depth = opts.max_call_depth or 64
     opts._call_depth = 0
-    return exec_node(compiled, ctx, opts)
+    local ok, ex_err = pcall(exec_node, compiled, ctx, opts)
+    if not ok then
+        if is_return_early(ex_err) then return ctx end
+        error(ex_err, 0)
+    end
+    return ctx
 end
 
 --- Public default dispatch helper.
