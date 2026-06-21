@@ -6942,7 +6942,7 @@ Returns `safe_paneled` shape:
 
 - [Usage](#usage)
 - [Algorithm](#algorithm)
-- [Theoretical foundations](#theoretical-foundations)
+- [Design rationale](#design-rationale)
 - [Caveats](#caveats)
 - [Parameters](#parameters)
 - [Result](#result)
@@ -6974,17 +6974,29 @@ return recipe.run({
 4. **commit_gate** — final `orch_gatephase` review against the
    picked branch; emits `COMMIT` or fails.
 
-## Theoretical foundations {#theoretical-foundations}
+## Design rationale {#design-rationale}
 
-AB-MCTS (Sakana AI 2025, arXiv:2503.04412) explores the
-(width × depth) reasoning tree with Thompson sampling and is
-known to lift accuracy when ensembled across diverse seeding
-prompts. orch_gatephase contributes the Phase-gate discipline
-(Heitkoetter et al. 2021 style structured verification) so the
-aggregator's verdict is gate-bounded rather than a free-form pick.
+This is a *recipe* (composition over algorithms), not a faithful
+implementation of any single paper — `ab_mcts` and `orch_gatephase`
+are the algorithm-level libs. The composition draws on:
+
+  * **ab_mcts** — implements AB-MCTS (Sakana AI 2025,
+    arXiv:2503.04412 §3 "AB-MCTS" / Algorithm 1) which explores the
+    (width × depth) reasoning tree with Thompson sampling; see the
+    pkg's own docstring for the algorithm citation. The recipe
+    fan-out treats each branch as one ab_mcts run with a distinct
+    approach hint, on the empirical observation that ensembling
+    diverse seeds lifts accuracy.
+  * **orch_gatephase** — implements the Phase-gate discipline
+    (structured verification with retry-on-fail), used here for the
+    root / consensus / commit reviews so the aggregator's verdict is
+    gate-bounded rather than a free-form pick.
+
 The recipe assumes branch outputs are exchangeable conditional on
-the approach hint; under that assumption the consensus pick maximises
-the expected best_score over the swarm.
+the approach hint; under that assumption the consensus pick targets
+the highest `best_score` over the swarm. The "exchangeability +
+consensus pick" framing is a working assumption of this recipe, not
+a theorem derived from either paper.
 
 ## Caveats {#caveats}
 

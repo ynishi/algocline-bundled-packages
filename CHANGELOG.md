@@ -9,6 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`flow` v0.7.0 → v0.8.0 — flow.ir 2 axes land (call_extern Expr +
+  step/wrap_step.out_schema), pre-D1 IR unchanged (361/361 existing
+  tests pass)**.
+  - **A. `call_extern` Expr (value-shape Hatch)** — new Expr op
+    resolves a host-injected pure function by opaque `ref` through an
+    `opts.externs` whitelist. Dissolves A1 regex_match / A2
+    json_decode / A4 array_append / A6b keys (issue
+    `edf05e72-3f85-4be1-9553-711ef79a6273`) without growing the Expr
+    op set per use case. Compile-time eager check when `opts.externs`
+    is provided; deferred to exec otherwise (raises on missing
+    registry / non-function value).
+    - Discipline (slippery slope fence): comparison / logical /
+      structural control / value composition (`eq` / `and` / `fold` /
+      `switch` / `concat` / `format`, etc.) stay as IR atoms; string
+      processing / data conversion / collection ops / domain helpers
+      go through `call_extern`. Control-flow extension (raising,
+      persisting, network IO) is OUT of scope — use `step` /
+      `wrap_step` for those.
+    - Constructor: `flow.ir.call_extern(ref, ...args)`. Registered fn
+      MUST be pure (no side effects, no flow control, no ctx
+      mutation), returning scalar / table / nil.
+    - Touched: `flow/ir/init.lua` (constructor), `flow/ir/schema.lua`
+      (discriminated entry + EXPR_OPS set), `flow/ir/compile.lua`
+      (eager whitelist + ref-non-empty), `flow/ir/walk.lua`
+      (expr_children_of), `flow/ir/interpreter.lua` (eval_expr opts
+      threading + resolution).
+  - **B. `step.out_schema` / `wrap_step.out_schema` (Schema-as-Data
+    dispatcher contract)** — optional `alc_shapes` T value declares
+    the expected dispatcher result shape. When present, exec runs
+    `S.check(result, out_schema)` after dispatch and raises on
+    mismatch with a slot-tagged message (`exec: step '<ref>':
+    out_schema mismatch: ...`). Caller's opt-in to a structured
+    contract — IR Expr downstream can `path` / `eq` / `switch` into
+    internal fields with confidence (routing-as-Data). Pkg-side
+    contract unchanged.
+    - `wrap_step` on the `on_mismatch` path intentionally bypasses
+      schema enforcement (the caller chose to handle the verify-fail
+      result directly and may inspect a raw value).
+    - When `out_schema` is nil (default), any dispatcher result is
+      accepted — full back-compat with all pre-D1 IRs.
+    - Touched: `flow/ir/init.lua` (step / wrap_step constructors),
+      `flow/ir/schema.lua` (discriminated field), `flow/ir/interpreter.lua`
+      (post-dispatch S.check on both step and wrap_step verify-success
+      paths).
+  - **Docs**: `flow/doc/ir.md` (Node/Expr shapes + `call_extern`
+    discipline + `opts.externs` exec opts), `flow/doc/contract.md`
+    (new section: Schema-as-Data dispatcher contract — independent
+    from token contract).
+  - **Tests**: +29 (16 `call_extern` + 13 `out_schema`), all pass.
+    - `call_extern`: shape + constructor + compile whitelist (eager /
+      deferred / reject), exec resolution + 4 error cases, nested
+      opts-threading through fold env, A1/A2/A4/A6b dissolution
+      proofs.
+    - `out_schema`: legacy path (absent) + strict happy path +
+      downstream Expr can path into structured ctx + 4 reject cases +
+      compile-time shape check + wrap_step verify-success + wrap_step
+      on_mismatch bypass.
+
 - **`flow` v0.6.0 → v0.7.0 — Step 3 §3.4: path syntax extended with
   RFC 9535 JSONPath bracket integer-index selector**.
   - `Expr.path.at` field shape is **unchanged** (still a string);

@@ -41,7 +41,7 @@ local M = {}
 ---@type AlcMeta
 M.meta = {
     name        = "flow",
-    version     = "0.7.0",
+    version     = "0.8.0",
     description = "Flow Frame — FlowState + ReqToken + IR substrate for "
         .. "composing algo-based pkg (ab_mcts / cascade / coevolve / "
         .. "...). Light Frame: driver loop stays in user code. v0.3 "
@@ -60,7 +60,15 @@ M.meta = {
         .. "concurrent execution is engine territory (swarm-frame). "
         .. "v0.7 extends path syntax with RFC 9535 JSONPath bracket "
         .. "integer index selector (`$.ctx.items[3]`, `[-1]` for tail "
-        .. "on read) — additive, `at` field shape unchanged.",
+        .. "on read) — additive, `at` field shape unchanged. v0.8 adds "
+        .. "two IR axes without breaking pre-D1 IR: (a) `call_extern` "
+        .. "Expr — value-shape Hatch resolving host-injected pure "
+        .. "functions via `opts.externs` whitelist (dissolves regex / "
+        .. "json_decode / array_append / keys without growing Expr "
+        .. "atoms); (b) `step.out_schema` / `wrap_step.out_schema` — "
+        .. "Schema-as-Data dispatcher contract (optional `alc_shapes` "
+        .. "T value enforced by exec, slot-tagged raise on mismatch); "
+        .. "wrap_step on_mismatch path intentionally bypasses schema.",
     category    = "substrate",
     alc_shapes_compat = "^0.25",
 }
