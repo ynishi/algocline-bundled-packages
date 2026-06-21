@@ -314,14 +314,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Provenance moved from short-label markers (`(L)` / `(I)` /
   `(X)`) to prose in public docstrings and `:describe("...")` text**
-  across `s1` / `aot` / `think_prm`, per this repo's
-  `.claude/CLAUDE.md` §3 (3 判断軸: short labels are an internal AI
+  across `s1` / `aot` / `think_prm`, per the repo's internal
+  AI-lint-trail rule (3 判断軸: short labels are an internal AI
   lint trail and must not be literal-emitted to public projection).
   Provenance is now written as prose ("Muennighoff 2025 §3 / Table 4
   ablation winner", "industry-standard per OpenAI tokenizer
   guidance", "implementation choice — paper does not specify, …").
   In-function `--` comment lines retain the short tags as the
-  internal AI lint trail per CLAUDE.md §3 last paragraph. Mirrors
+  internal AI lint trail per the same internal rule. Mirrors
   the v0.27.0 sweep for the previous-batch paper-explicit pkgs
   (`reconcile` / `moa` / `dmad` / `hegelian` / `conformal_vote` /
   `propose_verify`).
@@ -438,8 +438,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `propose_verify` per-pkg post-ship fix) carried local-rule lint
   labels (`(L)` / `(I)` / `(X)` short markers + `## EXTENSION POINTS`
   ASCII headers) in their public docstrings and `:describe("...")`
-  text. These labels are internal AI provenance trail defined in this
-  repo's `.claude/CLAUDE.md` §3, NOT part of the OSS user contract.
+  text. These labels are an internal AI provenance trail defined in
+  the repo's internal AI-lint rule, NOT part of the OSS user contract.
   Public docs now follow the official format defined in
   `algocline/docs/pkg-author-conventions.md` (§4.3 two-tier rule +
   §3.2 `## Caveats` H2 section with subheadings `### Required ctx
@@ -449,7 +449,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "implementation choice — paper does not specify, ...") rather than
   abbreviated label markers. In-function `--` comment lines (outside
   the `---` docstring) remain as the internal AI provenance trail per
-  CLAUDE.md §3 last paragraph. 202/202 spec PASS across the 4 paper
+  the same internal rule. 202/202 spec PASS across the 4 paper
   pkgs swept in this release; cumulative 219/219 with the prior-commit
   `propose_verify` / `conformal_vote` sweep.
 - **D1/D2/D3 audit Phase 1** (`dci` / `slm_mux` / `conformal_vote`) —
