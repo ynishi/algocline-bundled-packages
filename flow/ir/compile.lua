@@ -104,7 +104,7 @@ local function descend_expr(expr, path)
     return true
 end
 
----@type table<string, fun(expr: flow.ir.Expr, path: string): boolean|nil, string?>
+---@type table<string, fun(expr: flow.ir.Expr, path: string, state: table?): boolean|nil, string?>
 local EXPR_LOCAL_CHECK = {
     path = function(expr, path)
         if expr.at:sub(1, #PATH_READ_PREFIX) ~= PATH_READ_PREFIX then
@@ -116,10 +116,25 @@ local EXPR_LOCAL_CHECK = {
         end
         return true
     end,
+    call_extern = function(expr, path, state)
+        if expr.ref == "" then
+            return err(path, "call_extern.ref: required non-empty string")
+        end
+        if state and state.known_externs and not state.known_externs[expr.ref] then
+            return err(path,
+                "call_extern.ref: '" .. expr.ref .. "' not in opts.externs registry")
+        end
+        return true
+    end,
     -- lit / eq / and / or / not / lt / len / add / get: no local invariant
     -- beyond shape + recursive children. (concat min-2 is checked in
     -- descend_expr alongside and/or.)
 }
+
+--- Walk-state passed through expr validation (set by check_node before
+--- descending into Expr children). Single-threaded compile, so a module-
+--- local box is safe and avoids adding a parameter to every call site.
+local CURRENT_EXPR_STATE = nil
 
 check_expr = function(expr, path)
     if type(expr) ~= "table" then
@@ -133,7 +148,7 @@ check_expr = function(expr, path)
     if not ok then return err(path, reason) end
     local local_check = EXPR_LOCAL_CHECK[op]
     if local_check then
-        ok, reason = local_check(expr, path)
+        ok, reason = local_check(expr, path, CURRENT_EXPR_STATE)
         if not ok then return nil, reason end
     end
     return descend_expr(expr, path)
@@ -415,6 +430,9 @@ end
 ---@field refs  table<string, any>?  if provided, every `step.ref` name
 ---   not present as a key is a compile error (eager registry check).
 ---   Default (nil) defers resolution to exec/dispatch.
+---@field externs table<string, any>?  if provided, every `call_extern.ref`
+---   name not present as a key is a compile error (eager registry check).
+---   Default (nil) defers resolution to exec (where missing externs raise).
 
 --- Compile a Lua-table IR.
 ---
@@ -435,7 +453,14 @@ function M.compile(ir, opts)
         known_flows     = opts.flows,
         known_refs      = opts.refs,
     }
+    -- Expose extern whitelist to the Expr local-check via module-local box.
+    -- check_expr is invoked from many Node validators; threading state via
+    -- a parameter would require touching every Expr callsite for one Expr
+    -- op (call_extern). Compile is single-threaded so a module-local box
+    -- is safe; we always reset it in the finally-style guard below.
+    CURRENT_EXPR_STATE = { known_externs = opts.externs }
     local ok, reason = check_node(ir, "$", walk_state)
+    CURRENT_EXPR_STATE = nil
     if not ok then return nil, reason end
     return ir
 end

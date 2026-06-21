@@ -58,6 +58,45 @@ M.meta = {
 Declaring `flow_contract = "v1"` is how tooling and Frame-aware Recipe
 implementations know to treat this pkg as strictly verifiable.
 
+## Schema-as-Data dispatcher contract (step.out_schema)
+
+Independent from the token contract above. The IR caller MAY declare the
+expected shape of a `step` / `wrap_step` result as an `alc_shapes` T
+value:
+
+```lua
+local T = require("alc_shapes.t")
+
+ir.step({
+    ref        = "verdict_gate",
+    in_        = ir.path("$.ctx.request"),
+    out        = "ctx.verdict",
+    out_schema = T.shape({
+        status  = T.one_of({ "pass", "fail", "abstain" }),
+        payload = T.table:is_optional(),
+        reason  = T.string:is_optional(),
+    }, { open = false }),
+})
+```
+
+Semantics:
+
+- **out_schema absent** (default) — any dispatcher result is accepted;
+  written to `ctx[out]` as-is. This is the back-compat path; pre-D1 IRs
+  continue to work unchanged.
+- **out_schema present** — after dispatch returns, exec runs
+  `alc_shapes.check(result, out_schema)` and raises on mismatch with a
+  slot-tagged message (`exec: step '<ref>': out_schema mismatch: ...`).
+- **wrap_step** — schema validation happens AFTER token verify succeeds.
+  On the `on_mismatch` path the schema is intentionally NOT enforced;
+  the caller chose to handle the verify-fail result directly and may
+  inspect a raw value.
+
+The pkg author side is unchanged: pkgs return what they always returned.
+Schema declaration is the **caller's** opt-in to a structured dispatcher
+contract, which lets the IR downstream (`path`, `eq`, `switch`) touch
+the result's internal fields with confidence (routing-as-Data).
+
 ## Non-goals of the contract
 
 - The contract does **not** require the pkg to use `flow` itself, only to

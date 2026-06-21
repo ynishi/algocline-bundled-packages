@@ -127,6 +127,10 @@ function M.expr_children_of(expr)
         out[#out + 1] = { child = expr.from, key = "from" }
         out[#out + 1] = { child = expr.init, key = "init" }
         out[#out + 1] = { child = expr.fn,   key = "fn" }
+    elseif op == "call_extern" then
+        for i, ch in ipairs(expr.args) do
+            out[#out + 1] = { child = ch, key = "args", idx = i }
+        end
     end
     -- path / lit / var are leaves.
     return out

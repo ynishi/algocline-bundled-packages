@@ -107,6 +107,11 @@ local M = {}
 ---@field item_var  string        name bound to the current item inside fn
 ---@field fn        flow.ir.Expr  Expr returning the new acc (becomes next iter's acc_var)
 
+---@class flow.ir.Expr.call_extern
+---@field op    "call_extern"
+---@field ref   string        opaque function key resolved via opts.externs whitelist
+---@field args  flow.ir.Expr[]  positional args (each walked); may be empty
+
 ---@class flow.ir.Expr.sub
 ---@field op   "sub"
 ---@field lhs  flow.ir.Expr
@@ -186,6 +191,7 @@ local M = {}
 ---| flow.ir.Expr.var
 ---| flow.ir.Expr.filter
 ---| flow.ir.Expr.fold
+---| flow.ir.Expr.call_extern
 
 ---@type AlcShapeDiscriminated  alc_shapes discriminated schema over `op`
 M.Expr = T.discriminated("op", {
@@ -303,6 +309,18 @@ M.Expr = T.discriminated("op", {
         fn       = T.table:describe(
             "nested Expr (walked under acc_var + item_var bindings); returns next acc"),
     }, { open = false }),
+    call_extern = T.shape({
+        op   = T.one_of({ "call_extern" }),
+        ref  = T.string:describe(
+            "opaque function key resolved via opts.externs whitelist; "
+            .. "must be a non-empty string. Value-shape manipulation Hatch — "
+            .. "the registered function MUST be pure (no side effects) and "
+            .. "return a scalar / table / nil. Control-flow extern (raising, "
+            .. "yielding, mutating ctx, network IO) is OUT of scope; use Node "
+            .. "primitives (step / dispatch) for those."),
+        args = T.array_of(T.table):describe(
+            "positional args (nested Exprs, walked); may be empty for nullary functions"),
+    }, { open = false }),
 })
 
 ---@type table<string, boolean>  Set of supported Expr ops (membership test).
@@ -315,15 +333,22 @@ M.EXPR_OPS = {
     gt = true, gte = true, lte = true, ne = true,
     exists = true, format = true,
     ["var"] = true, filter = true, fold = true,
+    call_extern = true,
 }
 
 -- ── Node (kind-tagged) ──────────────────────────────────────────────
 
 ---@class flow.ir.Node.step
----@field kind   "step"
----@field ref    string  opaque handler reference passed to opts.dispatch
----@field in_    flow.ir.Expr|nil  input Expr; nil → dispatch receives nil
----@field out    string  ctx write path; must start with "ctx."
+---@field kind        "step"
+---@field ref         string  opaque handler reference passed to opts.dispatch
+---@field in_         flow.ir.Expr|nil  input Expr; nil → dispatch receives nil
+---@field out         string  ctx write path; must start with "ctx."
+---@field out_schema  table|nil  optional alc_shapes T value declaring the
+---  expected dispatcher result shape. When present, the interpreter runs
+---  `alc_shapes.check(result, out_schema)` after dispatch and raises on
+---  mismatch (Schema-as-Data dispatcher contract — IR Expr can then path
+---  into the structured ctx with compile-time guarantees). When nil, any
+---  result is accepted (legacy behavior, back-compat).
 
 ---@class flow.ir.Node.seq
 ---@field kind      "seq"
@@ -429,6 +454,9 @@ M.EXPR_OPS = {
 ---  and auto-delete on verify success (session-spanning). Default false (in-memory cycle).
 ---@field on_mismatch  flow.ir.Node|nil  Node executed when verify returns false
 ---  (instead of raising). When nil, exec raises with a slot-tagged message.
+---@field out_schema   table|nil  optional alc_shapes T value (same contract as
+---  step.out_schema). Applied AFTER token verify succeeds; on_mismatch path is
+---  unaffected (caller chose to handle the verify-fail result directly).
 
 ---@alias flow.ir.Node
 ---| flow.ir.Node.step
@@ -455,6 +483,11 @@ M.Node = T.discriminated("kind", {
         ref  = T.string:describe("opaque handler reference, passed to opts.dispatch"),
         in_  = T.table:is_optional():describe("input Expr (walked)"),
         out  = T.string:describe("ctx write path, must start with 'ctx.'"),
+        out_schema = T.table:is_optional():describe(
+            "optional alc_shapes T value declaring the dispatcher result shape. "
+            .. "When present, exec runs S.check(result, out_schema) after dispatch "
+            .. "and raises on mismatch (Schema-as-Data dispatcher contract). "
+            .. "When nil, any result is accepted (legacy)."),
     }, { open = false }),
     seq = T.shape({
         kind     = T.one_of({ "seq" }),
@@ -568,6 +601,9 @@ M.Node = T.discriminated("kind", {
         on_mismatch = T.table:is_optional():describe(
             "nested Node (walked); executed when verify returns false. "
             .. "When omitted, exec raises with a slot-tagged mismatch message."),
+        out_schema  = T.table:is_optional():describe(
+            "optional alc_shapes T value (same contract as step.out_schema); "
+            .. "applied after token verify succeeds. on_mismatch path is unaffected."),
     }, { open = false }),
 })
 

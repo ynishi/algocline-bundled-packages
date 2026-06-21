@@ -92,7 +92,8 @@ other Node and every Expr is host-neutral.
 ### Node shapes
 
 ```lua
-{ kind = "step",   ref = "<handler>", in_ = <Expr>?, out = "ctx.<path>" }
+{ kind = "step",   ref = "<handler>", in_ = <Expr>?, out = "ctx.<path>",
+                   out_schema = <alc_shapes T>? }                -- optional Schema-as-Data dispatcher contract
 { kind = "seq",    children = { <Node>, ... } }
 { kind = "branch", cond = <Expr>, then_ = <Node>, else_ = <Node> }
 { kind = "let",    at = "ctx.<path>", value = <Expr> }
@@ -132,6 +133,15 @@ to `ctx[out]`. Recursion is bounded by `opts.max_call_depth` (default
 64). `compile(ir, { flows = {...} })` enables eager validation of
 `call.flow` names; otherwise resolution is deferred to exec.
 
+`step.out_schema` (optional) declares the expected dispatcher result
+shape as an alc_shapes T value. When present, exec runs
+`alc_shapes.check(result, out_schema)` after dispatch and raises on
+mismatch — IR Expr downstream may then `path` into the structured ctx
+with compile-time guarantees (routing-as-Data). When nil, any result is
+accepted (legacy back-compat). `wrap_step.out_schema` follows the same
+contract; on the `on_mismatch` path the schema is NOT enforced (the
+caller chose to handle the verify-fail result directly).
+
 ### Expr shapes
 
 ```lua
@@ -143,6 +153,7 @@ to `ctx[out]`. Recursion is bounded by `opts.max_call_depth` (default
 { op = "not",  arg = <Expr> }                    -- truthiness inversion
 { op = "lt",   lhs = <Expr>, rhs = <Expr> }      -- numeric or lexicographic
 { op = "len",  arg = <Expr> }                    -- Lua `#`: string / array length
+{ op = "call_extern", ref = "<key>", args = { <Expr>, ... } }  -- value-shape Hatch
 ```
 
 `and` / `or` / `not` / `lt` all return Lua booleans (predictable over
@@ -150,6 +161,23 @@ Lua's last-value `and`/`or` semantics). `len` returns an integer
 (Lua `#`); it works on strings and sequence-style arrays and raises
 on values without a length op. `eq` follows Lua `==` semantics
 (reference equality on tables).
+
+`call_extern` is the **value-shape Hatch** for the IR — a host-injected
+pure function resolved by opaque key through `opts.externs` whitelist.
+The registered function MUST be pure (no side effects), no flow control,
+no ctx mutation, and return a scalar / table / nil. Use it to keep the
+IR Data while delegating value transformations (regex match, json
+decode, collection ops) to host helpers without growing the Expr op set
+per use case. Control-flow extension (raising, persisting, network IO)
+is OUT of scope — use `step` / `wrap_step` for those.
+
+Discipline (slippery slope fence):
+- Comparison / logical / structural control / value composition
+  (`eq` / `and` / `fold` / `switch` / `concat` / `format`, etc.) stay as
+  IR atoms.
+- String processing / data conversion / collection ops / domain helpers
+  go through `call_extern`.
+- `opts.externs` is caller-supplied; flow itself ships no built-in registry.
 
 ### State model
 
@@ -165,11 +193,13 @@ resume are trivial: snapshot `ctx`, replay from the IR position.
 local ir = require("flow").ir
 
 ir.compile(def, opts?)           -- flow.ir.Node → flow.ir.Node | nil, reason
-                                 --   opts.flows = { name = ... }   -- eager call.flow check
-                                 --   opts.refs  = { name = ... }   -- eager step.ref check
+                                 --   opts.flows   = { name = ... }       -- eager call.flow check
+                                 --   opts.refs    = { name = ... }       -- eager step.ref check
+                                 --   opts.externs = { name = ... }       -- eager call_extern.ref check
 ir.exec(compiled, ctx, opts)     -- mutates + returns ctx
                                  --   opts.dispatch(ref, input) -> result, err?
-                                 --   opts.flows = { name = compiled_sub_ir, ... }
+                                 --   opts.flows   = { name = compiled_sub_ir, ... }
+                                 --   opts.externs = { name = pure_fn, ... }  -- required for call_extern
                                  --   opts.max_call_depth = 64
                                  --   opts.scheduler = <reserved>
 

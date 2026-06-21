@@ -37,10 +37,11 @@
 -- 7 Node kinds × 8 Expr ops. The schema discriminated + `open = false`
 -- guard ensures unknown kind / op never reaches here.
 
-local path_mod = require("flow.ir.path")
+local path_mod  = require("flow.ir.path")
 local token_mod = require("flow.token")
 local state_mod = require("flow.state")
 local util_mod  = require("flow.util")
+local S         = require("alc_shapes")
 
 local M = {}
 
@@ -156,8 +157,10 @@ end
 ---
 ---@param expr flow.ir.Expr
 ---@param ctx  table
+---@param env  table?  optional binding env (filter/fold)
+---@param opts flow.ir.ExecOpts?  optional exec opts (only call_extern needs it)
 ---@return any
-local function eval_expr(expr, ctx, env)
+local function eval_expr(expr, ctx, env, opts)
     local op = expr.op
     if op == "lit" then
         return expr.value
@@ -171,27 +174,27 @@ local function eval_expr(expr, ctx, env)
         end
         return env[expr.name]
     elseif op == "eq" then
-        return eval_expr(expr.lhs, ctx, env) == eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) == eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "and" then
         for _, sub in ipairs(expr.args) do
-            if not eval_expr(sub, ctx, env) then return false end
+            if not eval_expr(sub, ctx, env, opts) then return false end
         end
         return true
     elseif op == "not" then
-        return not eval_expr(expr.arg, ctx, env)
+        return not eval_expr(expr.arg, ctx, env, opts)
     elseif op == "lt" then
-        return eval_expr(expr.lhs, ctx, env) < eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) < eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "or" then
         for _, sub in ipairs(expr.args) do
-            if eval_expr(sub, ctx, env) then return true end
+            if eval_expr(sub, ctx, env, opts) then return true end
         end
         return false
     elseif op == "len" then
-        return #eval_expr(expr.arg, ctx, env)
+        return #eval_expr(expr.arg, ctx, env, opts)
     elseif op == "concat" then
         local parts = {}
         for i, sub in ipairs(expr.args) do
-            local v = eval_expr(sub, ctx, env)
+            local v = eval_expr(sub, ctx, env, opts)
             if type(v) ~= "string" then
                 error(
                     "eval_expr: concat arg[" .. i .. "] must be a string, got "
@@ -201,8 +204,8 @@ local function eval_expr(expr, ctx, env)
         end
         return table.concat(parts)
     elseif op == "add" then
-        local lhs = eval_expr(expr.lhs, ctx, env)
-        local rhs = eval_expr(expr.rhs, ctx, env)
+        local lhs = eval_expr(expr.lhs, ctx, env, opts)
+        local rhs = eval_expr(expr.rhs, ctx, env, opts)
         if type(lhs) ~= "number" then
             error("eval_expr: add.lhs must be a number, got " .. type(lhs), 2)
         end
@@ -211,19 +214,19 @@ local function eval_expr(expr, ctx, env)
         end
         return lhs + rhs
     elseif op == "get" then
-        local from = eval_expr(expr.from, ctx, env)
+        local from = eval_expr(expr.from, ctx, env, opts)
         if type(from) ~= "table" then
             error("eval_expr: get.from must be a table, got " .. type(from), 2)
         end
-        local key = eval_expr(expr.key, ctx, env)
+        local key = eval_expr(expr.key, ctx, env, opts)
         local kt = type(key)
         if kt ~= "string" and kt ~= "number" then
             error("eval_expr: get.key must be a string or number, got " .. kt, 2)
         end
         return from[key]
     elseif op == "sub" or op == "mul" or op == "div" or op == "mod" then
-        local lhs = eval_expr(expr.lhs, ctx, env)
-        local rhs = eval_expr(expr.rhs, ctx, env)
+        local lhs = eval_expr(expr.lhs, ctx, env, opts)
+        local rhs = eval_expr(expr.rhs, ctx, env, opts)
         if type(lhs) ~= "number" then
             error("eval_expr: " .. op .. ".lhs must be a number, got " .. type(lhs), 2)
         end
@@ -238,27 +241,27 @@ local function eval_expr(expr, ctx, env)
         elseif op == "div" then return lhs / rhs
         else return lhs % rhs end
     elseif op == "gt" then
-        return eval_expr(expr.lhs, ctx, env) > eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) > eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "gte" then
-        return eval_expr(expr.lhs, ctx, env) >= eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) >= eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "lte" then
-        return eval_expr(expr.lhs, ctx, env) <= eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) <= eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "ne" then
-        return eval_expr(expr.lhs, ctx, env) ~= eval_expr(expr.rhs, ctx, env)
+        return eval_expr(expr.lhs, ctx, env, opts) ~= eval_expr(expr.rhs, ctx, env, opts)
     elseif op == "exists" then
-        return eval_expr(expr.arg, ctx, env) ~= nil
+        return eval_expr(expr.arg, ctx, env, opts) ~= nil
     elseif op == "format" then
-        local fmt = eval_expr(expr.fmt, ctx, env)
+        local fmt = eval_expr(expr.fmt, ctx, env, opts)
         if type(fmt) ~= "string" then
             error("eval_expr: format.fmt must be a string, got " .. type(fmt), 2)
         end
         local args = {}
         for i, sub in ipairs(expr.args) do
-            args[i] = eval_expr(sub, ctx, env)
+            args[i] = eval_expr(sub, ctx, env, opts)
         end
         return string.format(fmt, table.unpack(args))
     elseif op == "filter" then
-        local from = eval_expr(expr.from, ctx, env)
+        local from = eval_expr(expr.from, ctx, env, opts)
         if type(from) ~= "table" then
             error("eval_expr: filter.from must be an array, got " .. type(from), 2)
         end
@@ -267,25 +270,47 @@ local function eval_expr(expr, ctx, env)
         if env then for k, v in pairs(env) do inner_env[k] = v end end
         for _, item in ipairs(from) do
             inner_env[expr.var] = item
-            if eval_expr(expr.pred, ctx, inner_env) then
+            if eval_expr(expr.pred, ctx, inner_env, opts) then
                 results[#results + 1] = item
             end
         end
         return results
     elseif op == "fold" then
-        local from = eval_expr(expr.from, ctx, env)
+        local from = eval_expr(expr.from, ctx, env, opts)
         if type(from) ~= "table" then
             error("eval_expr: fold.from must be an array, got " .. type(from), 2)
         end
-        local acc = eval_expr(expr.init, ctx, env)
+        local acc = eval_expr(expr.init, ctx, env, opts)
         local inner_env = {}
         if env then for k, v in pairs(env) do inner_env[k] = v end end
         for _, item in ipairs(from) do
             inner_env[expr.acc_var]  = acc
             inner_env[expr.item_var] = item
-            acc = eval_expr(expr.fn, ctx, inner_env)
+            acc = eval_expr(expr.fn, ctx, inner_env, opts)
         end
         return acc
+    elseif op == "call_extern" then
+        -- Value-shape Hatch: resolve a host-injected pure function by
+        -- opaque key (whitelist), apply it to evaluated args, return the
+        -- value. The flow IR stays Data — extension surface for the value
+        -- layer (regex match / json decode / collection ops) without
+        -- growing the Expr op set per use case. See doc/ir.md §call_extern
+        -- for the discipline (pure, no side effects, no flow control).
+        local externs = opts and opts.externs
+        if type(externs) ~= "table" then
+            error("eval_expr: call_extern '" .. expr.ref
+                .. "' requires opts.externs to be a table", 2)
+        end
+        local fn = externs[expr.ref]
+        if type(fn) ~= "function" then
+            error("eval_expr: call_extern '" .. expr.ref
+                .. "': not registered in opts.externs (or not a function)", 2)
+        end
+        local args = {}
+        for i, sub in ipairs(expr.args) do
+            args[i] = eval_expr(sub, ctx, env, opts)
+        end
+        return fn(table.unpack(args))
     end
     error("eval_expr: unknown op " .. tostring(op), 2)
 end
@@ -369,10 +394,20 @@ local function exec_node(node, ctx, opts)
     local kind = node.kind
     if kind == "step" then
         local input = nil
-        if node.in_ then input = eval_expr(node.in_, ctx) end
+        if node.in_ then input = eval_expr(node.in_, ctx, nil, opts) end
         local result, derr = opts.dispatch(node.ref, input)
         if derr and result == nil then
             error("exec: step '" .. node.ref .. "': " .. derr, 2)
+        end
+        -- Schema-as-Data dispatcher contract: when out_schema is declared,
+        -- validate the result before binding to ctx. Mismatch raises (the
+        -- caller broke the contract; IR Expr downstream assumes the shape).
+        if node.out_schema ~= nil then
+            local sok, sreason = S.check(result, node.out_schema)
+            if not sok then
+                error("exec: step '" .. node.ref
+                    .. "': out_schema mismatch: " .. tostring(sreason), 2)
+            end
         end
         write_path(ctx, node.out, result)
     elseif kind == "seq" then
@@ -380,18 +415,18 @@ local function exec_node(node, ctx, opts)
             exec_node(child, ctx, opts)
         end
     elseif kind == "branch" then
-        local cond_val = eval_expr(node.cond, ctx)
+        local cond_val = eval_expr(node.cond, ctx, nil, opts)
         if cond_val then
             exec_node(node.then_, ctx, opts)
         elseif node.else_ ~= nil then
             exec_node(node.else_, ctx, opts)
         end
     elseif kind == "let" then
-        write_path(ctx, node.at, eval_expr(node.value, ctx))
+        write_path(ctx, node.at, eval_expr(node.value, ctx, nil, opts))
     elseif kind == "loop" then
         write_path(ctx, node.counter, 0)
         local n = 0
-        while n < node.max and eval_expr(node.cond, ctx) do
+        while n < node.max and eval_expr(node.cond, ctx, nil, opts) do
             n = n + 1
             write_path(ctx, node.counter, n)
             exec_node(node.body, ctx, opts)
@@ -406,14 +441,14 @@ local function exec_node(node, ctx, opts)
         end
         local sub_ctx = {}
         for k, expr in pairs(node.args) do
-            sub_ctx[k] = eval_expr(expr, ctx)
+            sub_ctx[k] = eval_expr(expr, ctx, nil, opts)
         end
         opts._call_depth = opts._call_depth + 1
         exec_node(sub_flow, sub_ctx, opts)
         opts._call_depth = opts._call_depth - 1
         write_path(ctx, node.out, sub_ctx)
     elseif kind == "fanout" then
-        local items = eval_expr(node.items, ctx)
+        local items = eval_expr(node.items, ctx, nil, opts)
         if type(items) ~= "table" then
             error("exec: fanout.items: expected array, got " .. type(items), 2)
         end
@@ -486,10 +521,10 @@ local function exec_node(node, ctx, opts)
             write_path(ctx, node.out, results)
         end
     elseif kind == "switch" then
-        local on_val = eval_expr(node.on, ctx)
+        local on_val = eval_expr(node.on, ctx, nil, opts)
         local matched = false
         for _, c in ipairs(node.cases) do
-            if eval_expr(c.match, ctx) == on_val then
+            if eval_expr(c.match, ctx, nil, opts) == on_val then
                 exec_node(c.body, ctx, opts)
                 matched = true
                 break
@@ -510,11 +545,11 @@ local function exec_node(node, ctx, opts)
         end
     elseif kind == "return_early" then
         if node.value ~= nil then
-            write_path(ctx, node.out, eval_expr(node.value, ctx))
+            write_path(ctx, node.out, eval_expr(node.value, ctx, nil, opts))
         end
         error({ [RETURN_EARLY_SENTINEL] = true }, 0)
     elseif kind == "map" then
-        local items = eval_expr(node.in_, ctx)
+        local items = eval_expr(node.in_, ctx, nil, opts)
         if type(items) ~= "table" then
             error("exec: map.in_: expected array, got " .. type(items), 2)
         end
@@ -528,11 +563,11 @@ local function exec_node(node, ctx, opts)
         end
         write_path(ctx, node.out, results)
     elseif kind == "reduce" then
-        local items = eval_expr(node.in_, ctx)
+        local items = eval_expr(node.in_, ctx, nil, opts)
         if type(items) ~= "table" then
             error("exec: reduce.in_: expected array, got " .. type(items), 2)
         end
-        write_path(ctx, node.acc, eval_expr(node.init, ctx))
+        write_path(ctx, node.acc, eval_expr(node.init, ctx, nil, opts))
         for _, item in ipairs(items) do
             write_path(ctx, node.bind, item)
             exec_node(node.body, ctx, opts)
@@ -541,15 +576,15 @@ local function exec_node(node, ctx, opts)
         if perr then error(perr, 2) end
         write_path(ctx, node.out, v)
     elseif kind == "fail" then
-        local msg = eval_expr(node.message, ctx)
+        local msg = eval_expr(node.message, ctx, nil, opts)
         if type(msg) ~= "string" then
             error("exec: fail.message must eval to a string, got " .. type(msg), 2)
         end
         error("exec: fail: " .. msg, 2)
     elseif kind == "assert" then
-        local cond = eval_expr(node.cond, ctx)
+        local cond = eval_expr(node.cond, ctx, nil, opts)
         if not cond then
-            local msg = eval_expr(node.message, ctx)
+            local msg = eval_expr(node.message, ctx, nil, opts)
             if type(msg) ~= "string" then
                 error("exec: assert.message must eval to a string, got " .. type(msg), 2)
             end
@@ -569,14 +604,14 @@ local function exec_node(node, ctx, opts)
         end
     elseif kind == "wrap_step" then
         -- Evaluate slot Expr to a non-empty string.
-        local slot = eval_expr(node.slot, ctx)
+        local slot = eval_expr(node.slot, ctx, nil, opts)
         if type(slot) ~= "string" or slot == "" then
             error("exec: wrap_step.slot must eval to a non-empty string, got "
                 .. type(slot), 2)
         end
         -- Evaluate input payload (or nil).
         local input = nil
-        if node.in_ then input = eval_expr(node.in_, ctx) end
+        if node.in_ then input = eval_expr(node.in_, ctx, nil, opts) end
         if input ~= nil and type(input) ~= "table" then
             error("exec: wrap_step '" .. slot .. "': in_ must eval to a table or nil, "
                 .. "got " .. type(input), 2)
@@ -623,7 +658,9 @@ local function exec_node(node, ctx, opts)
         if not ok then
             if node.on_mismatch ~= nil then
                 -- Surface verify result for the fallback Node before
-                -- handing control off.
+                -- handing control off. out_schema is intentionally NOT
+                -- applied on this path — the caller chose to handle the
+                -- verify-fail result directly and may inspect a raw value.
                 write_path(ctx, node.out, result)
                 exec_node(node.on_mismatch, ctx, opts)
             else
@@ -631,6 +668,15 @@ local function exec_node(node, ctx, opts)
                     .. "(set on_mismatch to handle, or check pkg echo contract)", 2)
             end
         else
+            -- Schema-as-Data dispatcher contract: validate after verify
+            -- succeeds (mirrors step.out_schema semantics).
+            if node.out_schema ~= nil then
+                local sok, sreason = S.check(result, node.out_schema)
+                if not sok then
+                    error("exec: wrap_step '" .. slot
+                        .. "': out_schema mismatch: " .. tostring(sreason), 2)
+                end
+            end
             write_path(ctx, node.out, result)
         end
     else
@@ -646,6 +692,13 @@ end
 ---@field state          table?  optional FlowState. When present, `wrap_step`
 ---                              issues / persists tokens via this state. Required
 ---                              when any `wrap_step` Node has `bound = true`.
+---@field externs        table<string, function>?  whitelist for `call_extern`
+---                              Expr. Each key is the opaque `ref` string; each
+---                              value MUST be a pure function (no side effects,
+---                              no flow control, no ctx mutation) returning a
+---                              scalar / table / nil. Required for IRs that
+---                              contain `call_extern` Expr; default nil (any
+---                              call_extern raises at exec).
 ---@field scheduler      any?  reserved forward-compat slot for concurrent
 ---                           fanout schedulers; the MVP interpreter is
 ---                           serial and ignores this field.

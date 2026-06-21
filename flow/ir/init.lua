@@ -372,6 +372,24 @@ function M.fold(spec)
     }
 end
 
+--- `call_extern` Expr: invoke an opts.externs-whitelisted Lua function
+--- by opaque `ref` with the evaluated arg list. Value-shape Hatch — the
+--- registered function MUST be pure (no side effects), no flow control,
+--- no ctx mutation, returning a scalar / table / nil. Control-flow
+--- extension (raising, persisting, network IO) is OUT of scope; use
+--- step / dispatch Nodes for those.
+---
+--- Use this to keep the IR Data while delegating value transformations
+--- (regex match, json decode, collection ops) to host helpers without
+--- growing the Expr op set per use case.
+---
+---@param ref  string         registry key; resolved at exec via opts.externs[ref]
+---@param ...  flow.ir.Expr   positional args (each walked); may be empty
+---@return flow.ir.Expr.call_extern
+function M.call_extern(ref, ...)
+    return { op = "call_extern", ref = ref, args = { ... } }
+end
+
 -- ── Constructor API — Node ──────────────────────────────────────────
 --
 -- Node constructors take a single spec table (named args). `seq` is
@@ -383,14 +401,21 @@ end
 -- interpreter, which already use `in_` to avoid the Lua reserved word.
 
 --- `step` Node: host-escape effect; calls opts.dispatch(ref, input).
----@param spec { ref: string, out: string, in_: flow.ir.Expr? }
+---
+--- `out_schema` (optional alc_shapes T value) declares the expected
+--- dispatcher result shape. When present, exec runs `S.check(result,
+--- out_schema)` after dispatch and raises on mismatch — the IR Expr
+--- downstream may then path into the structured ctx with confidence.
+--- When nil, any result is accepted (legacy back-compat).
+---@param spec { ref: string, out: string, in_: flow.ir.Expr?, out_schema: table? }
 ---@return flow.ir.Node.step
 function M.step(spec)
     return {
-        kind = "step",
-        ref  = spec.ref,
-        out  = spec.out,
-        in_  = spec.in_,
+        kind       = "step",
+        ref        = spec.ref,
+        out        = spec.out,
+        in_        = spec.in_,
+        out_schema = spec.out_schema,
     }
 end
 
@@ -487,7 +512,7 @@ end
 --- The pkg-side contract is unchanged from §11.2 / `flow/token.lua`:
 --- handlers MAY echo `_flow_token` / `_flow_slot` in their result;
 --- verify is fail-open when echo is absent.
----@param spec { slot: flow.ir.Expr, ref: string, in_: flow.ir.Expr?, out: string, bound: boolean?, on_mismatch: flow.ir.Node? }
+---@param spec { slot: flow.ir.Expr, ref: string, in_: flow.ir.Expr?, out: string, bound: boolean?, on_mismatch: flow.ir.Node?, out_schema: table? }
 ---@return flow.ir.Node.wrap_step
 function M.wrap_step(spec)
     return {
@@ -498,6 +523,7 @@ function M.wrap_step(spec)
         out         = spec.out,
         bound       = spec.bound,
         on_mismatch = spec.on_mismatch,
+        out_schema  = spec.out_schema,
     }
 end
 
