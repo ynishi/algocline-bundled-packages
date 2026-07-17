@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-07-18
+
+### Added
+
+- **3 new Boost26 packages (26-generation boost suite) — package count
+  128 → 131**.
+  - **`refine_loop` (Reasoning)** — reflective draft → reflect → revise
+    loop with rubric-driven critique, `ACCEPT` early-stop, and a
+    first-round external eval-feedback hook (GEPA direction,
+    arXiv:2507.19457). Spec 16/16.
+  - **`verify_select` (Selection)** — generate-then-verify best-of-N:
+    n diverse candidates in one `alc.llm_batch` round-trip, then a
+    single rubric verifier pass emitting the structured
+    `Candidate/SELECTED/RATIONALE` verdict block. Spec 12/12.
+  - **`triangulate` (Validation / Analysis)** — agreement-checked
+    verification across N route-independent solution paths
+    (alternative decomposition / independent derivation /
+    reverse-computation check). Agreement confirms at zero verifier
+    cost; mismatch triggers a bounded reconsideration round;
+    persistent splits surface as `agreed = false`, never forced into
+    a winner. Spec 22/22.
+- **E2E scripts for the 3 new packages** (`scripts/e2e/{refine_loop,
+  verify_select,triangulate}.lua`, common.lua harness pattern). All
+  three verified green against the live LLM path via `just e2e <name>`
+  (5/5 graders each).
+- **`recipe_swarm_gate` pkg** — flow-composed generate → gate → refine
+  recipe, plus 4 flow example scripts
+  (`flow/doc/examples/{cascade_prune,coding_style,coevolve_adaptive,
+  ensemble_vote}.lua`) with examples spec and E2E smoke coverage.
+- **flow.ir intermediate surface (landed between v0.2.x and the
+  v0.8.0 entry below)** — `wrap_step` Node + Expr 3 ops
+  (`concat` / `add` / `get`), and AST full coverage across 7 axes
+  (`once` / `fail` / `assert` / `map` / `reduce` / `switch` / `try` /
+  `return_early` / collection Exprs).
+
 ### Changed
 
 - **`flow` v0.7.0 → v0.8.0 — flow.ir 2 axes land (call_extern Expr +
@@ -15,8 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **A. `call_extern` Expr (value-shape Hatch)** — new Expr op
     resolves a host-injected pure function by opaque `ref` through an
     `opts.externs` whitelist. Dissolves A1 regex_match / A2
-    json_decode / A4 array_append / A6b keys (issue
-    `edf05e72-3f85-4be1-9553-711ef79a6273`) without growing the Expr
+    json_decode / A4 array_append / A6b keys without growing the Expr
     op set per use case. Compile-time eager check when `opts.externs`
     is provided; deferred to exec otherwise (raises on missing
     registry / non-function value).
