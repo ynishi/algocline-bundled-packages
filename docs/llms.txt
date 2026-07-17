@@ -153,6 +153,7 @@
 
 ## refinement
 
+- [refine_loop](narrative/refine_loop.md): Reflective draft-reflect-revise loop with rubric and external-feedback hooks
 - [reflect](narrative/reflect.md): Self-critique loop — generate, critique, revise until convergence
 - [reflexion](narrative/reflexion.md): Episodic memory self-improvement — learns from failed attempts via verbal reinforcement. Each new attempt references accumulated reflections on past failures. reflect polishes; reflexion learns.
 - [s1](narrative/s1.md): Budget forcing — prompt-level approximation of Muennighoff 2025 §3 (Minimum + Maximum Token Enforcement).
@@ -181,6 +182,7 @@
 - [slm_mux](narrative/slm_mux.md): Complementarity-driven K-subset selection over a pool of small language models. Implements Wang et al. (arXiv:2510.05077, ICLR 2026 Poster) §3.1 Algorithm 1 (confidence-based inference selection) ...
 - [smc_sample](narrative/smc_sample.md): Block-level Sequential Monte Carlo sampling for LLM quality (Markovic-Voronov et al. 2026, arXiv:2604.16453). Reward-weighted importance sampling with ESS-triggered multinomial resampling and Metro...
 - [ucb](narrative/ucb.md): UCB1 hypothesis space exploration — generate, score, select, refine
+- [verify_select](narrative/verify_select.md): Generate-then-verify best-of-N selection via a rubric verifier
 
 ## simulation
 
@@ -216,3 +218,4 @@
 - [sprt](narrative/sprt.md): Wald Sequential Probability Ratio Test — anytime 2-hypothesis stopping rule for Bernoulli streams with (α, β) error guarantees and Wald–Wolfowitz optimal E[N]. Complements cs_pruner (multi-ar...
 - [step_verify](narrative/step_verify.md): Step-level reasoning verification — PRM-style LLM-as-Verifier that scores each reasoning step independently. Identifies the first point of failure and re-derives from the last correct step.
 - [think_prm](narrative/think_prm.md): ThinkPRM verifier — per-step thinking chain + \boxed{correct|incorrect} verdicts (Khalifa 2025 §4 / Figure 21, training-free path).
+- [triangulate](narrative/triangulate.md): Agreement-checked verification across N independent solution paths

@@ -43,7 +43,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 
 **Rule of thumb for new pkgs**: if the pkg calls `alc.llm`, it is a Strategy and MUST use ctx-threading. If the pkg is a pure calculation with no LLM call, it is a Computation pkg and SHOULD use direct-args. Frames are rare and require explicit design review.
 
-## Packages (128)
+## Packages (131)
 
 ### Reasoning
 
@@ -53,6 +53,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[maieutic](maieutic/)** | Recursive explanation tree with logical consistency filtering. Generates supporting/opposing arguments recursively and eliminates contradictions | Jung et al. (2022) |
 | **[reflect](reflect/)** | Iterative self-critique loop. Generate, critique, and revise within a single attempt until convergence. Polishes the current draft | Madaan et al., "Self-Refine" (2023) |
 | **[reflexion](reflexion/)** | Episodic memory self-improvement. Multiple independent attempts where failures are reflected on and stored as lessons. Each new attempt references accumulated reflections. reflect polishes one draft; reflexion learns across attempts. HumanEval 67%→91% | Shinn et al. (NeurIPS 2023) |
+| **[refine_loop](refine_loop/)** | Reflective draft→reflect→revise loop with rubric-driven critique and ACCEPT early-stop. reflect polishes until a convergence marker; refine_loop adds rubric injection plus a first-round external eval-feedback hook (GEPA direction: textual eval feedback steers refinement) | Agrawal et al., "GEPA" (arXiv:2507.19457, 2025) |
 | **[calibrate](calibrate/)** | Confidence-gated adaptive reasoning. Escalates to sc/panel/retry when confidence falls below threshold | CISC (ACL Findings 2025) |
 | **[plan_solve](plan_solve/)** | Plan-and-Solve. Devises an explicit step-by-step plan, then executes each step sequentially. More structured than CoT, lighter than decompose | Wang et al. (2023) |
 | **[faithful](faithful/)** | Faithful CoT. Translates reasoning into formal representation (code/logic) for verification, then answers grounded in verified output | Lyu et al. (2023), Gao et al. "PAL" (2023) |
@@ -83,6 +84,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | Package | Description | Based On |
 |---------|-------------|----------|
 | **[sc](sc/)** | Self-Consistency. Independently samples multiple reasoning paths and aggregates by majority vote. Best for tasks with canonical answer formats (numbers, options) | Wang et al. (2022) |
+| **[verify_select](verify_select/)** | Generate-then-verify best-of-N. Samples n diverse candidates in one parallel round-trip (`alc.llm_batch`), then a single rubric verifier scores all candidates and selects the best with a rationale. sc tallies identical answers; verify_select picks the highest-quality answer when candidates diverge | — |
 | **[usc](usc/)** | Universal Self-Consistency. Extends SC to free-form tasks by having LLM select the most consistent response instead of majority voting. Works on open-ended QA, summarization, code generation where SC's answer extraction fails. Mathematically, majority vote is a special case of USC | Chen et al. (ICML 2024), Google DeepMind |
 | **[mbr_select](mbr_select/)** | Minimum Bayes Risk selection. Computes pairwise similarity for all candidate pairs and selects the one with highest expected agreement. Bayes-optimal under decision theory — no bracket luck or position bias unlike tournament-based rank. O(N²/2) but theoretically optimal | MBR (NAACL 2025), Eikema & Aziz (2020) |
 | **[ucb](ucb/)** | UCB1 hypothesis exploration. Generates, scores, and refines hypotheses using UCB1 selection | — |
@@ -160,6 +162,7 @@ The *Packages* section below groups pkgs by **functional category** (Reasoning /
 | **[sprt](sprt/)** | Wald's Sequential Probability Ratio Test primitive. Streaming Bernoulli test with declared α/β error rates; Wald–Wolfowitz optimality (minimal expected N among tests with same error bounds). Substrate for adaptive-stop recipes that need to decide accept_h0 / accept_h1 / continue per observation | Wald (1945), Wald & Wolfowitz (1948) |
 | **[conformal_vote](conformal_vote/)** | Split conformal prediction gate for multi-agent deliberation. Linear opinion pool + finite-sample quantile (⌈(n+1)(1-α)⌉/n) + three-way decision (commit/escalate/anomaly) per Proposition 3. Pr[Y ∈ C(X)] ≥ 1-α (Theorem 2). Calibration pins aggregation weights so online runs preserve exchangeability | Wang et al. (arXiv:2604.07667, 2026) |
 | **[propose_verify](propose_verify/)** | Universal 2-call Propose→Verify primitive. Proposer generates a candidate at creative temperature (0.7), independent verifier scores it at deterministic temperature (0.0) and emits `ACCEPT/SCORE/RATIONALE`. Caller-required `score_threshold` produces `DONE path=accepted | rejected` verdict compatible with swarm_frame aggregation. Three-domain cement (LATS planning / tool calling / speculative decoding) | Cobbe et al. (2021) §3, LATS (Zhou 2023) §3.2 |
+| **[triangulate](triangulate/)** | Agreement-checked verification across N independent solution paths (alternative decomposition / independent derivation / reverse-computation check). Agreement confirms the answer with zero verifier cost; on mismatch only, a bounded reconsideration round runs. A persistent split is surfaced via `agreed=false`, never forced into a winner | — |
 
 ### Orchestration
 

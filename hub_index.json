@@ -1,6 +1,6 @@
 {
   "schema_version": "hub_index/v0",
-  "updated_at": "2026-06-21T06:30:34Z",
+  "updated_at": "2026-07-17T17:07:15Z",
   "packages": [
     {
       "name": "ab_mcts",
@@ -1464,6 +1464,21 @@
       "best_card": null
     },
     {
+      "name": "refine_loop",
+      "version": "0.1.0",
+      "description": "Reflective draft-reflect-revise loop with rubric and external-feedback hooks",
+      "category": "refinement",
+      "docstring": "refine_loop(RefineLoop) — reflective refinement loop for 26-generation models\n\nA boost strategy that iterates draft -> reflection -> revise until the\nreflection stage signals acceptance or an iteration cap is reached. It is a\nsingle-strategy distillation of GEPA-style reflective refinement: linguistic\nself-reflection carries denser learning signal than a sparse scalar reward,\nwhich makes each round more sample-efficient than reward-only tuning.\n\n## Usage\n\n```lua\nlocal refine_loop = require(\"refine_loop\")\nreturn refine_loop.run({ task = \"Explain CAP theorem tradeoffs.\" })\n```\n\n## Algorithm\n\n1. **Draft** — one `alc.llm` pass produces the initial answer.\n2. **Reflection** — one `alc.llm` pass critiques the current draft against\nthe rubric (and, on the first round only, any external eval feedback). If\nthe draft fully satisfies the rubric the reflection returns the literal\nASCII marker `ACCEPT`, which triggers early-stop (no revise that round).\n3. **Revise** — when the reflection did not accept, one `alc.llm` pass\nrewrites the draft addressing the critique. Steps 2-3 repeat up to\n`max_iterations` times.\n\n## API\n\n- `ctx.task`           — string, required. Empty / whitespace-only → error.\n- `ctx.max_iterations` — number, optional. Max reflection→revise cycles\n(default 2).\n- `ctx.rubric`         — string, optional. Critique criteria injected verbatim\ninto every reflection prompt. Omitted → a generic quality rubric.\n- `ctx.feedback`       — string, optional. External eval feedback injected\ninto the FIRST reflection prompt only (eval-driven refinement v0 hook).\n\nResult (`ctx.result`):\n- `final`           — string, the final (possibly revised) answer.\n- `iterations_used` — number, how many reflection rounds ran.\n- `accepted`        — boolean, whether a reflection returned `ACCEPT`.\n- `history`         — table `{ draft = string, iterations = [ { index,\nreflection, revision?, accepted } ] }` recording every stage.\n\n## Comparison with related packages\n\nvs `reflect` (SelfRefine, Madaan 2023): `reflect` critiques with a\nconvergence marker (`NO_MAJOR_ISSUES`) and no external-signal hook. This\npackage adds a rubric-driven reflection prompt plus a `ctx.feedback` channel\nso an external evaluator's verdict can steer the first reflection — the GEPA\ndirection of feeding textual eval feedback back into refinement.\n\n## References\n\n- Agrawal et al. (2025). \"GEPA: Reflective Prompt Evolution Can Outperform\nReinforcement Learning.\" arXiv:2507.19457.",
+      "tags": null,
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "reflect",
       "version": "0.1.0",
       "description": "Self-critique loop — generate, critique, revise until convergence",
@@ -1884,6 +1899,25 @@
       "best_card": null
     },
     {
+      "name": "triangulate",
+      "version": "0.1.0",
+      "description": "Agreement-checked verification across N independent solution paths",
+      "category": "validation",
+      "docstring": "triangulate(Triangulate) — agreement-checked verification across N independent solution paths\n\nSolve the same task N times via deliberately independent methods (alternative\ndecomposition / independent derivation / reverse-computation check) and compare\nthe structured answers. When the paths agree, the answer is confirmed with no\nverifier call and no extra cost; when they disagree, only the mismatch is fed\nback into a bounded reconsideration loop, so verification cost is paid only when\nan error actually exists.\n\n## Usage\n\n```lua\nlocal triangulate = require(\"triangulate\")\nreturn triangulate.run({ task = \"Compute the number of trailing zeros in 100!.\" })\n```\n\n## Algorithm\n\n1. **Diversify** — build N method hints. When `ctx.methods` is given, each hint\ndrives one path (path count = `#ctx.methods`). Otherwise a default persona\ngroup is used whose hints explicitly induce route independence.\n2. **Solve in parallel** — one `alc.llm_batch` round-trip runs all N paths at\nonce. Each path is instructed to end with a single `ANSWER:` marker line so\nthe final answer can be extracted structurally.\n3. **Agreement check** — extract each path's `ANSWER:` answer, normalize it\n(trim / lowercase / whitespace-collapse / trailing-punctuation strip), and\ntest for an exact match across all paths. Agreement → confirmed, stop.\n4. **Reconsider on mismatch** — when paths disagree, present the per-path answers\n(the mismatch points) back to every path and re-solve in another parallel\nround, up to `ctx.max_rounds` times. If the paths still split, the result is\nreturned with `agreed = false` — the disagreement is surfaced, never hidden.\n\n## API\n\n- `ctx.task`       — string, required. Empty / whitespace-only → error.\n- `ctx.n`          — number, optional. Independent path count (default 2).\nIgnored when `ctx.methods` is provided (its length wins).\n- `ctx.methods`    — string array, optional. Per-path method hints. Omitted →\na default persona group that induces route independence.\n- `ctx.max_rounds` — number, optional. Max reconsideration rounds after the\ninitial solve when paths disagree (default 1). Total solve rounds ≤\n`1 + max_rounds`.\n\nResult (`ctx.result`):\n- `final`       — string, the confirmed answer when agreed; otherwise the final\nround's plurality answer (path 1 wins ties).\n- `agreed`      — boolean, whether the final round's paths reached exact match.\n- `rounds_used` — number, solve rounds executed (initial round counts as 1).\n- `answers`     — string array, the final round's per-path extracted answers.\n- `history`     — array of `{ round, results = [ { method, answer, raw } ] }`\nrecording every round's per-path method, extracted answer, and raw response.\n\n## Comparison with related packages\n\nvs `verify_select` (selection): `verify_select` generates N candidates then\nspends a dedicated verifier pass to *select* the best — verification cost is\nalways paid. This spends no verifier: agreement across independent paths *is*\nthe acceptance signal, so the deterministic (already-agreeing) regime costs\nonly the N parallel solves.\n\nvs `sc` (self-consistency, majority vote): `sc` samples the *same* method many\ntimes and tallies identical answers, so correlated mistakes (a shared reasoning\nflaw) survive the vote. Triangulation instead varies the *method* per path — the\nclassic surveying idea of fixing a point from independent bearings — so\nindependent routes must coincidentally share an error to agree wrongly, which\nis far less likely than a majority of same-method samples repeating one mistake.\n\n## Caveats\n\n- Agreement is only as strong as the route independence. With `ctx.methods`\nomitted the default persona group is engineered to pull paths apart; supplying\nnear-identical `ctx.methods` collapses the guarantee toward `sc`-style\ncorrelated voting.\n- The per-call token budget (`ctx.solve_tokens`, default 500) is an\nimplementation knob left undeclared in `M.spec`; it bounds each path's\nresponse and is not part of the stable contract.\n- On a persistent split the result reports `agreed = false` rather than forcing\na winner. Callers that must always act should branch on `agreed` and treat\n`final` (the plurality / path-1 answer) as a low-confidence fallback.",
+      "tags": [
+        "verification",
+        "triangulation",
+        "primitive"
+      ],
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
       "name": "ucb",
       "version": "0.1.0",
       "description": "UCB1 hypothesis space exploration — generate, score, select, refine",
@@ -1919,6 +1953,21 @@
       "description": "Verification-First prompting — verify a candidate answer before generating, reducing logical errors via reverse reasoning",
       "category": "reasoning",
       "docstring": "verify_first(VerifyFirst) — verification-first prompting\n\nProvides a candidate answer (trivial, random, or CoT-generated),\nthen instructs the LLM to verify it before generating the real\nanswer. Reverse reasoning is cognitively easier than forward\ngeneration and reduces logical errors by overcoming egocentric\nbias. Supports iterative mode (Iter-VF): a Markovian\nverify→extract→re-verify loop that scales test-time compute without\ncontext overflow.\n\n## Usage\n\n```lua\nlocal verify_first = require(\"verify_first\")\nreturn verify_first.run(ctx)\n```\n\n## Algorithm\n\n1. Generate — produce an initial candidate answer (CoT or trivial).\n2. Verify — \"a possible answer is X; first verify if X is correct,\nthen think step by step to find the answer\".\n3. Iter-VF (optional) — repeat step 2 with the extracted answer\nfrom the previous round.\n\n## References\n\n- \"Asking LLMs to Verify First is Almost Free Lunch\" (2025).\nhttps://arxiv.org/abs/2511.21734\nctx.trivial: Use trivial candidate \"1\" instead of CoT (default: false)\nctx.iterations: Number of Iter-VF rounds (default: 1, i.e. single VF)\nctx.gen_tokens: Max tokens for generation (default: 600)\nctx.verify_tokens: Max tokens for verification (default: 800)",
+      "tags": null,
+      "type": "runnable",
+      "type_source": null,
+      "source": {
+        "type": "unknown"
+      },
+      "card_count": 0,
+      "best_card": null
+    },
+    {
+      "name": "verify_select",
+      "version": "0.1.0",
+      "description": "Generate-then-verify best-of-N selection via a rubric verifier",
+      "category": "selection",
+      "docstring": "verify_select(VerifySelect) — generate-then-verify best-of-N selection\n\nA boost strategy aimed at 26-generation models, positioned as a successor\nto self-consistency (`sc`, majority vote). Instead of tallying identical\nanswers, it samples `n` diverse candidates in a single parallel round-trip\n(`alc.llm_batch`), then runs a single verifier pass (`alc.llm`) that scores\nevery candidate against a rubric and selects the best with a rationale.\n\n## Usage\n\n```lua\nlocal vs = require(\"verify_select\")\nreturn vs.run(ctx)\n```\n\n## Algorithm\n\n1. Generate `n` candidates in one `alc.llm_batch` round-trip. Each batch\nitem carries a distinct system persona to induce diversity (temperature\ndiversity is assumed on the host side).\n2. Run one `alc.llm` verifier pass. The verifier receives ALL candidates\nplus the rubric, scores each 0-10, and emits a structured verdict block\nwith `SELECTED:` and `RATIONALE:` markers.\n3. Parse the verdict block into per-candidate `{ index, score, verdict }`\nrecords, resolve the selected candidate, and return it with the rationale.\n\n## API\n\n- `ctx.task`   — string, required. Empty / whitespace-only → error.\n- `ctx.n`      — number, optional. Candidate count (default 3).\n- `ctx.rubric` — string, optional. Selection criteria injected verbatim\ninto the verifier prompt. Omitted → a generic accuracy/completeness rubric.\n\nResult (`ctx.result`):\n- `selected`   — string, the winning candidate text.\n- `candidates` — number, how many candidates were generated.\n- `verdicts`   — array of `{ index, score, verdict }`, one per candidate.\n- `rationale`  — string, the verifier's justification for the selection.\n\n## Comparison with related packages\n\nvs `sc`: `sc` deterministically majority-votes identical answers. This\npicks the highest-quality answer via a rubric verifier — better when\ncandidates diverge in quality rather than converging on one answer.\n\nvs `rank`: `rank` runs an O(n) pairwise elimination tournament (many\n`alc.llm` calls). This uses a single verifier pass over all candidates\n(2 round-trips total) — cheaper, at the cost of pairwise granularity.",
       "tags": null,
       "type": "runnable",
       "type_source": null,

@@ -7283,6 +7283,93 @@ Returns:
 
 ---
 
+<!-- ── refine_loop.md ── -->
+
+
+# refine_loop(RefineLoop) — reflective refinement loop for 26-generation models
+
+> A boost strategy that iterates draft -> reflection -> revise until the reflection stage signals acceptance or an iteration cap is reached. It is a single-strategy distillation of GEPA-style reflective refinement: linguistic self-reflection carries denser learning signal than a sparse scalar reward, which makes each round more sample-efficient than reward-only tuning.
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [API](#api)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [References](#references)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local refine_loop = require("refine_loop")
+return refine_loop.run({ task = "Explain CAP theorem tradeoffs." })
+```
+
+## Algorithm {#algorithm}
+
+1. **Draft** — one `alc.llm` pass produces the initial answer.
+2. **Reflection** — one `alc.llm` pass critiques the current draft against
+   the rubric (and, on the first round only, any external eval feedback). If
+   the draft fully satisfies the rubric the reflection returns the literal
+   ASCII marker `ACCEPT`, which triggers early-stop (no revise that round).
+3. **Revise** — when the reflection did not accept, one `alc.llm` pass
+   rewrites the draft addressing the critique. Steps 2-3 repeat up to
+   `max_iterations` times.
+
+## API {#api}
+
+- `ctx.task`           — string, required. Empty / whitespace-only → error.
+- `ctx.max_iterations` — number, optional. Max reflection→revise cycles
+  (default 2).
+- `ctx.rubric`         — string, optional. Critique criteria injected verbatim
+  into every reflection prompt. Omitted → a generic quality rubric.
+- `ctx.feedback`       — string, optional. External eval feedback injected
+  into the FIRST reflection prompt only (eval-driven refinement v0 hook).
+
+Result (`ctx.result`):
+- `final`           — string, the final (possibly revised) answer.
+- `iterations_used` — number, how many reflection rounds ran.
+- `accepted`        — boolean, whether a reflection returned `ACCEPT`.
+- `history`         — table `{ draft = string, iterations = [ { index,
+  reflection, revision?, accepted } ] }` recording every stage.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `reflect` (SelfRefine, Madaan 2023): `reflect` critiques with a
+convergence marker (`NO_MAJOR_ISSUES`) and no external-signal hook. This
+package adds a rubric-driven reflection prompt plus a `ctx.feedback` channel
+so an external evaluator's verdict can steer the first reflection — the GEPA
+direction of feeding textual eval feedback back into refinement.
+
+## References {#references}
+
+- Agrawal et al. (2025). "GEPA: Reflective Prompt Evolution Can Outperform
+  Reinforcement Learning." arXiv:2507.19457.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.feedback` | string | optional | External eval feedback injected into the first reflection prompt only (eval-driven refinement hook) |
+| `ctx.max_iterations` | number | optional | Maximum reflection->revise cycles (default: 2) |
+| `ctx.rubric` | string | optional | Critique criteria injected into every reflection prompt (default: generic quality rubric) |
+| `ctx.task` | string | **required** | The task to refine (required, non-empty) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `accepted` | boolean | — | True if a reflection returned the ACCEPT marker |
+| `final` | string | — | Final (possibly revised) answer |
+| `history` | shape { draft: string, iterations: array of shape { accepted: boolean, index: number, reflection: string, revision?: string } } | — | Full record of draft and each reflection/revision |
+| `iterations_used` | number | — | Number of reflection rounds executed |
+
+---
+
 <!-- ── reflect.md ── -->
 
 
@@ -9495,6 +9582,117 @@ Returns:
 
 ---
 
+<!-- ── triangulate.md ── -->
+
+
+# triangulate(Triangulate) — agreement-checked verification across N independent solution paths
+
+> Solve the same task N times via deliberately independent methods (alternative decomposition / independent derivation / reverse-computation check) and compare the structured answers. When the paths agree, the answer is confirmed with no verifier call and no extra cost; when they disagree, only the mismatch is fed back into a bounded reconsideration loop, so verification cost is paid only when an error actually exists.
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [API](#api)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Caveats](#caveats)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local triangulate = require("triangulate")
+return triangulate.run({ task = "Compute the number of trailing zeros in 100!." })
+```
+
+## Algorithm {#algorithm}
+
+1. **Diversify** — build N method hints. When `ctx.methods` is given, each hint
+   drives one path (path count = `#ctx.methods`). Otherwise a default persona
+   group is used whose hints explicitly induce route independence.
+2. **Solve in parallel** — one `alc.llm_batch` round-trip runs all N paths at
+   once. Each path is instructed to end with a single `ANSWER:` marker line so
+   the final answer can be extracted structurally.
+3. **Agreement check** — extract each path's `ANSWER:` answer, normalize it
+   (trim / lowercase / whitespace-collapse / trailing-punctuation strip), and
+   test for an exact match across all paths. Agreement → confirmed, stop.
+4. **Reconsider on mismatch** — when paths disagree, present the per-path answers
+   (the mismatch points) back to every path and re-solve in another parallel
+   round, up to `ctx.max_rounds` times. If the paths still split, the result is
+   returned with `agreed = false` — the disagreement is surfaced, never hidden.
+
+## API {#api}
+
+- `ctx.task`       — string, required. Empty / whitespace-only → error.
+- `ctx.n`          — number, optional. Independent path count (default 2).
+  Ignored when `ctx.methods` is provided (its length wins).
+- `ctx.methods`    — string array, optional. Per-path method hints. Omitted →
+  a default persona group that induces route independence.
+- `ctx.max_rounds` — number, optional. Max reconsideration rounds after the
+  initial solve when paths disagree (default 1). Total solve rounds ≤
+  `1 + max_rounds`.
+
+Result (`ctx.result`):
+- `final`       — string, the confirmed answer when agreed; otherwise the final
+  round's plurality answer (path 1 wins ties).
+- `agreed`      — boolean, whether the final round's paths reached exact match.
+- `rounds_used` — number, solve rounds executed (initial round counts as 1).
+- `answers`     — string array, the final round's per-path extracted answers.
+- `history`     — array of `{ round, results = [ { method, answer, raw } ] }`
+  recording every round's per-path method, extracted answer, and raw response.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `verify_select` (selection): `verify_select` generates N candidates then
+spends a dedicated verifier pass to *select* the best — verification cost is
+always paid. This spends no verifier: agreement across independent paths *is*
+the acceptance signal, so the deterministic (already-agreeing) regime costs
+only the N parallel solves.
+
+vs `sc` (self-consistency, majority vote): `sc` samples the *same* method many
+times and tallies identical answers, so correlated mistakes (a shared reasoning
+flaw) survive the vote. Triangulation instead varies the *method* per path — the
+classic surveying idea of fixing a point from independent bearings — so
+independent routes must coincidentally share an error to agree wrongly, which
+is far less likely than a majority of same-method samples repeating one mistake.
+
+## Caveats {#caveats}
+
+- Agreement is only as strong as the route independence. With `ctx.methods`
+  omitted the default persona group is engineered to pull paths apart; supplying
+  near-identical `ctx.methods` collapses the guarantee toward `sc`-style
+  correlated voting.
+- The per-call token budget (`ctx.solve_tokens`, default 500) is an
+  implementation knob left undeclared in `M.spec`; it bounds each path's
+  response and is not part of the stable contract.
+- On a persistent split the result reports `agreed = false` rather than forcing
+  a winner. Callers that must always act should branch on `agreed` and treat
+  `final` (the plurality / path-1 answer) as a low-confidence fallback.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.max_rounds` | number | optional | Maximum reconsideration rounds after the initial solve when paths disagree (default: 1; implementation choice — one re-convergence attempt bounds worst-case cost; total solve rounds <= 1 + max_rounds) |
+| `ctx.methods` | array of string | optional | Per-path method hints, one path per entry (path count becomes #methods). Omitted → a default persona group whose hints induce route independence (alternative decomposition / independent derivation / reverse-computation check) |
+| `ctx.n` | number | optional | Number of independent solution paths (default: 2; implementation choice — two paths already surface a disagreement while holding cost at 2x; ignored when ctx.methods is provided, whose length sets the path count) |
+| `ctx.task` | string | **required** | Task/problem to solve and triangulate (required, non-empty) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `agreed` | boolean | — | True if the final round's paths reached an exact normalized match |
+| `answers` | array of string | — | Final round's per-path extracted answers |
+| `final` | string | — | Confirmed answer when agreed; otherwise the final round's plurality answer (path 1 wins ties) |
+| `history` | array of shape { results: array of shape { answer: string, method: string, raw: string }, round: number } | — | Ordered per-round record of every path's method/answer/raw |
+| `rounds_used` | number | — | Solve rounds executed (initial round counts as 1) |
+
+---
+
 <!-- ── ucb.md ── -->
 
 
@@ -9668,5 +9866,83 @@ Returns:
 | `extracted_answer` | string | — | Answer extracted from the final verification |
 | `history` | array of shape { extracted_answer: string, input_candidate: string, round: number, verification: string } | — | Per-round Markovian trace: candidate in, verification out, extracted answer |
 | `iterations` | number | — | Number of Iter-VF rounds actually executed |
+
+---
+
+<!-- ── verify_select.md ── -->
+
+
+# verify_select(VerifySelect) — generate-then-verify best-of-N selection
+
+> A boost strategy aimed at 26-generation models, positioned as a successor to self-consistency (`sc`, majority vote). Instead of tallying identical answers, it samples `n` diverse candidates in a single parallel round-trip (`alc.llm_batch`), then runs a single verifier pass (`alc.llm`) that scores every candidate against a rubric and selects the best with a rationale.
+
+## Contents
+
+- [Usage](#usage)
+- [Algorithm](#algorithm)
+- [API](#api)
+- [Comparison with related packages](#comparison-with-related-packages)
+- [Parameters](#parameters)
+- [Result](#result)
+
+## Usage {#usage}
+
+```lua
+local vs = require("verify_select")
+return vs.run(ctx)
+```
+
+## Algorithm {#algorithm}
+
+1. Generate `n` candidates in one `alc.llm_batch` round-trip. Each batch
+   item carries a distinct system persona to induce diversity (temperature
+   diversity is assumed on the host side).
+2. Run one `alc.llm` verifier pass. The verifier receives ALL candidates
+   plus the rubric, scores each 0-10, and emits a structured verdict block
+   with `SELECTED:` and `RATIONALE:` markers.
+3. Parse the verdict block into per-candidate `{ index, score, verdict }`
+   records, resolve the selected candidate, and return it with the rationale.
+
+## API {#api}
+
+- `ctx.task`   — string, required. Empty / whitespace-only → error.
+- `ctx.n`      — number, optional. Candidate count (default 3).
+- `ctx.rubric` — string, optional. Selection criteria injected verbatim
+  into the verifier prompt. Omitted → a generic accuracy/completeness rubric.
+
+Result (`ctx.result`):
+- `selected`   — string, the winning candidate text.
+- `candidates` — number, how many candidates were generated.
+- `verdicts`   — array of `{ index, score, verdict }`, one per candidate.
+- `rationale`  — string, the verifier's justification for the selection.
+
+## Comparison with related packages {#comparison-with-related-packages}
+
+vs `sc`: `sc` deterministically majority-votes identical answers. This
+picks the highest-quality answer via a rubric verifier — better when
+candidates diverge in quality rather than converging on one answer.
+
+vs `rank`: `rank` runs an O(n) pairwise elimination tournament (many
+`alc.llm` calls). This uses a single verifier pass over all candidates
+(2 round-trips total) — cheaper, at the cost of pairwise granularity.
+
+## Parameters {#parameters}
+
+| key | type | required | description |
+|---|---|---|---|
+| `ctx.n` | number | optional | Number of candidates to generate (default: 3) |
+| `ctx.rubric` | string | optional | Selection criteria injected into the verifier prompt (default: generic accuracy/completeness rubric) |
+| `ctx.task` | string | **required** | Problem to solve (required, non-empty) |
+
+## Result {#result}
+
+Returns:
+
+| key | type | optional | description |
+|---|---|---|---|
+| `candidates` | number | — | Number of candidates generated |
+| `rationale` | string | — | Verifier justification for the selection |
+| `selected` | string | — | The winning candidate text |
+| `verdicts` | array of shape { index: number, score: number, verdict: string } | — | Per-candidate verifier records |
 
 ---

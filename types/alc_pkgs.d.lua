@@ -1171,6 +1171,18 @@
 ---@field tally { answer: string, count: number, weight: number }[] @Vote tally at termination round
 ---@field total_llm_calls number @Total LLM calls actually made
 
+---@class AlcPkgInput_refine_loop
+---@field feedback? string @External eval feedback injected into the first reflection prompt only (eval-driven refinement hook)
+---@field max_iterations? number @Maximum reflection->revise cycles (default: 2)
+---@field rubric? string @Critique criteria injected into every reflection prompt (default: generic quality rubric)
+---@field task string @The task to refine (required, non-empty)
+
+---@class AlcPkgResult_refine_loop
+---@field accepted boolean @True if a reflection returned the ACCEPT marker
+---@field final string @Final (possibly revised) answer
+---@field history { draft: string, iterations: { accepted: boolean, index: number, reflection: string, revision?: string }[] } @Full record of draft and each reflection/revision
+---@field iterations_used number @Number of reflection rounds executed
+
 ---@class AlcPkgInput_reflect
 ---@field critique_tokens? number @Max tokens for critique (default: 300)
 ---@field gen_tokens? number @Max tokens for generation (default: 500)
@@ -1499,6 +1511,19 @@
 ---@field verdict string @Full verdict text from the judge
 ---@field winner string @Parsed winner token ("proponent"|"opponent"|"draw"|"unknown")
 
+---@class AlcPkgInput_triangulate
+---@field max_rounds? number @Maximum reconsideration rounds after the initial solve when paths disagree (default: 1; implementation choice — one re-convergence attempt bounds worst-case cost; total solve rounds <= 1 + max_rounds)
+---@field methods? string[] @Per-path method hints, one path per entry (path count becomes #methods). Omitted → a default persona group whose hints induce route independence (alternative decomposition / independent derivation / reverse-computation check)
+---@field n? number @Number of independent solution paths (default: 2; implementation choice — two paths already surface a disagreement while holding cost at 2x; ignored when ctx.methods is provided, whose length sets the path count)
+---@field task string @Task/problem to solve and triangulate (required, non-empty)
+
+---@class AlcPkgResult_triangulate
+---@field agreed boolean @True if the final round's paths reached an exact normalized match
+---@field answers string[] @Final round's per-path extracted answers
+---@field final string @Confirmed answer when agreed; otherwise the final round's plurality answer (path 1 wins ties)
+---@field history { results: { answer: string, method: string, raw: string }[], round: number }[] @Ordered per-round record of every path's method/answer/raw
+---@field rounds_used number @Solve rounds executed (initial round counts as 1)
+
 ---@class AlcPkgInput_ucb
 ---@field n? number @Number of hypotheses to generate (default: 3)
 ---@field rounds? number @Number of evaluate+refine rounds (default: 2)
@@ -1534,3 +1559,14 @@
 ---@field extracted_answer string @Answer extracted from the final verification
 ---@field history { extracted_answer: string, input_candidate: string, round: number, verification: string }[] @Per-round Markovian trace: candidate in, verification out, extracted answer
 ---@field iterations number @Number of Iter-VF rounds actually executed
+
+---@class AlcPkgInput_verify_select
+---@field n? number @Number of candidates to generate (default: 3)
+---@field rubric? string @Selection criteria injected into the verifier prompt (default: generic accuracy/completeness rubric)
+---@field task string @Problem to solve (required, non-empty)
+
+---@class AlcPkgResult_verify_select
+---@field candidates number @Number of candidates generated
+---@field rationale string @Verifier justification for the selection
+---@field selected string @The winning candidate text
+---@field verdicts { index: number, score: number, verdict: string }[] @Per-candidate verifier records
