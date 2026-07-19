@@ -181,6 +181,7 @@
 - [setwise_rank](narrative/setwise_rank.md): Setwise tournament reranking — LLM picks the best from small sets and winners advance. Mid-cost/mid-accuracy sweet spot between listwise and pairwise. Resolves calibration issue.
 - [slm_mux](narrative/slm_mux.md): Complementarity-driven K-subset selection over a pool of small language models. Implements Wang et al. (arXiv:2510.05077, ICLR 2026 Poster) §3.1 Algorithm 1 (confidence-based inference selection) ...
 - [smc_sample](narrative/smc_sample.md): Block-level Sequential Monte Carlo sampling for LLM quality (Markovic-Voronov et al. 2026, arXiv:2604.16453). Reward-weighted importance sampling with ESS-triggered multinomial resampling and Metro...
+- [speculative_rejection](narrative/speculative_rejection.md): Iterative reward-pruned best-of-N selection (Sun 2024 speculative rejection, adapted to alc.llm call granularity)
 - [ucb](narrative/ucb.md): UCB1 hypothesis space exploration — generate, score, select, refine
 - [verify_select](narrative/verify_select.md): Generate-then-verify best-of-N selection via a rubric verifier
 
@@ -203,6 +204,7 @@
 ## synthesis
 
 - [dci](narrative/dci.md): Deliberative Collective Intelligence with typed epistemic acts
+- [debate](narrative/debate.md): Adversarial two-debater protocol with a terminal judge verdict
 - [panel](narrative/panel.md): Multi-perspective deliberation with distinct roles and moderator synthesis.
 
 ## validation

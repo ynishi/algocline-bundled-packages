@@ -428,6 +428,20 @@
 
 ---@alias AlcPkgResult_dci AlcResultDeliberated
 
+---@class AlcPkgInput_debate
+---@field judge_criteria? string @Rubric injected into the judge prompt (default: truthfulness-focused rubric — implementation choice echoing Khan 2024's "more truthful answers" framing, paper does not fix a literal rubric string)
+---@field position_a? string @Debater A's assigned stance (default: affirmative placeholder; Khan 2024 §3 assigns concrete opposing propositions per question, so callers should inject question-specific stances)
+---@field position_b? string @Debater B's assigned stance (default: negative placeholder; same provenance note as position_a)
+---@field question string @Question under debate (required, non-empty)
+---@field rounds? number @Number of full A/B round pairs (default: 3; Khan 2024 §3 Table 2 canonical setting)
+
+---@class AlcPkgResult_debate
+---@field rationale string @Judge's justification for the verdict
+---@field rounds_used number @Number of full A/B round pairs executed
+---@field transcript { argument: string, round: number, side: string }[] @Ordered debate transcript, length = 2 * rounds_used
+---@field verdict string @One-line judge decision
+---@field winner string @Judge's verdict: "A" or "B" (falls back to "A" with alc.log warn when unparseable)
+
 ---@class AlcPkgInput_decompose
 ---@field max_subtasks? number @Maximum sub-tasks to generate (default: 5)
 ---@field merge_tokens? number @Max tokens for final merge (default: 600)
@@ -1408,6 +1422,22 @@
 ---@field section_count number @Count of sections parsed and filled
 ---@field sections string[] @Per-section LLM fills in the same order as skeleton
 ---@field skeleton string[] @Parsed section titles from skeleton (fallback: single-element = original task)
+
+---@class AlcPkgInput_speculative_rejection
+---@field alpha? number @Rejection ratio per round in [0, 1] (default: 0.5; Sun 2024 §4.1 canonical setting)
+---@field extend_tokens? number @Tokens added per extension round (default: 200; implementation choice sized to typical continuation budget between rejection checkpoints)
+---@field n? number @Initial candidate count (default: 8; implementation choice — paper uses N=1000 for token-level parallel decoding, but at alc.llm-call granularity 8 is a practical starting cost)
+---@field partial_tokens? number @Tokens per initial generation (default: 100; implementation choice — paper checkpoints at token positions, not call boundaries)
+---@field reward_rubric? string @Rubric injected verbatim into every scoring prompt (default: generic quality rubric; override for domain-specific reward)
+---@field rounds? number @Number of rejection stages (default: 3; implementation choice to bound alc.llm_batch cost — paper runs until decode completes at token level)
+---@field task string @Problem to solve (required, non-empty)
+
+---@class AlcPkgResult_speculative_rejection
+---@field candidates_final number @Number of candidates surviving the final rejection round
+---@field candidates_initial number @Initial candidate count
+---@field rationale string @Final selector's justification for the winning candidate
+---@field rejection_history { rejected_indices: number[], round: number, scores: number[], survivors_after: number, survivors_before: number }[] @Ordered per-round rejection records
+---@field selected string @The winning full completion
 
 ---@class AlcPkgInput_step_back
 ---@field abstraction_levels? number @Number of abstraction rounds (default: 1)
