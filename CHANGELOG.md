@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-07-20
+
+### Added
+
+- **2 new Boost26 packages (26-generation frontier verifier / selector
+  extension) — package count 131 → 133**.
+  - **`debate` (Synthesis)** — adversarial two-debater protocol with
+    a terminal judge verdict. Two debaters argue opposing positions
+    (`position_a` / `position_b`) for R rounds (default R=3, Khan
+    2024 §3 Table 2 canonical), each seeing the prior transcript.
+    A single judge then emits `WINNER: A/B` + rationale under a
+    truthfulness rubric. `alc.llm` call budget = 2R + 1 (7 at
+    defaults), sequential (not batchable — each debater sees prior
+    turns). Distinct from `panel` (deliberative multi-role
+    synthesis) / `dissent` (critique-of-draft asymmetry) / `triad`
+    (three mutually critical perspectives without a fixed winner)
+    — this enforces symmetric pro/con exchange with a forced
+    WINNER decision. Spec 19/19. Based on Khan et al. "Debating
+    with More Persuasive LLMs Leads to More Truthful Answers"
+    (ICML 2024 Best Paper, arXiv:2402.06782).
+  - **`speculative_rejection` (Selection)** — iterative
+    reward-pruned Best-of-N. Adapts Sun 2024 Algorithm 1
+    (token-level speculative rejection) to `alc.llm` call
+    granularity: each round runs one `alc.llm_batch`
+    generation/extension + one `alc.llm` reward scoring, then
+    rejects the bottom α fraction (default α=0.5, paper §4.1
+    canonical). Trades more sequential calls (7 vs 2 at defaults)
+    for fewer generation tokens on losers. NOT a strict Pareto
+    improvement over `verify_select` — Caveats section explicitly
+    documents the token→call granularity adaptation gap (paper's
+    ~24x speedup depends on shared token-level forward pass which
+    does not carry over to call granularity). Spec 31/31. Based on
+    Sun et al. "Fast Best-of-N Decoding via Speculative Rejection"
+    (NeurIPS 2024, arXiv:2410.20290).
+
 ## [0.30.0] - 2026-07-18
 
 ### Added
